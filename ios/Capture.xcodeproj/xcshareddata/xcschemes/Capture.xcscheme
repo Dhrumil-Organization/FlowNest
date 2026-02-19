@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "Capture.app"
-               BlueprintName = "Capture"
-               ReferencedContainer = "container:Capture.xcodeproj">
+               BuildableName = "FlowNest.app"
+               BlueprintName = "FlowNest"
+               ReferencedContainer = "container:FlowNest.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "CaptureTests.xctest"
-               BlueprintName = "CaptureTests"
-               ReferencedContainer = "container:Capture.xcodeproj">
+               BuildableName = "FlowNestTests.xctest"
+               BlueprintName = "FlowNestTests"
+               ReferencedContainer = "container:FlowNest.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Capture.app"
-            BlueprintName = "Capture"
-            ReferencedContainer = "container:Capture.xcodeproj">
+            BuildableName = "FlowNest.app"
+            BlueprintName = "FlowNest"
+            ReferencedContainer = "container:FlowNest.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Capture.app"
-            BlueprintName = "Capture"
-            ReferencedContainer = "container:Capture.xcodeproj">
+            BuildableName = "FlowNest.app"
+            BlueprintName = "FlowNest"
+            ReferencedContainer = "container:FlowNest.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

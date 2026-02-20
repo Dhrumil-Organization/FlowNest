@@ -1,97 +1,114 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+📱 FlowNest
 
-# Getting Started
+FlowNest is a native Android mobile application built using React Native CLI.
+The application runs on an Android Emulator or a physical Android device.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+🚀 Tech Stack
 
-## Step 1: Start Metro
+React Native (CLI)
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+Java JDK 17
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Android SDK
 
-```sh
-# Using npm
-npm start
+Node.js
 
-# OR using Yarn
-yarn start
-```
+Gradle
 
-## Step 2: Build and run your app
+📦 Prerequisites
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+Ensure the following are installed:
 
-### Android
+Node.js (v20+ recommended)
 
-```sh
-# Using npm
-npm run android
+npm (v10+)
 
-# OR using Yarn
-yarn android
-```
+Java JDK 17
 
-### iOS
+Android Studio (for SDK & Emulator)
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+Android Emulator or Physical Device
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+ADB configured in system PATH
 
-```sh
-bundle install
-```
+Verify setup:
 
-Then, and every time you update your native dependencies, run:
+node -v
+npm -v
+java -version
+adb devices
+🛠 Installation
 
-```sh
-bundle exec pod install
-```
+Clone the repository:
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+git clone <your-repository-url>
+cd FlowNest
 
-```sh
-# Using npm
-npm run ios
+Install dependencies:
 
-# OR using Yarn
-yarn ios
-```
+npm install
+▶️ Running the Application (Android)
+Step 1 – Start Metro Bundler
+npx react-native start
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Metro runs on port 8081 by default.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+Step 2 – Build & Run on Android
 
-## Step 3: Modify your app
+Open a new terminal window and run:
 
-Now that you have successfully run the app, let's make changes!
+npx react-native run-android
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+If multiple devices are connected:
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+npx react-native run-android --device emulator-5554
+🔄 Fast Refresh
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+Changes reflect instantly when files are saved.
 
-## Congratulations! :tada:
+Manual reload:
 
-You've successfully run and modified your React Native App. :partying_face:
+Press R twice in Emulator
 
-### Now what?
+Or Ctrl + M → Reload
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+🧹 Clean Build (If Build Fails)
+cd android
+gradlew clean
+cd ..
+npx react-native run-android
+⚙️ Android SDK Configuration (If Needed)
 
-# Troubleshooting
+If you encounter SDK location errors, ensure:
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+android/local.properties contains:
 
-# Learn More
+sdk.dir=C:\\Users\\YOUR_USERNAME\\AppData\\Local\\Android\\Sdk
+📁 Project Structure
+FlowNest/
+│
+├── android/        # Native Android code
+├── ios/            # iOS code (if applicable)
+├── App.tsx         # Main entry component
+├── package.json    # Dependencies & scripts
+└── node_modules/   # Installed packages
+📦 Generate Release APK
+cd android
+gradlew assembleRelease
 
-To learn more about React Native, take a look at the following resources:
+APK output path:
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+android/app/build/outputs/apk/release/
+📌 Important Notes
+
+This is a native Android mobile application.
+
+It does not run in a web browser.
+
+Android Emulator or physical device is required.
+
+Native modules require proper Android SDK setup.
+
+📄 License
+
+This project is private and proprietary.

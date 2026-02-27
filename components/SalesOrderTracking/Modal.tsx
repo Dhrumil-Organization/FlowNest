@@ -13,6 +13,7 @@ export interface CustomDrawerProps {
     // onLoadPressItem: () => void;
     exeData: ExeData[];
     designData: DesignData[];
+    getPartyData: any[];
     itemData: ItemData[];
     isLoading: boolean;
     setIsLoading: (loading: boolean) => void;

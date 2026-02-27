@@ -869,6 +869,20 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 </View>
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Authorised By:</Text>
+                        <Text style={crlimtreq_styles.Authvalue}>
+                            {item.AuthorisedBy || ''}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.AuthorisedDate || ''}
+                        </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
                         <Text style={crlimtreq_styles.Authvalue}>
                             {item.ARemark || ''}
@@ -957,6 +971,20 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                         <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.NetAmt || ''}:
+                        </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Authorised By:</Text>
+                        <Text style={crlimtreq_styles.Authvalue}>
+                            {item.AuthorisedBy || ''}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.AuthorisedDate || ''}
                         </Text>
                     </View>
                 </View>

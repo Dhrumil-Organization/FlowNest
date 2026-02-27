@@ -23,12 +23,14 @@ interface HeaderProps {
   userName: string;
   header?: string;
   subHeader?: string;
+  backNavigateScreen?: string;
 }
 
 const HeaderBarwithBack: React.FC<HeaderProps> = ({
   userName,
   header,
-  subHeader
+  subHeader,
+  backNavigateScreen = 'Home',
 }) => {
   const [isAvatarBarVisible, setIsAvatarBarVisible] = useState(false);
   const navigation = useNavigation<any>();
@@ -39,7 +41,7 @@ const HeaderBarwithBack: React.FC<HeaderProps> = ({
   };
 
   const handleBackPress = () => {
-    navigation.navigate('Home' as never);
+    navigation.navigate(backNavigateScreen as never);
   };
 
   const initial = (userName || 'U').charAt(0).toUpperCase();

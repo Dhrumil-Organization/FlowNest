@@ -161,12 +161,12 @@ const APP_SECTIONS = [
             { id: '17', name: 'Taka Checking Entry', screen: 'Taka Checking Entry', icon: 'dynamic-form', iconColor: '#5B2CFF' },
         ],
     },
-    // {
-    //     title: 'D',
-    //     data: [
-    //         { id: '17', name: 'Sales Order Tracking', screen: 'Sales Order Tracking', icon: 'track-changes', iconColor: '#DB945A' },
-    //     ],
-    // },
+    {
+        title: 'D',
+        data: [
+            { id: '17', name: 'Sales Order Tracking', screen: 'Sales Order Tracking', icon: 'track-changes', iconColor: '#DB945A' },
+        ],
+    },
     // 
 
 ];
@@ -491,7 +491,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
         return (
             <TouchableOpacity
                 style={[styles.appCard, { width: APP_BUTTON_WIDTH, marginRight: GAP }]}
-                onPress={() => navigation.navigate(item.screen)}
+                // onPress={() => navigation.navigate(item.screen)}
+                onPress={async () => {
+                    if (item.name === 'Sales Order Tracking') {
+                        await AsyncStorage.removeItem('sales_order_tracking_recently_viewed');
+                        await AsyncStorage.removeItem('sales_order_tracking_confirm_action');
+                        await AsyncStorage.removeItem('sales_order_tracking_card_press_');
+                        // await AsyncStorage.removeItem('sales_order_tracking_recently_viewed');
+                    }
+                    navigation.navigate(item.screen);
+                }}
                 disabled={disabled}
                 activeOpacity={0.85}
                 accessibilityLabel={`Open ${item.name}`}

@@ -1,0 +1,83 @@
+{
+    "Rajesh Traders": {
+      "summary": {
+        "totalValue": 16.50,
+        "deliveredValue": 12.85,
+        "pendingValue": 3.80,
+        "totalOrders": 5,
+        "overallDeliveryPercentage": 78,
+        "totalDeliveredAmount": 1385000,
+        "totalAmount": 1650000
+      },
+      "orders": [
+        {
+          "id": "SO-2025001",
+          "date": "01 Jul 2025",
+          "status": "Completed",
+          "total": 2.45,
+          "delivered": 2.45,
+          "challans": 3,
+          "qty": "800/800"
+        },
+        {
+          "id": "SO-2025002",
+          "date": "15 Jul 2025",
+          "status": "Partial",
+          "total": 3.80,
+          "delivered": 3.10,
+          "challans": 2,
+          "qty": "480/600"
+        },
+        {
+          "id": "SO-2025003",
+          "date": "07 Aug 2025",
+          "status": "Pending",
+          "total": 1.95,
+          "delivered": 0,
+          "challans": 0,
+          "qty": "0/400"
+        },
+        {
+          "id": "SO-2025004",
+          "date": "10 Aug 2025",
+          "status": "Partial",
+          "total": 5.20,
+          "delivered": 4.20,
+          "challans": 4,
+          "qty": "870/950"
+        },
+        {
+          "id": "SO-2025005",
+          "date": "01 Sep 2025",
+          "status": "Completed",
+          "total": 3.10,
+          "delivered": 3.10,
+          "challans": 3,
+          "qty": "310/310"
+        }
+      ]
+    },
+    "AMIR ENTERPRISES": {
+      "summary": {
+        "totalValue": 18.20,
+        "deliveredValue": 15.70,
+        "pendingValue": 2.50,
+        "totalOrders": 6,
+        "overallDeliveryPercentage": 86,
+        "totalDeliveredAmount": 1570000,
+        "totalAmount": 1820000
+      },
+      "orders": [
+        {
+          "id": "SO-2025006",
+          "date": "03 Jul 2025",
+          "status": "Completed",
+          "total": 3.10,
+          "delivered": 3.10,
+          "challans": 4,
+          "qty": "400/400"
+        }
+      ]
+    }
+  }
+  

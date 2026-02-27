@@ -151,8 +151,8 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
     const [initialModalVisible, setInitialModalVisible] = useState<boolean>(false);
     const [form, setForm] = useState({
         EDate: "",
-        PrpCode: "SIP",
-        AccCode: "10341",
+        PrpCode: "",
+        AccCode: "",
         AccName: "",
         BankName: "",
         BankBr: "",
@@ -628,6 +628,8 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
 
     };
 
+    console.log('🔵 selected form:', form, selectedProperty);
+
 
     const handleLoadPress = () => {
         const yearValue = selectedYear.split('-')[1].substring(2);
@@ -637,8 +639,8 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
             yearno: yearValue,
             prpcode: form.PrpCode,
             action: 'browse',
-            isauth: "1",
             txntype: "mob_collection",
+            prptype: selectedProperty?.PrpOf
         });
         const payload = {
             fromDate: fromDate.toISOString().split('T')[0],
@@ -647,36 +649,65 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
             prpcode: form.PrpCode,
             action: 'browse',
             txntype: "mob_collection",
+            prptype: selectedProperty?.PrpOf
         }
 
         fetchBrowseData(payload as any);
     };
 
 
-    const fetchBrowseData = async () => {
+    const fetchBrowseData = async (payload) => {
         setIsLoading(true);
 
-        try {
-            const response = await axios.get(
-                'https://das.tms-webapp.com/api/get-inquiries',
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'RN-Android', // 🔥 important
-                    },
-                    // withCredentials: false, // ✅ MUST
-                    // timeout: 20000,
-                }
-            );
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
 
-            console.log('🟢 inquiry response', response.data);
+        try {
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/inquiry_crud`, payload, { headers, cancelToken: cancelToken.token });
+            console.log('🔵 response', response);
 
             if (response.data?.success) {
-                setPOTData(response.data.data);
+                const inquiries = response.data.data.inquires.map(inquiry => {
+                    const partyData = inquiry.data[0];
+                    const firstItem = partyData.items[0];
+                    const firstShade = firstItem.shades[0];
+
+                    const items = partyData.items.map(item => {
+                        return {
+                            itemtitle: item.itemtitle,
+                            itemtitlecode: item.itemtitlecode,
+                            shades: item.shades,
+                        };
+                    });
+
+                    return {
+                        id: inquiry.id,
+                        prpcode: inquiry.prpcode,
+                        prptype: inquiry.prptype,
+                        yearno: inquiry.yearno,
+                        createdAt: inquiry.createdAt,
+                        status: firstShade.status,
+                        deliveryDate: firstShade.deliverydate,
+                        party: {
+                            partyname: partyData.partyname,
+                            partycode: partyData.partycode,
+                            items: items,
+                        },
+                    };
+                });
+
+                setPOTData(inquiries);
+                closeDrawer();
             } else {
                 setPOTData([]);
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error('❌ inquiry error', err?.response || err);
             Alert.alert(
                 'Server Error',
@@ -818,30 +849,30 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
 
 
 
-    useEffect(() => {
-        const yearValue = selectedYear.split('-')[1].substring(2);
-        const payload = {
-            // fromDate:   ,
-            // current data
-            fromDate: new Date().toISOString().split('T')[0],
-            toDate: new Date().toISOString().split('T')[0],
-            yearno: yearValue,
-            prpcode: '',
-            action: 'browse',
-            txntype: "mob_collection",
-        }
-        fetchBrowseData(payload);
-    }, []);
+    // useEffect(() => {
+    //     const yearValue = selectedYear.split('-')[1].substring(2);
+    //     const payload = {
+    //         // fromDate:   ,
+    //         // current data
+    //         fromDate: new Date().toISOString().split('T')[0],
+    //         toDate: new Date().toISOString().split('T')[0],
+    //         yearno: yearValue,
+    //         prpcode: '',
+    //         action: 'browse',
+    //         txntype: "mob_collection",
+    //     }
+    //     fetchBrowseData(payload);
+    // }, []);
 
 
     const handleAdd = async () => {
         // if (onEdit) { onEdit(item); return; }
         try {
             // await AsyncStorage.setItem('collection_edit', JSON.stringify(item));
-            await AsyncStorage.setItem('collection_mode', 'add');
+            // await AsyncStorage.setItem('collection_mode', 'add');
             // navigate if desired
             // @ts-ignore
-            navigation.navigate('CollectionAdd' as never);
+            navigation.navigate('InquiryAdd' as never);
         } catch (e) { console.error(e); Alert.alert('Error', 'Could not open editor.'); }
     };
 

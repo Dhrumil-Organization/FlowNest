@@ -35,16 +35,20 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     // onLoadPressItem,
     exeData,
     designData,
+    getPartyData,
     isLoading,
     onDesignSelect,
     onItemSelectItem,
+    onItemSelectParty,
     itemData,
     selectedItemStatus,
     onItemStatusChange,
     setSelectedDesigns,
     selectedDesigns,
     setSelectedItems,
-    selectedItems
+    selectedItems,
+    setSelectedParty,
+    selectedParty
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
@@ -59,14 +63,20 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     const [hasMore, setHasMore] = useState(true);
     const scrollViewRef = useRef<ScrollView>(null);
     const [isDesignAccordionOpen, setIsDesignAccordionOpen] = useState(false);
+    const [isPartyAccordionOpen, setIsPartyAccordionOpen] = useState(false);
     // 
     const [searchQueryItem, setSearchQueryItem] = useState('');
+    const [searchQueryParty, setSearchQueryParty] = useState('');
     // const [selectedItems, setSelectedItems] = useState<ItemData[]>([]);
     const [displayedItems, setDisplayedItems] = useState<ItemData[]>([]);
+    const [displayedParty, setDisplayedParty] = useState([]);
     const [isLoadingMoreItem, setIsLoadingMoreItem] = useState(false);
+    const [isLoadingMoreParty, setIsLoadingMoreParty] = useState(false);
     const [hasMoreItem, setHasMoreItem] = useState(true);
+    const [hasMoreParty, setHasMoreParty] = useState(true);
     const scrollViewRefItem = useRef<ScrollView>(null);
     const [isDesignAccordionOpenItem, setIsDesignAccordionOpenItem] = useState(false);
+    const [isDesignAccordionOpenParty, setIsDesignAccordionOpenparty] = useState(false);
     const [localItemStatus, setLocalItemStatus] = useState<ItemStatus>(selectedItemStatus || 'All');
 
     const [step, setStep] = useState(1);
@@ -83,6 +93,31 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
 
 
+    // useEffect(() => {
+    //     const filtered = designData.filter(
+    //         (design) =>
+    //             design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    //             design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
+    //     );
+    //     const filtereditem = itemData.filter(
+    //         (item) =>
+    //             item.ItmName.toLowerCase().includes(searchQueryItem.toLowerCase()) ||
+    //             item.ItmCode.toLowerCase().includes(searchQueryItem.toLowerCase())
+    //     );
+    //     const filteredparty = getPartyData.filter(
+    //         (party) =>
+    //             party.acccode.toLowerCase().includes(searchQueryParty.toLowerCase()) ||
+    //             party.accountname.toLowerCase().includes(searchQueryParty.toLowerCase())
+    //     );
+    //     setDisplayedDesigns(filtered.slice(0, 10));
+    //     setDisplayedItems(filtereditem.slice(0, 10));
+    //     setDisplayedParty(filteredparty.slice(0, 10));
+    //     setHasMore(filtered.length > 10);
+    //     setHasMoreItem(filtereditem.length > 10);
+    //     setHasMoreParty(filteredparty.length > 10);
+
+
+
     useEffect(() => {
         const filtered = designData.filter(
             (design) =>
@@ -94,11 +129,35 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 item.ItmName.toLowerCase().includes(searchQueryItem.toLowerCase()) ||
                 item.ItmCode.toLowerCase().includes(searchQueryItem.toLowerCase())
         );
+        const filteredparty = getPartyData.filter(
+            (party) =>
+                party.acccode.toLowerCase().includes(searchQueryParty.toLowerCase()) ||
+                party.accountname.toLowerCase().includes(searchQueryParty.toLowerCase())
+        );
         setDisplayedDesigns(filtered.slice(0, 10));
         setDisplayedItems(filtereditem.slice(0, 10));
+        setDisplayedParty(filteredparty.slice(0, 10));
         setHasMore(filtered.length > 10);
         setHasMoreItem(filtereditem.length > 10);
-    }, [searchQuery, designData, searchQueryItem, itemData]);
+        setHasMoreParty(filteredparty.length > 10);
+    }, [searchQuery, designData, searchQueryItem, itemData, getPartyData, searchQueryParty]);
+
+    // useEffect(() => {
+    //     const filtered = getPartyData.filter(
+    //         (party) =>
+    //             party.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    //             party.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
+    //     );
+    //     const filtereditem = itemData.filter(
+    //         (item) =>
+    //             item.ItmName.toLowerCase().includes(searchQueryItem.toLowerCase()) ||
+    //             item.ItmCode.toLowerCase().includes(searchQueryItem.toLowerCase())
+    //     );
+    //     setDisplayedDesigns(filtered.slice(0, 10));
+    //     setDisplayedItems(filtereditem.slice(0, 10));
+    //     setHasMore(filtered.length > 10);
+    //     setHasMoreItem(filtereditem.length > 10);
+    // }, [searchQuery, getPartyData, searchQueryItem, itemData]);
 
 
     React.useEffect(() => {
@@ -151,6 +210,22 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             setIsLoadingMore(false);
         }, 1000); // Simulate network delay
     };
+    const loadMoreParty = () => {
+        if (isLoadingMoreParty || !hasMoreParty) return;
+
+        setIsLoadingMore(true);
+        setTimeout(() => {
+            const filtered = getPartyData.filter(
+                (party) =>
+                    party.acccode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    party.accountname.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            const newDisplayed = filtered.slice(0, displayedParty.length + 10);
+            setDisplayedParty(newDisplayed);
+            setHasMoreParty(newDisplayed.length < filtered.length);
+            setIsLoadingMoreParty(false);
+        }, 1000); // Simulate network delay
+    };
 
     const loadMoreItems = () => {
         if (isLoadingMoreItem || !hasMoreItem) return;
@@ -187,6 +262,14 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         );
     };
 
+    const togglePartySelection = (party) => {
+        setSelectedParty((prev) =>
+            prev.some((i) => i.acccode === party.acccode)
+                ? prev.filter((i) => i.acccode !== party.acccode)
+                : [...prev, party]
+        );
+    };
+
     // Toggle accordion
     const toggleDesignAccordion = () => {
         setIsDesignAccordionOpen(!isDesignAccordionOpen);
@@ -194,11 +277,17 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     const toggleDesignAccordionItem = () => {
         setIsDesignAccordionOpenItem(!isDesignAccordionOpenItem);
     };
+    const toggleDesignAccordionParty = () => {
+        setIsDesignAccordionOpenparty(!isDesignAccordionOpenParty);
+    };
 
 
     // Remove all selected designs
     const removeAllSelected = () => {
         setSelectedDesigns([]);
+    };
+    const removeAllSelectedParty = () => {
+        setSelectedParty([]);
     };
 
     const removeAllSelectedItems = () => {
@@ -209,6 +298,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         onLoadPress();
         onDesignSelect(selectedDesigns); // Pass selected designs to parent.
         onItemSelectItem(selectedItems);
+        onItemSelectParty(selectedParty);
     };
 
     const formatDate = (rawDate: any) => {
@@ -351,6 +441,114 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                 )}
 
                             </View>
+                            {/* Accordion for Design Selection */}
+                            <TouchableOpacity
+                                style={styles.accordionHeader}
+                                onPress={toggleDesignAccordionParty}
+                            >
+                                <Text style={styles.accordionHeaderText}>
+                                    {isDesignAccordionOpenParty ? `Hide Party: (${selectedParty.length})` : `Select Party: (${selectedParty.length})`}
+                                </Text>
+                                <Icon
+                                    name={isDesignAccordionOpenParty ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                                    size={24}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+
+                            {isDesignAccordionOpenParty && (
+                                <>
+                                    {/* Search Bar */}
+                                    <View style={styles.searchContainer}>
+                                        <TextInput
+                                            style={styles.searchInput}
+                                            placeholder="Search Party..."
+                                            placeholderTextColor="#ccc"
+                                            value={searchQueryParty}
+                                            onChangeText={setSearchQueryParty}
+                                        />
+                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
+                                    </View>
+                                    {/* Select All & Remove All Buttons */}
+                                    <View style={styles.selectAllContainer}>
+                                        <TouchableOpacity
+                                            style={styles.selectAllButton}
+                                            onPress={() => {
+                                                const filtered12 = getPartyData.filter(
+                                                    (party) =>
+                                                        party.acccode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        party.accountname.toLowerCase().includes(searchQuery.toLowerCase())
+                                                );
+                                                setSelectedParty(filtered12);
+                                            }}
+                                        >
+                                            <Text style={styles.selectAllButtonText}>Select All</Text>
+                                        </TouchableOpacity>
+                                        {selectedParty.length > 0 && (
+                                            <TouchableOpacity
+                                                style={styles.removeAllButton}
+                                                onPress={removeAllSelectedParty}
+                                            >
+                                                <Icon name="close" size={20} color="#fff" />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+
+                                    {/* Selected Designs (Chips) */}
+                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
+                                        {selectedParty.map((party) => (
+                                            <View key={party.DsnCode} style={styles.selectedDesignChip}>
+                                                <Text style={styles.selectedDesignText}>
+                                                    {party.accountname} ({party.acccode})
+                                                </Text>
+                                            </View>
+                                        ))}
+
+                                    </ScrollView>
+
+                                    {/* Design List (with Lazy Loading) */}
+                                    <ScrollView
+                                        ref={scrollViewRef}
+                                        style={styles.designListContainer}
+                                        contentContainerStyle={styles.designListContent}
+                                        nestedScrollEnabled={true} // Enable nested scrolling
+                                        onScroll={({ nativeEvent }) => {
+                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                                            const paddingToBottom = 20;
+                                            if (
+                                                layoutMeasurement.height + contentOffset.y >=
+                                                contentSize.height - paddingToBottom
+                                            ) {
+                                                loadMoreParty();
+                                            }
+                                        }}
+                                        scrollEventThrottle={16}
+                                    >
+                                        {displayedParty.map((party) => (
+                                            <TouchableOpacity
+                                                key={party.acccode}
+                                                style={[
+                                                    styles.designItem,
+                                                    selectedParty.some((d) => d.acccode === party.acccode) &&
+                                                    styles.selectedDesignItem,
+                                                ]}
+                                                onPress={() => togglePartySelection(party)}
+                                            >
+                                                <Text style={styles.designName}>{party.accountname}</Text>
+                                                <Text style={styles.designCode}>{party.acccode}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                        {isLoadingMoreParty && (
+                                            <ActivityIndicator
+                                                size="small"
+                                                color="#fff"
+                                                style={styles.loadingIndicator}
+                                            />
+                                        )}
+                                    </ScrollView>
+
+                                </>
+                            )}
 
                             {/* Accordion for Design Selection */}
                             <TouchableOpacity
@@ -385,12 +583,12 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                         <TouchableOpacity
                                             style={styles.selectAllButton}
                                             onPress={() => {
-                                                const filtered = designData.filter(
-                                                    (design) =>
-                                                        design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                        design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
+                                                const filteredpar = getPartyData.filter(
+                                                    (party) =>
+                                                        party.accountname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        party.acccode.toLowerCase().includes(searchQuery.toLowerCase())
                                                 );
-                                                setSelectedDesigns(filtered);
+                                                setSelectedParty(filteredpar);
                                             }}
                                         >
                                             <Text style={styles.selectAllButtonText}>Select All</Text>
@@ -398,7 +596,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                         {selectedDesigns.length > 0 && (
                                             <TouchableOpacity
                                                 style={styles.removeAllButton}
-                                                onPress={removeAllSelected}
+                                                onPress={removeAllSelectedParty}
                                             >
                                                 <Icon name="close" size={20} color="#fff" />
                                             </TouchableOpacity>
@@ -460,112 +658,9 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
                                 </>
                             )}
-                            <TouchableOpacity
-                                style={styles.accordionHeader}
-                                onPress={toggleDesignAccordionItem}
-                            >
-                                <Text style={styles.accordionHeaderText}>
-                                    {isDesignAccordionOpenItem ? `Hide Items: (${selectedItems.length})` : `Select Items: (${selectedItems.length})`}
-                                </Text>
-                                <Icon
-                                    name={isDesignAccordionOpenItem ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                    size={24}
-                                    color="#fff"
-                                />
-                            </TouchableOpacity>
-                            {isDesignAccordionOpenItem && (
-                                <>
-                                    {/* Search Bar */}
-                                    <View style={styles.searchContainer}>
-                                        <TextInput
-                                            style={styles.searchInput}
-                                            placeholder="Search Items..."
-                                            placeholderTextColor="#ccc"
-                                            value={searchQueryItem}
-                                            onChangeText={setSearchQueryItem}
-                                        />
-                                        <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
-                                    </View>
-                                    {/* Select All & Remove All Buttons */}
-                                    <View style={styles.selectAllContainer}>
-                                        <TouchableOpacity
-                                            style={styles.selectAllButton}
-                                            onPress={() => {
-                                                const filtered = itemData.filter(
-                                                    (item) =>
-                                                        item.ItmName.toLowerCase().includes(searchQueryItem.toLowerCase()) ||
-                                                        item.ItmCode.toLowerCase().includes(searchQueryItem.toLowerCase())
-                                                );
-                                                setSelectedItems(filtered);
-                                            }}
-                                        >
-                                            <Text style={styles.selectAllButtonText}>Select All</Text>
-                                        </TouchableOpacity>
-                                        {selectedItems.length > 0 && (
-                                            <TouchableOpacity
-                                                style={styles.removeAllButton}
-                                                onPress={removeAllSelectedItems}
-                                            >
-                                                <Icon name="close" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
 
-                                    {/* Selected Designs (Chips) */}
-                                    <ScrollView horizontal style={styles.selectedDesignsContainer}>
-                                        {selectedItems.map((item) => (
-                                            <View key={item.ItmCode} style={styles.selectedDesignChip}>
-                                                <Text style={styles.selectedDesignText}>
-                                                    {item.ItmName} ({item.ItmCode})
-                                                </Text>
-                                            </View>
-                                        ))}
 
-                                    </ScrollView>
 
-                                    {/* Design List (with Lazy Loading) */}
-                                    <ScrollView
-                                        ref={scrollViewRefItem}
-                                        style={styles.designListContainer}
-                                        contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
-                                        onScroll={({ nativeEvent }) => {
-                                            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-                                            const paddingToBottom = 20;
-                                            if (
-                                                layoutMeasurement.height + contentOffset.y >=
-                                                contentSize.height - paddingToBottom
-                                            ) {
-                                                loadMoreItems();
-                                            }
-                                        }}
-                                        scrollEventThrottle={16}
-                                    >
-                                        {displayedItems.map((item) => (
-                                            <TouchableOpacity
-                                                key={item.ItmCode}
-                                                style={[
-                                                    styles.designItem,
-                                                    selectedItems.some((i) => i.ItmCode === item.ItmCode) &&
-                                                    styles.selectedDesignItem,
-                                                ]}
-                                                onPress={() => toggleItemSelection(item)}
-                                            >
-                                                <Text style={styles.designName}>{item.ItmName}</Text>
-                                                <Text style={styles.designCode}>{item.ItmCode}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                        {isLoadingMoreItem && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#fff"
-                                                style={styles.loadingIndicator}
-                                            />
-                                        )}
-                                    </ScrollView>
-
-                                </>
-                            )}
                             <View style={styles.radioGroup}>
                                 {(['All', 'Open', 'Closed'] as ItemStatus[]).map((status) => (
                                     <TouchableOpacity

@@ -27,6 +27,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
     const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
     const [gePOTData, setPOTData] = useState<POTData[]>([])
     const [getpayload, setPayload] = useState<CardPayload[]>([])
+    const [parentDesignData, setParentDesignData] = useState<any[]>([]);
 
     const rowsPerPage = 20;
 
@@ -265,6 +266,9 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
         try {
             // const response = await axios.post(`https://apig.tms-webapp.com/api/prodorderlist`, payload, { headers });
             const response = await axios.post(`${API}/api/prodorderlist`, payload, { headers });
+            const response_details = await axios.post(`${API}/api/getparentdesign`, payload, { headers });
+            console.log('🔵 parent design details response:', response_details, payload);
+            console.log('🔵 design details response 123:', response, payload);
             if (response.data.success === true && response.data.data.length === 0) {
                 setIsLoading(false);
                 Alert.alert('No Data Found');
@@ -294,6 +298,11 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
                 setIsLoading(false);
                 Alert.alert(`${response.data.message}`);
                 setPOTData([]);
+            }
+
+            if (response_details.data.success === true && response_details.data.data.length > 0) {
+                console.log('🔵 parent design details response main:', response_details.data.data);
+                setParentDesignData(response_details.data.data);
             }
 
         } catch (error) {
@@ -329,16 +338,6 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
 
     // Handle Load Button Press
     const handleLoadPress = () => {
-        // console.log({
-        //     fromDate: fromDate.toISOString().split('T')[0],
-        //     toDate: toDate.toISOString().split('T')[0],
-        //     selectedYear,
-        //     selectedExeCode: selectedExe?.Code,
-        //     selectedExeName: selectedExe?.SalesExecutive,
-        //     selectedDesigns, // Now includes selected designs
-        //     selectedItems, // Now includes selected items
-        //     selectedItemStatus
-        // });
         handleConfirmAction();
     };
 
@@ -360,7 +359,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
                 </TouchableOpacity>
 
                 {/* Main Content: Replace Text with ProdOrderTrackingTable */}
-                <ProdOrderTrackingCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} />
+                <ProdOrderTrackingCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} parentDesignData={parentDesignData} />
             </View>
             <CustomDrawer
                 isVisible={isDrawerVisible}

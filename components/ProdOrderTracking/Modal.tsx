@@ -31,6 +31,7 @@ export interface POTDataProps {
     searchQueryPOT: string;
     getpayload: CardPayload[]
     token: string
+    parentDesignData: any[];
 }
 
 export interface ExeData {

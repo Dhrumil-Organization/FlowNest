@@ -11,6 +11,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native-community/datetimepicker": "^8.5.1",
@@ -69,6 +70,7 @@
     "@react-native/typescript-config": "0.80.1",
     "@types/base-64": "^1.0.2",
     "@types/jest": "^29.5.13",
+    "@types/lodash": "^4.17.24",
     "@types/react": "^19.1.0",
     "@types/react-native-base64": "^0.2.2",
     "@types/react-native-modal-dropdown": "^1.0.5",

@@ -22,28 +22,66 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     gePOTData,
     searchQueryPOT,
     getpayload,
-    token
+    token,
+    parentDesignData
 }) => {
     const [filteredData, setFilteredData] = useState(gePOTData || []);
     const [getStageData, setStageData] = useState<StageData[]>([]);
     const [isStageLoading, setStageLoading] = useState(false);
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [page, setPage] = useState(1);
+    const [allData, setAllData] = useState(gePOTData || []);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+    // useEffect(() => {
+    //     if (!searchQueryPOT.trim()) {
+    //         setFilteredData(gePOTData || []);
+    //     } else {
+    //         const filtered = (gePOTData || []).filter((item) =>
+    //             Object.values(item).some(
+    //                 (value) =>
+    //                     typeof value === 'string' &&
+    //                     value.toLowerCase().includes(searchQueryPOT.toLowerCase())
+    //             )
+    //         );
+    //         setFilteredData(filtered);
+    //     }
+    // }, [gePOTData, searchQueryPOT]);
 
     useEffect(() => {
         if (!searchQueryPOT.trim()) {
             setFilteredData(gePOTData || []);
+            setAllData((gePOTData || []).slice(0, 10)); // Reset pagination
+            setPage(1);
         } else {
-            const filtered = (gePOTData || []).filter((item) =>
-                Object.values(item).some(
+            // Step 1: ParentDesignData se pdesign nikalo jo searchQuery se match kare
+            const matchedParentDesigns = parentDesignData.filter((parent) =>
+                parent.pdesign.toLowerCase().includes(searchQueryPOT.toLowerCase()) ||
+                parent.cdesign.toLowerCase().includes(searchQueryPOT.toLowerCase())
+                // parent.pdesign.toLowerCase().includes(searchQueryPOT.toLowerCase())
+            );
+
+            // Step 2: gePOTData ko filter karo (normal search + parent design match)
+            const filtered = (gePOTData || []).filter((item) => {
+                const matchesSearch = Object.values(item).some(
                     (value) =>
                         typeof value === 'string' &&
                         value.toLowerCase().includes(searchQueryPOT.toLowerCase())
-                )
-            );
+                );
+                const matchesParentDesign = matchedParentDesigns.some(
+                    (parent) => parent.pdesign === item.dsnname
+                );
+                return matchesSearch || matchesParentDesign;
+            });
+
             setFilteredData(filtered);
+            setAllData(filtered.slice(0, 10)); // Reset pagination
+            setPage(1);
         }
-    }, [gePOTData, searchQueryPOT]);
+    }, [gePOTData, searchQueryPOT, parentDesignData]);
+
+
 
     const handleCardPress = (item: any) => {
         setSelectedCardId(item.uid);
@@ -332,6 +370,21 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     //     </View>
     // );
 
+    // Load more data on scroll
+    const loadMoreData = () => {
+        if (isLoadingMore || (searchQueryPOT.trim() && filteredData.length <= page * 10)) return;
+
+        setIsLoadingMore(true);
+        setTimeout(() => {
+            // Filtered data par kaam karna hai
+            const nextPageData = filteredData.slice(0, (page + 1) * 10);
+            setAllData(nextPageData);
+            setPage(page + 1);
+            setIsLoadingMore(false);
+        }, 500); // Simulate network delay
+    };
+
+
     const renderCard = ({ item }: { item: any }) => (
         <TouchableOpacity style={styles.card}>
             <View style={styles.cardHeader}>
@@ -361,8 +414,9 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
 
     return (
         <SafeAreaView style={styles.container}>
-            <FlatList
-                data={filteredData}
+            {/* <FlatList
+                // data={filteredData}
+                data={filteredData.slice(0, page * 10)}
                 renderItem={renderCard}
                 keyExtractor={(item, index) => index.toString()}
                 contentContainerStyle={styles.listContent}
@@ -371,7 +425,26 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
                         <Text style={styles.emptyText}>No data found!</Text>
                     </View>
                 }
+            /> */}
+            <FlatList
+                data={allData} // `allData` use karna hai
+                renderItem={renderCard}
+                keyExtractor={(item, index) => index.toString()}
+                contentContainerStyle={styles.listContent}
+                onEndReached={loadMoreData}
+                onEndReachedThreshold={0.3}
+                // ListFooterComponent={
+                //     isLoadingMore ? (
+                //         <ActivityIndicator size="large" color="rgb(86, 156, 214)" />
+                //     ) : null
+                // }
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>No data found!</Text>
+                    </View>
+                }
             />
+
             <Modal
                 animationType="slide"
                 transparent={false}

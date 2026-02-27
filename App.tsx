@@ -23,11 +23,14 @@ import GreyPurchaseOrder from './components/GreyPurchaseOrder/GreyPurchaseOrder'
 import GreySalesOrder from './components/GreySalesOrder/GreySalesOrder';
 import ProdOrderTracking from './components/ProdOrderTracking/ProdOrderTracking';
 import SalesOrderTracking from './components/SalesOrderTracking/SalesOrderTracking';
+import SOPartyDetails from './components/SalesOrderTracking/SOPartyDetails/SOPartyDetails';
+import SOPartyDetailsPart1 from './components/SalesOrderTracking/SOPartyDetailsPart1/SOPartyDetailsPart1';
 import Settings from './components/Settings/Settings';
 import Receivables from './components/Receivables/Receivables';
 import Payable from './components/Payable/Payable';
 import TakaCheckingEntry from './components/TakaCheckingEntry/TakaCheckingEntry';
 import TakaCheckingViewData from './components/TakaCheckingViewData/TakaCheckingViewData';
+import InquiryAdd from './components/InquiryAdd/InquiryAdd';
 import Footer from './components/Footer/Footer';
 import NetworkSpeed from './components/NetworkSpeed/NetworkSpeed';
 import { Alert, BackHandler, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
@@ -466,7 +469,7 @@ export default function App() {
                     }</Stack.Screen>
                     <Stack.Screen name="InquiryAdd">{(props) =>
                       <>
-                        <Collection {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        <InquiryAdd {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
@@ -512,7 +515,19 @@ export default function App() {
                      <Stack.Screen name="Sales Order Tracking">{(props) =>
                       <>
                         <SalesOrderTracking {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-                        <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="SOPartyDetails">{(props) =>
+                      <>
+                        <SOPartyDetails {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="SOPartyDetailsPart1">{(props) =>
+                      <>
+                        <SOPartyDetailsPart1 {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
                   </Stack.Navigator>

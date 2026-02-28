@@ -146,12 +146,12 @@ const PartyDropdown: React.FC<Props> = ({
         return (
             <View style={rowStyles.rowInner}>
                 <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.accountname)}</Text>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.accountname || item.accname)}</Text>
                 </View>
 
                 <View style={rowStyles.main}>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.accountname || '—'}
+                        {item.accountname || item.accname || '—'}
                     </Text>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.acccode || '—'}
@@ -185,6 +185,25 @@ const PartyDropdown: React.FC<Props> = ({
                             </View>
                         ) : null}
                     </View>
+                </View>
+            </View>
+        );
+    };
+    const renderRowContentItem = (item: Party, isSelected: boolean) => {
+        // const location = extractLocation(item.Address);
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.itmname || item.itmname)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.itmname || item.accname || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.itmcode || '—'}
+                    </Text>
                 </View>
             </View>
         );
@@ -411,7 +430,7 @@ const PartyDropdown: React.FC<Props> = ({
                     initialValue={selected ?? initialValue}
                     multiple={multiple}
                     emptyMessage={type == 'bank' ? 'No banks!' : type == 'party' ? "No parties!" : type == 'branch' ? "No branches!" : type == 'payment' ? "No payments!" : type == 'adj' ? "No adjustments!" : 'No items'}
-                    renderRowContent={type == 'bank' ? renderRowContentBank : type == 'party' ? renderRowContent : type == 'branch' ? renderRowContentBranch : type == 'payment' ? renderRowContentPayment : type == 'adj' ? renderRowContentAdj : type == 'machine' ? renderRowContentMachine : type == 'design' ? renderRowContentDesign : type == 'checker' ? renderRowContentChecker : type == 'grd' ? renderRowContentGrd : type == 'shift' ? renderRowContentShift : renderRowContentEmpty}
+                    renderRowContent={type == 'bank' ? renderRowContentBank : type == 'party' ? renderRowContent : type == 'branch' ? renderRowContentBranch : type == 'payment' ? renderRowContentPayment : type == 'adj' ? renderRowContentAdj : type == 'machine' ? renderRowContentMachine : type == 'design' ? renderRowContentDesign : type == 'checker' ? renderRowContentChecker : type == 'grd' ? renderRowContentGrd : type == 'shift' ? renderRowContentShift : type == 'item' ? renderRowContentItem : renderRowContentEmpty}
                 />
             )}
 

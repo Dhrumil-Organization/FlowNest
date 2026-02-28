@@ -52,6 +52,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+    const [designData1, setdesignData11] = useState([]);
     const [showToDatePicker, setShowToDatePicker] = useState(false);
     const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
     const [isExeDropdownOpen, setIsExeDropdownOpen] = useState(false);
@@ -83,18 +84,24 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
     const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
 
-    console.log("designData:", designData, "itemData:", itemData);
-
+    
     useEffect(() => {
         if (exeData.length > 0 && !selectedExe) {
             onExeChange(exeData[0]);
         }
     }, [exeData, selectedExe, onExeChange]);
-
+    
+    useEffect(() => {
+        if (designData) {
+            setdesignData11(designData as any);
+        }
+    }, [designData]);
+    
+    console.log("designData1:", designData1, "itemData:", itemData);
 
 
     // useEffect(() => {
-    //     const filtered = designData.filter(
+    //     const filtered = designData1.filter(
     //         (design) =>
     //             design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     //             design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
@@ -119,7 +126,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
 
     useEffect(() => {
-        const filtered = designData.filter(
+        const filtered = designData1.filter(
             (design) =>
                 design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
@@ -140,7 +147,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         setHasMore(filtered.length > 10);
         setHasMoreItem(filtereditem.length > 10);
         setHasMoreParty(filteredparty.length > 10);
-    }, [searchQuery, designData, searchQueryItem, itemData, getPartyData, searchQueryParty]);
+    }, [searchQuery, designData1, searchQueryItem, itemData, getPartyData, searchQueryParty]);
 
     // useEffect(() => {
     //     const filtered = getPartyData.filter(
@@ -184,14 +191,14 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
     // Filter and paginate designs based on search query
     // useEffect(() => {
-    //     const filtered = designData.filter(
+    //     const filtered = designData1.filter(
     //         (design) =>
     //             design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     //             design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
     //     );
     //     setDisplayedDesigns(filtered.slice(0, 10));
     //     setHasMore(filtered.length > 10);
-    // }, [searchQuery, designData]);
+    // }, [searchQuery, designData1]);
 
     // Load more designs on scroll
     const loadMoreDesigns = () => {
@@ -199,7 +206,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
         setIsLoadingMore(true);
         setTimeout(() => {
-            const filtered = designData.filter(
+            const filtered = designData1.filter(
                 (design) =>
                     design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase())
@@ -401,7 +408,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                             </View>
 
                             {/* Sales Executive Dropdown */}
-                            <View style={styles.inputGroup}>
+                            {/* <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Sales Executive</Text>
                                 <TouchableOpacity
                                     style={styles.dropdownButton}
@@ -440,7 +447,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                     </View>
                                 )}
 
-                            </View>
+                            </View> */}
                             {/* Accordion for Design Selection */}
                             <TouchableOpacity
                                 style={styles.accordionHeader}

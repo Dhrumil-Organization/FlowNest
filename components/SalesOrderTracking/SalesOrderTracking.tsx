@@ -1356,7 +1356,240 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const CACHE_KEY_CONFIRM_ACTION = 'sales_order_tracking_confirm_action';
     const CACHE_KEY_CARD_PRESS = 'sales_order_tracking_card_press_';
     const CACHE_KEY_LAST_VIEWED = 'sales_order_tracking_last_viewed';
+    const rowsPerPage = 20;
 
+    const fetchData = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        // setIsLoading(true);
+        try {
+            const payload = {
+                prpcode: 'SIP',
+                yearno: selectedYear,
+                strcode: '012',
+                txntype: 'production_order_track',
+                prptype: '',
+                fetch: 'salesexe'
+            };
+            const response = await axios.get(
+                // `https://apig.tms-webapp.com/api/get_criterion`,
+                `${API}/api/get_criterion`,
+                getRequestConfig({
+                    params: {
+                        prpcode: 'SIP',
+                        yearno: '26',
+                        strcode: '012',
+                        txntype: 'production_order_track',
+                        prptype: '',
+                        fetch: 'salesexe'
+                    }
+                })
+            );
+            console.log('🔵 payload', payload, response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                console.log('✅ Data Sexe:', response.data.response.data);
+                setExeData(response.data.response.data);
+                // fetchDesign();
+                fetchParty();
+                // fetchItem();
+
+                // setAllHistoryData([])
+            } else {
+                // setData([]);
+            }
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', `Server error: ${error}`);
+            }
+        } finally {
+            // setIsLoading(false);
+        }
+    };
+    const fetchParty = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        const yearValue = selectedYear.split('-')[1].substring(2);
+        // setIsLoading(true);
+        try {
+            console.log('🔵 payload PARTY', 'HI');
+            // const payload = {
+            //     prpcode: 'SIP',
+            //     yearno: selectedYear,
+            //     strcode: '012',
+            //     txntype: 'production_order_track',
+            //     prptype: '',
+            //     fetch: 'salesexe'
+            // };
+
+            const payload = {
+                prpcode: 'SIP',
+                prptype: 'S',
+                yearno: yearValue,
+                strcode: "0",
+                txntype: "sales_order",
+                partytype: "p",
+                type: "s",
+                page: 1,
+                limit: 20,
+                search: "",
+                isceo: 0,
+                partype: 0,
+                grntype: "",
+                fetch: "",
+                acccode: "",
+                billdate: "",
+                strtype: "",
+                isfaint: "",
+                user_id: 1,
+            };
+            console.log('🔵 payload PARTY', 'HI1');
+            const response = await axios.get(`${API}/api/mobaccountbasic`,
+                getRequestConfig({
+                    params: payload
+                })
+            );
+            console.log('🔵 payload PARTY', 'HI2');
+            console.log('🔵 payload PARTY', payload, response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                console.log('✅ Data Sexe:', response.data.response.data);
+                setPartyData(response.data.response.data);
+                // fetchDesign();
+                // fetchItem();
+
+                // setAllHistoryData([])
+            } else {
+                // setData([]);
+            }
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', `Server error: ${error}`);
+            }
+        } finally {
+            // setIsLoading(false);
+        }
+    };
+
+    const fetchDesign = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        // setIsLoading(true);
+        try {
+            const payload = {
+                prpcode: 'SIP',
+                yearno: '26',
+                strcode: '012',
+                itmcode: '',
+                dsncode: '',
+                shdcode: '',
+                page: page + 1,
+                limit: rowsPerPage,
+                txntype: 'production_order_track'
+            };
+            const response = await axios.get(
+                // `https://apig.tms-webapp.com/api/getdesign`,
+                `${API}/api/getdesign`,
+                getRequestConfig({
+                    params: {
+                        prpcode: 'SIP',
+                        yearno: '26',
+                        strcode: '012',
+                        itmcode: '',
+                        dsncode: '',
+                        shdcode: '',
+                        page: page + 1,
+                        limit: rowsPerPage,
+                        txntype: 'production_order_track'
+                    }
+                })
+            );
+            console.log('🔵 design payload', payload, response);
+            if (response.data.success) {
+                console.log('✅ Data:', response.data.response.data);
+                setDesignData(response.data.response.data);
+                fetchItem();
+                // setAllHistoryData([])
+            } else {
+                // setData([]);
+            }
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', `Server error: ${error}`);
+            }
+        } finally {
+            // setIsLoading(false);
+        }
+    };
+
+    console.log("designData", designData)
+
+    const fetchItem = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        // setIsLoading(true);
+        try {
+            const payload = {
+                // prpcode: 'SIP',
+                // yearno: '26',
+                // strcode: '012',
+                // itmcode: '',
+                // dsncode: '',
+                // shdcode: '',
+                // page: page + 1,
+                // limit: rowsPerPage,
+                // fetch: 'itm',
+                // txntype: 'production_order_track'
+                prpcode: 'SIP',
+                yearno: '26',
+                strcode: '012',
+                txntype: 'production_order_track',
+                prptype: '',
+                limit: 20,
+                fetch: 'itm',
+                itmcode: '',
+                strcodes: '012',
+                issdate: ''
+            };
+            const response = await axios.get(
+                // `https://apig.tms-webapp.com/api/get_criterion`,
+                `${API}/api/get_criterion`,
+                getRequestConfig({
+                    params: {
+                        prpcode: 'SIP',
+                        yearno: '26',
+                        strcode: '012',
+                        txntype: 'production_order_track',
+                        prptype: '',
+                        limit: 20,
+                        fetch: 'itm',
+                        itmcode: '',
+                        strcodes: '012',
+                        issdate: ''
+                    }
+                })
+            );
+            console.log('🔵 item payload', payload, response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                console.log('✅ Data:', response.data.response.data);
+                setItemData(response.data.response.data);
+                // setAllHistoryData([])
+            } else {
+                // setData([]);
+            }
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', `Server error: ${error}`);
+            }
+        } finally {
+            // setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (fromDate && toDate && selectedYear) {
+            fetchData();
+            fetchDesign();
+        }
+    }, []);
     // Save data to AsyncStorage
     const saveToCache = async (key: string, data: any) => {
         try {
@@ -1498,6 +1731,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         params: props.params,
         cancelToken: cancelToken?.token,
     });
+
 
     const formatDate = (rawDate: any) => {
         let day = rawDate.getDate().toString().padStart(2, '0') || '';

@@ -545,6 +545,7 @@ const CreditLimitRequest: React.FC<Props> = ({ token, navigation, isConnected, u
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
+            console.log("API CALL START", API);
             try {
 
                 const response = await axios.post(`${API}/api/crlimitreqedit`, payload, { headers });
@@ -587,7 +588,7 @@ const CreditLimitRequest: React.FC<Props> = ({ token, navigation, isConnected, u
                 //     "message": ""
                 // }
                 console.log('🔵 response', response);
-                if (response.success) {
+                if (response.data.success) {
                     console.log('✅ aaa 113 response.data.response.data');
                     setresponsemessage(response.data.message || 'Success');
                     setTimeout(() => {

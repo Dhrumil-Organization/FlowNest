@@ -174,6 +174,12 @@ interface DesignData {
     QltWt: string;
     islasttakatrack: string;
     Status: string;
+    ordno: string;
+    acccode: string;
+    accname: string;
+    address: string;
+    gstin: string;
+    email: string;
 }
 interface CheckerData {
     PrpCode: string;
@@ -186,6 +192,10 @@ interface CheckerData {
     DsgName: string;
     PPrpCode: string;
     PEmpCode: string;
+    // 
+    itmcode: string;
+    itmname: string;
+    lastrate: string;
 }
 
 interface GrdData {
@@ -325,7 +335,8 @@ const InquiryAdd: React.FC<Props> = ({
     const [getDLOcation, setDLOcation] = useState('');
     const [activeTab, setActiveTab] = useState<'party'>('party');
     const [activeTab1, setActiveTab1] = useState<'account requests'>('account requests');
-    const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
+    // const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
+    const [selectedProperty, setSelectedProperty] = useState<CheckerData[] | null>(null);
     const [selectedYearNo, setSelectedYearNo] = useState<YearMainData | null>(null);
     const [selectedMachine, setSelectedMachine] = useState<MachineData | null>(null);
     const [selectedDesign, setSelectedDesign] = useState<DesignData | null>(null);
@@ -369,6 +380,7 @@ const InquiryAdd: React.FC<Props> = ({
         MacCode: "",
         MacName: "",
         selectedMachine: null,
+        itmcode: [] as string[], 
         d2: []
     });
     const [getResponse, setResponse] = useState<any>();
@@ -446,41 +458,41 @@ const InquiryAdd: React.FC<Props> = ({
 
     const getToken = () => token;
 
-    const fetchYear = async () => {
-        const prpcode = 'MW';
+    // const fetchYear = async () => {
+    //     const prpcode = 'MW';
 
-        const payload = {
-            prpcode,
-        };
+    //     const payload = {
+    //         prpcode,
+    //     };
 
-        try {
-            const response = await axios.get(
-                `${API}/api/getyear`,
-                getRequestConfig({ params: payload })
-            );
+    //     try {
+    //         const response = await axios.get(
+    //             `${API}/api/getyear`,
+    //             getRequestConfig({ params: payload })
+    //         );
 
-            console.log('🔵 year payload', payload, 'response:', response);
+    //         console.log('🔵 year payload', payload, 'response:', response);
 
-            if (response.data?.success && Array.isArray(response.data.response?.data)) {
-                const year = response.data.response.data;
-                // console.log(`🌐 Fetched ${accounts.length} accounts from API`);
-                setMainYearData(year);
+    //         if (response.data?.success && Array.isArray(response.data.response?.data)) {
+    //             const year = response.data.response.data;
+    //             // console.log(`🌐 Fetched ${accounts.length} accounts from API`);
+    //             setMainYearData(year);
 
-            } else {
-                console.warn('⚪ No account data received');
-                setMainYearData([]);
-            }
-        } catch (error) {
-            console.error('❌ Failed to load year:', error);
-            // setPartyData([]);
-        } finally {
-            // setPartyLoading(false);
-        }
-    };
+    //         } else {
+    //             console.warn('⚪ No account data received');
+    //             setMainYearData([]);
+    //         }
+    //     } catch (error) {
+    //         console.error('❌ Failed to load year:', error);
+    //         // setPartyData([]);
+    //     } finally {
+    //         // setPartyLoading(false);
+    //     }
+    // };
 
-    useEffect(() => {
-        fetchYear();
-    }, []);
+    // useEffect(() => {
+    //     fetchYear();
+    // }, []);
 
     // ========== UPDATED FETCH FUNCTIONS WITH CACHE + BATCH LOADING ==========
     const fetchPartyData = async (gotSelectedPrp: PropertyData, forceRefresh: boolean | 'background' = false) => {
@@ -598,80 +610,42 @@ const InquiryAdd: React.FC<Props> = ({
         }
     };
 
-    const fetchDesignData = async (selectedMachine: MachineParentData, yearNo: string, maccode: string, cancelToken: any) => {
+    const fetchAllPartyData = async () => {
         setDesignLoading(true);
-        const payload = {
-            PrpCode: selectedMachine.PrpCode,
-            yearno: yearNo,
-            txntype: 'beam_checking_tablet',
-            MacCode: selectedMachine.MacCode,
-        };
-        const payloadShift = {
-            prpcode: selectedMachine.PrpCode,
-            yearno: yearNo,
-            txntype: 'beam_checking_tablet',
-            fetch: 'shift',
-        };
-        console.log("Design response called:", payload);
+        setCheckerLoading(true);
 
         try {
-            const response = await axios.get(
-                `${API}/api/get_checking_help`,
+            console.log("🚀 API CALL START");
+
+            const response = await axios.post(
+                `${API}/api/get_mobile_user_details`,
                 {
-                    params: payload,
-                    cancelToken: cancelToken,
+                    prptype: 'R'
+                },
+                {
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
-                },
-
+                        Accept: 'application/json'
+                    }
+                }
             );
-            setShiftLoading(true);
-            const responseShift = await axios.get(
-                `${API}/api/get_criterion`,
-                {
-                    params: payloadShift,
-                    cancelToken: cancelToken,
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
-                },
 
-            );
-            console.log("Design Shift response:", responseShift);
-            const designData = response?.data.response?.data;
-            if (response.data.success == true) {
-                setDesignLoading(false);
-                fetchCheckerData(selectedMachine, yearNo, cancelToken);
-                console.log("Design response:", designData);
-                setDesignData(designData);
-            }
-            const shiftData = responseShift?.data.response?.data;
-            const shiftsuccess = responseShift?.data.success;
-            console.log("Design Shift response:", shiftsuccess);
-            if (shiftsuccess == true) {
-                setShiftLoading(false);
-                setShiftData(shiftData);
+            console.log("✅ API RESPONSE:", response.data);
 
-                // fetchCheckerData(selectedMachine, yearNo, cancelToken);
-                // console.log("Design response:", designData);
+            const partyData = response?.data?.response?.party;
+            const itemDate = response?.data?.response?.item;
+
+            if (response.data.success) {
+                setDesignData(partyData);
+                setCheckerData(itemDate);
             }
-            // Handle designData here
+
         } catch (error) {
-            if (axios.isCancel(error)) {
-                setDesignLoading(false);
-                setShiftLoading(false);
-                console.log('Request canceled:', error.message);
-            } else {
-                setDesignLoading(false);
-                setShiftLoading(false);
-                console.error('❌ Failed to load accounts:', error);
-                // setDesignData([]);
-            }
+            console.log("❌ API ERROR:", error);
+        } finally {
+            setDesignLoading(false);
+            setCheckerLoading(false);
         }
     };
 
@@ -697,7 +671,7 @@ const InquiryAdd: React.FC<Props> = ({
         console.log("Checker response called:", payload);
 
         try {
-            setCheckerLoading(true);
+            // setCheckerLoading(true);
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 {
@@ -726,11 +700,11 @@ const InquiryAdd: React.FC<Props> = ({
 
             );
             if (response.data.success === true) {
-                setCheckerLoading(false);
+                // setCheckerLoading(false);
                 const designData = response.data.response?.data;
                 console.log("Checker response:", designData);
 
-                setCheckerData(designData);
+                // setCheckerData(designData);
                 // Handle designData here
             }
             if (responseGrd.data.success === true) {
@@ -1183,17 +1157,28 @@ const InquiryAdd: React.FC<Props> = ({
         // }
     }, [selectedYearNo]);
 
-    useEffect(() => {
-        if (form.selectedMachine !== null) {
-            const source = axios.CancelToken.source();
-            fetchDesignData(form.selectedMachine, form.YearNo, form.MacCode, source.token);
-            // fetchCheckerData(form.selectedMachine, form.YearNo, source.token);
+    // useEffect(() => {
+    //     if (form.selectedMachine !== null) {
+    //         const source = axios.CancelToken.source();
+    //         fetchAllPartyData(form.selectedMachine, form.YearNo, form.MacCode, source.token);
+    //         // fetchCheckerData(form.selectedMachine, form.YearNo, source.token);
 
-            return () => {
-                source.cancel('Operation canceled by the user.');
-            };
-        }
-    }, [form.selectedMachine]);
+    //         return () => {
+    //             source.cancel('Operation canceled by the user.');
+    //         };
+    //     }
+    // }, [form.selectedMachine]);
+    useEffect(() => {
+        // if (form.selectedMachine !== null) {
+        // const source = axios.CancelToken.source();
+        fetchAllPartyData();
+        // fetchCheckerData(form.selectedMachine, form.YearNo, source.token);
+
+        // return () => {
+        //     source.cancel('Operation canceled by the user.');
+        // };
+        // }
+    }, []);
 
 
 
@@ -1225,35 +1210,35 @@ const InquiryAdd: React.FC<Props> = ({
         }
     }, [form.MacCode]);
 
-    useEffect(() => {
-        if (form.DsnCode && form.DsnName && getDesignData && getDesignData.length > 0) {
-            // Find matched data from designData
-            const matchedData = getDesignData.find(
-                (data) => data.DsnCode === form.DsnCode && data.DsnName === form.DsnName
-            );
+    // useEffect(() => {
+    //     if (form.DsnCode && form.DsnName && getDesignData && getDesignData.length > 0) {
+    //         // Find matched data from designData
+    //         const matchedData = getDesignData.find(
+    //             (data) => data.DsnCode === form.DsnCode && data.DsnName === form.DsnName
+    //         );
 
-            if (matchedData) {
-                console.log("Matched Data from designData:", matchedData);
+    //         if (matchedData) {
+    //             console.log("Matched Data from designData:", matchedData);
 
-                // Update form state with matched data
-                setForm((prevForm) => ({
-                    ...prevForm,
-                    selectedMachine: matchedData,
-                    DsnCode: matchedData.DsnCode,
-                    DsnName: matchedData.DsnName,
-                    BeamNo: matchedData.BeamNo,
-                    QltWt: matchedData.QltWt,
-                    WarpLen: matchedData.WarpLen,
-                }));
-            } else {
-                console.log("No matching DsnCode and DsnName found in designData.");
-            }
-        }
-    }, [form.DsnCode, form.DsnName]);
+    //             // Update form state with matched data
+    //             setForm((prevForm) => ({
+    //                 ...prevForm,
+    //                 selectedMachine: matchedData,
+    //                 DsnCode: matchedData.DsnCode,
+    //                 DsnName: matchedData.DsnName,
+    //                 BeamNo: matchedData.BeamNo,
+    //                 QltWt: matchedData.QltWt,
+    //                 WarpLen: matchedData.WarpLen,
+    //             }));
+    //         } else {
+    //             console.log("No matching DsnCode and DsnName found in designData.");
+    //         }
+    //     }
+    // }, [form.DsnCode, form.DsnName]);
 
 
 
-    console.log('selectedYearNo:', selectedYearNo, 'form:', form);
+    console.log('selectedYearNo:', selectedYearNo, 'selectedItems:', selectedProperty, selectedChecker1, 'form:', form);
 
     useEffect(() => {
         ShowAdjustmentData();
@@ -1760,7 +1745,8 @@ const InquiryAdd: React.FC<Props> = ({
             <HeaderBarwithBack
                 userName={username}
                 header={'Inquiry Form'}
-                subHeader={'Manage your taka'}
+                subHeader={'Manage your inquiries'}
+                backNavigateScreen={'Inquiry'}
             />
             <CheckingForm
                 token={token}
@@ -1848,6 +1834,7 @@ const InquiryAdd: React.FC<Props> = ({
                 setSelectedShift1={setSelectedShift1}
                 getFaultsLoading={getFaultsLoading}
                 navigation={navigation}
+                onExeChange={setSelectedProperty}
             />
             <SuccessModal
                 visible={successModalVisible}
@@ -1856,7 +1843,7 @@ const InquiryAdd: React.FC<Props> = ({
                 onClose={closeSuccessModal}
                 onView={viewDataAndClose}
             />
-            <FaultsModal
+            {/* <FaultsModal
                 visible={getShowFaultsModal}
                 data={getFaultsData}
                 initialFilledData={form.d2 || []}
@@ -1883,7 +1870,7 @@ const InquiryAdd: React.FC<Props> = ({
                     setForm(prev => ({ ...prev, d2: updatedData }));
                     setShowFaultsModal(false);
                 }}
-            />
+            /> */}
 
 
 

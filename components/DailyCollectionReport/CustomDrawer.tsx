@@ -393,7 +393,7 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
                                     valueKey="Code"
                                     placeholder="Choose sales executive..."
                                     pageSize={10}
-                                    initialValue={selectedProperty ?? null}
+                                    initialValue={SelectedSexe ?? null}
                                     onSelect={(items) => {
                                         // items will be an array of selected objects
                                         setSelectedSexe(items);

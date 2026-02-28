@@ -31,6 +31,10 @@ interface PropertyData {
     ShtName: string;
     PrpOf: string;
     PrpOfFull: string;
+    // 
+    itmcode: string;
+    itmname: string;
+    lastrate: string;
 }
 interface PartyData {
     ordno: string;
@@ -87,6 +91,12 @@ interface DesignData {
     QltWt: string;
     islasttakatrack: string;
     Status: string;
+    ordno: string;
+    acccode: string;
+    accname: string;
+    address: string;
+    gstin: string;
+    email: string;
 }
 
 interface CheckerData {
@@ -100,6 +110,10 @@ interface CheckerData {
     DsgName: string;
     PPrpCode: string;
     PEmpCode: string;
+    // 
+    itmcode: string;
+    itmname: string;
+    lastrate: string;
 }
 
 interface GrdData {
@@ -224,6 +238,7 @@ interface Props {
     setSelectedShift1: (shift: ShiftData | null) => void;
     getFaultsLoading: boolean;
     navigation: any;
+    onExeChange: (exe: PropertyData) => void;
 }
 
 
@@ -337,7 +352,8 @@ const CheckingForm: React.FC<Props> = ({
     selectedShift1,
     setSelectedShift1,
     getFaultsLoading,
-    navigation
+    navigation,
+    onExeChange
 
 }) => {
     const [step, setStep] = useState<number>(1);
@@ -476,13 +492,13 @@ const CheckingForm: React.FC<Props> = ({
 
     useEffect(() => {
         // property
-        if (form.PrpCode && Array.isArray(getPropertyData)) {
-            const found = getPropertyData.find(p => String(p.PrpCode) === String(form.PrpCode));
+        if (form.itmcode && Array.isArray(getPropertyData)) {
+            const found = getPropertyData.find(p => String(p.itmcode) === String(form.itmcode));
             setSelectedProperty(found ?? null);
         } else {
             setSelectedProperty(null);
         }
-    }, [form.PrpCode, getPropertyData]);
+    }, [form.itmcode, getPropertyData]);
 
     useEffect(() => {
         // party
@@ -498,15 +514,15 @@ const CheckingForm: React.FC<Props> = ({
 
     // For Design
     useEffect(() => {
-        if (form.DsnCode && Array.isArray(getDesignData)) {
-            const found = getDesignData.find(p => String(p.DsnCode) === String(form.DsnCode));
+        if (form.acccode && Array.isArray(getDesignData)) {
+            const found = getDesignData.find(p => String(p.acccode) === String(form.acccode));
             setSelectedDesign(found ?? null);
             setSelectedDesign1?.(found ?? null);
         } else {
             setSelectedDesign(null);
             setSelectedDesign1?.(null);
         }
-    }, [form.DsnCode, getDesignData]);
+    }, [form.acccode, getDesignData]);
 
     // For Grd
     useEffect(() => {
@@ -533,28 +549,34 @@ const CheckingForm: React.FC<Props> = ({
     }, [form.ShfCode, getShiftData]);
 
     // For Checker
-    useEffect(() => {
-        if (form.EmpCode && Array.isArray(getCheckerData)) {
-            const found = getCheckerData.find(p => String(p.EmpCode) === String(form.EmpCode));
-            setSelectedChecker(found ?? null);
-            setSelectedChecker1?.(found ?? null);
-        } else {
-            setSelectedChecker(null);
-            setSelectedChecker1?.(null);
-        }
-    }, [form.EmpCode, getCheckerData]);
+    // useEffect(() => {
+    //     if (form.itmcode && Array.isArray(getCheckerData)) {
+    //         const found = getCheckerData.find(p => String(p.itmcode) === String(form.itmcode));
+    //         setSelectedChecker(found ?? null);
+    //         setSelectedChecker1?.(found ?? null);
+    //     } else {
+    //         setSelectedChecker(null);
+    //         setSelectedChecker1?.(null);
+    //     }
+    // }, [form.itmcode, getCheckerData]);
 
     useEffect(() => {
-        // party
-        if (form.AccCode && Array.isArray(getPartyData)) {
-            const found = getPartyData.find(p => String(p.acccode) === String(form.AccCode));
-            setSelectedParty(found ?? null);
-            setSelected?.(found ?? null);
-        } else {
-            setSelectedParty(null);
-            setSelected?.(null);
+        if (getCheckerData && getCheckerData?.length > 0 && !selectedProperty) {
+            onExeChange(getCheckerData[0]);
         }
-    }, [form.AccCode, getPartyData]);
+    }, [getCheckerData, selectedProperty, onExeChange]);
+
+    // useEffect(() => {
+    //     // party
+    //     if (form.AccCode && Array.isArray(getPartyData)) {
+    //         const found = getPartyData.find(p => String(p.acccode) === String(form.AccCode));
+    //         setSelectedParty(found ?? null);
+    //         setSelected?.(found ?? null);
+    //     } else {
+    //         setSelectedParty(null);
+    //         setSelected?.(null);
+    //     }
+    // }, [form.AccCode, getPartyData]);
 
     useEffect(() => {
         // bank
@@ -629,57 +651,114 @@ const CheckingForm: React.FC<Props> = ({
 
     // console.log('Payment:', form.PayType);
 
+    // const goNext = async () => {
+    //     // Validate required fields on Next from Step 1
+    //     if (step === 1) {
+    //         // If AdjType is ACC you previously returned early — keep same behaviour but still validate if you want
+    //         // The user asked validation for Payment type, Party, Amount, Bank — apply only when user actually wants to go to Step 2
+    //         // Validate required fields:
+    //         const MacCode = form.MacCode ?? form.MacCode?.toString() ?? '';
+    //         const ShfCode = form.ShfCode ?? form.ShfCode?.toString() ?? '';
+    //         const DsnCode = form.DsnCode ?? form.DsnCode?.toString() ?? '';
+    //         const Qty = form.Qty ?? form.Qty?.toString() ?? '';
+    //         const GrdCode = form.GrdCode ?? form.GrdCode?.toString() ?? '';
+    //         const accCode = form.AccCode ?? '';
+    //         const accName = form.AccName ?? '';
+    //         const amountRaw = form.Amount ?? '';
+    //         const bankName = form.BankName ?? '';
+
+    //         // Normalize amount: allow strings with commas
+    //         // const numericAmount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
+
+    //         if (!MacCode || String(MacCode).trim() === '') {
+    //             Alert.alert('Validation', 'Please select Machine.');
+    //             return;
+    //         } else if (!ShfCode || String(ShfCode).trim() === '') {
+    //             Alert.alert('Validation', 'Please select Shift.');
+    //             return;
+
+    //         } else if (!DsnCode || String(DsnCode).trim() === '') {
+    //             Alert.alert('Validation', 'Please select Design.');
+    //             return;
+
+    //         } else if (!Qty || String(Qty).trim() === '') {
+    //             Alert.alert('Validation', 'Please enter Mtrs.');
+    //             return;
+
+    //         } else if (!GrdCode || String(GrdCode).trim() === '') {
+    //             Alert.alert('Validation', 'Please select Grade.');
+    //             return;
+    //         }
+    //         else {
+    //             // Save current form.d1 into cache for this party (so switching away & back can restore)
+
+
+    //             // proceed to step 2
+    //             // setStep(2);
+    //             try {
+    //                 await handleSavePart2();
+    //             } catch (err) {
+    //                 console.warn('save part2 failed', err);
+    //             }
+    //             return;
+    //         }
+    //     }
+
+    //     // If already in step 2, perform "save" action
+    //     // if (step === 2) {
+    //     //     // call save handlers as earlier
+    //     //     // try {
+    //     //     //     await handleSavePart1();
+    //     //     // } catch (err) {
+    //     //     //     console.warn('save part1 failed', err);
+    //     //     // }
+    //     //     // Optionally continue to final save
+    //     //     try {
+    //     //         await handleSavePart2();
+    //     //     } catch (err) {
+    //     //         console.warn('save part2 failed', err);
+    //     //     }
+    //     // }
+    // };
     const goNext = async () => {
         // Validate required fields on Next from Step 1
         if (step === 1) {
-            // If AdjType is ACC you previously returned early — keep same behaviour but still validate if you want
-            // The user asked validation for Payment type, Party, Amount, Bank — apply only when user actually wants to go to Step 2
-            // Validate required fields:
-            const MacCode = form.MacCode ?? form.MacCode?.toString() ?? '';
-            const ShfCode = form.ShfCode ?? form.ShfCode?.toString() ?? '';
-            const DsnCode = form.DsnCode ?? form.DsnCode?.toString() ?? '';
-            const Qty = form.Qty ?? form.Qty?.toString() ?? '';
-            const GrdCode = form.GrdCode ?? form.GrdCode?.toString() ?? '';
-            const accCode = form.AccCode ?? '';
-            const accName = form.AccName ?? '';
-            const amountRaw = form.Amount ?? '';
-            const bankName = form.BankName ?? '';
 
             // Normalize amount: allow strings with commas
             // const numericAmount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
 
-            if (!MacCode || String(MacCode).trim() === '') {
-                Alert.alert('Validation', 'Please select Machine.');
-                return;
-            } else if (!ShfCode || String(ShfCode).trim() === '') {
-                Alert.alert('Validation', 'Please select Shift.');
-                return;
+            // if (!MacCode || String(MacCode).trim() === '') {
+            //     Alert.alert('Validation', 'Please select Machine.');
+            //     return;
+            // } else if (!ShfCode || String(ShfCode).trim() === '') {
+            //     Alert.alert('Validation', 'Please select Shift.');
+            //     return;
 
-            } else if (!DsnCode || String(DsnCode).trim() === '') {
-                Alert.alert('Validation', 'Please select Design.');
-                return;
+            // } else if (!DsnCode || String(DsnCode).trim() === '') {
+            //     Alert.alert('Validation', 'Please select Design.');
+            //     return;
 
-            } else if (!Qty || String(Qty).trim() === '') {
-                Alert.alert('Validation', 'Please enter Mtrs.');
-                return;
+            // } else if (!Qty || String(Qty).trim() === '') {
+            //     Alert.alert('Validation', 'Please enter Mtrs.');
+            //     return;
 
-            } else if (!GrdCode || String(GrdCode).trim() === '') {
-                Alert.alert('Validation', 'Please select Grade.');
-                return;
-            }
-            else {
-                // Save current form.d1 into cache for this party (so switching away & back can restore)
+            // } else if (!GrdCode || String(GrdCode).trim() === '') {
+            //     Alert.alert('Validation', 'Please select Grade.');
+            //     return;
+            // }
+            // else {
+            // Save current form.d1 into cache for this party (so switching away & back can restore)
 
 
-                // proceed to step 2
-                // setStep(2);
-                try {
-                    await handleSavePart2();
-                } catch (err) {
-                    console.warn('save part2 failed', err);
-                }
-                return;
-            }
+            // proceed to step 2
+            setStep(2);
+            // try {
+            //     await handleSavePart2();
+            // } catch (err) {
+            //     console.warn('save part2 failed', err);
+            // }
+            return;
+            // }
         }
 
         // If already in step 2, perform "save" action
@@ -940,7 +1019,7 @@ const CheckingForm: React.FC<Props> = ({
                                 emptyMessage="No properties available"
                             />
                         </View> */}
-                        <View style={styles.twoColRow123}>
+                        {/* <View style={styles.twoColRow123}>
                             <View style={styles.col1} >
                                 <Text style={styles.label}>Select Year <Text style={{ color: 'red' }}>*</Text></Text>
 
@@ -998,9 +1077,9 @@ const CheckingForm: React.FC<Props> = ({
                                     maximumDate={new Date()} // Only allow today or past dates
                                 />
                             </View>
-                        </View>
+                        </View> */}
                         {/* Machine - CONDITIONAL RENDERING */}
-                        <View style={styles.twoColRow123}>
+                        {/* <View style={styles.twoColRow123}>
                             <View style={styles.col1}>
                                 <Text style={styles.label}>
                                     {isPLN ? 'Machine' : 'Select Machine'} <Text style={{ color: 'red' }}>*</Text>
@@ -1095,27 +1174,27 @@ const CheckingForm: React.FC<Props> = ({
                                 />
 
                             </View>
-                        </View>
+                        </View> */}
 
                         {/* Design - CONDITIONAL RENDERING */}
                         <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}> {'Select Design'} <Text style={{ color: 'red' }}>*</Text>
+                            <Text style={styles.label}> {'Select Party'} <Text style={{ color: 'red' }}>*</Text>
                             </Text>
                             <PartyDropdown
                                 data={getDesignData}
-                                placeholder="Choose design..."
-                                labelKey={["DsnName", "DsnCode"]}
-                                valueKey="DsnCode"
+                                placeholder="Choose party..."
+                                labelKey={["accname", "acccode"]}
+                                valueKey="acccode"
                                 pageSize={12}
                                 initialValue={selectedDesign ?? null}
                                 selected={selectedDesign1 ?? null}
                                 loading={Boolean(getDesignLoading)}
-                                type="design"
+                                type="party"
                                 onSelect={(item) => {
                                     setForm(prev => ({
                                         ...prev,
-                                        DsnCode: item.DsnCode,
-                                        DsnName: item.DsnName
+                                        acccode: item.acccode,
+                                        accname: item.accname
                                     }));
                                     setSelectedDesign(item);
                                     setSelectedDesign1?.(item);
@@ -1124,8 +1203,8 @@ const CheckingForm: React.FC<Props> = ({
                                     if (!val) {
                                         setForm(prev => ({
                                             ...prev,
-                                            DsnCode: '',
-                                            DsnName: '',
+                                            acccode: '',
+                                            accname: '',
 
                                         }));
                                         setSelectedDesign(null);
@@ -1133,8 +1212,8 @@ const CheckingForm: React.FC<Props> = ({
                                     } else {
                                         setForm(prev => ({
                                             ...prev,
-                                            DsnCode: val.DsnCode,
-                                            DsnName: val.DsnName,
+                                            acccode: val.acccode,
+                                            accname: val.accname,
 
                                         }));
                                         setSelectedDesign(val as DesignData);
@@ -1147,23 +1226,24 @@ const CheckingForm: React.FC<Props> = ({
 
                         {/* Checker - CONDITIONAL RENDERING */}
                         <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}> {'Select Checker'} <Text style={{ color: 'red' }}>*</Text>
+                            <Text style={styles.label}> {'Select Item'} <Text style={{ color: 'red' }}>*</Text>
                             </Text>
-                            <PartyDropdown
+                            {/* <PartyDropdown
                                 data={getCheckerData}
-                                placeholder="Choose design..."
-                                labelKey={["EmpName", "EmpCode"]}
-                                valueKey="EmpCode"
+                                placeholder="Choose items..."
+                                labelKey={["itmname", "itmcode"]}
+                                valueKey="itmcode"
                                 pageSize={12}
                                 initialValue={selectedChecker ?? null}
                                 selected={selectedChecker1 ?? null}
                                 loading={Boolean(getCheckerLoading)}
-                                type="checker"
+                                type="item"
+                                multiple={true}
                                 onSelect={(item) => {
                                     setForm(prev => ({
                                         ...prev,
-                                        EmpCode: item.EmpCode,
-                                        EmpName: item.EmpName
+                                        itmcode: item?.itmcode || '',
+                                        itmname: item?.itmname || '',
                                     }));
                                     setSelectedChecker(item);
                                     setSelectedChecker1?.(item);
@@ -1172,8 +1252,8 @@ const CheckingForm: React.FC<Props> = ({
                                     if (!val) {
                                         setForm(prev => ({
                                             ...prev,
-                                            EmpCode: '',
-                                            EmpName: '',
+                                            itmcode: '',
+                                            itmname: '',
 
                                         }));
                                         setSelectedChecker(null);
@@ -1181,15 +1261,40 @@ const CheckingForm: React.FC<Props> = ({
                                     } else {
                                         setForm(prev => ({
                                             ...prev,
-                                            EmpCode: val.EmpCode,
-                                            EmpName: val.EmpName,
+                                            itmcode: val?.itmcode || '',
+                                            itmname: val?.itmname || '',
 
                                         }));
                                         setSelectedChecker(val as CheckerData);
                                         setSelectedChecker1?.(val as CheckerData);
                                     }
                                 }}
+                            /> */}
+                            <SearchableDropdown
+                                data={getCheckerData}
+                                labelKey={["itmname", "itmcode"]}
+                                valueKey="itmcode"
+                                placeholder="Choose item..."
+                                pageSize={10}
+                                initialValue={selectedProperty ?? []} // Ensure this is an array
+                                // onSelect={(items) => {
+                                //     // items is an array of selected objects
+                                //     setSelectedProperty(items);
+                                //     // Extract itmcode values and pass as array to parent
+                                //     const selectedCodes = items.map(item => item.itmcode);
+                                //     setForm(prev => ({ ...prev, itmcode: selectedCodes }));
+                                // }}
+                                onSelect={(items) => {
+                                    console.log("Selected items:", items); // Debug
+                                    setSelectedProperty(items);
+                                    const selectedCodes = items.map(item => item.itmcode);
+                                    setForm(prev => ({ ...prev, itmcode: selectedCodes }));
+                                }}
+
+                                multiple={true}
+                                emptyMessage="No items available"
                             />
+
 
                         </View>
 
@@ -1418,14 +1523,11 @@ const CheckingForm: React.FC<Props> = ({
                                 <Text style={styles.saveText}>{AdjType === 'ACC' ? 'Save' : 'Next'}</Text>
                             </TouchableOpacity>
                         </View>
-                        <View style={styles.navRow}>
+                        {/* <View style={styles.navRow}>
                             <TouchableOpacity style={styles.ghostBtn} onPress={goPrev}>
                                 <Icon name="arrow-back" size={18} color={theme.TEXT_SECONDARY} />
                                 <Text style={styles.ghostText}>Previous</Text>
                             </TouchableOpacity>
-
-                            {/* <View style={{ flex: 1 }} /> */}
-
                             <TouchableOpacity style={styles.faultsBtn12} onPress={goFaults} disabled={!isConnected}>
                                 <Text style={styles.saveText}>{getFaultsLoading ? 'Loading...' : `Select Faults [ ${form?.d2 ? form.d2.length : 0} ]`}</Text>
                             </TouchableOpacity>
@@ -1435,7 +1537,7 @@ const CheckingForm: React.FC<Props> = ({
                             <TouchableOpacity style={styles.saveBtn} onPress={goNext} disabled={!isConnected}>
                                 <Text style={styles.saveText}>{getSaveLoading ? 'Saving...' : 'Save'}</Text>
                             </TouchableOpacity>
-                        </View>
+                        </View> */}
                     </View>
                 )}
 
@@ -1543,7 +1645,7 @@ const CheckingForm: React.FC<Props> = ({
                                 maximumDate={new Date()} // Only allow today or past dates
                             />
 
-                            <View style={{ marginTop: 12 }}>
+                            {/* <View style={{ marginTop: 12 }}>
                                 <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
                                 <SearchableDropdown
                                     data={getPropertyData}
@@ -1559,7 +1661,7 @@ const CheckingForm: React.FC<Props> = ({
                                     multiple={false}
                                     emptyMessage="No properties available"
                                 />
-                            </View>
+                            </View> */}
 
                             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 }}>
                                 <TouchableOpacity

@@ -217,14 +217,14 @@ const FaultsModal: React.FC<FaultsModalProps> = ({
         }
     }, [visible, cacheKey, initialFilledData]);
 
-    useEffect(() => {
-        const updateLayout = () => {
-            const { width } = Dimensions.get('window');
-            // No need to update state here, just recalculate numColumns and cardWidth
-        };
-        Dimensions.addEventListener('change', updateLayout);
-        return () => Dimensions.removeEventListener('change', updateLayout);
-    }, []);
+    // useEffect(() => {
+    //     const updateLayout = () => {
+    //         const { width } = Dimensions.get('window');
+    //         // No need to update state here, just recalculate numColumns and cardWidth
+    //     };
+    //     Dimensions.addEventListener('change', updateLayout);
+    //     return () => Dimensions.removeEventListener('change', updateLayout);
+    // }, []);
 
 
     // Search functionality

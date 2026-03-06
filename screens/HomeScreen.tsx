@@ -156,18 +156,48 @@ const APP_SECTIONS = [
     },
     // Only For Sudamo
     {
-        title: 'D',
+        title: 'T',
         data: [
             { id: '17', name: 'Taka Checking Entry', screen: 'Taka Checking Entry', icon: 'dynamic-form', iconColor: '#5B2CFF' },
         ],
     },
     {
+        title: 'S',
+        data: [
+            { id: '18', name: 'Sales Order Tracking', screen: 'Sales Order Tracking', icon: 'track-changes', iconColor: '#DB945A' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '19', name: 'Yarn Stock Verification', screen: 'Yarn Stock Verification', icon: 'check-circle', iconColor: '#008080' },
+        ],
+    },
+    {
+        title: 'C',
+        data: [
+            { id: '20', name: 'Checking Scanner', screen: 'Checking Scanner', icon: 'document-scanner', iconColor: '#4169E1' },
+        ],
+    },
+    {
+        title: 'P',
+        data: [
+            { id: '21', name: 'Purchase Order Tracking', screen: 'Purchase Order Tracking', icon: 'shopping-cart', iconColor: '#228B22' },
+        ],
+    },
+    {
         title: 'D',
         data: [
-            { id: '17', name: 'Sales Order Tracking', screen: 'Sales Order Tracking', icon: 'track-changes', iconColor: '#DB945A' },
+            { id: '22', name: 'Design Authorization', screen: 'Design Authorization', icon: 'edit', iconColor: '#4B0082' },
         ],
     },
     // 
+    {
+        title: 'S',
+        data: [
+            { id: '23', name: 'Sales Analysis', screen: 'Sales Analysis', icon: 'bar-chart', iconColor: '#221080' },
+        ],
+    },
 
 ];
 

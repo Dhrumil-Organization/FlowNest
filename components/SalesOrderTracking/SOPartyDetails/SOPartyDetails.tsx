@@ -199,261 +199,261 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 uid: order.srno,
                 srno: order.uid,
             };
-            // const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
-            const response = {
-                "data": {
-                    "data": {
-                        "data_all": [
-                            {
-                                "chalno": "00001028/F",
-                                "chaldate": "03/07/2025",
-                                "chalqty": "191.250",
-                                "uid": "370005541",
-                                "dsnname": "PEANUT",
-                                "shdname": "PRINT",
-                                "chalsrno": "1",
-                                "data": [
-                                    {
-                                        "chaluid": "370005541",
-                                        "stepname": "purchase",
-                                        "totalqty": "382.500",
-                                        "rate": "120.00000",
-                                        "amount": 45955
-                                    },
-                                    {
-                                        "chaluid": "370005542",
-                                        "stepname": "purchase",
-                                        "totalqty": "382.500",
-                                        "rate": "120.00000",
-                                        "amount": 85623
-                                    },
-                                    {
-                                        "chaluid": "370005543",
-                                        "stepname": "purchase",
-                                        "totalqty": "382.500",
-                                        "rate": "120.00000",
-                                        "amount": 741553
-                                    },
-                                    {
-                                        "chaluid": "370005544",
-                                        "stepname": "purchase",
-                                        "totalqty": "382.500",
-                                        "rate": "120.00000",
-                                        "amount": 96652
-                                    },
-                                    {
-                                        "chaluid": "370005545",
-                                        "stepname": "purchase",
-                                        "totalqty": "382.500",
-                                        "rate": "120.00000",
-                                        "amount": 884552
-                                    }
-                                ]
-                            },
-                            {
-                                "chalno": "00001029/F",
-                                "chaldate": "03/07/2025",
-                                "chalqty": "190.500",
-                                "uid": "370005542",
-                                "dsnname": "PEANUT",
-                                "shdname": "PRINT",
-                                "chalsrno": "1",
-                                "data": [
-                                    {
-                                        "chaluid": "370005542",
-                                        "stepname": "purchase",
-                                        "totalqty": "381.000",
-                                        "rate": "120.00000",
-                                        "amount": 45720
-                                    }
-                                ]
-                            },
-                            {
-                                "chalno": "00001030/F",
-                                "chaldate": "03/07/2025",
-                                "chalqty": "194.500",
-                                "uid": "370005544",
-                                "dsnname": "PEANUT",
-                                "shdname": "PRINT",
-                                "chalsrno": "1",
-                                "data": [
-                                    {
-                                        "chaluid": "370005544",
-                                        "stepname": "purchase",
-                                        "totalqty": "389.000",
-                                        "rate": "120.00000",
-                                        "amount": 46680
-                                    }
-                                ]
-                            },
-                            {
-                                "chalno": "00001031/F",
-                                "chaldate": "03/07/2025",
-                                "chalqty": "186.750",
-                                "uid": "370005546",
-                                "dsnname": "PEANUT",
-                                "shdname": "PRINT",
-                                "chalsrno": "1",
-                                "data": [
-                                    {
-                                        "chaluid": "370005546",
-                                        "stepname": "purchase",
-                                        "totalqty": "373.500",
-                                        "rate": "120.00000",
-                                        "amount": 44820
-                                    }
-                                ]
-                            }
-                        ],
-                        "grandtotal": {
-                            "purchase": 1526,
-                            "jobin": 555,
-                            "jobin_prod": 5654,
-                            "Repack": 4585,
-                            "Grading": 44565
-                        }
-                    },
-                    "success": true,
-                    "message": ""
-                },
-                "status": 200,
-                "headers": {
-                    "access-control-allow-methods": "GET",
-                    "access-control-allow-origin": "*",
-                    "cache-control": "no-cache, private",
-                    "connection": "Keep-Alive",
-                    "content-type": "application/json; charset=utf-8",
-                    "date": "Mon, 23 Feb 2026 10:08:54 GMT",
-                    "keep-alive": "timeout=5, max=99",
-                    "server": "Apache/2.4.52 (Ubuntu)",
-                    "vary": "Authorization"
-                },
-                "config": {
-                    "transitional": {
-                        "silentJSONParsing": true,
-                        "forcedJSONParsing": true,
-                        "clarifyTimeoutError": false
-                    },
-                    "adapter": [
-                        "xhr",
-                        "http",
-                        "fetch"
-                    ],
-                    "transformRequest": [
-                        null
-                    ],
-                    "transformResponse": [
-                        null
-                    ],
-                    "timeout": 0,
-                    "xsrfCookieName": "XSRF-TOKEN",
-                    "xsrfHeaderName": "X-XSRF-TOKEN",
-                    "maxContentLength": -1,
-                    "maxBodyLength": -1,
-                    "env": {},
-                    "headers": {
-                        "Accept": "application/json, text/plain, */*",
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzIiwianRpIjoiODMzNTdkNjU4ZDFiYjJlMWJlYWU5Zjc4NmQzMTRmMDk5MDliNzExNWMwNmI2ZjkzNDA4NjA1OWE2OTc4ZmIxYjEwZTk1MjlhZmMzZTJiZTYiLCJpYXQiOjE3NzE1ODAzMzQsIm5iZiI6MTc3MTU4MDMzNCwiZXhwIjoxODAzMTE2MzM0LCJzdWIiOiIxIiwic2NvcGVzIjpbXX0.Rr1B55n70Lrm1qhyhB10tbaZkG1AzWz5SxrA86k4U9XQ7ZslNsb0SecVbQxn4Wd0MIFcMO87S7y1HDJcQAcL9W-aTWAH8RbIRldji8SYOl0P3YIOJJnN797q8IXXgJQLfBpWMKHwW1DYvoBlf75cBdVJs_JyJCRXbgo8HXS6mwlIZ2o-3wu3QYt41BtaYhlE-lNWGqs-pQT5-tIlfFh40a2wc3_xrwV-DHNH84KJcm6t7wS7N5_NJBYELRGxfVutdg71LZ2Y8ZsXSmOZTH9_ckEAsRRoDSC55k-9O9QykMJds4WfvzN7HsEm8mzy3GvxWKY1xgCGOC_5EW-zk0IN9yiqVdnh_ysRp5GABtID89u5Ob1NkwBg95HXnQL1BdUYEg0C1sI8hvzORM4e6utOOnhN7C1MbtgBM7hKZBaS-BODdtHG2o1-XaY_nTqBw_UwwiqmM7d8C683zMeutOjj62a1BwNRg3xB90SnqrNN174Wf0a-hzMZ4G7rt1t5XRPfZMXuHlNStjNKuQv-HRzMUoPQ02gqwoaht8vDh8cS78nooqWzOiLntIDfZyUmZji79t9dNLo_M9DrpCQxs8vPfoXkREOH0fHxzoXxgymbmoAkn_ESBZZk30AI1kzXaT2UYOK_rziBdxF1NQQGXJ3R4tzEt_yDlx_1Q3JhKhyNGIA",
-                        "X-Requested-with": "XMLHttpRequest"
-                    },
-                    "method": "post",
-                    "url": "https://apig.tms-webapp.com/api/salesorderpartychallantracking",
-                    "data": "{\"fromdate\":\"01-02-2026\",\"todate\":\"23-02-2026\",\"yearno\":\"26\",\"sexes\":\"0\",\"type\":\"all\",\"dsncodes\":[],\"parcode\":\"19996\",\"prptype\":\"S\",\"txntype\":\"prodorderlist\",\"uid\":\"1\",\"srno\":\"630032512\"}",
-                    "allowAbsoluteUrls": true
-                },
-                "request": {
-                    "UNSENT": 0,
-                    "OPENED": 1,
-                    "HEADERS_RECEIVED": 2,
-                    "LOADING": 3,
-                    "DONE": 4,
-                    "readyState": 4,
-                    "status": 200,
-                    "timeout": 0,
-                    "withCredentials": true,
-                    "upload": {},
-                    "_aborted": false,
-                    "_hasError": false,
-                    "_method": "POST",
-                    "_perfKey": "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesorderpartychallantracking",
-                    "_response": "{\"data\":{\"data_all\":[],\"grandtotal\":[]},\"success\":true,\"message\":\"\"}",
-                    "_url": "https://apig.tms-webapp.com/api/salesorderpartychallantracking",
-                    "_timedOut": false,
-                    "_trackingName": null,
-                    "_incrementalEvents": false,
-                    "_startTime": 8554836.9546,
-                    "_performanceLogger": {
-                        "_timespans": {
-                            "network_XMLHttpRequest_https://apig.tms-webapp.com/api/checkdevice": {
-                                "startTime": 8442043.8289,
-                                "endTime": 8442216.0322,
-                                "totalTime": 172.20329999923706
-                            },
-                            "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesordertracking": {
-                                "startTime": 8453162.512,
-                                "endTime": 8453343.5957,
-                                "totalTime": 181.08369999937713
-                            },
-                            "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesorderpartytracking": {
-                                "startTime": 8461953.8026,
-                                "endTime": 8462145.5017,
-                                "totalTime": 191.6991000007838
-                            },
-                            "network_XMLHttpRequest_http://10.0.2.2:8081/symbolicate": {
-                                "startTime": 8463179.2969,
-                                "endTime": 8463438.5036,
-                                "totalTime": 259.2066999990493
-                            },
-                            "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesorderpartychallantracking": {
-                                "startTime": 8480689.5179,
-                                "endTime": 8480859.2388,
-                                "totalTime": 169.72090000100434
-                            }
-                        },
-                        "_extras": {},
-                        "_points": {
-                            "initializeCore_start": 8440742.8791,
-                            "initializeCore_end": 8441115.1147
-                        },
-                        "_pointExtras": {},
-                        "_closed": false
-                    },
-                    "responseHeaders": {
-                        "Access-Control-Allow-Origin": "*",
-                        "Content-Type": "application/json; charset=utf-8",
-                        "Access-Control-Allow-Methods": "GET",
-                        "Date": "Mon, 23 Feb 2026 10:08:54 GMT",
-                        "Vary": "Authorization",
-                        "Connection": "Keep-Alive",
-                        "Server": "Apache/2.4.52 (Ubuntu)",
-                        "Cache-Control": "no-cache, private",
-                        "Keep-Alive": "timeout=5, max=99"
-                    },
-                    "_requestId": null,
-                    "_headers": {
-                        "accept": "application/json, text/plain, */*",
-                        "content-type": "application/json",
-                        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzIiwianRpIjoiODMzNTdkNjU4ZDFiYjJlMWJlYWU5Zjc4NmQzMTRmMDk5MDliNzExNWMwNmI2ZjkzNDA4NjA1OWE2OTc4ZmIxYjEwZTk1MjlhZmMzZTJiZTYiLCJpYXQiOjE3NzE1ODAzMzQsIm5iZiI6MTc3MTU4MDMzNCwiZXhwIjoxODAzMTE2MzM0LCJzdWIiOiIxIiwic2NvcGVzIjpbXX0.Rr1B55n70Lrm1qhyhB10tbaZkG1AzWz5SxrA86k4U9XQ7ZslNsb0SecVbQxn4Wd0MIFcMO87S7y1HDJcQAcL9W-aTWAH8RbIRldji8SYOl0P3YIOJJnN797q8IXXgJQLfBpWMKHwW1DYvoBlf75cBdVJs_JyJCRXbgo8HXS6mwlIZ2o-3wu3QYt41BtaYhlE-lNWGqs-pQT5-tIlfFh40a2wc3_xrwV-DHNH84KJcm6t7wS7N5_NJBYELRGxfVutdg71LZ2Y8ZsXSmOZTH9_ckEAsRRoDSC55k-9O9QykMJds4WfvzN7HsEm8mzy3GvxWKY1xgCGOC_5EW-zk0IN9yiqVdnh_ysRp5GABtID89u5Ob1NkwBg95HXnQL1BdUYEg0C1sI8hvzORM4e6utOOnhN7C1MbtgBM7hKZBaS-BODdtHG2o1-XaY_nTqBw_UwwiqmM7d8C683zMeutOjj62a1BwNRg3xB90SnqrNN174Wf0a-hzMZ4G7rt1t5XRPfZMXuHlNStjNKuQv-HRzMUoPQ02gqwoaht8vDh8cS78nooqWzOiLntIDfZyUmZji79t9dNLo_M9DrpCQxs8vPfoXkREOH0fHxzoXxgymbmoAkn_ESBZZk30AI1kzXaT2UYOK_rziBdxF1NQQGXJ3R4tzEt_yDlx_1Q3JhKhyNGIA",
-                        "x-requested-with": "XMLHttpRequest"
-                    },
-                    "_responseType": "",
-                    "_sent": true,
-                    "_lowerCaseResponseHeaders": {
-                        "access-control-allow-origin": "*",
-                        "content-type": "application/json; charset=utf-8",
-                        "access-control-allow-methods": "GET",
-                        "date": "Mon, 23 Feb 2026 10:08:54 GMT",
-                        "vary": "Authorization",
-                        "connection": "Keep-Alive",
-                        "server": "Apache/2.4.52 (Ubuntu)",
-                        "cache-control": "no-cache, private",
-                        "keep-alive": "timeout=5, max=99"
-                    },
-                    "_subscriptions": [],
-                    "responseURL": "https://apig.tms-webapp.com/api/salesorderpartychallantracking"
-                }
-            }
+            const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
+            // const response = {
+            //     "data": {
+            //         "data": {
+            //             "data_all": [
+            //                 {
+            //                     "chalno": "00001028/F",
+            //                     "chaldate": "03/07/2025",
+            //                     "chalqty": "191.250",
+            //                     "uid": "370005541",
+            //                     "dsnname": "PEANUT",
+            //                     "shdname": "PRINT",
+            //                     "chalsrno": "1",
+            //                     "data": [
+            //                         {
+            //                             "chaluid": "370005541",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "382.500",
+            //                             "rate": "120.00000",
+            //                             "amount": 45955
+            //                         },
+            //                         {
+            //                             "chaluid": "370005542",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "382.500",
+            //                             "rate": "120.00000",
+            //                             "amount": 85623
+            //                         },
+            //                         {
+            //                             "chaluid": "370005543",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "382.500",
+            //                             "rate": "120.00000",
+            //                             "amount": 741553
+            //                         },
+            //                         {
+            //                             "chaluid": "370005544",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "382.500",
+            //                             "rate": "120.00000",
+            //                             "amount": 96652
+            //                         },
+            //                         {
+            //                             "chaluid": "370005545",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "382.500",
+            //                             "rate": "120.00000",
+            //                             "amount": 884552
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "chalno": "00001029/F",
+            //                     "chaldate": "03/07/2025",
+            //                     "chalqty": "190.500",
+            //                     "uid": "370005542",
+            //                     "dsnname": "PEANUT",
+            //                     "shdname": "PRINT",
+            //                     "chalsrno": "1",
+            //                     "data": [
+            //                         {
+            //                             "chaluid": "370005542",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "381.000",
+            //                             "rate": "120.00000",
+            //                             "amount": 45720
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "chalno": "00001030/F",
+            //                     "chaldate": "03/07/2025",
+            //                     "chalqty": "194.500",
+            //                     "uid": "370005544",
+            //                     "dsnname": "PEANUT",
+            //                     "shdname": "PRINT",
+            //                     "chalsrno": "1",
+            //                     "data": [
+            //                         {
+            //                             "chaluid": "370005544",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "389.000",
+            //                             "rate": "120.00000",
+            //                             "amount": 46680
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "chalno": "00001031/F",
+            //                     "chaldate": "03/07/2025",
+            //                     "chalqty": "186.750",
+            //                     "uid": "370005546",
+            //                     "dsnname": "PEANUT",
+            //                     "shdname": "PRINT",
+            //                     "chalsrno": "1",
+            //                     "data": [
+            //                         {
+            //                             "chaluid": "370005546",
+            //                             "stepname": "purchase",
+            //                             "totalqty": "373.500",
+            //                             "rate": "120.00000",
+            //                             "amount": 44820
+            //                         }
+            //                     ]
+            //                 }
+            //             ],
+            //             "grandtotal": {
+            //                 "purchase": 1526,
+            //                 "jobin": 555,
+            //                 "jobin_prod": 5654,
+            //                 "Repack": 4585,
+            //                 "Grading": 44565
+            //             }
+            //         },
+            //         "success": true,
+            //         "message": ""
+            //     },
+            //     "status": 200,
+            //     "headers": {
+            //         "access-control-allow-methods": "GET",
+            //         "access-control-allow-origin": "*",
+            //         "cache-control": "no-cache, private",
+            //         "connection": "Keep-Alive",
+            //         "content-type": "application/json; charset=utf-8",
+            //         "date": "Mon, 23 Feb 2026 10:08:54 GMT",
+            //         "keep-alive": "timeout=5, max=99",
+            //         "server": "Apache/2.4.52 (Ubuntu)",
+            //         "vary": "Authorization"
+            //     },
+            //     "config": {
+            //         "transitional": {
+            //             "silentJSONParsing": true,
+            //             "forcedJSONParsing": true,
+            //             "clarifyTimeoutError": false
+            //         },
+            //         "adapter": [
+            //             "xhr",
+            //             "http",
+            //             "fetch"
+            //         ],
+            //         "transformRequest": [
+            //             null
+            //         ],
+            //         "transformResponse": [
+            //             null
+            //         ],
+            //         "timeout": 0,
+            //         "xsrfCookieName": "XSRF-TOKEN",
+            //         "xsrfHeaderName": "X-XSRF-TOKEN",
+            //         "maxContentLength": -1,
+            //         "maxBodyLength": -1,
+            //         "env": {},
+            //         "headers": {
+            //             "Accept": "application/json, text/plain, */*",
+            //             "Content-Type": "application/json",
+            //             "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzIiwianRpIjoiODMzNTdkNjU4ZDFiYjJlMWJlYWU5Zjc4NmQzMTRmMDk5MDliNzExNWMwNmI2ZjkzNDA4NjA1OWE2OTc4ZmIxYjEwZTk1MjlhZmMzZTJiZTYiLCJpYXQiOjE3NzE1ODAzMzQsIm5iZiI6MTc3MTU4MDMzNCwiZXhwIjoxODAzMTE2MzM0LCJzdWIiOiIxIiwic2NvcGVzIjpbXX0.Rr1B55n70Lrm1qhyhB10tbaZkG1AzWz5SxrA86k4U9XQ7ZslNsb0SecVbQxn4Wd0MIFcMO87S7y1HDJcQAcL9W-aTWAH8RbIRldji8SYOl0P3YIOJJnN797q8IXXgJQLfBpWMKHwW1DYvoBlf75cBdVJs_JyJCRXbgo8HXS6mwlIZ2o-3wu3QYt41BtaYhlE-lNWGqs-pQT5-tIlfFh40a2wc3_xrwV-DHNH84KJcm6t7wS7N5_NJBYELRGxfVutdg71LZ2Y8ZsXSmOZTH9_ckEAsRRoDSC55k-9O9QykMJds4WfvzN7HsEm8mzy3GvxWKY1xgCGOC_5EW-zk0IN9yiqVdnh_ysRp5GABtID89u5Ob1NkwBg95HXnQL1BdUYEg0C1sI8hvzORM4e6utOOnhN7C1MbtgBM7hKZBaS-BODdtHG2o1-XaY_nTqBw_UwwiqmM7d8C683zMeutOjj62a1BwNRg3xB90SnqrNN174Wf0a-hzMZ4G7rt1t5XRPfZMXuHlNStjNKuQv-HRzMUoPQ02gqwoaht8vDh8cS78nooqWzOiLntIDfZyUmZji79t9dNLo_M9DrpCQxs8vPfoXkREOH0fHxzoXxgymbmoAkn_ESBZZk30AI1kzXaT2UYOK_rziBdxF1NQQGXJ3R4tzEt_yDlx_1Q3JhKhyNGIA",
+            //             "X-Requested-with": "XMLHttpRequest"
+            //         },
+            //         "method": "post",
+            //         "url": "https://apig.tms-webapp.com/api/salesorderpartychallantracking",
+            //         "data": "{\"fromdate\":\"01-02-2026\",\"todate\":\"23-02-2026\",\"yearno\":\"26\",\"sexes\":\"0\",\"type\":\"all\",\"dsncodes\":[],\"parcode\":\"19996\",\"prptype\":\"S\",\"txntype\":\"prodorderlist\",\"uid\":\"1\",\"srno\":\"630032512\"}",
+            //         "allowAbsoluteUrls": true
+            //     },
+            //     "request": {
+            //         "UNSENT": 0,
+            //         "OPENED": 1,
+            //         "HEADERS_RECEIVED": 2,
+            //         "LOADING": 3,
+            //         "DONE": 4,
+            //         "readyState": 4,
+            //         "status": 200,
+            //         "timeout": 0,
+            //         "withCredentials": true,
+            //         "upload": {},
+            //         "_aborted": false,
+            //         "_hasError": false,
+            //         "_method": "POST",
+            //         "_perfKey": "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesorderpartychallantracking",
+            //         "_response": "{\"data\":{\"data_all\":[],\"grandtotal\":[]},\"success\":true,\"message\":\"\"}",
+            //         "_url": "https://apig.tms-webapp.com/api/salesorderpartychallantracking",
+            //         "_timedOut": false,
+            //         "_trackingName": null,
+            //         "_incrementalEvents": false,
+            //         "_startTime": 8554836.9546,
+            //         "_performanceLogger": {
+            //             "_timespans": {
+            //                 "network_XMLHttpRequest_https://apig.tms-webapp.com/api/checkdevice": {
+            //                     "startTime": 8442043.8289,
+            //                     "endTime": 8442216.0322,
+            //                     "totalTime": 172.20329999923706
+            //                 },
+            //                 "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesordertracking": {
+            //                     "startTime": 8453162.512,
+            //                     "endTime": 8453343.5957,
+            //                     "totalTime": 181.08369999937713
+            //                 },
+            //                 "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesorderpartytracking": {
+            //                     "startTime": 8461953.8026,
+            //                     "endTime": 8462145.5017,
+            //                     "totalTime": 191.6991000007838
+            //                 },
+            //                 "network_XMLHttpRequest_http://10.0.2.2:8081/symbolicate": {
+            //                     "startTime": 8463179.2969,
+            //                     "endTime": 8463438.5036,
+            //                     "totalTime": 259.2066999990493
+            //                 },
+            //                 "network_XMLHttpRequest_https://apig.tms-webapp.com/api/salesorderpartychallantracking": {
+            //                     "startTime": 8480689.5179,
+            //                     "endTime": 8480859.2388,
+            //                     "totalTime": 169.72090000100434
+            //                 }
+            //             },
+            //             "_extras": {},
+            //             "_points": {
+            //                 "initializeCore_start": 8440742.8791,
+            //                 "initializeCore_end": 8441115.1147
+            //             },
+            //             "_pointExtras": {},
+            //             "_closed": false
+            //         },
+            //         "responseHeaders": {
+            //             "Access-Control-Allow-Origin": "*",
+            //             "Content-Type": "application/json; charset=utf-8",
+            //             "Access-Control-Allow-Methods": "GET",
+            //             "Date": "Mon, 23 Feb 2026 10:08:54 GMT",
+            //             "Vary": "Authorization",
+            //             "Connection": "Keep-Alive",
+            //             "Server": "Apache/2.4.52 (Ubuntu)",
+            //             "Cache-Control": "no-cache, private",
+            //             "Keep-Alive": "timeout=5, max=99"
+            //         },
+            //         "_requestId": null,
+            //         "_headers": {
+            //             "accept": "application/json, text/plain, */*",
+            //             "content-type": "application/json",
+            //             "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIzIiwianRpIjoiODMzNTdkNjU4ZDFiYjJlMWJlYWU5Zjc4NmQzMTRmMDk5MDliNzExNWMwNmI2ZjkzNDA4NjA1OWE2OTc4ZmIxYjEwZTk1MjlhZmMzZTJiZTYiLCJpYXQiOjE3NzE1ODAzMzQsIm5iZiI6MTc3MTU4MDMzNCwiZXhwIjoxODAzMTE2MzM0LCJzdWIiOiIxIiwic2NvcGVzIjpbXX0.Rr1B55n70Lrm1qhyhB10tbaZkG1AzWz5SxrA86k4U9XQ7ZslNsb0SecVbQxn4Wd0MIFcMO87S7y1HDJcQAcL9W-aTWAH8RbIRldji8SYOl0P3YIOJJnN797q8IXXgJQLfBpWMKHwW1DYvoBlf75cBdVJs_JyJCRXbgo8HXS6mwlIZ2o-3wu3QYt41BtaYhlE-lNWGqs-pQT5-tIlfFh40a2wc3_xrwV-DHNH84KJcm6t7wS7N5_NJBYELRGxfVutdg71LZ2Y8ZsXSmOZTH9_ckEAsRRoDSC55k-9O9QykMJds4WfvzN7HsEm8mzy3GvxWKY1xgCGOC_5EW-zk0IN9yiqVdnh_ysRp5GABtID89u5Ob1NkwBg95HXnQL1BdUYEg0C1sI8hvzORM4e6utOOnhN7C1MbtgBM7hKZBaS-BODdtHG2o1-XaY_nTqBw_UwwiqmM7d8C683zMeutOjj62a1BwNRg3xB90SnqrNN174Wf0a-hzMZ4G7rt1t5XRPfZMXuHlNStjNKuQv-HRzMUoPQ02gqwoaht8vDh8cS78nooqWzOiLntIDfZyUmZji79t9dNLo_M9DrpCQxs8vPfoXkREOH0fHxzoXxgymbmoAkn_ESBZZk30AI1kzXaT2UYOK_rziBdxF1NQQGXJ3R4tzEt_yDlx_1Q3JhKhyNGIA",
+            //             "x-requested-with": "XMLHttpRequest"
+            //         },
+            //         "_responseType": "",
+            //         "_sent": true,
+            //         "_lowerCaseResponseHeaders": {
+            //             "access-control-allow-origin": "*",
+            //             "content-type": "application/json; charset=utf-8",
+            //             "access-control-allow-methods": "GET",
+            //             "date": "Mon, 23 Feb 2026 10:08:54 GMT",
+            //             "vary": "Authorization",
+            //             "connection": "Keep-Alive",
+            //             "server": "Apache/2.4.52 (Ubuntu)",
+            //             "cache-control": "no-cache, private",
+            //             "keep-alive": "timeout=5, max=99"
+            //         },
+            //         "_subscriptions": [],
+            //         "responseURL": "https://apig.tms-webapp.com/api/salesorderpartychallantracking"
+            //     }
+            // }
             if (response.data.success === true) {
                 console.log("I am here:", response.data);
                 // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));

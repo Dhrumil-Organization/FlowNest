@@ -50,6 +50,7 @@ import { initDatabase } from './common/API/DatabaseManager';
 import { ThemeProvider } from './android/app/src/ThemeContext';
 import { API, initAPI } from './common/API/dynamicAPI';
 import { handleNotification } from './android/app/src/utils/notificationHandler';
+import SalesAnalysis from './components/SalesAnalysis/SalesAnalysis';
 
 const Stack = createNativeStackNavigator();
 
@@ -60,6 +61,7 @@ export default function App() {
   const [getMenuApps, setMenuApps] = useState<string | null>('');
   const [getDecodedMenuApps, setDecodedMenuApps] = useState([]);
   const [getUserDetails, setUserDetails] = useState<string | null>('');
+  const [getUserPrptype, setUserPrptype] = useState<string | null>('');
   const [getMasterSyncData, setMasterSyncData] = useState([]);
   const [getDeviceId, setDeviceId] = useState<string | null>('');
   const [getAuth, setAuth] = useState<boolean | null>(null);
@@ -138,10 +140,12 @@ export default function App() {
         const deviceId = await DeviceInfo.getUniqueId();
         const token = await AsyncStorage.getItem('access_token');
         const user_details = await AsyncStorage.getItem('user_details');
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
 
         setDeviceId(deviceId);
         setToken(token);
         setUserDetails(user_details);
+        setUserPrptype(user_prptype);
         setIsLoggedIn(!!token);
 
         const netState = await NetInfo.fetch();
@@ -527,6 +531,12 @@ export default function App() {
                     <Stack.Screen name="SOPartyDetailsPart1">{(props) =>
                       <>
                         <SOPartyDetailsPart1 {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Sales Analysis">{(props) =>
+                      <>
+                        <SalesAnalysis {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>

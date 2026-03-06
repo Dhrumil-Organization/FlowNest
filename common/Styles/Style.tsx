@@ -667,20 +667,7 @@ export const crlimtreq_styles = StyleSheet.create({
         backgroundColor: '#f8f9fa', // Light gray background
         paddingTop: 50,
     },
-    modalCloseButton: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        zIndex: 10,
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 5,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-    },
+
     tabContainer: {
         flexDirection: 'row',
         marginBottom: 10,
@@ -830,50 +817,8 @@ export const crlimtreq_styles = StyleSheet.create({
         backgroundColor: 'rgba(173, 173, 173, 0.7)',
         borderColor: 'rgba(140, 140, 140, 0.9)',
     },
-    carouselModalOverlay: {
-        flex: 1,
-        // backgroundColor: 'rgb(255, 255, 255)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        // maxHeight: '100%',
-        // zIndex: 1000000,
-    },
-    carouselModalContainer: {
-        width: '100%',
-        height: '85%',
-        backgroundColor: 'rgba(0, 0, 0, 0.11)',
-        // borderRadius: 15,
-        padding: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000000,
-        // marginTop: 40,
-        // elevation: 1,
-    },
-    carouselCard: {
-        // width: 280,
-        // height: '85%',
-        backgroundColor: 'transparent',
-        borderRadius: 15,
-        // padding: 15,
-        marginHorizontal: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 8,
-        justifyContent: 'center',
-    },
-    headerContainer: {
-        width: 280,
-        height: '85%',
-        padding: 16,
-        paddingTop: 40,
-        zIndex: 1000,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.2)',
-      },
-      noDataContainer: {
+
+    noDataContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
@@ -885,35 +830,8 @@ export const crlimtreq_styles = StyleSheet.create({
         fontSize: 16,
         color: '#000',
     },
-      
-    // modalCloseButton: {
-    //   position: 'absolute',
-    //   top: 10,
-    //   right: 10,
-    //   zIndex: 10,
-    //   backgroundColor: 'white',
-    //   borderRadius: 20,
-    //   padding: 5,
-    //   elevation: 3,
-    // },
-    carouselCardContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    // carouselCard: {
-    //     width: 260,
-    //     height: '85%',
-    //     backgroundColor: 'white',
-    //     borderRadius: 15,
-    //     padding: 15,
-    //     marginHorizontal: 5,
-    //     shadowColor: '#000',
-    //     shadowOffset: { width: 0, height: 5 },
-    //     shadowOpacity: 0.3,
-    //     shadowRadius: 10,
-    //     elevation: 8,
-    //     justifyContent: 'center',
-    // },
+
+
     carouselCardActive: {
         width: 280,
         height: '90%',
@@ -928,43 +846,259 @@ export const crlimtreq_styles = StyleSheet.create({
         opacity: 0.6,
         elevation: 4,
     },
-    carouselCardContent: {
-        flex: 1,
-        padding: 10,
-        // borderStyle: 'solid',
-        // borderColor: 'rgb(255, 255, 255)',
-    },
-    carouselCardTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        // color: theme.BRAND_GRADIENT_END,
-        color: '#fff',
-        marginBottom: 8,
-        textAlign: 'center',
-        borderBottomColor: 'rgb(255, 255, 255)',
-        borderBottomWidth: 1,
-        paddingBottom: 6,
-        
-    },
-    carouselCardText: {
-        fontSize: 13,
-        color: '#fff',
-        marginBottom: 5,
-        textAlign: 'left',
-        fontWeight: '800',
-    },
-    carouselCardKey: {
-        // fontWeight: 'bold',
-        color: '#fff',
-        fontSize: 13,
-    },
+    // carouselCardContent: {
+    //     flex: 1,
+    //     padding: 10,
+    //     // borderStyle: 'solid',
+    //     // borderColor: 'rgb(255, 255, 255)',
+    // },
+    // carouselCardTitle: {
+    //     fontSize: 16,
+    //     fontWeight: 'bold',
+    //     // color: theme.BRAND_GRADIENT_END,
+    //     color: '#fff',
+    //     marginBottom: 8,
+    //     textAlign: 'center',
+    //     borderBottomColor: 'rgb(255, 255, 255)',
+    //     borderBottomWidth: 1,
+    //     paddingBottom: 6,
+
+    // },
+    // carouselCardText: {
+    //     fontSize: 13,
+    //     color: '#fff',
+    //     marginBottom: 5,
+    //     textAlign: 'left',
+    //     fontWeight: '800',
+    // },
+    // carouselCardKey: {
+    //     // fontWeight: 'bold',
+    //     color: '#fff',
+    //     fontSize: 13,
+    // },
     infoIconContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-      },
-      infoCount: {
+    },
+    infoCount: {
         color: '#2196F3',
         fontWeight: 'bold',
         marginLeft: 5,
-      },
+    },
+    //   
+    // ... aapke existing styles
+    carouselModalOverlay: {
+        flex: 1,
+        backgroundColor: 'white',  // Full-screen white
+    },
+    modalCloseButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 1,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 20,
+        padding: 8,
+    },
+    verticalScrollContainer: {
+        paddingTop: 50,  // Close button ke neeche space
+        paddingHorizontal: 10,
+    },
+    designCard: {
+        backgroundColor: '#f9f9f9',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    designCardTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        paddingBottom: 6,
+    },
+    itemCardTitle: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#555',
+        marginBottom: 10,
+    },
+    tableContainer: {
+        minWidth: 500,  // Horizontal scroll ke liye
+    },
+    tableScrollWrapper: {
+        width: 500,   // table width bigger than screen
+    },
+    tableHeader: {
+        flexDirection: "row",
+        backgroundColor: "#4a6fa5",
+        paddingVertical: 10,
+    },
+
+    tableRow: {
+        flexDirection: "row",
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    tableHeaderText: {
+        color: 'white',
+        fontWeight: '600',
+        textAlign: 'center',
+        paddingHorizontal: 4,
+        fontSize: 12,
+    },
+
+    tableCell: {
+        textAlign: 'center',
+        color: '#555',
+        paddingHorizontal: 4,
+        fontSize: 12,
+    },
+    rowCard: {
+        backgroundColor: "#fff",
+        borderRadius: 6,
+        padding: 10,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: "#eee"
+    },
+
+    rowItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 4
+    },
+
+    label: {
+        fontSize: 12,
+        color: "#666"
+    },
+
+    value: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#333"
+    },
+    accordionCard: {
+        backgroundColor: "#fff",
+        borderRadius: 10,
+        marginBottom: 14,
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        overflow: "hidden"
+    },
+
+    accordionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 14,
+        backgroundColor: "#f7f7f7",
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee"
+    },
+
+    accordionTitle: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: "#333"
+    },
+
+    accordionSubTitle: {
+        fontSize: 13,
+        color: "#666",
+        marginTop: 2
+    },
+
+    accordionBody: {
+        padding: 12
+    },
+
+    rowCard: {
+        backgroundColor: "#fafafa",
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: "#eee"
+    },
+
+    rowItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 4
+    },
+
+    label: {
+        fontSize: 12,
+        color: "#777"
+    },
+
+    value: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#222"
+    },
+    countBadge: {
+        backgroundColor: "#2196F3",
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginRight: 8
+    },
+
+    countText: {
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: "700"
+    },
+    // Column widths
+    shadeColumn: { width: 120 },
+    qtyColumn: { width: 80 },
+    rateColumn: { width: 100 },
+    amountColumn: { width: 120 },
+    discColumn: { width: 80 },
+    gridCard:{
+        flex:1,
+        backgroundColor:"#fafafa",
+        borderRadius:10,
+        padding:12,
+        marginBottom:10,
+        marginHorizontal:4,
+        borderWidth:1,
+        borderColor:"#eee"
+        },
+        
+        gridRow:{
+        flexDirection:"row",
+        justifyContent:"space-between",
+        alignItems:"flex-start",
+        marginBottom:6
+        },
+        
+        gridLabel:{
+        fontSize:12,
+        color:"#666",
+        fontWeight:"500",
+        flex:1
+        },
+        
+        gridValue:{
+        fontSize:12.5,
+        fontWeight:"700",
+        color:"#222",
+        flex:1,
+        textAlign:"right",
+        flexWrap:"wrap"
+        }
 });

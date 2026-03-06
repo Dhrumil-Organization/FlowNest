@@ -20,6 +20,7 @@ import theme from '../../android/app/src/theme';
 import CameraPage from './CameraPage'; // modal camera component
 import SearchableDropdown from '../Shared/SearchableDropdown';
 import PartyDropdown from '../Shared/PartyDropdown';
+import NewPartyDropdown from '../Shared/NewPartyDropdown';
 import PartyDropdownType from '../Shared/PartyDropdownType';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -115,7 +116,10 @@ interface CheckerData {
     itmname: string;
     lastrate: string;
 }
-
+interface ShadeData {
+    shdcode: string;
+    shdname: string;
+}
 interface GrdData {
     GrdCode: string;
     GrdName: string;
@@ -222,6 +226,13 @@ interface Props {
     getCheckerLoading: boolean;
     selectedChecker1: CheckerData | null;
     setSelectedChecker1: (checker: CheckerData | null) => void;
+    // 
+    getCheckerDataShade?: ShadeData[];
+    setSelectedCheckerShade: (checker: ShadeData | null) => void;
+    selectedCheckerShade: ShadeData | null;
+    getCheckerLoadingShade: boolean;
+    selectedChecker1Shade: ShadeData | null;
+    setSelectedChecker1Shade: (checker: ShadeData | null) => void;
     // 
     getGrdData?: GrdData[];
     setSelectedGrd: (grd: GrdData | null) => void;
@@ -338,6 +349,13 @@ const CheckingForm: React.FC<Props> = ({
     selectedChecker1,
     setSelectedChecker1,
     // 
+    getCheckerDataShade,
+    setSelectedCheckerShade,
+    selectedCheckerShade,
+    getCheckerLoadingShade,
+    selectedChecker1Shade,
+    setSelectedChecker1Shade,
+    // 
     getGrdData,
     setSelectedGrd,
     selectedGrd,
@@ -371,6 +389,8 @@ const CheckingForm: React.FC<Props> = ({
     const partyD1CacheRef = React.useRef<Record<string, any[]>>({});
     const [lastPartyOnNext, setLastPartyOnNext] = useState<string | null>(null);
     const dropdownAdjRef = React.useRef<any>(null);
+    const [shadeModalVisible, setShadeModalVisible] = useState(false);
+    const [selectedItemForShade, setSelectedItemForShade] = useState(null);
 
     console.log('CheckingForm:', getMainYearData);
     const isPLN = useMemo(() => {
@@ -445,26 +465,6 @@ const CheckingForm: React.FC<Props> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form.AccCode]);
 
-    useEffect(() => {
-        // Parse Qty, QltWt, and Wt as floats (default to 0 if invalid)
-        const parsedQty = parseFloat(form.Qty) || 0;
-        const parsedQltWt = parseFloat(form.QltWt) || 0;
-
-        // Calculate Wt = Qty * QltWt (fixed to 2 decimal places)
-        const calculatedWt = (parsedQty * parsedQltWt).toFixed(2);
-
-        // Calculate AvgWt = (Wt * 100) / Qty (fixed to 2 decimal places)
-        const calculatedAvgWt = parsedQty > 0
-            ? ((parseFloat(calculatedWt) * 100) / parsedQty).toFixed(2)
-            : "0.00"; // Avoid division by zero
-
-        // Update form.Wt and form.AvgWt
-        setForm(prev => ({
-            ...prev,
-            Wt: calculatedWt,
-            AvgWt: calculatedAvgWt,
-        }));
-    }, [form.Qty]); // Re-run when Qty or QltWt changes
 
     // useEffect(() => {
     //     // Parse Qty, QltWt, and Wt as floats (default to 0 if invalid)
@@ -490,15 +490,15 @@ const CheckingForm: React.FC<Props> = ({
 
 
 
-    useEffect(() => {
-        // property
-        if (form.itmcode && Array.isArray(getPropertyData)) {
-            const found = getPropertyData.find(p => String(p.itmcode) === String(form.itmcode));
-            setSelectedProperty(found ?? null);
-        } else {
-            setSelectedProperty(null);
-        }
-    }, [form.itmcode, getPropertyData]);
+    // useEffect(() => {
+    //     // property
+    //     if (form.itmcode && Array.isArray(getPropertyData)) {
+    //         const found = getPropertyData.find(p => String(p.itmcode) === String(form.itmcode));
+    //         setSelectedProperty(found ?? null);
+    //     } else {
+    //         setSelectedProperty(null);
+    //     }
+    // }, [form.itmcode, getPropertyData]);
 
     useEffect(() => {
         // party
@@ -549,22 +549,35 @@ const CheckingForm: React.FC<Props> = ({
     }, [form.ShfCode, getShiftData]);
 
     // For Checker
-    // useEffect(() => {
-    //     if (form.itmcode && Array.isArray(getCheckerData)) {
-    //         const found = getCheckerData.find(p => String(p.itmcode) === String(form.itmcode));
-    //         setSelectedChecker(found ?? null);
-    //         setSelectedChecker1?.(found ?? null);
-    //     } else {
-    //         setSelectedChecker(null);
-    //         setSelectedChecker1?.(null);
-    //     }
-    // }, [form.itmcode, getCheckerData]);
+    useEffect(() => {
+        if (Array.isArray(form.itmcode) && Array.isArray(getCheckerData)) {
+            const foundItems = getCheckerData.filter(p => form.itmcode.includes(p.itmcode));
+            setSelectedChecker(foundItems);
+            setSelectedChecker1?.(foundItems);
+        } else {
+            setSelectedChecker([]);
+            setSelectedChecker1?.([]);
+        }
+    }, [form.itmcode, getCheckerData]);
 
     useEffect(() => {
-        if (getCheckerData && getCheckerData?.length > 0 && !selectedProperty) {
-            onExeChange(getCheckerData[0]);
+        if (Array.isArray(form.shdcode) && Array.isArray(getCheckerDataShade)) {
+            const foundItems = getCheckerDataShade.filter(p => form.shdcode.includes(p.shdcode));
+            setSelectedCheckerShade(foundItems);
+            setSelectedChecker1Shade?.(foundItems);
+        } else {
+            setSelectedCheckerShade([]);
+            setSelectedChecker1Shade?.([]);
         }
-    }, [getCheckerData, selectedProperty, onExeChange]);
+    }, [form.shdcode, getCheckerDataShade]);
+
+
+
+    // useEffect(() => {
+    //     if (getCheckerData && getCheckerData?.length > 0 && !selectedProperty) {
+    //         onExeChange(getCheckerData[0]);
+    //     }
+    // }, [getCheckerData, selectedProperty, onExeChange]);
 
     // useEffect(() => {
     //     // party
@@ -1001,186 +1014,13 @@ const CheckingForm: React.FC<Props> = ({
                 {step === 1 && (
                     <View style={styles.card}>
                         {/* Property */}
-                        {/* <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
 
-                            <SearchableDropdown
-                                data={getPropertyData}
-                                labelKey="LngName"
-                                valueKey="PrpCode"
-                                placeholder="Choose property..."
-                                pageSize={10}
-                                initialValue={selectedProperty ?? null}
-                                onSelect={(item) => {
-                                    setForm(prev => ({ ...prev, PrpCode: item.PrpCode, AccCode: "", BankName: "", BankBr: "" }));
-                                    setSelectedProperty(item);
-                                }}
-                                multiple={false}
-                                emptyMessage="No properties available"
-                            />
-                        </View> */}
-                        {/* <View style={styles.twoColRow123}>
-                            <View style={styles.col1} >
-                                <Text style={styles.label}>Select Year <Text style={{ color: 'red' }}>*</Text></Text>
-
-                                <SearchableDropdown
-                                    data={getMainYearData}
-                                    labelKey="YearName"
-                                    valueKey="YearNo"
-                                    placeholder="Choose year..."
-                                    pageSize={10}
-                                    initialValue={selectedYearNo ?? null}
-                                    onSelect={(item) => {
-                                        setForm(prev => ({ ...prev, YearNo: item.YearNo }));
-                                        setSelectedYearNo(item);
-                                    }}
-                                    multiple={false}
-                                    emptyMessage="No years available"
-                                />
-                            </View>
-                            <View style={styles.col1} >
-                                <Text style={styles.label}>Checking Date</Text>
-                                <TouchableOpacity activeOpacity={0.85}
-                                    style={[
-                                        styles.dateTrigger,
-                                        { opacity: 0.6 } // Optional: Visual feedback for disabled state
-                                    ]}
-                                    onPress={() => setCheckingDatePickerVisible(true)}
-                                    disabled={true} >
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.dateTriggerText, !form.ChkDate && styles.placeholderText]}>
-                                            {form.ChkDate ? formatDisplayDate(form.ChkDate) : "Select Checking date"}
-                                        </Text>
-                                    </View>
-                                    <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                </TouchableOpacity>
-
-                                <DateTimePickerModal
-                                    isVisible={checkingDatePickerVisible}
-                                    mode="date"
-
-                                    // onConfirm={(date) => setForm(prev => ({ ...prev, EDate: toISODate(date) }))}
-                                    onConfirm={(date) => {
-                                        const selectedDate = new Date(date);
-                                        selectedDate.setHours(0, 0, 0, 0);
-                                        setForm(prev => ({ ...prev, ChkDate: toISODate(selectedDate) }));
-                                        setCheckingDatePickerVisible(false);
-                                        // Force UI update
-                                        setTimeout(() => { }, 100); // Small delay to ensure state update
-                                    }}
-
-                                    onCancel={() => setCheckingDatePickerVisible(false)}
-                                    headerTextIOS="Pick Checking Date"
-                                    locale="en_GB"
-                                    // maximumDate={new Date(2099, 11, 31)}
-                                    // minimumDate={new Date(2000, 0, 1)} // Allow dates from 1st Jan 2000
-                                    maximumDate={new Date()} // Only allow today or past dates
-                                />
-                            </View>
-                        </View> */}
-                        {/* Machine - CONDITIONAL RENDERING */}
-                        {/* <View style={styles.twoColRow123}>
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>
-                                    {isPLN ? 'Machine' : 'Select Machine'} <Text style={{ color: 'red' }}>*</Text>
-                                </Text>
-                                <PartyDropdown
-                                    data={getMachineData}
-                                    placeholder="Choose machine..."
-                                    labelKey={["MacName", "MacCode"]}
-                                    valueKey="MacCode"
-                                    pageSize={12}
-                                    initialValue={selectedMachine ?? null}
-                                    selected={selected ?? null}
-                                    loading={Boolean(getMachineLoading)}
-                                    type="machine"
-                                    onSelect={(item) => {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            MacCode: item.MacCode,
-                                            MacName: item.MacName
-                                        }));
-                                        setSelectedParty(item);
-                                        setSelected?.(item);
-                                    }}
-                                    setSelected={(val) => {
-                                        if (!val) {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                MacCode: '',
-                                                MacName: '',
-
-                                            }));
-                                            setSelectedParty(null);
-                                            setSelected?.(null);
-                                        } else {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                MacCode: val.MacCode,
-                                                MacName: val.MacName,
-
-                                            }));
-                                            setSelectedMachine(val as MachineData);
-                                            setSelected?.(val as MachineData);
-                                        }
-                                    }}
-                                />
-
-                            </View>
-
-                            <View style={styles.col1}>
-                                <Text style={styles.label}> {'Select Shift'} <Text style={{ color: 'red' }}>*</Text>
-                                </Text>
-                                <PartyDropdown
-                                    data={getShiftData}
-                                    placeholder="Choose shift.."
-                                    labelKey={["ShfName", "ShfCode"]}
-                                    valueKey="ShfCode"
-                                    pageSize={12}
-                                    initialValue={selectedShift ?? null}
-                                    selected={selectedShift1 ?? null}
-                                    loading={Boolean(getShiftLoading)}
-                                    type="shift"
-                                    onSelect={(item) => {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            ShfCode: item.ShfCode,
-                                            ShfName: item.ShfName
-                                        }));
-                                        setSelectedShift(item);
-                                        setSelectedShift1?.(item);
-                                    }}
-                                    setSelected={(val) => {
-                                        if (!val) {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                ShfCode: '',
-                                                ShfName: '',
-
-                                            }));
-                                            setSelectedShift(null);
-                                            setSelectedShift1?.(null);
-                                        } else {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                ShfCode: val.ShfCode,
-                                                ShfName: val.ShfName,
-
-                                            }));
-                                            setSelectedShift(val as ShiftData);
-                                            setSelectedShift1?.(val as ShiftData);
-                                        }
-                                    }}
-                                />
-
-                            </View>
-                        </View> */}
 
                         {/* Design - CONDITIONAL RENDERING */}
                         <View style={{ marginBottom: 10 }} >
                             <Text style={styles.label}> {'Select Party'} <Text style={{ color: 'red' }}>*</Text>
                             </Text>
-                            <PartyDropdown
+                            <NewPartyDropdown
                                 data={getDesignData}
                                 placeholder="Choose party..."
                                 labelKey={["accname", "acccode"]}
@@ -1190,14 +1030,24 @@ const CheckingForm: React.FC<Props> = ({
                                 selected={selectedDesign1 ?? null}
                                 loading={Boolean(getDesignLoading)}
                                 type="party"
+                                multiple={false}
+                                // onSelect={(item) => {
+                                //     setForm(prev => ({
+                                //         ...prev,
+                                //         acccode: item.acccode,
+                                //         accname: item.accname
+                                //     }));
+                                //     setSelectedDesign(item);
+                                //     setSelectedDesign1?.(item);
+                                // }}
                                 onSelect={(item) => {
+
                                     setForm(prev => ({
                                         ...prev,
-                                        acccode: item.acccode,
-                                        accname: item.accname
+                                        PrpOf: item?.prptycode,
+                                        prptyname: item?.prptyname
                                     }));
-                                    setSelectedDesign(item);
-                                    setSelectedDesign1?.(item);
+
                                 }}
                                 setSelected={(val) => {
                                     if (!val) {
@@ -1228,291 +1078,226 @@ const CheckingForm: React.FC<Props> = ({
                         <View style={{ marginBottom: 10 }} >
                             <Text style={styles.label}> {'Select Item'} <Text style={{ color: 'red' }}>*</Text>
                             </Text>
-                            {/* <PartyDropdown
+                            <NewPartyDropdown
                                 data={getCheckerData}
                                 placeholder="Choose items..."
                                 labelKey={["itmname", "itmcode"]}
                                 valueKey="itmcode"
                                 pageSize={12}
-                                initialValue={selectedChecker ?? null}
-                                selected={selectedChecker1 ?? null}
+                                initialValue={selectedChecker ?? []}
+                                selected={selectedChecker1 ?? []}
                                 loading={Boolean(getCheckerLoading)}
                                 type="item"
                                 multiple={true}
-                                onSelect={(item) => {
-                                    setForm(prev => ({
-                                        ...prev,
-                                        itmcode: item?.itmcode || '',
-                                        itmname: item?.itmname || '',
-                                    }));
-                                    setSelectedChecker(item);
-                                    setSelectedChecker1?.(item);
-                                }}
-                                setSelected={(val) => {
-                                    if (!val) {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            itmcode: '',
-                                            itmname: '',
-
-                                        }));
-                                        setSelectedChecker(null);
-                                        setSelectedChecker1?.(null);
-                                    } else {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            itmcode: val?.itmcode || '',
-                                            itmname: val?.itmname || '',
-
-                                        }));
-                                        setSelectedChecker(val as CheckerData);
-                                        setSelectedChecker1?.(val as CheckerData);
-                                    }
-                                }}
-                            /> */}
-                            <SearchableDropdown
-                                data={getCheckerData}
-                                labelKey={["itmname", "itmcode"]}
-                                valueKey="itmcode"
-                                placeholder="Choose item..."
-                                pageSize={10}
-                                initialValue={selectedProperty ?? []} // Ensure this is an array
                                 // onSelect={(items) => {
-                                //     // items is an array of selected objects
-                                //     setSelectedProperty(items);
-                                //     // Extract itmcode values and pass as array to parent
-                                //     const selectedCodes = items.map(item => item.itmcode);
-                                //     setForm(prev => ({ ...prev, itmcode: selectedCodes }));
+                                //     const selectedItems = Array.isArray(items) ? items : [];
+                                //     setForm(prev => ({
+                                //         ...prev,
+                                //         itmcode: selectedItems.map(item => item.itmcode),
+                                //         itmname: selectedItems.map(item => item.itmname),
+                                //     }));
                                 // }}
                                 onSelect={(items) => {
-                                    console.log("Selected items:", items); // Debug
-                                    setSelectedProperty(items);
-                                    const selectedCodes = items.map(item => item.itmcode);
-                                    setForm(prev => ({ ...prev, itmcode: selectedCodes }));
+
+                                    const mapped = items.map(i => ({
+                                        itmcode: i.itmcode,
+                                        itmname: i.itmname,
+                                        shades: []
+                                    }));
+
+                                    setForm(prev => ({
+                                        ...prev,
+                                        items: mapped,
+                                        itmcode: mapped.map(i => i.itmcode),
+                                        itmname: mapped.map(i => i.itmname)
+                                    }));
+
                                 }}
-
-                                multiple={true}
-                                emptyMessage="No items available"
+                                setSelected={(val) => {
+                                    const selectedValues = Array.isArray(val) ? val : [];
+                                    setSelectedChecker(selectedValues);
+                                    setSelectedChecker1?.(selectedValues);
+                                }}
                             />
-
-
                         </View>
+                        {form.items?.length > 0 && (
 
-                        <View style={styles.twoColRow1}>
-                            {/* Beam */}
-                            <View style={styles.col1} >
-                                <Text style={styles.label}>Beam <Text style={{ color: 'red' }}>*</Text></Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.BeamNo}
-                                    onChangeText={(t) => setForm(prev => ({ ...prev, BeamNo: t }))}
-                                    editable={false}
-                                // keyboardType="numeric"
-                                // placeholder="0.00"
-                                />
-                            </View>
-                            <View style={styles.col1} >
-                                {/* Taka No */}
-                                <Text style={styles.label}>Taka No <Text style={{ color: 'red' }}>*</Text></Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.TakaNo}
-                                    onChangeText={(t) => setForm(prev => ({ ...prev, TakaNo: t }))}
-                                    // keyboardType="numeric"
-                                    placeholder="Enter taka no..."
-                                />
-                            </View>
-                        </View>
+                            <View style={{ marginTop: 12 }}>
 
-                        <View style={styles.twoColRow1}>
-                            {/* Mtrs */}
-                            <View style={styles.col1}>
-                                <Text style={styles.label}>
-                                    Mtrs <Text style={{ color: 'red' }}>*</Text>
+                                {form.items.map((item, index) => (
+
+                                    <View key={item.itmcode} style={styles.itemCard}>
+
+                                        <View style={styles.itemHeader}>
+
+                                            <Text style={styles.itemTitle}>
+                                                {item.itmname}
+                                            </Text>
+
+                                            <View style={{ flexDirection: 'row' }}>
+
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setSelectedItemForShade(item);
+                                                        setShadeModalVisible(true);
+                                                    }}
+                                                >
+                                                    <Icon name="palette" size={20} color="#0A7EA4" />
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={{ marginLeft: 10 }}
+                                                    onPress={() => {
+
+                                                        const updated = form.items.filter(i => i.itmcode !== item.itmcode);
+
+                                                        setForm(prev => ({
+                                                            ...prev,
+                                                            items: updated,
+                                                            itmcode: updated.map(i => i.itmcode),
+                                                            itmname: updated.map(i => i.itmname)
+                                                        }));
+
+                                                    }}
+                                                >
+
+                                                    <Icon name="close" size={20} color="#E53935" />
+
+                                                </TouchableOpacity>
+
+                                            </View>
+
+                                        </View>
+
+                                        {/* Shades */}
+
+                                        {item.shades?.length > 0 && (
+
+                                            <View style={styles.shadeContainer}>
+
+                                                {item.shades.map(shade => (
+
+                                                    <View key={shade.shdcode} style={styles.shadeChip}>
+
+                                                        <Text style={styles.shadeText}>
+                                                            {shade.shdname}
+                                                        </Text>
+
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+
+                                                                const updated = form.items.map(i => {
+
+                                                                    if (i.itmcode === item.itmcode) {
+
+                                                                        return {
+                                                                            ...i,
+                                                                            shades: i.shades.filter(s => s.shdcode !== shade.shdcode)
+                                                                        }
+
+                                                                    }
+
+                                                                    return i
+
+                                                                })
+
+                                                                setForm(prev => ({ ...prev, items: updated }))
+
+                                                            }}
+                                                        >
+
+                                                            <Icon name="close" size={14} color="#E53935" />
+
+                                                        </TouchableOpacity>
+
+                                                    </View>
+
+                                                ))}
+
+                                            </View>
+
+                                        )}
+
+                                    </View>
+
+                                ))}
+
+                            </View>
+
+                        )}
+                        <Modal
+                            visible={shadeModalVisible}
+                            animationType="slide"
+                        >
+
+                            <View style={{
+                                flex: 1,
+                                backgroundColor: '#F7F9FC',
+                                padding: 20
+                            }}>
+
+                                <Text style={{ fontSize: 18, fontWeight: '600' }}>
+                                    Select Shades for {selectedItemForShade?.itmname}
                                 </Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.Qty}
-                                    onChangeText={(t) => {
-                                        const enteredValue = parseFloat(t) || 0;
-                                        const warpLen = parseFloat(form.WarpLen) || 0;
 
-                                        if (enteredValue > warpLen) {
-                                            Alert.alert(
-                                                "Validation",
-                                                `Mtrs ${enteredValue} should be less than or equal to the total warp length (${warpLen}).`,
-                                                [{ text: "OK", onPress: () => { } }],
-                                                { cancelable: false }
-                                            );
-                                            setTimeout(() => {
-                                                setForm(prev => ({ ...prev, Qty: "0" }));
-                                            }, 2000);
-                                            return;
-                                        }
-                                        setForm(prev => ({ ...prev, Qty: t }));
+                                <NewPartyDropdown
+                                    data={getCheckerDataShade}
+                                    labelKey={["shdname", "shdcode"]}
+                                    valueKey="shdcode"
+                                    multiple={true}
+
+                                    initialValue={selectedItemForShade?.shades || []}
+                                    selected={selectedItemForShade?.shades || []}
+
+                                    onSelect={(shades) => {
+
+                                        const updated = form.items.map(i => {
+
+                                            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                                                return { ...i, shades }
+
+                                            }
+
+                                            return i
+
+                                        })
+
+                                        setForm(prev => ({ ...prev, items: updated }))
+
                                     }}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
-                                />
-                            </View>
-                            <View style={styles.col1} >
-                                {/* Weight */}
-                                <Text style={styles.label}>Weight <Text style={{ color: 'red' }}>*</Text></Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.Wt}
-                                    // onChangeText={(t) => setForm(prev => ({ ...prev, Wt: t }))}
-                                    onChangeText={(t) => {
-                                        const enteredValue = parseFloat(t) || 0;
-                                        const qty = parseFloat(form.Qty) || 0;
-                                        const calculatedWt = (enteredValue).toFixed(2);
 
-                                        if (enteredValue && qty) {
-                                            const calculatedAvgWt = qty > 0
-                                                ? ((parseFloat(calculatedWt) * 100) / qty).toFixed(2)
-                                                : "0.00"; // Avoid division by zero
-
-                                            setForm(prev => ({
-                                                ...prev,
-                                                // Wt: calculatedWt,
-                                                AvgWt: calculatedAvgWt,
-                                            }));
-                                        }
-                                        setForm(prev => ({ ...prev, Wt: t }));
-                                    }}
-                                    //         Alert.alert(
-                                    //             "Validation",
-                                    //             `Mtrs ${enteredValue} should be less than or equal to the total warp length (${warpLen}).`,
-                                    //             [{ text: "OK", onPress: () => { } }],
-                                    //             { cancelable: false }
-                                    //         );
-                                    //         setTimeout(() => {
-                                    //             setForm(prev => ({ ...prev, Qty: "0" }));
-                                    //         }, 2000);
-                                    //         return;
-                                    //     }
-                                    //     setForm(prev => ({ ...prev, Qty: t }));
-                                    // }}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
-                                />
-                            </View>
-                        </View>
-                        <View style={styles.twoColRow123}>
-                            <View style={styles.col1} >
-                                {/* Avg. Weight */}
-                                <Text style={styles.label}>Avg. Weight <Text style={{ color: 'red' }}>*</Text></Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={form.AvgWt}
-                                    onChangeText={(t) => setForm(prev => ({ ...prev, AvgWt: t }))}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
-                                />
-                            </View>
-
-                            {/* Grd - CONDITIONAL RENDERING */}
-                            <View style={styles.col1}>
-                                <Text style={styles.label}> {'Select Grade'} <Text style={{ color: 'red' }}>*</Text>
-                                </Text>
-                                <PartyDropdown
-                                    data={getGrdData}
-                                    placeholder="Choose grd.."
-                                    labelKey={["GrdName", "GrdCode"]}
-                                    valueKey="GrdCode"
-                                    pageSize={12}
-                                    initialValue={selectedGrd ?? null}
-                                    selected={selectedGrd1 ?? null}
-                                    loading={Boolean(getGrdLoading)}
-                                    type="grd"
-                                    onSelect={(item) => {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            GrdCode: item.GrdCode,
-                                            GrdName: item.GrdName
-                                        }));
-                                        setSelectedGrd(item);
-                                        setSelectedGrd1?.(item);
-                                    }}
                                     setSelected={(val) => {
-                                        if (!val) {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                GrdCode: '',
-                                                GrdName: '',
 
-                                            }));
-                                            setSelectedGrd(null);
-                                            setSelectedGrd1?.(null);
-                                        } else {
-                                            setForm(prev => ({
-                                                ...prev,
-                                                GrdCode: val.GrdCode,
-                                                GrdName: val.GrdName,
+                                        const updated = form.items.map(i => {
 
-                                            }));
-                                            setSelectedGrd(val as GrdData);
-                                            setSelectedGrd1?.(val as GrdData);
-                                        }
+                                            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                                                return { ...i, shades: val }
+
+                                            }
+
+                                            return i
+
+                                        })
+
+                                        setForm(prev => ({ ...prev, items: updated }))
+
                                     }}
                                 />
 
-                            </View>
-                        </View>
+                                <TouchableOpacity
+                                    style={styles.saveBtn}
+                                    onPress={() => setShadeModalVisible(false)}
+                                >
 
-                        <View style={styles.twoColRow1}>
-                            {/* Mending require? */}
-                            <View style={styles.col1}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                                    <TouchableOpacity
-                                        onPress={() => setForm(prev => ({ ...prev, isMending: prev.isMending === 1 ? 0 : 1 }))}
-                                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                                    >
-                                        <View style={{
-                                            width: 20,
-                                            height: 20,
-                                            borderRadius: 4,
-                                            borderWidth: 1.5,
-                                            borderColor: theme.BRAND_ACCENT,
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            marginRight: 8,
-                                            backgroundColor: form.isMending === 1 ? theme.BRAND_ACCENT : 'transparent'
-                                        }}>
-                                            {form.isMending === 1 && <Icon name="check" size={14} color="#fff" />}
-                                        </View>
-                                        <Text style={styles.label}>Mending require?</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                    <Text style={styles.saveText}>Done</Text>
+
+                                </TouchableOpacity>
+
                             </View>
 
-                            {/* Last taka? */}
-                            <View style={styles.col1}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                                    <TouchableOpacity
-                                        onPress={() => setForm(prev => ({ ...prev, islasttaka: prev.islasttaka === 1 ? 0 : 1 }))}
-                                        style={{ flexDirection: 'row', alignItems: 'center' }}
-                                    >
-                                        <View style={{
-                                            width: 20,
-                                            height: 20,
-                                            borderRadius: 4,
-                                            borderWidth: 1.5,
-                                            borderColor: theme.BRAND_ACCENT,
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            marginRight: 8,
-                                            backgroundColor: form.islasttaka === 1 ? theme.BRAND_ACCENT : 'transparent'
-                                        }}>
-                                            {form.islasttaka === 1 && <Icon name="check" size={14} color="#fff" />}
-                                        </View>
-                                        <Text style={styles.label}>Last taka?</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </View>
-
-
+                        </Modal>
 
 
                         {/* Nav */}
@@ -1523,21 +1308,7 @@ const CheckingForm: React.FC<Props> = ({
                                 <Text style={styles.saveText}>{AdjType === 'ACC' ? 'Save' : 'Next'}</Text>
                             </TouchableOpacity>
                         </View>
-                        {/* <View style={styles.navRow}>
-                            <TouchableOpacity style={styles.ghostBtn} onPress={goPrev}>
-                                <Icon name="arrow-back" size={18} color={theme.TEXT_SECONDARY} />
-                                <Text style={styles.ghostText}>Previous</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.faultsBtn12} onPress={goFaults} disabled={!isConnected}>
-                                <Text style={styles.saveText}>{getFaultsLoading ? 'Loading...' : `Select Faults [ ${form?.d2 ? form.d2.length : 0} ]`}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.faultsBtn} onPress={viewDataAndClose} disabled={!isConnected}>
-                                <Text style={styles.saveText}>{'View Data'}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.saveBtn} onPress={goNext} disabled={!isConnected}>
-                                <Text style={styles.saveText}>{getSaveLoading ? 'Saving...' : 'Save'}</Text>
-                            </TouchableOpacity>
-                        </View> */}
+                      
                     </View>
                 )}
 
@@ -1834,6 +1605,62 @@ const styles = StyleSheet.create({
     stepLabelActive: {
         color: theme.BRAND_DARK,
         fontWeight: '900',
+    },
+    itemChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EEF6FA',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        marginRight: 6,
+        marginBottom: 6
+    },
+    itemCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E5EAF0'
+    },
+
+    itemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    itemTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#333'
+    },
+
+    shadeContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 10
+    },
+
+    shadeChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EEF6FA',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginRight: 6,
+        marginBottom: 6,
+        maxWidth: '100%'
+    },
+
+    shadeText: {
+        marginRight: 6,
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#333',
+        flexShrink: 1
     },
 });
 

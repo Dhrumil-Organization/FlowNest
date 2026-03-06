@@ -11,7 +11,9 @@ import {
     ActivityIndicator,
     Linking,
     LayoutAnimation,
-    ScrollView
+    ScrollView,
+    UIManager, Platform,
+    useWindowDimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -214,10 +216,19 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     const [activeTab1YPO, setActiveTab1YPO] = useState<'requests' | 'history' | 'verify'>('requests');
     const [showCarouselModal, setShowCarouselModal] = useState(false);
     const [selectedD1Data, setSelectedD1Data] = useState<D1datakeys[]>([]);
+    const [openAccordion, setOpenAccordion] = useState({})
     // const [historyDataYPO, setHistoryDataYPO] = useState<AllHistoryData[]>([]);
     // const [isHistoryLoading, setIsHistoryLoadingYPO] = useState(false);
 
     let cancelToken: any;
+
+    if (Platform.OS === "android") {
+        UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
+
+    const { width } = useWindowDimensions();
+
+    const numColumns = width > 600 ? 3 : 2;
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -1057,6 +1068,26 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         </View>
     );
 
+    const groupedData = Object.entries(
+        selectedD1Data.reduce((acc, item) => {
+            const key = `${item.DsnName}_${item.ItmName}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
+            return acc;
+        }, {})
+    ).map(([key, items]) => {
+        const [designName, itemName] = key.split('_');
+        return { key, designName, itemName, items };
+    });
+    const toggleAccordion = (key) => {
+
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+
+        setOpenAccordion(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }))
+    }
 
     return (
         <>
@@ -1267,108 +1298,130 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                         </View>
                     </Modal>
                 )}
+
                 <Modal
                     visible={showCarouselModal}
-                    transparent={true}
+                    transparent={false}
                     animationType="slide"
-                    onRequestClose={() => {
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setShowCarouselModal(false);
-                    }}
+                    onRequestClose={() => setShowCarouselModal(false)}
                 >
                     <View style={crlimtreq_styles.carouselModalOverlay}>
-                        <View style={crlimtreq_styles.carouselModalContainer}>
-                            {/* Close Button */}
-                            <TouchableOpacity
-                                style={crlimtreq_styles.modalCloseButton}
-                                onPress={() => {
-                                    setShowCarouselModal(false);
-                                    setSelectedD1Data([]); // Clear the data when closing
-                                }}
-                            >
-                                <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
-                            </TouchableOpacity>
 
-                            {/* Carousel Cards */}
+                        <TouchableOpacity
+                            style={crlimtreq_styles.modalCloseButton}
+                            onPress={() => {
+                                setShowCarouselModal(false)
+                                setSelectedD1Data([])
+                            }}
+                        >
+                            <Icon name="close" size={24} color={theme.BRAND_GRADIENT_START} />
+                        </TouchableOpacity>
 
-                            <ScrollView
-                                horizontal
-                                pagingEnabled
-                                snapToInterval={300} // Increased for better spacing
-                                snapToAlignment="center"
-                                decelerationRate="fast"
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={crlimtreq_styles.carouselCardContainer}
-                            >
-                                {selectedD1Data.map((d1Item, index) => (
-                                    <View
-                                        key={`${d1Item.SrNo || index}`}
-                                        style={[
-                                            crlimtreq_styles.carouselCard,
-                                            { marginHorizontal: 10 } // Add spacing between cards
-                                        ]}
-                                    >
-                                        <LinearGradient
-                                            colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                                            style={crlimtreq_styles.headerContainer}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}>
 
-                                            <View style={crlimtreq_styles.carouselCardContent}>
-                                                <Text style={crlimtreq_styles.carouselCardTitle}>
-                                                    {/* {d1Item.ItmName} */}
-                                                    {getD1Party}
+                        <FlatList
+                            data={groupedData}
+                            keyExtractor={(item) => item.key}
+                            showsVerticalScrollIndicator
+                            initialNumToRender={8}
+                            maxToRenderPerBatch={10}
+                            windowSize={10}
+                            removeClippedSubviews={true}
+                            contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 10 }}
+                            renderItem={({ item }) => {
+
+                                const isOpen = openAccordion[item.key] ?? true
+
+                                return (
+
+                                    <View style={crlimtreq_styles.accordionCard}>
+
+                                        <TouchableOpacity
+                                            style={crlimtreq_styles.accordionHeader}
+                                            onPress={() => toggleAccordion(item.key)}
+                                            activeOpacity={0.8}
+                                        >
+
+                                            <View style={{ flex: 1 }}>
+
+                                                <Text style={crlimtreq_styles.accordionTitle}>
+                                                    {item.designName}
                                                 </Text>
-                                                <View style={{ marginVertical: 10 }}>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Design Name: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.DsnName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Item Name: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ItmName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Grade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.GrdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Shade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ShdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Qty: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Qty}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Rate: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.UnitRate}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Amount: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Amount}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Disc. %: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.DisPer}</Text>
-                                                    </Text>
-                                                    {/* <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Grade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.GrdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Shade: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.ShdName}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Qty: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Qty}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Rate: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.UnitRate}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Amount: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.Amount}</Text>
-                                                    </Text>
-                                                    <Text style={crlimtreq_styles.carouselCardKey}>
-                                                        Disc. %: <Text style={crlimtreq_styles.carouselCardText}>{d1Item.DisPer}</Text>
-                                                    </Text> */}
-                                                </View>
+
+                                                <Text style={crlimtreq_styles.accordionSubTitle}>
+                                                    {item.itemName}
+                                                </Text>
+
                                             </View>
-                                        </LinearGradient>
+
+                                            <View style={crlimtreq_styles.countBadge}>
+                                                <Text style={crlimtreq_styles.countText}>
+                                                    {item.items.length}
+                                                </Text>
+                                            </View>
+
+                                            <Icon
+                                                name={isOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                                                size={26}
+                                                color="#444"
+                                            />
+
+                                        </TouchableOpacity>
+
+                                        {isOpen && (
+
+                                            <View style={crlimtreq_styles.accordionBody}>
+
+                                                <FlatList
+                                                    data={item.items}
+                                                    key={numColumns}
+                                                    numColumns={numColumns}
+                                                    scrollEnabled={false}
+                                                    columnWrapperStyle={{ justifyContent: "space-between" }}
+                                                    keyExtractor={(row, index) => index.toString()}
+                                                    renderItem={({ item: row }) => (
+
+                                                        <View style={crlimtreq_styles.gridCard}>
+
+                                                            <View style={crlimtreq_styles.gridRow}>
+                                                                <Text style={crlimtreq_styles.gridLabel}>Shade</Text>
+                                                                <Text style={crlimtreq_styles.gridValue}>{row.ShdName}</Text>
+                                                            </View>
+
+                                                            <View style={crlimtreq_styles.gridRow}>
+                                                                <Text style={crlimtreq_styles.gridLabel}>Qty</Text>
+                                                                <Text style={crlimtreq_styles.gridValue}>{row.Qty}</Text>
+                                                            </View>
+
+                                                            <View style={crlimtreq_styles.gridRow}>
+                                                                <Text style={crlimtreq_styles.gridLabel}>Rate</Text>
+                                                                <Text style={crlimtreq_styles.gridValue}>{row.UnitRate}</Text>
+                                                            </View>
+
+                                                            <View style={crlimtreq_styles.gridRow}>
+                                                                <Text style={crlimtreq_styles.gridLabel}>Amount</Text>
+                                                                <Text style={crlimtreq_styles.gridValue}>{row.Amount}</Text>
+                                                            </View>
+
+                                                            <View style={crlimtreq_styles.gridRow}>
+                                                                <Text style={crlimtreq_styles.gridLabel}>Disc %</Text>
+                                                                <Text style={crlimtreq_styles.gridValue}>{row.DisPer}</Text>
+                                                            </View>
+
+                                                        </View>
+
+                                                    )}
+                                                />
+
+                                            </View>
+
+                                        )}
+
                                     </View>
-                                ))}
-                            </ScrollView>
-                        </View>
+
+                                )
+                            }}
+                        />
+
                     </View>
                 </Modal>
 

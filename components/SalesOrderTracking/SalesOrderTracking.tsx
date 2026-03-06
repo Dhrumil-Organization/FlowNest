@@ -1677,12 +1677,12 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         const lowercasedQuery = searchQueryPOT.toLowerCase();
         const filtered = salesdata.filter(
             (item) =>
-                item.partyname.toLowerCase().includes(lowercasedQuery) ||
-                item.parcode.toLowerCase().includes(lowercasedQuery) ||
-                item.noof.toLowerCase().includes(lowercasedQuery) ||
-                item.totmtr.toLowerCase().includes(lowercasedQuery) ||
-                item.pendingmtr.toLowerCase().includes(lowercasedQuery) ||
-                item.pendingamt.toLowerCase().includes(lowercasedQuery)
+                item?.partyname && item?.partyname.toLowerCase().includes(lowercasedQuery) ||
+                item?.parcode && item?.parcode.toLowerCase().includes(lowercasedQuery) ||
+                item?.noof && item?.noof.toLowerCase().includes(lowercasedQuery) ||
+                item?.totmtr && item?.totmtr.toLowerCase().includes(lowercasedQuery) ||
+                item?.pendingmtr && item?.pendingmtr.toLowerCase().includes(lowercasedQuery) ||
+                item?.pendingamt && item?.pendingamt.toLowerCase().includes(lowercasedQuery)
         );
         setFilteredData(filtered.slice(0, itemsPerPage));
         setPage(1);
@@ -1758,15 +1758,15 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         };
 
         // Check cache first
-        const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
-        if (cachedData && JSON.stringify(cachedData.payload) === JSON.stringify(payload)) {
-            setsalesdata(cachedData.response.data.salesdata);
-            setsalesdataTotal(cachedData.response.data.salesdata.length);
-            setsalessumdata(cachedData.response.data.salessumdata);
-            setIsLoading(false);
-            closeDrawer();
-            return;
-        }
+        // const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
+        // if (cachedData && JSON.stringify(cachedData.payload) === JSON.stringify(payload)) {
+        //     setsalesdata(cachedData.response.data.salesdata);
+        //     setsalesdataTotal(cachedData.response.data.salesdata.length);
+        //     setsalessumdata(cachedData.response.data.salessumdata);
+        //     setIsLoading(false);
+        //     closeDrawer();
+        //     return;
+        // }
 
         // If not in cache, proceed with API call
         const headers = {
@@ -1777,6 +1777,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
 
         try {
             const response = await axios.post(`${API}/api/salesordertracking`, payload, { headers });
+            console.log("🔵 response", payload, response)
             if (response.data.success === true && response.data.data.salesdata.length > 0) {
                 setsalesdata(response.data.data.salesdata);
                 setsalesdataTotal(response.data.data.salesdata.length);
@@ -1820,6 +1821,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 txntype: 'prodorderlist'
             };
             const response = await axios.post(`${API}/api/salesorderpartytracking`, payload, { headers });
+            console.log("🔵 responsedd", payload, response);
             if (response.data.success === true) {
                 await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
                 await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
@@ -1959,7 +1961,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                     </View>
                     <FlatList
                         ref={flatListRef}
-                        data={searchQueryPOT.trim() ? filteredData : renderedData}
+                        // data={searchQueryPOT.trim() ? filteredData : renderedData}
+                        data={filteredData}
                         renderItem={renderPartyCard}
                         keyExtractor={(item, index) => `${item.parcode}-${index}`}
                         onEndReached={loadMoreData}

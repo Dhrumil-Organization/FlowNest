@@ -197,6 +197,10 @@ interface CheckerData {
     itmname: string;
     lastrate: string;
 }
+interface ShadeData {
+    shdcode: string;
+    shdname: string;
+}
 
 interface GrdData {
     GrdCode: string;
@@ -298,6 +302,7 @@ const InquiryAdd: React.FC<Props> = ({
     const [getMachineLoading, setMachineLoading] = useState(false);
     const [getDesignLoading, setDesignLoading] = useState(false);
     const [getCheckerLoading, setCheckerLoading] = useState(false);
+    const [getCheckerLoadingShade, setCheckerLoadingShade] = useState(false);
     const [getGrdLoading, setGrdLoading] = useState(false);
     const [getShiftLoading, setShiftLoading] = useState(false);
     const [getBankLoading, setBankLoading] = useState(false);
@@ -321,6 +326,7 @@ const InquiryAdd: React.FC<Props> = ({
     const [getFaultsData, setFaultsData] = useState<Fault[]>([]);
     const [getDesignData, setDesignData] = useState<DesignData[]>([]);
     const [getCheckerData, setCheckerData] = useState<CheckerData[]>([]);
+    const [getCheckerDataShade, setCheckerDataShade] = useState<ShadeData[]>([]);
     const [getGrdData, setGrdData] = useState<GrdData[]>([]);
     const [getShiftData, setShiftData] = useState<ShiftData[]>([]);
     const [getMainYearData, setMainYearData] = useState<YearMainData[]>([]);
@@ -341,6 +347,7 @@ const InquiryAdd: React.FC<Props> = ({
     const [selectedMachine, setSelectedMachine] = useState<MachineData | null>(null);
     const [selectedDesign, setSelectedDesign] = useState<DesignData | null>(null);
     const [selectedChecker, setSelectedChecker] = useState<CheckerData | null>(null);
+    const [selectedCheckerShade, setSelectedCheckerShade] = useState<ShadeData | null>(null);
     const [selectedGrd, setSelectedGrd] = useState<GrdData | null>(null);
     const [selectedShift, setSelectedShift] = useState<ShiftData | null>(null);
     const [selectedParty, setSelectedParty] = useState<PartyData | null>(null);
@@ -352,6 +359,7 @@ const InquiryAdd: React.FC<Props> = ({
     const [selectedMachine1, setSelectedMachine1] = useState<MachineData | null>();
     const [selectedDesign1, setSelectedDesign1] = useState<DesignData | null>();
     const [selectedChecker1, setSelectedChecker1] = useState<CheckerData | null>();
+    const [selectedChecker1Shade, setSelectedChecker1Shade] = useState<ShadeData | null>();
     const [selectedGrd1, setSelectedGrd1] = useState<GrdData | null>();
     const [selectedShift1, setSelectedShift1] = useState<ShiftData | null>();
     const [selectedbank, setSelectedbank] = useState<BankData | null>();
@@ -380,7 +388,11 @@ const InquiryAdd: React.FC<Props> = ({
         MacCode: "",
         MacName: "",
         selectedMachine: null,
-        itmcode: [] as string[], 
+        items: [],
+        itmcode: [],
+        itmname: [],
+        shdcode: [],
+        shdname: [],
         d2: []
     });
     const [getResponse, setResponse] = useState<any>();
@@ -613,6 +625,7 @@ const InquiryAdd: React.FC<Props> = ({
     const fetchAllPartyData = async () => {
         setDesignLoading(true);
         setCheckerLoading(true);
+        setCheckerLoadingShade(true);
 
         try {
             console.log("🚀 API CALL START");
@@ -635,10 +648,12 @@ const InquiryAdd: React.FC<Props> = ({
 
             const partyData = response?.data?.response?.party;
             const itemDate = response?.data?.response?.item;
+            const itemDateShade = response?.data?.response?.shade;
 
             if (response.data.success) {
                 setDesignData(partyData);
                 setCheckerData(itemDate);
+                setCheckerDataShade(itemDateShade);
             }
 
         } catch (error) {
@@ -646,6 +661,7 @@ const InquiryAdd: React.FC<Props> = ({
         } finally {
             setDesignLoading(false);
             setCheckerLoading(false);
+            setCheckerLoadingShade(false);
         }
     };
 
@@ -1248,6 +1264,18 @@ const InquiryAdd: React.FC<Props> = ({
     const origSavePart2 = async (payload: any) => {
         console.log("Save FUnction Called", form);
 
+        const itmcode = form.items.map(i => i.itmcode);
+
+        const itmname = form.items.map(i => i.itmname);
+
+        const shdcode = form.items.flatMap(i =>
+            i.shades?.map(s => s.shdcode) || []
+        );
+
+        const shdname = form.items.flatMap(i =>
+            i.shades?.map(s => s.shdname) || []
+        );
+
 
         const d1Obj: d1Data = {
             font: 0,
@@ -1296,16 +1324,10 @@ const InquiryAdd: React.FC<Props> = ({
         };
 
         const payload123 = {
-            ShfCode: form.ShfCode || '',
-            ChkDate: formatDateToDDMMYYYY(form.ChkDate),
-            MacGrp: form.MacGrp || '',
-            PrpCode: form.selectedMachine.PrpCode,
-            prpcode: form.selectedMachine.PrpCode,
-            yearno: form.YearNo,
-            YearNo: form.YearNo,
-            txntype: 'beam_checking_tablet',
-            d1: [d1Obj],
-            d2: form?.d2 || [],
+            itmcode,
+            itmname,
+            shdcode,
+            shdname
         };
 
         console.log('payload:', payload123);
@@ -1818,6 +1840,13 @@ const InquiryAdd: React.FC<Props> = ({
                 getCheckerLoading={getCheckerLoading}
                 selectedChecker1={selectedChecker1}
                 setSelectedChecker1={setSelectedChecker1}
+                // 
+                getCheckerDataShade={getCheckerDataShade}
+                setSelectedCheckerShade={setSelectedCheckerShade}
+                selectedCheckerShade={selectedCheckerShade}
+                getCheckerLoadingShade={getCheckerLoadingShade}
+                selectedChecker1Shade={selectedChecker1Shade}
+                setSelectedChecker1Shade={setSelectedChecker1Shade}
                 // 
                 getGrdData={getGrdData}
                 setSelectedGrd={setSelectedGrd}

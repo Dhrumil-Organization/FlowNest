@@ -1,389 +1,3 @@
-// import React, { useEffect, useRef, useState } from 'react';
-// import {
-//   View,
-//   Text,
-//   TextInput,
-//   TouchableOpacity,
-//   Alert,
-//   ActivityIndicator,
-//   Animated,
-//   Easing,
-//   StyleSheet,
-//   Linking,
-//   Image
-// } from 'react-native';
-// import Icon from 'react-native-vector-icons/MaterialIcons';
-// import LinearGradient from 'react-native-linear-gradient';
-// import axios from 'axios';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { loginScreen_styles } from '../../common/Styles/Style';
-// import DeviceInfo from 'react-native-device-info';
-// import theme from '../../android/app/src/theme';
-// import { fetchMasterSyncPartyDataPerPrptypeCache, readPrptypeCache, getPrptypeSummary, normalizePrptype, printCachedPrptypesWithData } from '../../common/API/Functions';
-// import { initDatabase } from '../../common/API/DatabaseManager';
-
-// interface Props {
-//   setIsLoggedIn: (value: boolean) => void;
-//   setToken: (value: string) => void;
-//   getDeviceId: string | null;
-//   isConnected: boolean | null;
-//   setUserDetails: (value: string | null) => void;
-//   setMenuApps: (value: string) => void;
-// }
-
-// const LoginScreen: React.FC<Props> = ({
-//   setIsLoggedIn,
-//   setToken,
-//   getDeviceId,
-//   isConnected,
-//   setUserDetails,
-//   setMenuApps,
-// }) => {
-//   const [username, setUsername] = useState('');
-//   const [password, setPassword] = useState('');
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [showUpdateBadge, setShowUpdateBadge] = useState(false);
-//   const animatedValue = useRef(new Animated.Value(0)).current;
-//   const [showPassword, setShowPassword] = useState(false);
-//   console.log("getDeviceId in Login Page:", getDeviceId);
-
-//   const MOCK_API_RESPONSE = {
-//     latest_version: "1.0.1",
-//     update_required: false,
-//     update_message: "update available!",
-//     download_url: "https://your-server.com/app/latest.apk",
-//   };
-
-//   // const animatedValue = useRef(new Animated.Value(0)).current;
-//   const rainbowColors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'];
-//   // Rainbow animation
-//   useEffect(() => {
-//     Animated.loop(
-//       Animated.timing(animatedValue, {
-//         toValue: 1,
-//         duration: 2000,
-//         easing: Easing.linear,
-//         useNativeDriver: false,
-//       })
-//     ).start();
-//   }, []);
-
-//   const backgroundColor = animatedValue.interpolate({
-//     inputRange: rainbowColors.map((_, i) => i / rainbowColors.length),
-//     outputRange: rainbowColors,
-//   });
-
-
-//   // Version check
-//   useEffect(() => {
-//     const checkForUpdates = () => {
-//       try {
-//         const currentVersion = DeviceInfo.getVersion();
-//         if (currentVersion !== MOCK_API_RESPONSE.latest_version) {
-//           setShowUpdateBadge(true);
-//         }
-//       } catch (error) {
-//         console.error("Update check failed:", error);
-//       }
-//     };
-//     checkForUpdates();
-//   }, []);
-
-
-//   const handleLogin = async () => {
-//     if (!username || !password) {
-//       Alert.alert('❌ Error', 'Please enter username and password.');
-//       return;
-//     }
-//     const payload = {
-//       name: username.trim(),
-//       password: password.trim(),
-//       // platform: 'mobile',
-//     };
-//     console.log('🔵 Sending login payload:', payload);
-//     try {
-//       setIsLoading(true);
-
-//       const headers = {
-//         // Authorization: `Bearer ${getToken()}`,
-//         // 'Content-Type': 'application/json',
-//         'x-platform': 'mob',
-//       };
-
-//       const response = await axios.post(
-//         'https://apig.tms-webapp.com/api/login',
-//         payload, { headers }
-//       );
-//       console.log('✅ Login API Response:', response.data);
-//       console.log('✅ Login API Response User:', response.data.response.user);
-//       const token = response.data.response.access_token;
-//       const user_details = response.data.response.user?.first_name || 'user';
-//       // const user_menu_apps = response.data.response.usermenu || '';
-//       const user_menu_apps = response.data.response.usermenu || '';
-//       const ismastersync = response.data.response.ismastersync || '';
-//       const ismastersyncData = response.data.response.mastersyncprptypes || [];
-//       console.log('✅ Access Token:', token);
-//       console.log('✅ Shown Apps:', user_menu_apps);
-//       console.log('✅ Mastersync Data:', ismastersync, ismastersyncData);
-//       if (response.data.success === true) {
-//         if (token && user_details && user_menu_apps) {
-//           await AsyncStorage.setItem('access_token', token);
-//           await AsyncStorage.setItem('user_details', user_details);
-//           await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
-//           await AsyncStorage.setItem('login_user_name', username.trim());
-//           await AsyncStorage.setItem('login_user_passwd', password.trim());
-//           setToken(token);
-//           setUserDetails(user_details);
-//           setMenuApps(user_menu_apps);
-//           setIsLoggedIn(true);
-//           console.log('🔒 Token saved in AsyncStorage');
-//           // inside handleLogin after you saved token & user details
-//           // if (ismastersync == 1 || ismastersync === '1' || ismastersync === true) {
-//           //   try {
-//           //     console.log('🔁 Starting master-sync caching for prptypes:', ismastersyncData);
-//           //     await fetchMasterSyncPartyDataPerPrptypeCache(token || '', ismastersyncData);
-
-//           //     // after fetchMasterSyncPartyDataPerPrptypeCache(...)
-//           //     console.log('🔎 Verifying requested prptypes individually:');
-//           //     for (const itm of ismastersyncData) {
-//           //       const key = normalizePrptype(itm.prptype ?? itm.PrpType ?? '');
-//           //       const summary = await getPrptypeSummary(key);
-//           //       console.log(`→ summary for requested prptype "${itm.prptype}" (normalized "${key}") :`, summary);
-//           //       const raw = await readPrptypeCache(key);
-//           //       console.log(`→ raw cache for "${key}" preview: account=${Array.isArray(raw?.account) ? raw.account.length : raw?.account ? 'non-array' : 'null'}, banks=${Array.isArray(raw?.banks) ? raw.banks.length : raw?.banks ? 'non-array' : 'null'}, branches=${Array.isArray(raw?.branches) ? raw.branches.length : raw?.branches ? 'non-array' : 'null'}`);
-//           //     }
-
-
-//           //     // verify & print prptypes which actually have data
-//           //     await printCachedPrptypesWithData();
-
-//           //     // if still confused, uncomment next line to dump raw AsyncStorage keys
-//           //     // await debugRawAsyncStorage();
-//           //   } catch (err) {
-//           //     console.warn('Master-sync or verification failed:', err);
-//           //   }
-//           // }
-//           // In your login handler (where you call fetchMasterSyncPartyDataPerPrptypeCache):
-//           if (ismastersync == 1 || ismastersync === '1' || ismastersync === true) {
-//             try {
-//               console.log('🔁 Starting master-sync caching for prptypes:', ismastersyncData);
-//               await AsyncStorage.setItem('master_sync_data', JSON.stringify(ismastersyncData)); // Save ismastersyncData);
-//               // Initialize database first
-//               await initDatabase();
-
-//               await fetchMasterSyncPartyDataPerPrptypeCache(token || '', ismastersyncData);
-
-//               // Verify data
-//               console.log('🔎 Verifying requested prptypes individually:');
-//               for (const itm of ismastersyncData) {
-//                 const key = normalizePrptype(itm.prptype ?? itm.PrpType ?? '');
-//                 const summary = await getPrptypeSummary(key);
-//                 console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
-//               }
-
-//               // Print cached prptypes
-//               await printCachedPrptypesWithData();
-//             } catch (err) {
-//               console.warn('Master-sync or verification failed:', err);
-//             }
-//           }
-
-
-
-
-//         }
-
-//         else {
-//           Alert.alert('❌ Error', `${response.data.response.message}`);
-//         }
-//       } else if (response.data.success === false) {
-//         Alert.alert('❌ Error', `${response.data.message}`);
-//       } else {
-//         Alert.alert('❌ Error', `${response.data.message}`);
-//       }
-
-//     } catch (error) {
-//       console.error('❌ Login API Error:', error);
-//       if (axios.isAxiosError(error) && error.response) {
-//         console.log('🔴 API Error Response:', error.response.data);
-//         Alert.alert('Error', 'Server error');
-//       } else {
-//         Alert.alert('Error', 'Server error');
-//       }
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   return (
-//     <View style={styles.container}>
-//       {/* Update Badge */}
-//       {/* {showUpdateBadge && (
-//         <View style={styles.updateContainer}>
-//           <Animated.Text style={[styles.updateText, { backgroundColor }]}>
-//             New
-//           </Animated.Text>
-//           <Text style={styles.staticText}>{MOCK_API_RESPONSE.update_message}</Text>
-//           <Text
-//             style={styles.clickHereText}
-//             onPress={() => Linking.openURL(MOCK_API_RESPONSE.download_url)}>
-//             Click here
-//           </Text>
-//         </View>
-//       )} */}
-
-//       {/* Logo */}
-//       <Image source={require('../images/badge.png')} style={styles.logo} resizeMode="contain" />
-
-//       {/* Username Field */}
-//       <View style={styles.inputContainer}>
-//         <Icon name="person-outline" size={24} color={theme.BRAND_GRADIENT_END} />
-//         <TextInput
-//           style={styles.input}
-//           placeholder="Username"
-//           placeholderTextColor="#999"
-//           value={username}
-//           onChangeText={setUsername}
-//           autoCapitalize="none"
-//         />
-//       </View>
-
-//       {/* Password Field */}
-//       <View style={styles.inputContainer}>
-//         <Icon name="lock-outline" size={24} color={theme.BRAND_GRADIENT_END} />
-//         <TextInput
-//           style={styles.input}
-//           placeholder="Password"
-//           placeholderTextColor="#999"
-//           value={password}
-//           secureTextEntry={!showPassword}
-//           autoCapitalize="none"
-//           onChangeText={setPassword}
-//         />
-//         <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-//           <Icon
-//             name={showPassword ? 'visibility-off' : 'visibility'}
-//             size={24}
-//             color={theme.BRAND_GRADIENT_END}
-//           />
-//         </TouchableOpacity>
-//       </View>
-
-//       {/* Submit Button */}
-//       <LinearGradient
-//         colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-//         style={styles.button}
-//         start={{ x: 0, y: 0 }}
-//         end={{ x: 1, y: 0 }}>
-//         <TouchableOpacity
-//           style={styles.buttonTouch}
-//           onPress={handleLogin}
-//           disabled={isLoading || !isConnected}>
-//           {isLoading ? (
-//             <ActivityIndicator color="#fff" />
-//           ) : (
-//             <Text style={styles.buttonText}>Login</Text>
-//           )}
-//         </TouchableOpacity>
-//       </LinearGradient>
-//     </View>
-//   );
-
-// };
-
-// // export default LoginScreen;
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     padding: 30,
-//     backgroundColor: '#f8f9fa',
-//   },
-//   logo: {
-//     width: 120,
-//     height: 120,
-//     marginBottom: 40,
-//     shadowColor: theme.BRAND_GRADIENT_END,
-//     shadowOffset: { width: 0, height: 4 },
-//     shadowOpacity: 0.3,
-//     shadowRadius: 10,
-//   },
-//   inputContainer: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     width: '100%',
-//     marginBottom: 20,
-//     borderBottomWidth: 1,
-//     borderBottomColor: theme.BRAND_GRADIENT_END,
-//     paddingVertical: 8,
-//   },
-//   input: {
-//     flex: 1,
-//     height: 50,
-//     fontSize: 16,
-//     color: '#333',
-//     marginLeft: 10,
-//   },
-//   button: {
-//     width: '100%',
-//     height: 50,
-//     borderRadius: 25,
-//     marginTop: 20,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   buttonTouch: {
-//     width: '100%',
-//     height: '100%',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   buttonText: {
-//     color: '#fff',
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//   },
-//   updateContainer: {
-//     position: 'absolute',
-//     top: 40,
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     backgroundColor: '#fff',
-//     padding: 10,
-//     borderRadius: 20,
-//     shadowColor: '#000',
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowOpacity: 0.2,
-//     shadowRadius: 4,
-//     elevation: 3,
-//   },
-//   updateText: {
-//     color: 'white',
-//     fontSize: 12,
-//     fontWeight: 'bold',
-//     paddingHorizontal: 8,
-//     paddingVertical: 4,
-//     borderRadius: 10,
-//     overflow: 'hidden',
-//   },
-//   staticText: {
-//     marginLeft: 8,
-//     fontSize: 14,
-//     color: '#333',
-//   },
-//   clickHereText: {
-//     marginLeft: 4,
-//     color: theme.BRAND_GRADIENT_END,
-//     fontWeight: 'bold',
-//     textDecorationLine: 'underline',
-//   },
-// });
-
-
-// export default LoginScreen;
-
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -406,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
 import theme from '../../android/app/src/theme';
 import { Picker } from '@react-native-picker/picker';
+import { Dropdown } from 'react-native-element-dropdown';
 // import React, { useEffect, useRef, useState } from 'react';
 // import {
 //   View,
@@ -554,11 +169,13 @@ const LoginScreen: React.FC<Props> = ({
       const user_menu_apps = response.data.response.usermenu || '';
       const ismastersync = response.data.response.ismastersync || '';
       const ismastersyncData = response.data.response.mastersyncprptypes || [];
+      const userof = response.data.response.userof;
       if (response.data.success === true) {
         if (token && user_details && user_menu_apps) {
           await AsyncStorage.setItem('access_token', token);
           await AsyncStorage.setItem('user_details', user_details);
           await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
+          await AsyncStorage.setItem('user_prptype', userof);
           await AsyncStorage.setItem('login_user_name', username.trim());
           await AsyncStorage.setItem('login_user_passwd', password.trim());
           setToken(token);
@@ -600,27 +217,42 @@ const LoginScreen: React.FC<Props> = ({
       {showDropdown ? (
         <Animated.View style={[styles.dropdownContainer, { opacity: fadeAnim }]}>
           <Image source={require('../images/badge.png')} style={styles.logo} resizeMode="contain" />
-          {/* <Text style={styles.dropdownLabel}>Property</Text> */}
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { backgroundColor: '#f8f9fa', color: '#000' }]}>
             <Icon name="business" size={24} color={theme.BRAND_GRADIENT_END} />
-            <Picker
-              selectedValue={selectedProperty}
-              onValueChange={handlePropertySelect}
-              style={styles.picker}
-              dropdownIconColor={theme.BRAND_GRADIENT_END}
-            >
-              {propertyData.map((item) => (
-                <Picker.Item
-                  key={item.value}
-                  label={item.label}
-                  value={item.value}
-                  enabled={item.value !== ''}
-                  color={item.value === '' ? '#999' : '#333'}
-                />
-              ))}
-            </Picker>
+            <View style={styles.pickerWrapper}>
+              {/* <Picker
+                mode="dropdown"
+                selectedValue={selectedProperty}
+                onValueChange={handlePropertySelect}
+                style={styles.picker}
+                dropdownIconColor={theme.BRAND_GRADIENT_END}
+              >
+                {propertyData.map((item) => (
+                  <Picker.Item
+                    key={item.value}
+                    label={item.label}
+                    value={item.value}
+                    color="#000"
+                  />
+                ))}
+              </Picker> */}
+              <Dropdown
+                style={styles.dropdown}
+                containerStyle={styles.dropdownContainerStyle}
+                placeholderStyle={styles.placeholderStyle}
+                selectedTextStyle={styles.selectedTextStyle}
+                itemTextStyle={styles.itemTextStyle}
+                data={propertyData}
+                labelField="label"
+                valueField="value"
+                placeholder="Select Property"
+                value={selectedProperty}
+                onChange={item => handlePropertySelect(item.value)}
+              />
+            </View>
           </View>
         </Animated.View>
+
       ) : (
         <>
           <TouchableOpacity style={styles.backButton} onPress={goBackToDropdown}>
@@ -718,13 +350,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.BRAND_GRADIENT_END,
     paddingVertical: 8,
-    color: '#333',
+    color: '#fff',
   },
-  picker: {
-    flex: 1,
-    height: 50,
-    color: '#333',
-  },
+  // picker: {
+  //   flex: 1,
+  //   height: 50,
+  //   color: '#333',
+  // },
   input: {
     flex: 1,
     height: 50,
@@ -756,6 +388,44 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  pickerWrapper: {
+    flex: 1,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 6
+  },
+
+  picker: {
+    flex: 1,
+    color: "#000", 
+    backgroundColor: "#f8f9fa"
+  },
+  dropdown: {
+    flex: 1,
+    height: 50,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    paddingHorizontal: 10
+  },
+
+  dropdownContainerStyle: {
+    backgroundColor: "#fff",
+    borderRadius: 8
+  },
+
+  placeholderStyle: {
+    color: "#666",
+    fontSize: 16
+  },
+
+  selectedTextStyle: {
+    color: "#000",
+    fontSize: 16
+  },
+
+  itemTextStyle: {
+    color: "#000",
+    fontSize: 16
+  }
 });
 
 export default LoginScreen;

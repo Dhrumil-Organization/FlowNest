@@ -799,11 +799,29 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         />
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Sales Exec.:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.sexecname || ''}
+                        </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Status:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.AuthStatus || ''}
                         </Text>
                     </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        {/* <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
+                        <RNTextInput
+                            style={crlimtreq_styles.editableValueBlack}
+                            value={editableValuesYPO[item.UId]?.ARemark || ''}
+                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                        // keyboardType="numeric"
+                        /> */}
+                    </View>
+
                 </View>
 
             </View>
@@ -889,10 +907,24 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         </Text>
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Sales Exec.:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.sexecname || 'N/A'}
+                        </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Auth Date:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.AuthorisedDate || 'N/A'}
                         </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        {/* <Text style={crlimtreq_styles.key}>Auth By:</Text>
+                        <Text style={crlimtreq_styles.Authvalue}>
+                            {item.AuthorisedBy || 'N/A'}
+                        </Text> */}
                     </View>
                 </View>
 
@@ -999,10 +1031,24 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         </Text>
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Sales Exec.:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.sexecname || 'N/A'}
+                        </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Auth Date:</Text>
                         <Text style={crlimtreq_styles.value}>
                             {item.AuthorisedDate || 'N/A'}
                         </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        {/* <Text style={crlimtreq_styles.key}>Auth By:</Text>
+                        <Text style={crlimtreq_styles.Authvalue}>
+                            {item.AuthorisedBy || 'N/A'}
+                        </Text> */}
                     </View>
                 </View>
 

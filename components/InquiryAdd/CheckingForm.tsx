@@ -391,6 +391,10 @@ const CheckingForm: React.FC<Props> = ({
     const dropdownAdjRef = React.useRef<any>(null);
     const [shadeModalVisible, setShadeModalVisible] = useState(false);
     const [selectedItemForShade, setSelectedItemForShade] = useState(null);
+    const [commonQty, setCommonQty] = useState('');
+    const [commonRate, setCommonRate] = useState('');
+    const [openAccordion, setOpenAccordion] = useState<string | null>(null); // Track which item's accordion is open
+
 
     console.log('CheckingForm:', getMainYearData);
     const isPLN = useMemo(() => {
@@ -955,6 +959,204 @@ const CheckingForm: React.FC<Props> = ({
         // setSuccessModalVisible(false);
         navigation.navigate('Taka Checking Entry View Data');
     };
+    useEffect(() => {
+        console.log('Updated form.items:', form.items);
+    }, [form.items]);
+
+
+
+    const applyQty = () => {
+        const updated = form.items.map(i => {
+            if (i.itmcode === selectedItemForShade.itmcode) {
+                return {
+                    ...i,
+                    shades: i.shades.map(s => {
+                        if (s.checked) {
+                            return { ...s, qty: form.tempQty };
+                        }
+                        return s;
+                    })
+                };
+            }
+            return i;
+        });
+        setForm(prev => ({ ...prev, items: updated }));
+    };
+
+
+
+    const removeQty = () => {
+
+        const updated = form.items.map(i => {
+
+            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                return {
+                    ...i,
+                    shades: i.shades.map(s => {
+
+                        if (s.checked) {
+                            return { ...s, qty: '' }
+                        }
+
+                        return s
+                    })
+                }
+
+            }
+
+            return i
+
+        })
+
+        setForm(prev => ({ ...prev, items: updated }))
+
+    }
+
+    const applyRate = () => {
+
+        const updated = form.items.map(i => {
+
+            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                return {
+                    ...i,
+                    shades: i.shades.map(s => {
+
+                        if (s.checked) {
+                            return { ...s, rate: form.tempRate }
+                        }
+
+                        return s
+                    })
+                }
+
+            }
+
+            return i
+
+        })
+
+        setForm(prev => ({ ...prev, items: updated }))
+
+    }
+
+    const removeRate = () => {
+
+        const updated = form.items.map(i => {
+
+            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                return {
+                    ...i,
+                    shades: i.shades.map(s => {
+
+                        if (s.checked) {
+                            return { ...s, rate: '' }
+                        }
+
+                        return s
+                    })
+                }
+
+            }
+
+            return i
+
+        })
+
+        setForm(prev => ({ ...prev, items: updated }))
+
+    }
+
+    const applyBoth = () => {
+
+        const updated = form.items.map(i => {
+
+            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                return {
+                    ...i,
+                    shades: i.shades.map(s => {
+
+                        if (s.checked) {
+                            return {
+                                ...s,
+                                qty: form.tempQty,
+                                rate: form.tempRate
+                            }
+                        }
+
+                        return s
+                    })
+                }
+
+            }
+
+            return i
+
+        })
+
+        setForm(prev => ({ ...prev, items: updated }))
+
+    }
+
+    const removeBoth = () => {
+
+        const updated = form.items.map(i => {
+
+            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                return {
+                    ...i,
+                    shades: i.shades.map(s => {
+
+                        if (s.checked) {
+                            return { ...s, qty: '', rate: '' }
+                        }
+
+                        return s
+                    })
+                }
+
+            }
+
+            return i
+
+        })
+
+        setForm(prev => ({ ...prev, items: updated }))
+
+    }
+
+    const applyAll = () => {
+
+        const updated = form.items.map(i => {
+
+            if (i.itmcode === selectedItemForShade.itmcode) {
+
+                return {
+                    ...i,
+                    shades: i.shades.map(s => ({
+                        ...s,
+                        qty: form.tempQty,
+                        rate: form.tempRate
+                    }))
+                }
+
+            }
+
+            return i
+
+        })
+
+        setForm(prev => ({ ...prev, items: updated }))
+
+    }
+
+    const isShadeValid = selectedItemForShade?.shades?.every(
+        s => s.qty && s.rate
+    )
 
 
 
@@ -1099,18 +1301,30 @@ const CheckingForm: React.FC<Props> = ({
                                 // }}
                                 onSelect={(items) => {
 
-                                    const mapped = items.map(i => ({
-                                        itmcode: i.itmcode,
-                                        itmname: i.itmname,
-                                        shades: []
-                                    }));
+                                    const selectedItems = Array.isArray(items) ? items : []
+
+                                    const updatedItems = selectedItems.map(i => {
+
+                                        const existing = form.items?.find(x => x.itmcode === i.itmcode)
+
+                                        if (existing) {
+                                            return existing   // keep old shades
+                                        }
+
+                                        return {
+                                            itmcode: i.itmcode,
+                                            itmname: i.itmname,
+                                            shades: []
+                                        }
+
+                                    })
 
                                     setForm(prev => ({
                                         ...prev,
-                                        items: mapped,
-                                        itmcode: mapped.map(i => i.itmcode),
-                                        itmname: mapped.map(i => i.itmname)
-                                    }));
+                                        items: updatedItems,
+                                        itmcode: updatedItems.map(i => i.itmcode),
+                                        itmname: updatedItems.map(i => i.itmname)
+                                    }))
 
                                 }}
                                 setSelected={(val) => {
@@ -1120,184 +1334,334 @@ const CheckingForm: React.FC<Props> = ({
                                 }}
                             />
                         </View>
-                        {form.items?.length > 0 && (
+                        {form.items?.map((item) => (
+                            <View key={item.itmcode} style={styles.itemCard}>
+                                <View style={styles.itemHeader}>
+                                    <Text style={styles.itemTitle}>{item.itmname}</Text>
+                                    <View style={{ flexDirection: 'row' }}>
+                                        <TouchableOpacity onPress={() => setOpenAccordion(openAccordion === item.itmcode ? null : item.itmcode)}>
+                                            <Icon name={openAccordion === item.itmcode ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#0A7EA4" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => {
+                                            const updated = form.items.filter(i => i.itmcode !== item.itmcode);
+                                            setForm(prev => ({
+                                                ...prev,
+                                                items: updated,
+                                                itmcode: updated.map(i => i.itmcode),
+                                                itmname: updated.map(i => i.itmname)
+                                            }));
+                                        }}>
+                                            <Icon name="close" size={20} color="#E53935" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
 
-                            <View style={{ marginTop: 12 }}>
+                                {/* Accordion Content: Shades */}
+                                {openAccordion === item.itmcode && (
+                                    <View style={styles.accordionContent}>
+                                        {/* Shade Dropdown */}
+                                        <NewPartyDropdown
+                                            data={getCheckerDataShade}
+                                            labelKey={["shdname", "shdcode"]}
+                                            valueKey="shdcode"
+                                            multiple={true}
+                                            initialValue={item.shades || []}
+                                            selected={item.shades || []}
+                                            onSelect={(shades) => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: shades.map(s => ({
+                                                                shdcode: s.shdcode,
+                                                                shdname: s.shdname,
+                                                                qty: '',
+                                                                rate: '',
+                                                                checked: false
+                                                            }))
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}
+                                            setSelected={(val) => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return { ...i, shades: val };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}
+                                        />
 
-                                {form.items.map((item, index) => (
-
-                                    <View key={item.itmcode} style={styles.itemCard}>
-
-                                        <View style={styles.itemHeader}>
-
-                                            <Text style={styles.itemTitle}>
-                                                {item.itmname}
-                                            </Text>
-
-                                            <View style={{ flexDirection: 'row' }}>
-
-                                                <TouchableOpacity
-                                                    onPress={() => {
-                                                        setSelectedItemForShade(item);
-                                                        setShadeModalVisible(true);
-                                                    }}
+                                        {/* Selected Shade Chips */}
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                                            {item.shades?.map(shade => (
+                                                <View
+                                                    key={shade.shdcode}
+                                                    style={[
+                                                        styles.shadeChip,
+                                                        (!shade.qty || !shade.rate) ? styles.shadeChipInvalid : styles.shadeChipValid
+                                                    ]}
                                                 >
-                                                    <Icon name="palette" size={20} color="#0A7EA4" />
-                                                </TouchableOpacity>
+                                                    <Text style={styles.shadeText}>
+                                                        {shade.shdname}
+                                                    </Text>
+                                                    <TextInput
+                                                        style={styles.shadeQtyInput}
+                                                        placeholder="Qty"
+                                                        value={shade.qty}
+                                                        keyboardType="numeric"
+                                                        onChangeText={(text) => {
+                                                            const updated = form.items.map(i => {
+                                                                if (i.itmcode === item.itmcode) {
+                                                                    return {
+                                                                        ...i,
+                                                                        shades: i.shades.map(s => {
+                                                                            if (s.shdcode === shade.shdcode) {
+                                                                                return { ...s, qty: text };
+                                                                            }
+                                                                            return s;
+                                                                        })
+                                                                    };
+                                                                }
+                                                                return i;
+                                                            });
+                                                            setForm(prev => ({ ...prev, items: updated }));
+                                                        }}
+                                                    />
+                                                    <TextInput
+                                                        style={styles.shadeRateInput}
+                                                        placeholder="Rate"
+                                                        value={shade.rate}
+                                                        keyboardType="numeric"
+                                                        onChangeText={(text) => {
+                                                            const updated = form.items.map(i => {
+                                                                if (i.itmcode === item.itmcode) {
+                                                                    return {
+                                                                        ...i,
+                                                                        shades: i.shades.map(s => {
+                                                                            if (s.shdcode === shade.shdcode) {
+                                                                                return { ...s, rate: text };
+                                                                            }
+                                                                            return s;
+                                                                        })
+                                                                    };
+                                                                }
+                                                                return i;
+                                                            });
+                                                            setForm(prev => ({ ...prev, items: updated }));
+                                                        }}
+                                                    />
+                                                </View>
+                                            ))}
 
-                                                <TouchableOpacity
-                                                    style={{ marginLeft: 10 }}
-                                                    onPress={() => {
-
-                                                        const updated = form.items.filter(i => i.itmcode !== item.itmcode);
-
-                                                        setForm(prev => ({
-                                                            ...prev,
-                                                            items: updated,
-                                                            itmcode: updated.map(i => i.itmcode),
-                                                            itmname: updated.map(i => i.itmname)
-                                                        }));
-
-                                                    }}
-                                                >
-
-                                                    <Icon name="close" size={20} color="#E53935" />
-
-                                                </TouchableOpacity>
-
-                                            </View>
 
                                         </View>
 
-                                        {/* Shades */}
-
-                                        {item.shades?.length > 0 && (
-
-                                            <View style={styles.shadeContainer}>
-
-                                                {item.shades.map(shade => (
-
-                                                    <View key={shade.shdcode} style={styles.shadeChip}>
-
-                                                        <Text style={styles.shadeText}>
-                                                            {shade.shdname}
-                                                        </Text>
-
+                                        {/* Shade Checkbox List */}
+                                        <ScrollView style={{ maxHeight: 220 }}>
+                                            {item.shades?.map(shade => {
+                                                const isChecked = shade.checked;
+                                                return (
+                                                    <View key={shade.shdcode} style={styles.modalShadeRow}>
                                                         <TouchableOpacity
                                                             onPress={() => {
-
                                                                 const updated = form.items.map(i => {
-
                                                                     if (i.itmcode === item.itmcode) {
-
                                                                         return {
                                                                             ...i,
-                                                                            shades: i.shades.filter(s => s.shdcode !== shade.shdcode)
-                                                                        }
-
+                                                                            shades: i.shades.map(s => {
+                                                                                if (s.shdcode === shade.shdcode) {
+                                                                                    return { ...s, checked: !s.checked };
+                                                                                }
+                                                                                return s;
+                                                                            })
+                                                                        };
                                                                     }
-
-                                                                    return i
-
-                                                                })
-
-                                                                setForm(prev => ({ ...prev, items: updated }))
-
+                                                                    return i;
+                                                                });
+                                                                setForm(prev => ({ ...prev, items: updated }));
                                                             }}
                                                         >
-
-                                                            <Icon name="close" size={14} color="#E53935" />
-
+                                                            <Icon
+                                                                name={isChecked ? 'check-box' : 'check-box-outline-blank'}
+                                                                size={22}
+                                                                color="#333"
+                                                            />
                                                         </TouchableOpacity>
-
+                                                        <Text style={{ flex: 1, marginLeft: 10 }}>
+                                                            {shade.shdname}
+                                                        </Text>
                                                     </View>
+                                                );
+                                            })}
+                                        </ScrollView>
 
-                                                ))}
+                                        {/* Common Inputs */}
+                                        <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                                            <TextInput
+                                                placeholder="Common Qty"
+                                                keyboardType="numeric"
+                                                value={commonQty}
+                                                onChangeText={setCommonQty}
+                                                style={styles.commonInput}
+                                            />
+                                            <TextInput
+                                                placeholder="Common Rate"
+                                                keyboardType="numeric"
+                                                value={commonRate}
+                                                onChangeText={setCommonRate}
+                                                style={styles.commonInput}
+                                            />
+                                        </View>
 
-                                            </View>
-
-                                        )}
-
+                                        {/* Buttons */}
+                                        <View style={styles.bulkBtnGrid}>
+                                            <TouchableOpacity style={styles.btnApply} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => {
+                                                                if (s.checked) {
+                                                                    return { ...s, qty: commonQty };
+                                                                }
+                                                                return s;
+                                                            })
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Apply Qty</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.btnRemove} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => {
+                                                                if (s.checked) {
+                                                                    return { ...s, qty: '' };
+                                                                }
+                                                                return s;
+                                                            })
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Remove Qty</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.btnApply} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => {
+                                                                if (s.checked) {
+                                                                    return { ...s, rate: commonRate };
+                                                                }
+                                                                return s;
+                                                            })
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Apply Rate</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.btnRemove} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => {
+                                                                if (s.checked) {
+                                                                    return { ...s, rate: '' };
+                                                                }
+                                                                return s;
+                                                            })
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Remove Rate</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.btnApply} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => {
+                                                                if (s.checked) {
+                                                                    return {
+                                                                        ...s,
+                                                                        qty: commonQty,
+                                                                        rate: commonRate
+                                                                    };
+                                                                }
+                                                                return s;
+                                                            })
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Apply Both</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.btnRemove} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => {
+                                                                if (s.checked) {
+                                                                    return { ...s, qty: '', rate: '' };
+                                                                }
+                                                                return s;
+                                                            })
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Remove Both</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.btnApplyAll} onPress={() => {
+                                                const updated = form.items.map(i => {
+                                                    if (i.itmcode === item.itmcode) {
+                                                        return {
+                                                            ...i,
+                                                            shades: i.shades.map(s => ({
+                                                                ...s,
+                                                                qty: commonQty,
+                                                                rate: commonRate
+                                                            }))
+                                                        };
+                                                    }
+                                                    return i;
+                                                });
+                                                setForm(prev => ({ ...prev, items: updated }));
+                                            }}>
+                                                <Text style={styles.btnText}>Apply All</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
-
-                                ))}
-
+                                )}
                             </View>
+                        ))}
 
-                        )}
-                        <Modal
-                            visible={shadeModalVisible}
-                            animationType="slide"
-                        >
-
-                            <View style={{
-                                flex: 1,
-                                backgroundColor: '#F7F9FC',
-                                padding: 20
-                            }}>
-
-                                <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                                    Select Shades for {selectedItemForShade?.itmname}
-                                </Text>
-
-                                <NewPartyDropdown
-                                    data={getCheckerDataShade}
-                                    labelKey={["shdname", "shdcode"]}
-                                    valueKey="shdcode"
-                                    multiple={true}
-
-                                    initialValue={selectedItemForShade?.shades || []}
-                                    selected={selectedItemForShade?.shades || []}
-
-                                    onSelect={(shades) => {
-
-                                        const updated = form.items.map(i => {
-
-                                            if (i.itmcode === selectedItemForShade.itmcode) {
-
-                                                return { ...i, shades }
-
-                                            }
-
-                                            return i
-
-                                        })
-
-                                        setForm(prev => ({ ...prev, items: updated }))
-
-                                    }}
-
-                                    setSelected={(val) => {
-
-                                        const updated = form.items.map(i => {
-
-                                            if (i.itmcode === selectedItemForShade.itmcode) {
-
-                                                return { ...i, shades: val }
-
-                                            }
-
-                                            return i
-
-                                        })
-
-                                        setForm(prev => ({ ...prev, items: updated }))
-
-                                    }}
-                                />
-
-                                <TouchableOpacity
-                                    style={styles.saveBtn}
-                                    onPress={() => setShadeModalVisible(false)}
-                                >
-
-                                    <Text style={styles.saveText}>Done</Text>
-
-                                </TouchableOpacity>
-
-                            </View>
-
-                        </Modal>
 
 
                         {/* Nav */}
@@ -1308,7 +1672,7 @@ const CheckingForm: React.FC<Props> = ({
                                 <Text style={styles.saveText}>{AdjType === 'ACC' ? 'Save' : 'Next'}</Text>
                             </TouchableOpacity>
                         </View>
-                      
+
                     </View>
                 )}
 
@@ -1634,7 +1998,9 @@ const styles = StyleSheet.create({
     itemTitle: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#333'
+        color: '#333',
+        flex: 1,
+        flexWrap: 'wrap'
     },
 
     shadeContainer: {
@@ -1662,6 +2028,126 @@ const styles = StyleSheet.create({
         color: '#333',
         flexShrink: 1
     },
+    shadeChipInvalid: {
+        backgroundColor: '#FFE6E6'
+    },
+
+    shadeChipValid: {
+        backgroundColor: '#E6F7E6'
+    },
+    qtyInput: {
+        width: 60,
+        backgroundColor: '#F3F6FA',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        marginRight: 6
+    },
+
+    rateInput: {
+        width: 70,
+        backgroundColor: '#F3F6FA',
+        borderRadius: 6,
+        paddingHorizontal: 8
+    },
+
+    bulkBtnRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 12
+    },
+
+    bulkBtn: {
+        backgroundColor: '#EEF6FA',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6,
+        marginRight: 6,
+        marginBottom: 6
+    },
+    modalShadeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderColor: '#eee'
+    },
+
+    commonInput: {
+        flex: 1,
+        backgroundColor: '#F3F6FA',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        marginRight: 8
+    },
+
+    bulkBtnGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 14,
+        justifyContent: 'space-between'
+    },
+
+    btnApply: {
+        width: '48%',
+        backgroundColor: '#4CAF50',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 8,
+        alignItems: 'center'
+    },
+
+    btnRemove: {
+        width: '48%',
+        backgroundColor: '#F44336',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 8,
+        alignItems: 'center'
+    },
+
+    btnApplyAll: {
+        width: '100%',
+        backgroundColor: '#1976D2',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+
+    btnText: {
+        color: '#fff',
+        fontWeight: '700'
+    },
+    shadeQtyInput: {
+        width: 60,
+        height: 50,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        marginLeft: 4,
+        fontSize: 12,
+        color: '#000',
+    },
+    shadeRateInput: {
+        width: 50,
+        height: 24,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        marginLeft: 4,
+        fontSize: 12,
+    },
+    accordionContent: {
+        marginTop: 10,
+        padding: 10,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 8,
+    },
+    
+    
 });
 
 export default CheckingForm;

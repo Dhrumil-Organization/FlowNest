@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, use } from 'react';
 import {
     View,
     Text,
@@ -52,6 +52,7 @@ const SalesAnalysis: React.FC<Props> = ({
     const [isListening, setIsListening] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
+    const [updatedDate, setUpdatedDate] = useState('');
 
     const flatListRef = useRef<FlatList>(null);
     const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -197,6 +198,41 @@ const SalesAnalysis: React.FC<Props> = ({
 
     };
 
+    useEffect(() => {
+        updateCache(getUserPrptype);
+    }, []);
+
+    const updateCache = async (getUserPrptype) => {
+
+        try {
+
+            const payload = {
+                prptype: getUserPrptype
+            };
+
+            const headers = {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            const response = await axios.post(
+                `${API}/api/updatecache`,
+                payload,
+                { headers }
+            );
+
+            const data = response.data.response.updateddate;
+
+            setUpdatedDate(data);
+
+        } catch (error) {
+
+            console.log("update cache error", error);
+
+        }
+
+    };
+
     const sendMessage = async () => {
 
         if (!inputText.trim()) return;
@@ -309,18 +345,18 @@ const SalesAnalysis: React.FC<Props> = ({
                 styles.messageRow,
                 isUser ? styles.userRow : styles.aiRow
             ]}>
+
                 <View style={[
                     styles.bubble,
-                    isUser ? styles.userBubble : styles.aiBubble,
-                    { maxWidth: isTablet ? '50%' : '75%' }
+                    isUser ? styles.userBubble : styles.aiBubble
                 ]}>
-                    <Text style={[
-                        styles.messageText,
-                        isUser ? { color: '#fff' } : { color: '#000' }
-                    ]}>
+
+                    <Text style={styles.messageText}>
                         {formatAIText(item.text)}
                     </Text>
+
                 </View>
+
             </View>
         );
     };
@@ -335,12 +371,19 @@ const SalesAnalysis: React.FC<Props> = ({
                 subHeader={'Manage your sales analysis'}
             />
 
-            <TouchableOpacity
-                style={styles.clearBtn}
-                onPress={handleClearChat}
-            >
-                <Text style={{ color: '#0A7EA4' }}>Clear Chat</Text>
-            </TouchableOpacity>
+            <View style={styles.topRow}>
+
+                <Text style={styles.updateText}>
+                    {updatedDate}
+                </Text>
+
+                <TouchableOpacity
+                    onPress={handleClearChat}
+                >
+                    <Text style={{ color: '#0A7EA4' }}>Clear Chat</Text>
+                </TouchableOpacity>
+
+            </View>
 
             <FlatList
                 ref={flatListRef}
@@ -405,35 +448,51 @@ export default SalesAnalysis;
 const styles = StyleSheet.create({
 
     messageRow: {
-        marginBottom: 10,
-        flexDirection: 'row'
+        marginBottom: 16,
+        width: '100%',
     },
 
     userRow: {
-        justifyContent: 'flex-end'
+        alignItems: 'flex-end'
     },
 
     aiRow: {
-        justifyContent: 'flex-start'
+        alignItems: 'center'
     },
 
     bubble: {
-        padding: 12,
-        borderRadius: 12
+        padding: 16,
+        borderRadius: 14
     },
 
     userBubble: {
-        backgroundColor: '#0A7EA4'
+        backgroundColor: '#0A7EA4',
+        width: '80%'
     },
 
     aiBubble: {
-        backgroundColor: '#e6e6e6'
+        backgroundColor: '#000',
+        width: '100%'
     },
 
     messageText: {
-        fontSize: 15
+        fontSize: 13,
+        lineHeight: 24,
+        color: '#fff'
     },
 
+    topRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        alignItems: 'center'
+    },
+
+    updateText: {
+        fontSize: 12,
+        color: '#666'
+    },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -449,7 +508,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#f1f1f1',
         borderRadius: 10,
         paddingHorizontal: 12,
-        paddingVertical: 8
+        paddingVertical: 8,
+        color: '#000'
     },
 
     loader: {

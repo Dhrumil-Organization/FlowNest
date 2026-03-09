@@ -45,6 +45,11 @@ import { loginScreen_styles } from '../../common/Styles/Style';
 import { fetchMasterSyncPartyDataPerPrptypeCache, readPrptypeCache, getPrptypeSummary, normalizePrptype, printCachedPrptypesWithData } from '../../common/API/Functions';
 import { initDatabase } from '../../common/API/DatabaseManager';
 import { API, initAPI } from '../../common/API/dynamicAPI';
+import {
+  fetchAndCacheGlobalData,
+  getCachedGlobalData,
+  updateGlobalCacheInBackground
+} from '../../common/utils/sqliteCacheManager';
 
 interface Props {
   setIsLoggedIn: (value: boolean) => void;
@@ -142,6 +147,21 @@ const LoginScreen: React.FC<Props> = ({
 
   console.log('Login API:', API);
   // Login handler (existing)
+
+  // Check if cache is populated
+  const isCachePopulated = async (): Promise<boolean> => {
+    try {
+      const cachedParty = await getCachedGlobalData('party');
+      const cachedItem = await getCachedGlobalData('item');
+      const cachedShade = await getCachedGlobalData('shade');
+      return cachedParty.length > 0 && cachedItem.length > 0 && cachedShade.length > 0;
+    } catch (error) {
+      console.error('❌ Error checking cache status:', error);
+      return false;
+    }
+  };
+
+
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert('❌ Error', 'Please enter username and password.');
@@ -170,6 +190,7 @@ const LoginScreen: React.FC<Props> = ({
       const ismastersync = response.data.response.ismastersync || '';
       const ismastersyncData = response.data.response.mastersyncprptypes || [];
       const userof = response.data.response.userof;
+      const yno = response.data.response.year.YearNo || '';
       if (response.data.success === true) {
         if (token && user_details && user_menu_apps) {
           await AsyncStorage.setItem('access_token', token);
@@ -178,10 +199,20 @@ const LoginScreen: React.FC<Props> = ({
           await AsyncStorage.setItem('user_prptype', userof);
           await AsyncStorage.setItem('login_user_name', username.trim());
           await AsyncStorage.setItem('login_user_passwd', password.trim());
+          await AsyncStorage.setItem('yno', yno.trim());
           setToken(token);
           setUserDetails(user_details);
           setMenuApps(user_menu_apps);
           setIsLoggedIn(true);
+          // const cachedParty = await getCachedGlobalData('party').catch(() => []);
+          const cachePopulated = await isCachePopulated();
+          if (!cachePopulated) {
+            await fetchAndCacheGlobalData(token); // Only fetch if cache is empty
+          } else {
+            console.log('✅ Using existing cached data');
+          }
+          await fetchAndCacheGlobalData(token); // Cache global data
+          // await fetchAndCacheGlobalData(token);
           await AsyncStorage.setItem('master_sync_data_common', JSON.stringify(ismastersyncData));
           if (ismastersync == 1 || ismastersync === '1' || ismastersync === true) {
             try {
@@ -193,7 +224,7 @@ const LoginScreen: React.FC<Props> = ({
                 const summary = await getPrptypeSummary(key);
                 console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
               }
-              await printCachedPrptypesWithData();
+              // await printCachedPrptypesWithData();
             } catch (err) {
               console.warn('Master-sync or verification failed:', err);
             }
@@ -396,7 +427,7 @@ const styles = StyleSheet.create({
 
   picker: {
     flex: 1,
-    color: "#000", 
+    color: "#000",
     backgroundColor: "#f8f9fa"
   },
   dropdown: {

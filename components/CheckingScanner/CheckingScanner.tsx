@@ -1,0 +1,919 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    Alert,
+    TextInput as RNTextInput,
+    Button
+} from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import axios from 'axios';
+import FullScreenLoader from '../Loader/Loader';
+import { checkingScannerStyles } from '../../common/Styles/Style';
+import { API } from '../../common/API/dynamicAPI';
+import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
+import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
+import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ScrollView } from 'react-native';
+import Snackbar from 'react-native-snackbar';
+
+interface Props {
+    token: string;
+    navigation: any;
+    isConnected: boolean | null;
+    username: string;
+}
+
+const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, username }) => {
+
+    const device = useCameraDevice('back');
+    const scanLock = useRef(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const { hasPermission, requestPermission } = useCameraPermission();
+    const [scannedValue, setScannedValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [getData, setData] = useState([]);
+
+    const [beamNo, setBeamNo] = useState('');
+    const [takaNo, setTakaNo] = useState('');
+    const [beamUid, setBeamUid] = useState('');
+    const [prpCode, setPrpCode] = useState('');
+    const [yearNo, setYearNo] = useState('');
+
+    const [meter, setMeter] = useState('');
+    const [kgs, setKgs] = useState('');
+    const [validMeter, setValidMeter] = useState('');
+    const [design, setDesign] = useState('');
+    const [getWarpLen, setWarpLen] = useState('0');
+    const [getavgWt, setavgWt] = useState('0');
+    const [getGradeData, setGradeData] = useState([]);
+    const [getCheckerData, setCheckerData] = useState([]);
+    const [grade, setGrade] = useState('');
+    const [checker, setChecker] = useState('');
+    const [getScannedObj, setScannedObj] = useState({})
+    const [shift, setShift] = useState('')
+    const [getShiftData, setShiftData] = useState([]);
+
+    let cancelToken: any;
+    const getRequestConfig = (props: any) => ({
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+        params: props.params,
+        cancelToken: cancelToken?.token,
+    });
+
+    useEffect(() => {
+        requestPermission();
+    }, []);
+
+    // if (!device || !hasPermission) return null;
+
+    const codeScanner = useCodeScanner({
+        codeTypes: ['qr'],
+        onCodeScanned: (codes) => {
+
+            setBeamNo('');
+            setTakaNo('');
+            setBeamUid('');
+            setPrpCode('');
+            setYearNo('')
+            setMeter('')
+            setKgs('');
+            setavgWt('');
+            setWarpLen('')
+            setData([])
+            setDesign('')
+            setGradeData([])
+            setGrade('')
+            setCheckerData([]);
+            setChecker('')
+            setScannedObj({})
+            setShift('')
+
+            const value = codes[0]?.value || '';
+
+            try {
+
+                const parsed = JSON.parse(value);
+                setScannedObj(parsed)
+
+                setBeamNo(parsed.beamno || '');
+                setTakaNo(parsed.takano || '');
+                setBeamUid(parsed.beamuid || '');
+                setPrpCode(parsed.prpcode || '');
+                setYearNo(parsed.yearNo || '')
+                setMeter('')
+                setKgs('');
+                setavgWt('');
+                getGrades(parsed)
+                getCheckers(parsed)
+                getShifts(parsed)
+                sendScannedValue(value);
+
+            } catch (err) {
+
+                setBeamNo('');
+                setTakaNo('');
+                setBeamUid('');
+                setPrpCode('');
+                setYearNo('')
+                setMeter('')
+                setKgs('');
+                setavgWt('');
+                setWarpLen('')
+                setData([])
+                setDesign('')
+                setGradeData([])
+                setGrade('')
+                setCheckerData([]);
+                setChecker('')
+                setScannedObj({})
+                setShift('')
+
+                Alert.alert("Invalid QR", "QR format not valid");
+            }
+
+            setIsScanning(false);
+        },
+    });
+
+    if (!device || !hasPermission) {
+        return (
+            <View>
+                <Text>No camera permission or device not available</Text>
+            </View>
+        );
+    }
+
+    const getToken = () => {
+
+        return token;
+    };
+
+    const getGrades = async (qrValue: object) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        let yno = await AsyncStorage.getItem('yno');
+
+        try {
+            const historyPayload = {
+                txntype: 'beam_checking_tablet',
+                referrer: 'dashboard',
+                fetch: 'grd',
+                prpcode: qrValue.prpcode,
+                yearno: yno
+            };
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+
+            if (response.data.success && response.data.response.data.length > 0) {
+
+                setGradeData(response.data.response.data);
+
+            } else {
+
+                setGradeData([]);
+            }
+
+        } catch (error) {
+
+            console.log("grade API error:", error);
+
+        } finally {
+
+            setIsLoading(false)
+        }
+    }
+
+    const getCheckers = async (qrValue: object) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+
+            let yno = await AsyncStorage.getItem('yno');
+
+            const historyPayload = {
+                txntype: 'beam_checking_tablet',
+                referrer: 'dashboard',
+                fetch: 'prodrepackchkby',
+                prpcode: qrValue.prpcode,
+                yearno: yno
+            };
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+
+            if (response.data.success && response.data.response.data.length > 0) {
+
+                setCheckerData(response.data.response.data);
+
+                let tempChecker = '';
+                tempChecker = await AsyncStorage.getItem('csChecker');
+
+                if (typeof tempChecker != 'undefined' && tempChecker != null && tempChecker != '') {
+
+                    response.data.response.data && response.data.response.data.filter((el, ind) => {
+
+                        if (el.EmpCode == tempChecker) {
+
+                            setChecker(tempChecker);
+                        }
+                    })
+                }
+            } else {
+
+                setCheckerData([]);
+            }
+        } catch (error) {
+
+            console.log("API getCheckers error:", error);
+
+        } finally {
+
+            setIsLoading(false);
+        }
+    }
+
+    const getShifts = async (qrValue: object) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+
+            const historyPayload = {
+                // text: parcode,
+                txntype: 'beam_checking_tablet',
+                referrer: 'dashboard',
+                fetch: 'shift',
+                prpcode: qrValue.prpcode,
+                yearno: yno
+
+            };
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+
+            if (response.data.success && response.data.response.data.length > 0) {
+
+                setShiftData(response.data.response.data);
+
+            } else {
+
+                setShiftData([]);
+            }
+        } catch (error) {
+
+            console.log("API getshifts error:", error);
+
+        } finally {
+
+            setIsLoading(false);
+        }
+    }
+
+    const sendScannedValue = async (qrValue: string) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+
+        try {
+            let temp = JSON.parse(qrValue)
+            let yno = await AsyncStorage.getItem('yno');
+
+            let infoPyload = {
+
+                txntype: 'chekingScanner',
+                referrer: 'dashboard',
+                scannedString: temp,
+                prpcode: temp.prpcode,
+                yearno: yno
+            };
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
+
+            if (response.data.success && response.data.response.data) {
+
+                setData(response.data.response.data);
+                setIsLoading(false);
+
+            } else {
+
+                setIsLoading(false);
+                console.error('Unexpected response structure:', response.data);
+
+                Alert.alert(`${response.data}`);
+
+            }
+        } catch (error) {
+
+            console.log("API sendScannedValue error:", error);
+
+        } finally {
+
+            setIsLoading(false);
+        }
+    };
+
+    const handleMeterChange = (value: string) => {
+
+        if (typeof design == 'undefined' || design == null || design == '') {
+
+            Alert.alert("Design", "Please select design first");
+            return;
+
+        } else {
+
+            let qltWt = 0.00;
+            getData && getData.filter((el, ind) => {
+                if (el.DsnCode == design) {
+                    qltWt = el.QltWt;
+                }
+            })
+            value = value.replace(',', '.');
+
+            const regex = /^\d*(?:\.\d{0,2})?$/;
+
+            if (value === '' || regex.test(value)) {
+                setMeter(value);
+                setValidMeter(value);
+            }
+
+            let qty = 0.0;
+            qty = isNaN(value) ? 0.0 : parseFloat(value);
+
+            let wt = 0.0;
+            wt = isNaN(qty) || isNaN(qltWt) || parseFloat(qty) == 0 || parseFloat(qltWt) == 0 ? 0.0 : (parseFloat(qty) * parseFloat(qltWt)).toFixed(2);
+
+            let avgWt = 0.0;
+            avgWt = isNaN(qty) || isNaN(wt) || parseFloat(qty) == 0 || parseFloat(wt) == 0 ? 0.0 : ((parseFloat(wt) * 100) / parseFloat(qty)).toFixed(2);
+
+            setKgs(wt);
+            setavgWt(avgWt);
+        }
+    };
+
+    const handleKgsChange = (value: string) => {
+
+        value = value.replace(',', '.');
+
+        const regex = /^\d*(?:\.\d{0,2})?$/;
+
+        if (value === '' || regex.test(value)) {
+
+            setKgs(value);
+
+            let qty = parseFloat(meter) || 0;
+            let wt = parseFloat(value) || 0;
+
+            let avgWt =
+                qty === 0 || wt === 0
+                    ? 0
+                    : ((wt * 100) / qty).toFixed(2);
+
+            setavgWt(avgWt);
+        }
+    }
+
+    const handleSubmitScan = async () => {
+
+        if (typeof beamNo == 'undefined' || beamNo == null || beamNo == '') {
+
+            Alert.alert('Beam no can not be blank');
+            return false;
+        } else if (typeof takaNo == 'undefined' || takaNo == null || takaNo == '') {
+
+            Alert.alert('Taka no can not be blank');
+            return false;
+
+        } else if (typeof design == 'undefined' || design == null || design == '') {
+
+            Alert.alert('Design can not be blank.');
+            return false;
+        } else if (typeof meter == 'undefined' || meter == null || meter == '' || parseInt(meter) <= 0) {
+
+            Alert.alert('Meter can not be blank or 0.');
+            return false;
+
+        } else if (typeof meter == 'undefined' || meter == null || meter == '' || parseInt(meter) > 0 && (parseFloat(meter) > parseFloat(getWarpLen))) {
+
+            Alert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
+            return false;
+
+        } else if (typeof kgs == 'undefined' || kgs == null || kgs == '' || parseInt(kgs) <= 0) {
+
+            Alert.alert('Kgs can not be blank or 0.');
+            return false;
+
+        } else if (typeof kgs == 'undefined' || kgs == null || kgs == '' || parseInt(kgs) <= 0) {
+
+            Alert.alert('Kgs can not be blank or 0.');
+            return false;
+
+        } else if (typeof grade == 'undefined' || grade == null || grade == '') {
+
+            Alert.alert('Grade can not be blank.');
+            return false;
+
+        } else if (typeof checker == 'undefined' || checker == null || checker == '') {
+
+            Alert.alert('Checker can not be blank.');
+            return false;
+
+        } else if (typeof shift == 'undefined' || shift == null || shift == '') {
+
+            Alert.alert('Shift can not be blank.');
+            return false;
+
+        } else {
+
+            let finalObj = new Object();
+            getData && getData.filter((el, ind) => {
+
+                if (design == el.DsnCode) {
+                    finalObj = el;
+                }
+            })
+
+            if (cancelToken?.cancel) cancelToken.cancel();
+            cancelToken = axios.CancelToken.source();
+            setIsLoading(true);
+
+            try {
+
+                let yno = await AsyncStorage.getItem('yno');
+
+                let payloadObj = new Object()
+
+                payloadObj = finalObj;
+                payloadObj['prpcode'] = getScannedObj.prpcode;
+                payloadObj['yearno'] = yno;
+                payloadObj['TakaNo'] = takaNo;
+                payloadObj['GrdCode'] = grade;
+                //payloadObj['EmpCode'] = checker;
+                payloadObj['ChkCode'] = checker;
+                payloadObj['Qty'] = meter;
+                payloadObj['Wt'] = kgs;
+                payloadObj['AvgWt'] = getavgWt;
+                payloadObj['txntype'] = 'chekingScanner';
+
+                payloadObj['ShfCode'] = shift;
+                payloadObj['SrNo'] = '0';
+                payloadObj['islasttaka'] = getScannedObj.islasttaka;
+                payloadObj['isfirsttaka'] = getScannedObj.isfirsttaka;
+                payloadObj['IsLastTaka'] = getScannedObj.islasttaka;
+                payloadObj['IsFirstTaka'] = getScannedObj.isfirsttaka;
+
+                const headers = {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                };
+
+                const response = await axios.post(`${API}/api/add_auto_checking_detail`, payloadObj, { headers });
+
+                if (response.data.success == true) {
+
+                    setIsLoading(false);
+
+                    setBeamNo('');
+                    setTakaNo('');
+                    setBeamUid('');
+                    setPrpCode('');
+                    setYearNo('')
+                    setMeter('')
+                    setKgs('');
+                    setavgWt('');
+                    setWarpLen('')
+                    setData([])
+                    setDesign('')
+                    setGradeData([])
+                    setGrade('')
+                    setCheckerData([]);
+                    setChecker('')
+                    setScannedObj({});
+                    setShift('');
+
+                    Snackbar.show({
+                        text: 'Saved successfully',
+                        duration: Snackbar.LENGTH_LONG,
+                        backgroundColor: '#000',
+                        action: {
+                            text: 'OK',
+                            textColor: 'green',
+                        },
+                    });
+
+                } else if (response.data.success === false) {
+
+                    setIsLoading(false);
+
+                    Snackbar.show({
+                        text: response.data.message,
+                        duration: Snackbar.LENGTH_LONG,
+                        backgroundColor: '#000',
+                        textColor: '#fff',
+                        action: {
+                            text: 'OK',
+                            textColor: 'yellow',
+                        },
+                    });
+
+                } else {
+
+                    setIsLoading(false);
+
+                    Snackbar.show({
+                        text: response.data.message,
+                        duration: Snackbar.LENGTH_LONG,
+                        backgroundColor: '#000',
+                        textColor: '#fff',
+                        action: {
+                            text: 'OK',
+                            textColor: 'red',
+                        },
+                    });
+                }
+
+            } catch (error) {
+
+                setIsLoading(false);
+                console.log("API handleSubmitScan error:", error);
+
+            } finally {
+
+                setIsLoading(false);
+            }
+        }
+    }
+
+    const clearDesign = () => {
+        setDesign('');
+        setWarpLen('0');
+        setMeter('')
+        setKgs('')
+        setavgWt('');
+    };
+
+    const clearGrade = () => {
+        setGrade('');
+    };
+
+    const clearChecker = () => {
+        setChecker('');
+    };
+
+    const clearShift = () => {
+        setShift('');
+    };
+
+    return (
+        <>
+            {isLoading && <FullScreenLoader />}
+            <HeaderBarwithBack
+                userName={username}
+                header={'Checking scanner'}
+                subHeader={'scan with QR code'}
+            />
+            <View style={checkingScannerStyles.flexContainer}>
+                <Icon name="camera" style={checkingScannerStyles.cameraIcon} />
+                <Text style={checkingScannerStyles.titleTextWithIcon}> QR scanner </Text>
+                <Button
+                    title={isScanning ? "Stop scan" : "Start scan"}
+                    color={'#007EA7'}
+                    onPress={() => setIsScanning(!isScanning)}
+                />
+            </View>
+            <ScrollView
+                style={checkingScannerStyles.container}
+                contentContainerStyle={{ paddingBottom: 40 }}
+                keyboardShouldPersistTaps="handled"
+            >
+                {isScanning && (
+                    <View style={checkingScannerStyles.cameraContainer}>
+                        <>
+                            {device && hasPermission && (
+                                <Camera
+                                    style={checkingScannerStyles.camera}
+                                    device={device}
+                                    isActive={true}
+                                    codeScanner={codeScanner}
+                                />
+                            )}
+                            {/* Overlay */}
+                            <View style={checkingScannerStyles.overlay}>
+                                <View style={checkingScannerStyles.scanBox} />
+                            </View>
+                        </>
+                    </View>
+                )}
+                <View style={checkingScannerStyles.container}>
+
+                    <View style={checkingScannerStyles.row}>
+
+                        <View style={checkingScannerStyles.halfInput}>
+                            <Text style={checkingScannerStyles.label}>
+                                Beam Number
+                                <Text style={{ color: 'red' }}> *</Text>
+                            </Text>
+                            <TextInput
+                                placeholder="Beam number"
+                                style={checkingScannerStyles.inputDisabled}
+                                //value={scannedValue}
+                                value={beamNo}
+                                onChangeText={setBeamNo}
+                                editable={false}
+                            />
+                        </View>
+
+                        <View style={checkingScannerStyles.halfInput}>
+                            <Text style={checkingScannerStyles.label}>
+                                Taka No
+                                <Text style={{ color: 'red' }}> *</Text>
+                            </Text>
+                            <TextInput
+                                placeholder="Enter taka no"
+                                style={checkingScannerStyles.inputDisabled}
+                                value={takaNo}
+                                onChangeText={setTakaNo}
+                                editable={false}
+                            />
+                        </View>
+
+                    </View>
+
+                    {/* Design */}
+                    <Text style={checkingScannerStyles.label}>
+                        Design
+                        <Text style={{ color: 'red' }}> *</Text>
+                    </Text>
+
+                    <View style={checkingScannerStyles.dropdown}>
+                        <Picker
+                            mode="dialog"
+                            style={checkingScannerStyles.picker}
+                            selectedValue={design || ''}
+                            onValueChange={(itemValue) => {
+
+                                setDesign(itemValue);
+                                const selectedRow = getData.find(el => el.DsnCode === itemValue);
+
+                                if (selectedRow) {
+                                    setWarpLen(selectedRow.WarpLen || '0');
+                                } else {
+                                    setWarpLen('0');
+                                }
+
+                            }}
+                        >
+                            <Picker.Item label="Select Design" value="" enabled={false} />
+
+                            {getData.map((item, index) => (
+                                <Picker.Item
+                                    key={index}
+                                    label={item.DsnName}
+                                    value={item.DsnCode}
+                                />
+                            ))}
+                        </Picker>
+                        <Icon
+                            name="arrow-drop-down"
+                            size={28}
+                            color="#000"
+                            style={checkingScannerStyles.dropdownIcon}
+                        />
+                    </View>
+                    <View style={checkingScannerStyles.viewCustom}>
+                        <TouchableOpacity
+                            onPress={clearDesign}
+                        >
+                            <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
+                        </TouchableOpacity>
+                    </View>
+                    {/* Meter */}
+                    <View style={checkingScannerStyles.row}>
+
+                        <View style={checkingScannerStyles.halfInput}>
+                            <Text style={checkingScannerStyles.label}>
+                                Meter (in meters)
+                                <Text style={{ color: 'red' }}> *</Text>
+                                {
+                                    typeof getWarpLen != 'undefined' && getWarpLen != '' && getWarpLen != null && parseFloat(getWarpLen) != 0 ? <Text style={{ fontSize: 11, color: '#000', }}> [ {getWarpLen} ] </Text> : null
+                                }
+                            </Text>
+                            <TextInput
+                                placeholder="Enter meter"
+                                value={meter}
+                                keyboardType="decimal-pad"
+                                style={checkingScannerStyles.input}
+                                onChangeText={handleMeterChange}
+                            />
+                        </View>
+
+                        <View style={checkingScannerStyles.halfInput}>
+                            <Text style={checkingScannerStyles.label}>
+                                Kgs
+                                <Text style={{ color: 'red' }}> *</Text>
+                            </Text>
+                            <TextInput
+                                placeholder="Enter kgs"
+                                style={checkingScannerStyles.input}
+                                onChangeText={handleKgsChange}
+                                keyboardType="decimal-pad"
+                                value={kgs}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={checkingScannerStyles.row}>
+
+                        <View style={checkingScannerStyles.halfInput}>
+                            <Text style={checkingScannerStyles.label}>
+                                Avg. Wt
+                                <Text style={{ color: 'red' }}> *</Text>
+                            </Text>
+                            <TextInput
+                                placeholder="Enter meter"
+                                value={getavgWt}
+                                keyboardType="decimal-pad"
+                                style={checkingScannerStyles.inputDisabled}
+                                editable={false}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Design */}
+                    <Text style={checkingScannerStyles.label}>
+                        Grade
+                        <Text style={{ color: 'red' }}> *</Text>
+                    </Text>
+                    <View style={checkingScannerStyles.dropdown}>
+                        <Picker
+                            mode="dialog"
+                            style={checkingScannerStyles.picker}
+                            selectedValue={grade}
+                            //onValueChange={(itemValue) => setDesign(itemValue)}
+                            onValueChange={(itemValue) => {
+                                setGrade(itemValue)
+                            }}
+                        >
+                            <Picker.Item label="Select Grade" value="" enabled={false} />
+
+                            {getGradeData.map((item, index) => (
+                                <Picker.Item
+                                    key={index}
+                                    label={item.GrdName}
+                                    value={item.GrdCode}
+                                />
+                            ))}
+                        </Picker>
+                        <Icon
+                            name="arrow-drop-down"
+                            size={28}
+                            color="#000"
+                            style={checkingScannerStyles.dropdownIcon}
+                        />
+                    </View>
+                    <View style={checkingScannerStyles.viewCustom}>
+                        <TouchableOpacity
+                            onPress={clearGrade}
+                        >
+                            <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
+                        </TouchableOpacity>
+                    </View>
+                    {/* Design */}
+                    <Text style={checkingScannerStyles.label}>
+                        Checker
+                        <Text style={{ color: 'red' }}> *</Text>
+                    </Text>
+                    <View style={checkingScannerStyles.dropdown}>
+                        <Picker
+                            mode="dialog"
+                            style={checkingScannerStyles.picker}
+                            selectedValue={checker}
+                            onValueChange={(itemValue) => {
+                                AsyncStorage.setItem('csChecker', itemValue);
+                                setChecker(itemValue);
+
+                            }}
+                        >
+                            <Picker.Item label="Select Checker" value="" enabled={false} />
+
+                            {getCheckerData.map((item, index) => (
+                                <Picker.Item
+                                    key={index}
+                                    label={item.EmpName}
+                                    value={item.EmpCode}
+                                />
+                            ))}
+                        </Picker>
+                        <Icon
+                            name="arrow-drop-down"
+                            size={28}
+                            color="#000"
+                            style={checkingScannerStyles.dropdownIcon}
+                        />
+                    </View>
+                    <View style={checkingScannerStyles.viewCustom}>
+                        <TouchableOpacity
+                            onPress={clearChecker}
+                        >
+                            <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
+                        </TouchableOpacity>
+                    </View>
+
+
+
+                    <Text style={checkingScannerStyles.label}>
+                        Shift
+                        <Text style={{ color: 'red' }}> *</Text>
+                    </Text>
+                    <View style={checkingScannerStyles.dropdown}>
+                        <Picker
+                            mode="dialog"
+                            style={checkingScannerStyles.picker}
+                            selectedValue={shift}
+                            onValueChange={(itemValue) => {
+                                setShift(itemValue);
+
+                            }}
+                        >
+                            <Picker.Item label="Select shift" value="" enabled={false} />
+
+                            {getShiftData.map((item, index) => (
+                                <Picker.Item
+                                    key={index}
+                                    label={item.ShfName}
+                                    value={item.ShfCode}
+                                />
+                            ))}
+                        </Picker>
+                        <Icon
+                            name="arrow-drop-down"
+                            size={28}
+                            color="#000"
+                            style={checkingScannerStyles.dropdownIcon}
+                        />
+                    </View>
+                    <View style={checkingScannerStyles.viewCustom}>
+                        <TouchableOpacity
+                            onPress={clearShift}
+                        >
+                            <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
+                        </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity
+                        style={checkingScannerStyles.submitBtn}
+                        onPress={handleSubmitScan}
+                    >
+                        <Text style={checkingScannerStyles.submitText}>
+                            Submit Scan
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Info */}
+                    <View style={checkingScannerStyles.infoBox}>
+                        <Text style={checkingScannerStyles.infoText}>
+                            Fill all fields to enable submission
+                        </Text>
+                    </View>
+                </View>
+
+            </ScrollView>
+        </>
+    );
+};
+export default CheckingScanner;

@@ -30,6 +30,11 @@ import {
 import { SuccessModal } from '../Shared/SuccessModal';
 import { API } from '../../common/API/dynamicAPI';
 import FaultsModal from './FaultsModal';
+import {
+    fetchAndCacheGlobalData,
+    getCachedGlobalData,
+    updateGlobalCacheInBackground
+} from '../../common/utils/sqliteCacheManager';
 
 // ========== INTERFACES ==========
 interface CardData {
@@ -406,9 +411,42 @@ const InquiryAdd: React.FC<Props> = ({
     const [prptypeCacheReady, setPrptypeCacheReady] = useState(false);
     const cancelTokenRef = useRef<axios.CancelTokenSource | null>(null);
     const faultsCacheRef = useRef<{ [key: string]: Fault[] }>({});
+    const [isCacheLoading, setIsCacheLoading] = useState(false);
+    const [cacheError, setCacheError] = useState<string | null>(null);
+
 
 
     let currentYear = getYearData?.data;
+
+    const loadCachedData = async () => {
+        setIsCacheLoading(true);
+        setCacheError(null);
+        try {
+            const party = await getCachedGlobalData('party');
+            const item = await getCachedGlobalData('item');
+            const shade = await getCachedGlobalData('shade');
+            setDesignData(party);
+            setCheckerData(item);
+            setCheckerDataShade(shade);
+        } catch (error) {
+            console.error('Failed to load cached data:', error);
+            setCacheError('Failed to load cached data. Please try again.');
+        } finally {
+            setIsCacheLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            updateGlobalCacheInBackground(token || '');
+        }, 3600000); // Update every hour
+        return () => clearInterval(interval);
+    }, [token]);
+
+
+    useEffect(() => {
+        loadCachedData();
+    }, []);
     // ========== PRELOAD CACHES ==========
     useEffect(() => {
         let cancelled = false;
@@ -1184,17 +1222,20 @@ const InquiryAdd: React.FC<Props> = ({
     //         };
     //     }
     // }, [form.selectedMachine]);
-    useEffect(() => {
-        // if (form.selectedMachine !== null) {
-        // const source = axios.CancelToken.source();
-        fetchAllPartyData();
-        // fetchCheckerData(form.selectedMachine, form.YearNo, source.token);
 
-        // return () => {
-        //     source.cancel('Operation canceled by the user.');
-        // };
-        // }
-    }, []);
+
+
+    // useEffect(() => {
+    //     // if (form.selectedMachine !== null) {
+    //     // const source = axios.CancelToken.source();
+    //     fetchAllPartyData();
+    //     // fetchCheckerData(form.selectedMachine, form.YearNo, source.token);
+
+    //     // return () => {
+    //     //     source.cancel('Operation canceled by the user.');
+    //     // };
+    //     // }
+    // }, []);
 
 
 
@@ -1763,6 +1804,11 @@ const InquiryAdd: React.FC<Props> = ({
 
     // ========== RENDER ==========
     return (
+
+        //         <TouchableOpacity onPress={() => updateGlobalDataInBackground(token)}>
+        //   <Text>Refresh Data</Text>
+        // </TouchableOpacity>
+
         <>
             <HeaderBarwithBack
                 userName={username}
@@ -1770,101 +1816,108 @@ const InquiryAdd: React.FC<Props> = ({
                 subHeader={'Manage your inquiries'}
                 backNavigateScreen={'Inquiry'}
             />
-            <CheckingForm
-                token={token}
-                isConnected={isConnected}
-                username={username}
-                getPropertyData={getPropertyData}
-                getPartyData={getPartyData}
-                setSelectedProperty={setSelectedProperty}
-                selectedProperty={selectedProperty}
-                setSelectedYearNo={setSelectedYearNo}
-                selectedYearNo={selectedYearNo}
-                setSelectedParty={setSelectedParty}
-                selectedParty={selectedParty}
-                selected={selected}
-                setSelected={setSelected}
-                selectedMachine1={selectedMachine1}
-                setSelectedMachine1={setSelectedMachine1}
-                getBankData={getBankData}
-                getAdjData={getAdjData}
-                getPaymentData={getPaymentData}
-                getBranchData={getBranchData}
-                setSelectedBank={setSelectedBank}
-                setSelectedAdj={setSelectedAdj}
-                selectedBank={selectedBank}
-                selectedAdj={selectedAdj}
-                setSelectedPayment={setSelectedPayment}
-                selectedPayment={selectedPayment}
-                selectedBranch={selectedBranch}
-                setSelectedbank={setSelectedbank}
-                setSelectedadj={setSelectedadj}
-                setSelectedpayment={setSelectedpayment}
-                setSelectedbranch={setSelectedbranch}
-                selectedbank={selectedbank}
-                selectedadj={selectedadj}
-                selectedpayment={selectedpayment}
-                selectedbranch={selectedbranch}
-                getPartyLoading={getPartyLoading}
-                getBankLoading={getBankLoading}
-                getAdjLoading={getAdjLoading}
-                getPaymentLoading={getPaymentLoading}
-                getBranchLoading={getBranchLoading}
-                form={form}
-                setForm={setForm}
-                ShowChequeData={ShowChequeData}
-                ShowAdjustmentData={ShowAdjustmentData}
-                initialLoading={initialLoading}
-                initialModalVisible={initialModalVisible}
-                onSavePart1={''}
-                onSavePart2={handleSavePart2}
-                onSaveFaults={handleSaveFaults}
-                getSaveLoading={getSaveLoading}
-                getMainYearData={getMainYearData}
-                // 
-                getMachineData={getMachineData}
-                setSelectedMachine={setSelectedMachine}
-                selectedMachine={selectedMachine}
-                getMachineLoading={getMachineLoading}
-                // 
-                getDesignData={getDesignData}
-                setSelectedDesign={setSelectedDesign}
-                selectedDesign={selectedDesign}
-                getDesignLoading={getDesignLoading}
-                selectedDesign1={selectedDesign1}
-                setSelectedDesign1={setSelectedDesign1}
-                // 
-                getCheckerData={getCheckerData}
-                setSelectedChecker={setSelectedChecker}
-                selectedChecker={selectedChecker}
-                getCheckerLoading={getCheckerLoading}
-                selectedChecker1={selectedChecker1}
-                setSelectedChecker1={setSelectedChecker1}
-                // 
-                getCheckerDataShade={getCheckerDataShade}
-                setSelectedCheckerShade={setSelectedCheckerShade}
-                selectedCheckerShade={selectedCheckerShade}
-                getCheckerLoadingShade={getCheckerLoadingShade}
-                selectedChecker1Shade={selectedChecker1Shade}
-                setSelectedChecker1Shade={setSelectedChecker1Shade}
-                // 
-                getGrdData={getGrdData}
-                setSelectedGrd={setSelectedGrd}
-                selectedGrd={selectedGrd}
-                getGrdLoading={getGrdLoading}
-                selectedGrd1={selectedGrd1}
-                setSelectedGrd1={setSelectedGrd1}
-                // 
-                getShiftData={getShiftData}
-                setSelectedShift={setSelectedShift}
-                selectedShift={selectedShift}
-                getShiftLoading={getShiftLoading}
-                selectedShift1={selectedShift1}
-                setSelectedShift1={setSelectedShift1}
-                getFaultsLoading={getFaultsLoading}
-                navigation={navigation}
-                onExeChange={setSelectedProperty}
-            />
+
+            {isCacheLoading ? (
+                <ActivityIndicator size="large" color="#0000ff" />
+            ) : cacheError ? (
+                <Text style={{ color: 'red' }}>{cacheError}</Text>
+            ) : (
+                <CheckingForm
+                    token={token}
+                    isConnected={isConnected}
+                    username={username}
+                    getPropertyData={getPropertyData}
+                    getPartyData={getPartyData}
+                    setSelectedProperty={setSelectedProperty}
+                    selectedProperty={selectedProperty}
+                    setSelectedYearNo={setSelectedYearNo}
+                    selectedYearNo={selectedYearNo}
+                    setSelectedParty={setSelectedParty}
+                    selectedParty={selectedParty}
+                    selected={selected}
+                    setSelected={setSelected}
+                    selectedMachine1={selectedMachine1}
+                    setSelectedMachine1={setSelectedMachine1}
+                    getBankData={getBankData}
+                    getAdjData={getAdjData}
+                    getPaymentData={getPaymentData}
+                    getBranchData={getBranchData}
+                    setSelectedBank={setSelectedBank}
+                    setSelectedAdj={setSelectedAdj}
+                    selectedBank={selectedBank}
+                    selectedAdj={selectedAdj}
+                    setSelectedPayment={setSelectedPayment}
+                    selectedPayment={selectedPayment}
+                    selectedBranch={selectedBranch}
+                    setSelectedbank={setSelectedbank}
+                    setSelectedadj={setSelectedadj}
+                    setSelectedpayment={setSelectedpayment}
+                    setSelectedbranch={setSelectedbranch}
+                    selectedbank={selectedbank}
+                    selectedadj={selectedadj}
+                    selectedpayment={selectedpayment}
+                    selectedbranch={selectedbranch}
+                    getPartyLoading={getPartyLoading}
+                    getBankLoading={getBankLoading}
+                    getAdjLoading={getAdjLoading}
+                    getPaymentLoading={getPaymentLoading}
+                    getBranchLoading={getBranchLoading}
+                    form={form}
+                    setForm={setForm}
+                    ShowChequeData={ShowChequeData}
+                    ShowAdjustmentData={ShowAdjustmentData}
+                    initialLoading={initialLoading}
+                    initialModalVisible={initialModalVisible}
+                    onSavePart1={''}
+                    onSavePart2={handleSavePart2}
+                    onSaveFaults={handleSaveFaults}
+                    getSaveLoading={getSaveLoading}
+                    getMainYearData={getMainYearData}
+                    // 
+                    getMachineData={getMachineData}
+                    setSelectedMachine={setSelectedMachine}
+                    selectedMachine={selectedMachine}
+                    getMachineLoading={getMachineLoading}
+                    // 
+                    getDesignData={getDesignData}
+                    setSelectedDesign={setSelectedDesign}
+                    selectedDesign={selectedDesign}
+                    getDesignLoading={getDesignLoading}
+                    selectedDesign1={selectedDesign1}
+                    setSelectedDesign1={setSelectedDesign1}
+                    // 
+                    getCheckerData={getCheckerData}
+                    setSelectedChecker={setSelectedChecker}
+                    selectedChecker={selectedChecker}
+                    getCheckerLoading={getCheckerLoading}
+                    selectedChecker1={selectedChecker1}
+                    setSelectedChecker1={setSelectedChecker1}
+                    // 
+                    getCheckerDataShade={getCheckerDataShade}
+                    setSelectedCheckerShade={setSelectedCheckerShade}
+                    selectedCheckerShade={selectedCheckerShade}
+                    getCheckerLoadingShade={getCheckerLoadingShade}
+                    selectedChecker1Shade={selectedChecker1Shade}
+                    setSelectedChecker1Shade={setSelectedChecker1Shade}
+                    // 
+                    getGrdData={getGrdData}
+                    setSelectedGrd={setSelectedGrd}
+                    selectedGrd={selectedGrd}
+                    getGrdLoading={getGrdLoading}
+                    selectedGrd1={selectedGrd1}
+                    setSelectedGrd1={setSelectedGrd1}
+                    // 
+                    getShiftData={getShiftData}
+                    setSelectedShift={setSelectedShift}
+                    selectedShift={selectedShift}
+                    getShiftLoading={getShiftLoading}
+                    selectedShift1={selectedShift1}
+                    setSelectedShift1={setSelectedShift1}
+                    getFaultsLoading={getFaultsLoading}
+                    navigation={navigation}
+                    onExeChange={setSelectedProperty}
+                />
+            )}
             <SuccessModal
                 visible={successModalVisible}
                 title="Taka Saved"

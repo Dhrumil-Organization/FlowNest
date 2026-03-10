@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, use } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
     View,
     Text,
@@ -6,84 +6,61 @@ import {
     StyleSheet,
     TextInput,
     FlatList,
-    ActivityIndicator,
     PermissionsAndroid,
     Platform,
     Animated,
-    Dimensions,
     Alert
-} from 'react-native';
+} from "react-native";
 
-import Voice from '@react-native-voice/voice';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
-import axios from 'axios';
-import { API } from '../../common/API/dynamicAPI';
+import Markdown from "react-native-markdown-display";
+import Clipboard from "@react-native-clipboard/clipboard";
+
+import Voice from "@react-native-voice/voice";
+import Icon from "react-native-vector-icons/MaterialIcons";
+import axios from "axios";
+
+import HeaderBarwithBack from "../HeaderBarwithBack/HeaderBarwithBack";
+import { API } from "../../common/API/dynamicAPI";
 
 import {
     initDB,
     saveChat,
     getChat,
     clearChat,
-    getAllChats
-} from '../../common/utils/chatDB';
+    getAllChats,
+    deleteAfterMessage
+} from "../../common/utils/chatDB";
 
-interface Props {
-    token: string;
-    navigation: any;
-    isConnected: boolean | null;
-    username: string;
-    getUserPrptype: string;
-}
+const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
-const { width } = Dimensions.get('window');
-const isTablet = width > 768;
-
-const SalesAnalysis: React.FC<Props> = ({
-    token,
-    isConnected,
-    username,
-    navigation,
-    getUserPrptype
-}) => {
-
-    const [messages, setMessages] = useState<any[]>([]);
-    const [inputText, setInputText] = useState('');
-    const [isListening, setIsListening] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [messages, setMessages] = useState([]);
+    const [inputText, setInputText] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+    const [isListening, setIsListening] = useState(false);
+    const [editingIndex, setEditingIndex] = useState(null);
+    const [editingText, setEditingText] = useState("");
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(null);
     const [updatedDate, setUpdatedDate] = useState('');
 
-    const flatListRef = useRef<FlatList>(null);
-    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const flatListRef = useRef(null);
+    const controllerRef = useRef(null);
+    const firstLoadRef = useRef(true);
 
-    const dot1 = useRef(new Animated.Value(0)).current;
-    const dot2 = useRef(new Animated.Value(0)).current;
-    const dot3 = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-
-        Animated.loop(
-
-            Animated.stagger(200, [
-
-                Animated.timing(dot1, { toValue: 1, duration: 400, useNativeDriver: true }),
-                Animated.timing(dot2, { toValue: 1, duration: 400, useNativeDriver: true }),
-                Animated.timing(dot3, { toValue: 1, duration: 400, useNativeDriver: true })
-
-            ])
-
-        ).start();
-
-    }, []);
+    const dot1 = useRef(new Animated.Value(0.2)).current;
+    const dot2 = useRef(new Animated.Value(0.2)).current;
+    const dot3 = useRef(new Animated.Value(0.2)).current;
 
     useEffect(() => {
 
         initDB();
-
         loadChats();
 
         Voice.onSpeechResults = onSpeechResults;
+        Voice.onSpeechPartialResults = e => {
+            if (e.value) setInputText(e.value[0]);
+        };
+        Voice.onSpeechEnd = () => setIsListening(false);
 
         return () => {
             Voice.destroy().then(Voice.removeAllListeners);
@@ -91,112 +68,33 @@ const SalesAnalysis: React.FC<Props> = ({
 
     }, []);
 
-    const loadChats = async () => {
+    useEffect(() => {
 
-        try {
+        const animateDot = (dot, delay) => {
 
-            const chats: any = await getAllChats();
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(dot, {
+                        toValue: 1,
+                        duration: 300,
+                        delay,
+                        useNativeDriver: true
+                    }),
+                    Animated.timing(dot, {
+                        toValue: 0.2,
+                        duration: 300,
+                        useNativeDriver: true
+                    })
+                ])
+            ).start();
 
-            if (chats && chats.length > 0) {
+        };
 
-                setMessages(chats);
+        animateDot(dot1, 0);
+        animateDot(dot2, 200);
+        animateDot(dot3, 400);
 
-                scrollToBottom();
-
-            }
-
-        } catch (e) {
-
-            console.log("Cache load error", e);
-
-        }
-
-    };
-
-    const scrollToBottom = () => {
-        setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        }, 200);
-    };
-
-    const requestPermission = async () => {
-
-        if (Platform.OS === 'android') {
-
-            const granted = await PermissionsAndroid.request(
-                PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-                {
-                    title: 'Microphone Permission',
-                    message: 'App needs microphone access for voice recognition',
-                    buttonPositive: 'OK'
-                }
-            );
-
-            return granted === PermissionsAndroid.RESULTS.GRANTED;
-        }
-
-        return true;
-    };
-
-    const animateMic = () => {
-
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(scaleAnim, {
-                    toValue: 1.2,
-                    duration: 600,
-                    useNativeDriver: true
-                }),
-                Animated.timing(scaleAnim, {
-                    toValue: 1,
-                    duration: 600,
-                    useNativeDriver: true
-                })
-            ])
-        ).start();
-
-    };
-
-    const startListening = async () => {
-
-        const granted = await requestPermission();
-
-        if (!granted) return;
-
-        try {
-
-            setIsListening(true);
-            animateMic();
-            await Voice.start('en-US');
-
-        } catch (e) {
-            console.log(e);
-        }
-
-    };
-
-    const stopListening = async () => {
-
-        try {
-
-            await Voice.stop();
-            setIsListening(false);
-
-        } catch (e) {
-            console.log(e);
-        }
-
-    };
-
-    const onSpeechResults = (e: any) => {
-
-        const text = e.value[0];
-
-        setInputText(text);
-
-        setIsListening(false);
-
-    };
+    }, [isTyping]);
 
     useEffect(() => {
         updateCache(getUserPrptype);
@@ -222,6 +120,7 @@ const SalesAnalysis: React.FC<Props> = ({
             );
 
             const data = response.data.response.updateddate;
+            console.log("updated date", response);
 
             setUpdatedDate(data);
 
@@ -233,77 +132,186 @@ const SalesAnalysis: React.FC<Props> = ({
 
     };
 
-    const sendMessage = async () => {
-
-        if (!inputText.trim()) return;
-
-        const userText = inputText;
-
-        setMessages(prev => [
-            ...prev,
-            { type: 'user', text: userText }
-        ]);
-
-        setInputText('');
-        scrollToBottom();
-
-        const cached = await getChat(userText);
-
-        if (cached) {
-
-            setMessages(prev => [
-                ...prev,
-                { type: 'ai', text: cached.aiText }
-            ]);
-
-            scrollToBottom();
-
-            return;
-
-        }
-
-        setIsTyping(true);
+    const loadChats = async () => {
 
         try {
 
-            const payload = {
-                prptype: getUserPrptype,
-                text: userText
-            };
+            const chats = await getAllChats();
+            if (chats?.length) setMessages(chats);
 
-            const headers = {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
+        } catch (e) { }
 
-            const response = await axios.post(
+    };
+
+    const scrollToBottom = () => {
+        setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+    };
+
+    const onSpeechResults = (e) => {
+        setInputText(e.value[0]);
+    };
+
+    const requestPermission = async () => {
+
+        if (Platform.OS === "android") {
+            const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+            );
+            return granted === PermissionsAndroid.RESULTS.GRANTED;
+        }
+
+        return true;
+
+    };
+
+    const startListening = async () => {
+        const ok = await requestPermission();
+        if (!ok) return;
+
+        setIsListening(true);
+        await Voice.start("en-IN");
+    };
+
+    const stopListening = async () => {
+        await Voice.stop();
+        setIsListening(false);
+    };
+
+    const streamText = (text) => {
+
+        let i = 0;
+        let buffer = "";
+
+        const speed = Math.max(1, Math.floor(400 / text.length));
+        // entire message ~300-400ms
+
+        const interval = setInterval(() => {
+
+            buffer += text[i];
+            i++;
+
+            setMessages(prev => {
+                const arr = [...prev];
+                arr[arr.length - 1].text = buffer;
+                return arr;
+            });
+
+            scrollToBottom();
+
+            if (i >= text.length) clearInterval(interval);
+
+        }, speed);
+
+    };
+
+    const sendMessage = async (textParam = null) => {
+
+        const userText = textParam ?? inputText;
+        if (!userText.trim()) return;
+
+        let updated = [...messages];
+
+        if (editingIndex !== null) {
+
+            const editedUserText = messages[editingIndex].text;
+
+            updated[editingIndex].text = userText;
+            updated = updated.slice(0, editingIndex + 1);
+
+            setMessages(updated);
+
+            /* delete cache after edited message */
+
+            deleteAfterMessage(editedUserText);
+
+            setEditingIndex(null);
+
+        }
+        else {
+
+            updated.push({ type: "user", text: userText });
+            setMessages(updated);
+
+        }
+
+        setInputText("");
+        scrollToBottom();
+
+        /* show loader immediately */
+
+        setIsTyping(true);
+        controllerRef.current = new AbortController();
+
+        try {
+
+            const cached = await getChat(userText);
+
+            if (cached) {
+
+                setIsTyping(false);
+
+                setMessages(prev => [
+                    ...prev,
+                    { type: "ai", text: cached.aiText }
+                ]);
+
+                return;
+
+            }
+
+            const res = await axios.post(
                 `${API}/api/salesanalysisvoice`,
-                payload,
-                { headers }
+                {
+                    prptype: getUserPrptype,
+                    text: userText
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: controllerRef.current.signal
+                }
             );
 
-            const aiText = response?.data?.response?.output || 'No response';
+            console.log("res:", res);
 
+            const aiText = res?.data?.response?.output ?? "No response";
+
+            /* add AI message after response */
+
+            // setMessages(prev => [...prev, { type: "ai", text: "" }]);
             setMessages(prev => [
                 ...prev,
-                { type: 'ai', text: aiText }
+                { type: "ai", text: aiText }
             ]);
+
+            scrollToBottom();
+
+            // streamText(aiText);
 
             saveChat(userText, aiText);
 
-        } catch (error) {
+        } catch (e) {
 
-            setMessages(prev => [
-                ...prev,
-                { type: 'ai', text: '⚠️ Server error. Please try again.' }
-            ]);
+            if (e.name !== "CanceledError") {
 
-            console.log(error);
+                const errorText = "⚠️ Server error";
 
-        } finally {
+                setMessages(prev => [
+                    ...prev,
+                    { type: "ai", text: errorText }
+                ]);
+
+                saveChat(userText, errorText);
+
+            }
+
+        }
+
+        finally {
 
             setIsTyping(false);
-            scrollToBottom();
+            controllerRef.current = null;
 
         }
 
@@ -328,21 +336,50 @@ const SalesAnalysis: React.FC<Props> = ({
 
     };
 
-    const formatAIText = (text: string) => {
-        if (!text) return '';
+    const cancelRequest = () => {
 
-        return text
-            .replace(/\\n/g, '\n')   // convert \\n to real newline
-            .replace(/\/n/g, '\n');  // convert /n to newline
+        if (controllerRef.current) {
+
+            controllerRef.current.abort();
+            controllerRef.current = null;
+            setIsTyping(false);
+
+        }
+        const cancelText = "❌ Request cancelled";
+
+        setMessages(prev => [
+            ...prev,
+            { type: "ai", text: cancelText }
+        ]);
+
+        saveChat(inputText, cancelText);
+
     };
 
-    const renderItem = ({ item }: any) => {
+    const copyMessage = text => {
+        Clipboard.setString(text);
+        Alert.alert("Copied");
+    };
 
-        const isUser = item.type === 'user';
+    const startEdit = index => {
+
+        const msg = messages[index];
+
+        setEditingIndex(index);
+        setEditingText(msg.text);
+        setInputText(msg.text);
+
+    };
+
+    const renderItem = ({ item, index }) => {
+
+        const isUser = item.type === "user";
+        const isEditing = editingIndex === index;
 
         return (
+
             <View style={[
-                styles.messageRow,
+                styles.row,
                 isUser ? styles.userRow : styles.aiRow
             ]}>
 
@@ -350,25 +387,74 @@ const SalesAnalysis: React.FC<Props> = ({
                     styles.bubble,
                     isUser ? styles.userBubble : styles.aiBubble
                 ]}>
+                    
 
-                    <Text style={styles.messageText}>
-                        {formatAIText(item.text)}
-                    </Text>
+                    {isEditing ? (
+
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+
+                            <TextInput
+                                style={{ flex: 1, color: "#fff" }}
+                                value={inputText}
+                                onChangeText={setInputText}
+                            />
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setEditingIndex(null);
+                                    setInputText("");
+                                }}
+                            >
+                                <Icon name="close" size={20} color="#fff" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => sendMessage(inputText)}
+                            >
+                                <Icon name="send" size={20} color="#fff" />
+                            </TouchableOpacity>
+
+                        </View>
+
+                    ) : (
+                        <>
+
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                onLongPress={() => {
+                                    setSelectedIndex(index);
+                                    setMenuVisible(true);
+                                }}
+                            >
+
+                                <Markdown style={markdownStyles}>
+                                    {item.text}
+                                </Markdown>
+
+                            </TouchableOpacity>
+                            
+                        </>
+
+                    )}
+
+
 
                 </View>
 
             </View>
+
         );
+
     };
 
     return (
 
-        <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+        <View style={{ flex: 1, backgroundColor: "#F7F7F7" }}>
 
             <HeaderBarwithBack
                 userName={username}
-                header={'Sales Analysis'}
-                subHeader={'Manage your sales analysis'}
+                header="Sales AI"
+                subHeader="Smart Sales Assistant"
             />
 
             <View style={styles.topRow}>
@@ -385,23 +471,65 @@ const SalesAnalysis: React.FC<Props> = ({
 
             </View>
 
+
             <FlatList
                 ref={flatListRef}
                 data={messages}
                 renderItem={renderItem}
                 keyExtractor={(_, i) => i.toString()}
                 contentContainerStyle={{ padding: 16 }}
+                onContentSizeChange={() => {
+                    if (firstLoadRef.current) {
+                        scrollToBottom();
+                        firstLoadRef.current = false;
+                    }
+                }}
             />
 
             {isTyping && (
+                <View style={[styles.typingRow, { marginTop: -10 }]}>
 
-                <View style={styles.typingRow}>
+                    <Animated.View style={[styles.dot, { opacity: dot1 }]} />
+                    <Animated.View style={[styles.dot, { opacity: dot2 }]} />
+                    <Animated.View style={[styles.dot, { opacity: dot3 }]} />
 
-                    <View style={styles.typingBubble}>
+                </View>
 
-                        <View style={styles.dot} />
-                        <View style={styles.dot} />
-                        <View style={styles.dot} />
+            )}
+
+            {menuVisible && (
+
+                <View style={styles.menuOverlay}>
+
+                    <View style={styles.menuBox}>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                Clipboard.setString(messages[selectedIndex].text);
+                                setMenuVisible(false);
+                            }}
+                        >
+                            <Text style={styles.menuItem}>Copy</Text>
+                        </TouchableOpacity>
+
+                        {messages[selectedIndex]?.type === "user" && (
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    startEdit(selectedIndex);
+                                    setMenuVisible(false);
+                                }}
+                            >
+                                <Text style={styles.menuItem}>Edit</Text>
+                            </TouchableOpacity>
+
+                        )}
+
+                        <TouchableOpacity
+                            onPress={() => setMenuVisible(false)}
+                        >
+                            <Text style={styles.menuCancel}>Cancel</Text>
+                        </TouchableOpacity>
 
                     </View>
 
@@ -415,13 +543,11 @@ const SalesAnalysis: React.FC<Props> = ({
                     onPress={isListening ? stopListening : startListening}
                 >
 
-                    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                        <Icon
-                            name="mic"
-                            size={28}
-                            color={isListening ? "#ff4d4f" : "#0A7EA4"}
-                        />
-                    </Animated.View>
+                    <Icon
+                        name="mic"
+                        size={26}
+                        color={isListening ? "#ff4d4f" : "#0A7EA4"}
+                    />
 
                 </TouchableOpacity>
 
@@ -430,10 +556,17 @@ const SalesAnalysis: React.FC<Props> = ({
                     value={inputText}
                     onChangeText={setInputText}
                     placeholder="Ask sales analysis..."
+                    multiline
                 />
 
-                <TouchableOpacity onPress={sendMessage}>
-                    <Icon name="send" size={26} color="#0A7EA4" />
+                <TouchableOpacity
+                    onPress={isTyping ? cancelRequest : () => sendMessage()}
+                >
+                    <Icon
+                        name={isTyping ? "pause" : "send"}
+                        size={26}
+                        color="#0A7EA4"
+                    />
                 </TouchableOpacity>
 
             </View>
@@ -441,46 +574,19 @@ const SalesAnalysis: React.FC<Props> = ({
         </View>
 
     );
+
 };
 
 export default SalesAnalysis;
 
 const styles = StyleSheet.create({
 
-    messageRow: {
-        marginBottom: 16,
-        width: '100%',
-    },
+    row: { marginBottom: 18 },
 
-    userRow: {
-        alignItems: 'flex-end'
-    },
+    userRow: { alignItems: "flex-end" },
 
-    aiRow: {
-        alignItems: 'center'
-    },
-
-    bubble: {
-        padding: 16,
-        borderRadius: 14
-    },
-
-    userBubble: {
-        backgroundColor: '#0A7EA4',
-        width: '80%'
-    },
-
-    aiBubble: {
-        backgroundColor: '#000',
-        width: '100%'
-    },
-
-    messageText: {
-        fontSize: 13,
-        lineHeight: 24,
-        color: '#fff'
-    },
-
+    // aiRow: { alignItems: "center" },
+    aiRow: { alignItems: "flex-start" },
     topRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -493,53 +599,114 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#666'
     },
+
+    bubble: {
+        padding: 14,
+        borderRadius: 14
+    },
+
+    userBubble: {
+        backgroundColor: "#0A7EA4",
+        width: "80%",
+        alignSelf: "flex-end"
+    },
+
+    aiBubble: {
+        backgroundColor: "#000",
+        width: "100%",
+        alignSelf: "center"
+    },
+
+    editIcon: {
+        marginTop: 6,
+        alignSelf: "flex-end"
+    },
+
+    longPressHint: {
+        fontSize: 10,
+        color: "#888",
+        marginTop: 4
+    },
+
+    typingRow: {
+        flexDirection: "row",
+        justifyContent: "flex-start",
+        marginTop: 10,
+        marginLeft: 16,
+        marginBottom: 10
+    },
+
+    dot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: "#0A7EA4",
+        marginHorizontal: 5
+    },
+
     inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
+        flexDirection: "row",
+        alignItems: "center",
         padding: 10,
         borderTopWidth: 1,
-        borderColor: '#eee',
-        backgroundColor: '#fff'
+        borderColor: "#eee",
+        backgroundColor: "#fff"
     },
 
     input: {
         flex: 1,
-        marginHorizontal: 10,
-        backgroundColor: '#f1f1f1',
+        backgroundColor: "#f1f1f1",
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
-        color: '#000'
+        marginHorizontal: 10
+    },
+    menuOverlay: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        top: 0,
+        backgroundColor: "rgba(0,0,0,0.3)",
+        justifyContent: "flex-end"
     },
 
-    loader: {
-        padding: 10,
-        alignItems: 'flex-start'
+    menuBox: {
+        backgroundColor: "#fff",
+        padding: 20,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16
     },
 
-    clearBtn: {
-        alignItems: 'flex-end',
-        padding: 10
-    },
-    typingRow: {
-        flexDirection: 'row',
-        marginLeft: 10,
-        marginBottom: 10
+    menuItem: {
+        fontSize: 16,
+        paddingVertical: 12,
+        color: "#000"
     },
 
-    typingBubble: {
-        flexDirection: 'row',
-        backgroundColor: '#e6e6e6',
-        padding: 12,
-        borderRadius: 12,
-        width: 60,
-        justifyContent: 'space-between'
+    menuCancel: {
+        fontSize: 16,
+        paddingVertical: 12,
+        color: "#ff4d4f"
     },
 
-    dot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#888'
-    },
 });
+
+const markdownStyles = {
+    body: {
+        color: "#fff",
+        fontSize: 14,
+        lineHeight: 24
+    },
+    code_inline: {
+        backgroundColor: "#222",
+        padding: 4,
+        borderRadius: 6
+    },
+    code_block: {
+        backgroundColor: "#222",
+        padding: 10,
+        borderRadius: 8
+    },
+
+};

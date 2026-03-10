@@ -250,6 +250,7 @@ interface Props {
     getFaultsLoading: boolean;
     navigation: any;
     onExeChange: (exe: PropertyData) => void;
+    isLoading: boolean;
 }
 
 
@@ -371,7 +372,8 @@ const CheckingForm: React.FC<Props> = ({
     setSelectedShift1,
     getFaultsLoading,
     navigation,
-    onExeChange
+    onExeChange,
+    isLoading
 
 }) => {
     const [step, setStep] = useState<number>(1);
@@ -386,6 +388,7 @@ const CheckingForm: React.FC<Props> = ({
     const [checkingDatePickerVisible, setCheckingDatePickerVisible] = useState(false);
     const [isCameraModalVisible, setCameraModalVisible] = useState(false);
     const [isPreviewVisible, setPreviewVisible] = useState(false);
+    const [getLoading, setLoading] = useState(false);
     const partyD1CacheRef = React.useRef<Record<string, any[]>>({});
     const [lastPartyOnNext, setLastPartyOnNext] = useState<string | null>(null);
     const dropdownAdjRef = React.useRef<any>(null);
@@ -668,57 +671,46 @@ const CheckingForm: React.FC<Props> = ({
 
     // console.log('Payment:', form.PayType);
 
+
     // const goNext = async () => {
     //     // Validate required fields on Next from Step 1
     //     if (step === 1) {
-    //         // If AdjType is ACC you previously returned early — keep same behaviour but still validate if you want
-    //         // The user asked validation for Payment type, Party, Amount, Bank — apply only when user actually wants to go to Step 2
-    //         // Validate required fields:
-    //         const MacCode = form.MacCode ?? form.MacCode?.toString() ?? '';
-    //         const ShfCode = form.ShfCode ?? form.ShfCode?.toString() ?? '';
-    //         const DsnCode = form.DsnCode ?? form.DsnCode?.toString() ?? '';
-    //         const Qty = form.Qty ?? form.Qty?.toString() ?? '';
-    //         const GrdCode = form.GrdCode ?? form.GrdCode?.toString() ?? '';
-    //         const accCode = form.AccCode ?? '';
-    //         const accName = form.AccName ?? '';
-    //         const amountRaw = form.Amount ?? '';
-    //         const bankName = form.BankName ?? '';
 
     //         // Normalize amount: allow strings with commas
     //         // const numericAmount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
 
-    //         if (!MacCode || String(MacCode).trim() === '') {
-    //             Alert.alert('Validation', 'Please select Machine.');
-    //             return;
-    //         } else if (!ShfCode || String(ShfCode).trim() === '') {
-    //             Alert.alert('Validation', 'Please select Shift.');
-    //             return;
+    //         // if (!MacCode || String(MacCode).trim() === '') {
+    //         //     Alert.alert('Validation', 'Please select Machine.');
+    //         //     return;
+    //         // } else if (!ShfCode || String(ShfCode).trim() === '') {
+    //         //     Alert.alert('Validation', 'Please select Shift.');
+    //         //     return;
 
-    //         } else if (!DsnCode || String(DsnCode).trim() === '') {
-    //             Alert.alert('Validation', 'Please select Design.');
-    //             return;
+    //         // } else if (!DsnCode || String(DsnCode).trim() === '') {
+    //         //     Alert.alert('Validation', 'Please select Design.');
+    //         //     return;
 
-    //         } else if (!Qty || String(Qty).trim() === '') {
-    //             Alert.alert('Validation', 'Please enter Mtrs.');
-    //             return;
+    //         // } else if (!Qty || String(Qty).trim() === '') {
+    //         //     Alert.alert('Validation', 'Please enter Mtrs.');
+    //         //     return;
 
-    //         } else if (!GrdCode || String(GrdCode).trim() === '') {
-    //             Alert.alert('Validation', 'Please select Grade.');
-    //             return;
-    //         }
-    //         else {
-    //             // Save current form.d1 into cache for this party (so switching away & back can restore)
+    //         // } else if (!GrdCode || String(GrdCode).trim() === '') {
+    //         //     Alert.alert('Validation', 'Please select Grade.');
+    //         //     return;
+    //         // }
+    //         // else {
+    //         // Save current form.d1 into cache for this party (so switching away & back can restore)
 
 
-    //             // proceed to step 2
-    //             // setStep(2);
-    //             try {
-    //                 await handleSavePart2();
-    //             } catch (err) {
-    //                 console.warn('save part2 failed', err);
-    //             }
-    //             return;
-    //         }
+    //         // proceed to step 2
+    //         setStep(2);
+    //         // try {
+    //         //     await handleSavePart2();
+    //         // } catch (err) {
+    //         //     console.warn('save part2 failed', err);
+    //         // }
+    //         return;
+    //         // }
     //     }
 
     //     // If already in step 2, perform "save" action
@@ -738,113 +730,65 @@ const CheckingForm: React.FC<Props> = ({
     //     // }
     // };
     const goNext = async () => {
-        // Validate required fields on Next from Step 1
         if (step === 1) {
-
-            // Normalize amount: allow strings with commas
-            // const numericAmount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
-
-            // if (!MacCode || String(MacCode).trim() === '') {
-            //     Alert.alert('Validation', 'Please select Machine.');
-            //     return;
-            // } else if (!ShfCode || String(ShfCode).trim() === '') {
-            //     Alert.alert('Validation', 'Please select Shift.');
-            //     return;
-
-            // } else if (!DsnCode || String(DsnCode).trim() === '') {
-            //     Alert.alert('Validation', 'Please select Design.');
-            //     return;
-
-            // } else if (!Qty || String(Qty).trim() === '') {
-            //     Alert.alert('Validation', 'Please enter Mtrs.');
-            //     return;
-
-            // } else if (!GrdCode || String(GrdCode).trim() === '') {
-            //     Alert.alert('Validation', 'Please select Grade.');
-            //     return;
-            // }
-            // else {
-            // Save current form.d1 into cache for this party (so switching away & back can restore)
-
-
-            // proceed to step 2
-            setStep(2);
-            // try {
-            //     await handleSavePart2();
-            // } catch (err) {
-            //     console.warn('save part2 failed', err);
-            // }
-            return;
-            // }
-        }
-
-        // If already in step 2, perform "save" action
-        // if (step === 2) {
-        //     // call save handlers as earlier
-        //     // try {
-        //     //     await handleSavePart1();
-        //     // } catch (err) {
-        //     //     console.warn('save part1 failed', err);
-        //     // }
-        //     // Optionally continue to final save
-        //     try {
-        //         await handleSavePart2();
-        //     } catch (err) {
-        //         console.warn('save part2 failed', err);
-        //     }
-        // }
-    };
-
-    const goFaults = async () => {
-        // Validate required fields on Next from Step 1
-        if (step === 1) {
-            // If AdjType is ACC you previously returned early — keep same behaviour but still validate if you want
-            // The user asked validation for Payment type, Party, Amount, Bank — apply only when user actually wants to go to Step 2
-            // Validate required fields:
-            const MacCode = form.MacCode ?? form.MacCode?.toString() ?? '';
-            const ShfCode = form.ShfCode ?? form.ShfCode?.toString() ?? '';
-
-            // Normalize amount: allow strings with commas
-            // const numericAmount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
-
-            if (!MacCode || String(MacCode).trim() === '') {
-                Alert.alert('Validation', 'Please select Machine.');
-                return;
-            } else if (!ShfCode || String(ShfCode).trim() === '') {
-                Alert.alert('Validation', 'Please select Shift.');
+            // 1. Check if at least one item is selected
+            if (!form.items || form.items.length === 0) {
+                Alert.alert('Validation', 'Please select at least one item.');
                 return;
             }
-            else {
-                // Save current form.d1 into cache for this party (so switching away & back can restore)
 
-
-                // proceed to step 2
-                // setStep(2);
-                try {
-                    await handleSaveFaults();
-                } catch (err) {
-                    console.warn('save part2 failed', err);
+            // 2. Check each selected item
+            for (const item of form.items) {
+                // 2a. Check if item has at least one shade (length >= 1)
+                if (!item.shades || item.shades.length === 0) {
+                    Alert.alert('Validation', `No shades available for item: ${item.itmname}.`);
+                    return;
                 }
-                return;
+
+                // 2b. Check if ALL shades have Qty and Rate > 0 (no checkbox check)
+                for (const shade of item.shades) {
+                    if (!shade.qty || !shade.rate || parseFloat(shade.qty) <= 0 || parseFloat(shade.rate) <= 0) {
+                        Alert.alert(
+                            'Validation',
+                            `Qty and Rate must be greater than 0 for shade: ${shade.shdname} in item: ${item.itmname}.`
+                        );
+                        return;
+                    }
+                }
             }
+
+            // If all validations pass, proceed to step 2
+            setStep(2);
+            return;
         }
 
-        // If already in step 2, perform "save" action
         // if (step === 2) {
-        //     // call save handlers as earlier
-        //     // try {
-        //     //     await handleSavePart1();
-        //     // } catch (err) {
-        //     //     console.warn('save part1 failed', err);
-        //     // }
-        //     // Optionally continue to final save
+        //     if (!form.Remark || form.Remark.trim() === '') {
+        //         Alert.alert('Validation', 'Please enter remarks.');
+        //         return;
+        //     }
         //     try {
         //         await handleSavePart2();
         //     } catch (err) {
         //         console.warn('save part2 failed', err);
         //     }
         // }
+
+
+        // Step 2 logic (if needed)
+        if (step === 2) {
+            try {
+                setLoading(true); // Set loading to true before API call
+                await handleSavePart2();
+            } catch (err) {
+                console.warn('save part2 failed', err);
+            } finally {
+                setLoading(false); // Set loading to false after API call (success or error)
+            }
+        }
     };
+
+
 
     // const goPrev = () => setStep((s) => Math.max(1, s - 1));    
     const goPrev = () => {
@@ -872,15 +816,18 @@ const CheckingForm: React.FC<Props> = ({
     };
 
     const handleSavePart2 = async () => {
-        // example behavior preserved
         try {
+            setLoading(true); // Set loading to true before API call
             await onSavePart2?.({ ...form });
             // Alert.alert('Saved', 'Form saved');
         } catch (err) {
             console.error(err);
             Alert.alert('Error', 'Could not save part 2');
+        } finally {
+            setLoading(false); // Set loading to false after API call (success or error)
         }
     };
+
     const handleSaveFaults = async () => {
         // example behavior preserved
         try {
@@ -1162,43 +1109,51 @@ const CheckingForm: React.FC<Props> = ({
 
     return (
         <>
-
-            <View style={styles.stepperContainer}>
-                <View style={styles.stepperInner}>
-                    {/* progress line background */}
-                    <View style={styles.progressTrack} />
-
-                    {/* animated progress fill */}
-                    <Animated.View
-                        style={[styles.progressFill, { width: progressWidth }]}
-                        pointerEvents="none"
-                    />
-
-                    {/* Step 1 */}
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => { setStep(1); }}
-                        style={[styles.stepWrap, { alignItems: 'flex-end' }]}
-                    >
-                        <View style={[styles.stepDot, step === 1 ? styles.stepDotActive : step === 2 ? styles.stepDotDone : null]}>
-                            {step === 2 ? <Icon name="check" size={12} color="#fff" /> : <Text style={styles.stepNum}>1</Text>}
-                        </View>
-                        {/* <Text style={[styles.stepLabelSmall, step === 1 && styles.stepLabelActive]}>Part 1</Text> */}
-                    </TouchableOpacity>
-
-                    {/* Step 2 */}
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => { setStep(2); }}
-                        style={[styles.stepWrap, { alignItems: 'flex-start' }]}
-                    >
-                        <View style={[styles.stepDot, step === 2 ? styles.stepDotActive : null]}>
-                            <Text style={styles.stepNum}>2</Text>
-                        </View>
-                        {/* <Text style={[styles.stepLabelSmall, step === 2 && styles.stepLabelActive]}>Finish</Text> */}
-                    </TouchableOpacity>
+            {getLoading ?
+                <View style={styles.stepperContainer}>
+                    <View style={styles.stepperInner}>
+                        {/* progress line background */}
+                        <ActivityIndicator style={{justifyContent: 'center'}} size="large" color={theme.BRAND_GRADIENT_START} />
+                    </View>
                 </View>
-            </View>
+                :
+                <View style={styles.stepperContainer}>
+                    <View style={styles.stepperInner}>
+                        {/* progress line background */}
+                        <View style={styles.progressTrack} />
+
+                        {/* animated progress fill */}
+                        <Animated.View
+                            style={[styles.progressFill, { width: progressWidth }]}
+                            pointerEvents="none"
+                        />
+
+                        {/* Step 1 */}
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => { setStep(1); }}
+                            style={[styles.stepWrap, { alignItems: 'flex-end' }]}
+                        >
+                            <View style={[styles.stepDot, step === 1 ? styles.stepDotActive : step === 2 ? styles.stepDotDone : null]}>
+                                {step === 2 ? <Icon name="check" size={12} color="#fff" /> : <Text style={styles.stepNum}>1</Text>}
+                            </View>
+                            {/* <Text style={[styles.stepLabelSmall, step === 1 && styles.stepLabelActive]}>Part 1</Text> */}
+                        </TouchableOpacity>
+
+                        {/* Step 2 */}
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => { setStep(2); }}
+                            style={[styles.stepWrap, { alignItems: 'flex-start' }]}
+                        >
+                            <View style={[styles.stepDot, step === 2 ? styles.stepDotActive : null]}>
+                                <Text style={styles.stepNum}>2</Text>
+                            </View>
+                            {/* <Text style={[styles.stepLabelSmall, step === 2 && styles.stepLabelActive]}>Finish</Text> */}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            }
             <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
                 {/* <View style={styles.modeRow}>
                 {step === 1 && (<TouchableOpacity style={[styles.modeBtn, AdjType === 'ACC' && styles.modeBtnActive]} onPress={() => setMode('ACC')}>
@@ -1214,506 +1169,519 @@ const CheckingForm: React.FC<Props> = ({
 
 
                 {step === 1 && (
-                    <View style={styles.card}>
-                        {/* Property */}
+                    <>
+                        <View style={styles.card}>
+                            {/* Property */}
 
 
-                        {/* Design - CONDITIONAL RENDERING */}
-                        <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}> {'Select Party'} <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            <NewPartyDropdown
-                                data={getDesignData}
-                                placeholder="Choose party..."
-                                labelKey={["accname", "acccode"]}
-                                valueKey="acccode"
-                                pageSize={12}
-                                initialValue={selectedDesign ?? null}
-                                selected={selectedDesign1 ?? null}
-                                loading={Boolean(getDesignLoading)}
-                                type="party"
-                                multiple={false}
-                                // onSelect={(item) => {
-                                //     setForm(prev => ({
-                                //         ...prev,
-                                //         acccode: item.acccode,
-                                //         accname: item.accname
-                                //     }));
-                                //     setSelectedDesign(item);
-                                //     setSelectedDesign1?.(item);
-                                // }}
-                                onSelect={(item) => {
+                            {/* Design - CONDITIONAL RENDERING */}
+                            <View style={{ marginBottom: 10 }} >
+                                <Text style={styles.label}> {'Select Party'} <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                <NewPartyDropdown
+                                    data={getDesignData}
+                                    placeholder="Choose party..."
+                                    labelKey={["accname", "acccode"]}
+                                    valueKey="acccode"
+                                    pageSize={12}
+                                    initialValue={selectedDesign ?? null}
+                                    selected={selectedDesign1 ?? null}
+                                    loading={Boolean(getDesignLoading)}
+                                    type="party"
+                                    multiple={false}
+                                    // onSelect={(item) => {
+                                    //     setForm(prev => ({
+                                    //         ...prev,
+                                    //         acccode: item.acccode,
+                                    //         accname: item.accname
+                                    //     }));
+                                    //     setSelectedDesign(item);
+                                    //     setSelectedDesign1?.(item);
+                                    // }}
+                                    onSelect={(item) => {
 
-                                    setForm(prev => ({
-                                        ...prev,
-                                        PrpOf: item?.prptycode,
-                                        prptyname: item?.prptyname
-                                    }));
-
-                                }}
-                                setSelected={(val) => {
-                                    if (!val) {
                                         setForm(prev => ({
                                             ...prev,
-                                            acccode: '',
-                                            accname: '',
-
+                                            PrpOf: item?.prptycode,
+                                            prptyname: item?.prptyname
                                         }));
-                                        setSelectedDesign(null);
-                                        setSelectedDesign1?.(null);
-                                    } else {
-                                        setForm(prev => ({
-                                            ...prev,
-                                            acccode: val.acccode,
-                                            accname: val.accname,
 
-                                        }));
-                                        setSelectedDesign(val as DesignData);
-                                        setSelectedDesign1?.(val as DesignData);
-                                    }
-                                }}
-                            />
-
-                        </View>
-
-                        {/* Checker - CONDITIONAL RENDERING */}
-                        <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}> {'Select Item'} <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            <NewPartyDropdown
-                                data={getCheckerData}
-                                placeholder="Choose items..."
-                                labelKey={["itmname", "itmcode"]}
-                                valueKey="itmcode"
-                                pageSize={12}
-                                initialValue={selectedChecker ?? []}
-                                selected={selectedChecker1 ?? []}
-                                loading={Boolean(getCheckerLoading)}
-                                type="item"
-                                multiple={true}
-                                // onSelect={(items) => {
-                                //     const selectedItems = Array.isArray(items) ? items : [];
-                                //     setForm(prev => ({
-                                //         ...prev,
-                                //         itmcode: selectedItems.map(item => item.itmcode),
-                                //         itmname: selectedItems.map(item => item.itmname),
-                                //     }));
-                                // }}
-                                onSelect={(items) => {
-
-                                    const selectedItems = Array.isArray(items) ? items : []
-
-                                    const updatedItems = selectedItems.map(i => {
-
-                                        const existing = form.items?.find(x => x.itmcode === i.itmcode)
-
-                                        if (existing) {
-                                            return existing   // keep old shades
-                                        }
-
-                                        return {
-                                            itmcode: i.itmcode,
-                                            itmname: i.itmname,
-                                            shades: []
-                                        }
-
-                                    })
-
-                                    setForm(prev => ({
-                                        ...prev,
-                                        items: updatedItems,
-                                        itmcode: updatedItems.map(i => i.itmcode),
-                                        itmname: updatedItems.map(i => i.itmname)
-                                    }))
-
-                                }}
-                                setSelected={(val) => {
-                                    const selectedValues = Array.isArray(val) ? val : [];
-                                    setSelectedChecker(selectedValues);
-                                    setSelectedChecker1?.(selectedValues);
-                                }}
-                            />
-                        </View>
-                        {form.items?.map((item) => (
-                            <View key={item.itmcode} style={styles.itemCard}>
-                                <View style={styles.itemHeader}>
-                                    <Text style={styles.itemTitle}>{item.itmname}</Text>
-                                    <View style={{ flexDirection: 'row' }}>
-                                        <TouchableOpacity onPress={() => setOpenAccordion(openAccordion === item.itmcode ? null : item.itmcode)}>
-                                            <Icon name={openAccordion === item.itmcode ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#0A7EA4" />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => {
-                                            const updated = form.items.filter(i => i.itmcode !== item.itmcode);
+                                    }}
+                                    setSelected={(val) => {
+                                        if (!val) {
                                             setForm(prev => ({
                                                 ...prev,
-                                                items: updated,
-                                                itmcode: updated.map(i => i.itmcode),
-                                                itmname: updated.map(i => i.itmname)
+                                                acccode: '',
+                                                accname: '',
+
                                             }));
-                                        }}>
-                                            <Icon name="close" size={20} color="#E53935" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
+                                            setSelectedDesign(null);
+                                            setSelectedDesign1?.(null);
+                                        } else {
+                                            setForm(prev => ({
+                                                ...prev,
+                                                acccode: val.acccode,
+                                                accname: val.accname,
 
-                                {/* Accordion Content: Shades */}
-                                {openAccordion === item.itmcode && (
-                                    <View style={styles.accordionContent}>
-                                        {/* Shade Dropdown */}
-                                        <NewPartyDropdown
-                                            data={getCheckerDataShade}
-                                            labelKey={["shdname", "shdcode"]}
-                                            valueKey="shdcode"
-                                            multiple={true}
-                                            initialValue={item.shades || []}
-                                            selected={item.shades || []}
-                                            onSelect={(shades) => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: shades.map(s => ({
-                                                                shdcode: s.shdcode,
-                                                                shdname: s.shdname,
-                                                                qty: '',
-                                                                rate: '',
-                                                                checked: false
-                                                            }))
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}
-                                            setSelected={(val) => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return { ...i, shades: val };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}
-                                        />
+                                            }));
+                                            setSelectedDesign(val as DesignData);
+                                            setSelectedDesign1?.(val as DesignData);
+                                        }
+                                    }}
+                                />
 
-                                        {/* Selected Shade Chips */}
-                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
-                                            {item.shades?.map(shade => (
-                                                <View
-                                                    key={shade.shdcode}
-                                                    style={[
-                                                        styles.shadeChip,
-                                                        (!shade.qty || !shade.rate) ? styles.shadeChipInvalid : styles.shadeChipValid
-                                                    ]}
-                                                >
-                                                    <Text style={styles.shadeText}>
-                                                        {shade.shdname}
-                                                    </Text>
-                                                    <TextInput
-                                                        style={styles.shadeQtyInput}
-                                                        placeholder="Qty"
-                                                        value={shade.qty}
-                                                        keyboardType="numeric"
-                                                        onChangeText={(text) => {
-                                                            const updated = form.items.map(i => {
-                                                                if (i.itmcode === item.itmcode) {
-                                                                    return {
-                                                                        ...i,
-                                                                        shades: i.shades.map(s => {
-                                                                            if (s.shdcode === shade.shdcode) {
-                                                                                return { ...s, qty: text };
+                            </View>
+
+                            {/* Checker - CONDITIONAL RENDERING */}
+                            <View style={{ marginBottom: 10 }} >
+                                <Text style={styles.label}> {'Select Item'} <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                <NewPartyDropdown
+                                    data={getCheckerData}
+                                    placeholder="Choose items..."
+                                    labelKey={["itmname", "itmcode"]}
+                                    valueKey="itmcode"
+                                    pageSize={12}
+                                    initialValue={selectedChecker ?? []}
+                                    selected={selectedChecker1 ?? []}
+                                    loading={Boolean(getCheckerLoading)}
+                                    type="item"
+                                    multiple={true}
+                                    // onSelect={(items) => {
+                                    //     const selectedItems = Array.isArray(items) ? items : [];
+                                    //     setForm(prev => ({
+                                    //         ...prev,
+                                    //         itmcode: selectedItems.map(item => item.itmcode),
+                                    //         itmname: selectedItems.map(item => item.itmname),
+                                    //     }));
+                                    // }}
+                                    onSelect={(items) => {
+
+                                        const selectedItems = Array.isArray(items) ? items : []
+
+                                        const updatedItems = selectedItems.map(i => {
+
+                                            const existing = form.items?.find(x => x.itmcode === i.itmcode)
+
+                                            if (existing) {
+                                                return existing   // keep old shades
+                                            }
+
+                                            return {
+                                                itmcode: i.itmcode,
+                                                itmname: i.itmname,
+                                                shades: []
+                                            }
+
+                                        })
+
+                                        setForm(prev => ({
+                                            ...prev,
+                                            items: updatedItems,
+                                            itmcode: updatedItems.map(i => i.itmcode),
+                                            itmname: updatedItems.map(i => i.itmname)
+                                        }))
+
+                                    }}
+                                    setSelected={(val) => {
+                                        const selectedValues = Array.isArray(val) ? val : [];
+                                        setSelectedChecker(selectedValues);
+                                        setSelectedChecker1?.(selectedValues);
+                                    }}
+                                />
+                            </View>
+                            {form.items?.map((item) => (
+                                <>
+                                    <View key={item.itmcode} style={styles.itemCard}>
+                                        <View style={styles.itemHeader}>
+                                            <Text style={styles.itemTitle}>{item.itmname}</Text>
+                                            <View style={{ flexDirection: 'row' }}>
+                                                <TouchableOpacity onPress={() => setOpenAccordion(openAccordion === item.itmcode ? null : item.itmcode)}>
+                                                    <Icon name={openAccordion === item.itmcode ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={20} color="#0A7EA4" />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => {
+                                                    const updated = form.items.filter(i => i.itmcode !== item.itmcode);
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        items: updated,
+                                                        itmcode: updated.map(i => i.itmcode),
+                                                        itmname: updated.map(i => i.itmname)
+                                                    }));
+                                                }}>
+                                                    <Icon name="close" size={20} color="#E53935" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        {/* Accordion Content: Shades */}
+                                        {openAccordion === item.itmcode && (
+                                            <View style={styles.accordionContent}>
+                                                {/* Shade Dropdown */}
+                                                <NewPartyDropdown
+                                                    data={getCheckerDataShade}
+                                                    labelKey={["shdname", "shdcode"]}
+                                                    valueKey="shdcode"
+                                                    multiple={true}
+                                                    initialValue={item.shades || []}
+                                                    selected={item.shades || []}
+                                                    onSelect={(shades) => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: shades.map(s => ({
+                                                                        shdcode: s.shdcode,
+                                                                        shdname: s.shdname,
+                                                                        qty: '',
+                                                                        rate: '',
+                                                                        checked: false
+                                                                    }))
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}
+                                                    setSelected={(val) => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return { ...i, shades: val };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}
+                                                />
+
+                                                {/* Selected Shade Chips */}
+                                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                                                    {item.shades?.map(shade => (
+                                                        <View
+                                                            key={shade.shdcode}
+                                                            style={[
+                                                                styles.shadeChip,
+                                                                (!shade.qty || !shade.rate) ? styles.shadeChipInvalid : styles.shadeChipValid
+                                                            ]}
+                                                        >
+                                                            {/* Checkbox for shade selection */}
+                                                            <TouchableOpacity
+                                                                onPress={() => {
+                                                                    const updated = form.items.map(i => {
+                                                                        if (i.itmcode === item.itmcode) {
+                                                                            return {
+                                                                                ...i,
+                                                                                shades: i.shades.map(s =>
+                                                                                    s.shdcode === shade.shdcode ? { ...s, checked: !s.checked } : s
+                                                                                )
+                                                                            };
+                                                                        }
+                                                                        return i;
+                                                                    });
+                                                                    setForm(prev => ({ ...prev, items: updated }));
+                                                                }}
+                                                                style={{ marginRight: 4 }}
+                                                            >
+                                                                <Icon
+                                                                    name={shade.checked ? 'check-box' : 'check-box-outline-blank'}
+                                                                    size={18}
+                                                                    color="#333"
+                                                                />
+                                                            </TouchableOpacity>
+
+                                                            {/* Shade name */}
+                                                            <Text style={styles.shadeText}>{shade.shdname}</Text>
+
+                                                            {/* Accordion for Qty and Rate inputs (default open) */}
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                                <TextInput
+                                                                    style={styles.shadeQtyInput}
+                                                                    placeholder="Qty"
+                                                                    value={shade.qty}
+                                                                    keyboardType="numeric"
+                                                                    onChangeText={(text) => {
+                                                                        const updated = form.items.map(i => {
+                                                                            if (i.itmcode === item.itmcode) {
+                                                                                return {
+                                                                                    ...i,
+                                                                                    shades: i.shades.map(s =>
+                                                                                        s.shdcode === shade.shdcode ? { ...s, qty: text } : s
+                                                                                    )
+                                                                                };
                                                                             }
-                                                                            return s;
-                                                                        })
-                                                                    };
-                                                                }
-                                                                return i;
-                                                            });
-                                                            setForm(prev => ({ ...prev, items: updated }));
-                                                        }}
+                                                                            return i;
+                                                                        });
+                                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                                    }}
+                                                                />
+                                                                <TextInput
+                                                                    style={styles.shadeRateInput}
+                                                                    placeholder="Rate"
+                                                                    value={shade.rate}
+                                                                    keyboardType="numeric"
+                                                                    onChangeText={(text) => {
+                                                                        const updated = form.items.map(i => {
+                                                                            if (i.itmcode === item.itmcode) {
+                                                                                return {
+                                                                                    ...i,
+                                                                                    shades: i.shades.map(s =>
+                                                                                        s.shdcode === shade.shdcode ? { ...s, rate: text } : s
+                                                                                    )
+                                                                                };
+                                                                            }
+                                                                            return i;
+                                                                        });
+                                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                                    }}
+                                                                />
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+
+
+                                                {/* Common Inputs */}
+                                                <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                                                    <TextInput
+                                                        placeholder="Common Qty"
+                                                        keyboardType="numeric"
+                                                        value={commonQty}
+                                                        onChangeText={setCommonQty}
+                                                        style={styles.commonInput}
                                                     />
                                                     <TextInput
-                                                        style={styles.shadeRateInput}
-                                                        placeholder="Rate"
-                                                        value={shade.rate}
+                                                        placeholder="Common Rate"
                                                         keyboardType="numeric"
-                                                        onChangeText={(text) => {
-                                                            const updated = form.items.map(i => {
-                                                                if (i.itmcode === item.itmcode) {
-                                                                    return {
-                                                                        ...i,
-                                                                        shades: i.shades.map(s => {
-                                                                            if (s.shdcode === shade.shdcode) {
-                                                                                return { ...s, rate: text };
-                                                                            }
-                                                                            return s;
-                                                                        })
-                                                                    };
-                                                                }
-                                                                return i;
-                                                            });
-                                                            setForm(prev => ({ ...prev, items: updated }));
-                                                        }}
+                                                        value={commonRate}
+                                                        onChangeText={setCommonRate}
+                                                        style={styles.commonInput}
                                                     />
                                                 </View>
-                                            ))}
 
-
-                                        </View>
-
-                                        {/* Shade Checkbox List */}
-                                        <ScrollView style={{ maxHeight: 220 }}>
-                                            {item.shades?.map(shade => {
-                                                const isChecked = shade.checked;
-                                                return (
-                                                    <View key={shade.shdcode} style={styles.modalShadeRow}>
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                const updated = form.items.map(i => {
-                                                                    if (i.itmcode === item.itmcode) {
-                                                                        return {
-                                                                            ...i,
-                                                                            shades: i.shades.map(s => {
-                                                                                if (s.shdcode === shade.shdcode) {
-                                                                                    return { ...s, checked: !s.checked };
-                                                                                }
-                                                                                return s;
-                                                                            })
-                                                                        };
-                                                                    }
-                                                                    return i;
-                                                                });
-                                                                setForm(prev => ({ ...prev, items: updated }));
-                                                            }}
-                                                        >
-                                                            <Icon
-                                                                name={isChecked ? 'check-box' : 'check-box-outline-blank'}
-                                                                size={22}
-                                                                color="#333"
-                                                            />
-                                                        </TouchableOpacity>
-                                                        <Text style={{ flex: 1, marginLeft: 10 }}>
-                                                            {shade.shdname}
-                                                        </Text>
-                                                    </View>
-                                                );
-                                            })}
-                                        </ScrollView>
-
-                                        {/* Common Inputs */}
-                                        <View style={{ flexDirection: 'row', marginTop: 12 }}>
-                                            <TextInput
-                                                placeholder="Common Qty"
-                                                keyboardType="numeric"
-                                                value={commonQty}
-                                                onChangeText={setCommonQty}
-                                                style={styles.commonInput}
-                                            />
-                                            <TextInput
-                                                placeholder="Common Rate"
-                                                keyboardType="numeric"
-                                                value={commonRate}
-                                                onChangeText={setCommonRate}
-                                                style={styles.commonInput}
-                                            />
-                                        </View>
-
-                                        {/* Buttons */}
-                                        <View style={styles.bulkBtnGrid}>
-                                            <TouchableOpacity style={styles.btnApply} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => {
-                                                                if (s.checked) {
-                                                                    return { ...s, qty: commonQty };
-                                                                }
-                                                                return s;
-                                                            })
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Apply Qty</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnRemove} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => {
-                                                                if (s.checked) {
-                                                                    return { ...s, qty: '' };
-                                                                }
-                                                                return s;
-                                                            })
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Remove Qty</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnApply} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => {
-                                                                if (s.checked) {
-                                                                    return { ...s, rate: commonRate };
-                                                                }
-                                                                return s;
-                                                            })
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Apply Rate</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnRemove} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => {
-                                                                if (s.checked) {
-                                                                    return { ...s, rate: '' };
-                                                                }
-                                                                return s;
-                                                            })
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Remove Rate</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnApply} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => {
-                                                                if (s.checked) {
-                                                                    return {
+                                                {/* Buttons */}
+                                                <View style={styles.bulkBtnGrid}>
+                                                    <TouchableOpacity style={styles.btnApply} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => {
+                                                                        if (s.checked) {
+                                                                            return { ...s, qty: commonQty };
+                                                                        }
+                                                                        return s;
+                                                                    })
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Apply Qty</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.btnRemove} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => {
+                                                                        if (s.checked) {
+                                                                            return { ...s, qty: '' };
+                                                                        }
+                                                                        return s;
+                                                                    })
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Remove Qty</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.btnApply} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => {
+                                                                        if (s.checked) {
+                                                                            return { ...s, rate: commonRate };
+                                                                        }
+                                                                        return s;
+                                                                    })
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Apply Rate</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.btnRemove} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => {
+                                                                        if (s.checked) {
+                                                                            return { ...s, rate: '' };
+                                                                        }
+                                                                        return s;
+                                                                    })
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Remove Rate</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.btnApply} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => {
+                                                                        if (s.checked) {
+                                                                            return {
+                                                                                ...s,
+                                                                                qty: commonQty,
+                                                                                rate: commonRate
+                                                                            };
+                                                                        }
+                                                                        return s;
+                                                                    })
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Apply Both</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.btnRemove} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => {
+                                                                        if (s.checked) {
+                                                                            return { ...s, qty: '', rate: '' };
+                                                                        }
+                                                                        return s;
+                                                                    })
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Remove Both</Text>
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity style={styles.btnApplyAll} onPress={() => {
+                                                        const updated = form.items.map(i => {
+                                                            if (i.itmcode === item.itmcode) {
+                                                                return {
+                                                                    ...i,
+                                                                    shades: i.shades.map(s => ({
                                                                         ...s,
                                                                         qty: commonQty,
                                                                         rate: commonRate
-                                                                    };
-                                                                }
-                                                                return s;
-                                                            })
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Apply Both</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnRemove} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => {
-                                                                if (s.checked) {
-                                                                    return { ...s, qty: '', rate: '' };
-                                                                }
-                                                                return s;
-                                                            })
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Remove Both</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.btnApplyAll} onPress={() => {
-                                                const updated = form.items.map(i => {
-                                                    if (i.itmcode === item.itmcode) {
-                                                        return {
-                                                            ...i,
-                                                            shades: i.shades.map(s => ({
-                                                                ...s,
-                                                                qty: commonQty,
-                                                                rate: commonRate
-                                                            }))
-                                                        };
-                                                    }
-                                                    return i;
-                                                });
-                                                setForm(prev => ({ ...prev, items: updated }));
-                                            }}>
-                                                <Text style={styles.btnText}>Apply All</Text>
-                                            </TouchableOpacity>
-                                        </View>
+                                                                    }))
+                                                                };
+                                                            }
+                                                            return i;
+                                                        });
+                                                        setForm(prev => ({ ...prev, items: updated }));
+                                                    }}>
+                                                        <Text style={styles.btnText}>Apply All</Text>
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                            </View>
+                                        )}
+
                                     </View>
-                                )}
+
+
+
+                                    {/* Delivery Date Picker */}
+
+                                </>
+
+                            ))}
+
+
+                            < View style={{ marginBottom: 12 }}>
+                                <Text style={styles.label}>Delivery Date <Text style={{ color: 'red' }}>*</Text></Text>
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    style={styles.dateTrigger}
+                                    onPress={() => setCheckingDatePickerVisible(true)}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.dateTriggerText, !form.DeliveryDate && styles.placeholderText]}>
+                                            {form.DeliveryDate ? formatDisplayDate(form.DeliveryDate) : "Select delivery date"}
+                                        </Text>
+                                    </View>
+                                    <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
+                                </TouchableOpacity>
+                                <DateTimePickerModal
+                                    isVisible={checkingDatePickerVisible}
+                                    mode="date"
+                                    onConfirm={(date) => {
+                                        setForm(prev => ({ ...prev, DeliveryDate: toISODate(date) }));
+                                        setCheckingDatePickerVisible(false);
+                                    }}
+                                    onCancel={() => setCheckingDatePickerVisible(false)}
+                                    headerTextIOS="Pick Delivery Date"
+                                    locale="en_GB"
+                                    minimumDate={new Date(2000, 0, 1)}
+                                    maximumDate={new Date(2099, 11, 31)}
+                                />
                             </View>
-                        ))}
+                            {/* Nav */}
+                            <View style={styles.navRow}>
+                                <View style={{ width: 12 }} />
+                                <View style={{ flex: 1 }} />
+                                <TouchableOpacity style={[styles.saveBtn, { minWidth: 120 }]} onPress={goNext} disabled={getLoading || !isConnected}>
+                                    <Text style={styles.saveText}>
+                                        {step === 2 ? (getLoading ? "Loading..." : 'Save') : 'Next'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
 
 
-
-                        {/* Nav */}
-                        <View style={styles.navRow}>
-                            <View style={{ width: 12 }} />
-                            <View style={{ flex: 1 }} />
-                            <TouchableOpacity style={[styles.saveBtn, { minWidth: 120 }]} onPress={goNext} disabled={!isConnected}>
-                                <Text style={styles.saveText}>{AdjType === 'ACC' ? 'Save' : 'Next'}</Text>
-                            </TouchableOpacity>
                         </View>
 
-                    </View>
+                    </>
+
                 )}
 
                 {/* STEP 2 */}
                 {step === 2 && (
                     <View style={styles.card}>
-                        <Text style={styles.label}>Adjust Account</Text>
-
-                        <PartyDropdownAdj
-                            ref={dropdownAdjRef}
-                            data={getAdjData || []}
-                            placeholder="Choose Adjustment..."
-                            labelKey={["BILLNO", "NVOUDATE", "NETAMT"]}
-                            valueKey="UROWID"
-                            pageSize={12}
-                            initialValue={selectedAdj ?? []}
-                            selected={selectedadj ?? []}
-                            loading={Boolean(getAdjLoading)}
-                            multiple={true}
-                            formD1={Array.isArray(form.d1) ? form.d1 : []} // Only pass formD1, NOT formD2
-                            formUId={form.UId ?? null}
-                            onUpdateD1={(d1) => setForm(prev => ({ ...prev, d1: d1 || [] }))}
-                            onSelect={(items) => {
-                                const mappedItems = Array.isArray(items) ? items : [items];
-                                setForm(prev => ({ ...prev, d2: mappedItems }));
-                            }}
+                        <Text style={styles.label}>Remarks</Text>
+                        <TextInput
+                            style={styles.remarksInput}
+                            placeholder="Enter remarks here..."
+                            multiline
+                            numberOfLines={4}
+                            value={form.Remark}
+                            onChangeText={(text) => setForm(prev => ({ ...prev, Remark: text }))}
                         />
                         <View style={styles.navRow}>
                             <TouchableOpacity style={styles.ghostBtn} onPress={goPrev}>
                                 <Icon name="arrow-back" size={18} color={theme.TEXT_SECONDARY} />
                                 <Text style={styles.ghostText}>Previous</Text>
                             </TouchableOpacity>
-
                             <View style={{ flex: 1 }} />
-
                             <TouchableOpacity style={styles.saveBtn} onPress={goNext} disabled={!isConnected}>
                                 <Text style={styles.saveText}>{getSaveLoading ? 'Saving...' : 'Save'}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 )}
+
 
                 {/* CAMERA MODAL */}
                 <Modal visible={isCameraModalVisible} animationType="slide" onRequestClose={() => setCameraModalVisible(false)}>
@@ -1812,7 +1780,7 @@ const CheckingForm: React.FC<Props> = ({
                     </View>
                 </Modal>
                 {/* ---------- END INITIAL BLOCKING MODAL ---------- */}
-            </ScrollView>
+            </ScrollView >
 
         </>
     );
@@ -2118,8 +2086,9 @@ const styles = StyleSheet.create({
         fontWeight: '700'
     },
     shadeQtyInput: {
-        width: 60,
-        height: 50,
+        width: 75,
+        height: 30,
+        paddingVertical: 4,
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#ccc',
@@ -2128,10 +2097,12 @@ const styles = StyleSheet.create({
         marginLeft: 4,
         fontSize: 12,
         color: '#000',
+        textAlign: 'right'
     },
     shadeRateInput: {
-        width: 50,
-        height: 24,
+        width: 75,
+        height: 30,
+        paddingVertical: 4,
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#ccc',
@@ -2139,6 +2110,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
         marginLeft: 4,
         fontSize: 12,
+        color: '#000',
+        textAlign: 'right'
     },
     accordionContent: {
         marginTop: 10,
@@ -2146,8 +2119,18 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9f9f9',
         borderRadius: 8,
     },
-    
-    
+    remarksInput: {
+        backgroundColor: '#F6F7FA',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+        textAlignVertical: 'top',
+        minHeight: 100,
+        borderWidth: 1,
+        borderColor: '#E5EAF0',
+    },
+
+
 });
 
 export default CheckingForm;

@@ -12,19 +12,47 @@ export const initDB = () => {
       `CREATE TABLE IF NOT EXISTS chat(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userText TEXT,
-        aiText TEXT
+        aiText TEXT,
+        createdAt INTEGER
       );`
     );
   });
 };
 
 export const saveChat = (userText, aiText) => {
-  db.transaction(tx => {
-    tx.executeSql(
-      'INSERT INTO chat(userText, aiText) VALUES (?,?)',
-      [userText, aiText]
-    );
+  return new Promise((resolve) => {
+
+    db.transaction(tx => {
+
+      tx.executeSql(
+        'INSERT INTO chat(userText, aiText, createdAt) VALUES (?,?,?)',
+        [userText, aiText, Date.now()],
+        () => resolve(true),
+        (_, err) => {
+          console.log("Save error", err);
+          resolve(false);
+        }
+      );
+
+    });
+
   });
+};
+
+export const deleteAfterMessage = (userText) => {
+
+  db.transaction(tx => {
+
+    tx.executeSql(
+      `DELETE FROM chat 
+       WHERE id > (
+         SELECT id FROM chat WHERE userText=? ORDER BY id DESC LIMIT 1
+       )`,
+      [userText]
+    );
+
+  });
+
 };
 
 export const getChat = (userText) => {

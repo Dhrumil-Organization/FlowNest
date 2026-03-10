@@ -369,6 +369,7 @@ const InquiryAdd: React.FC<Props> = ({
     const [selectedShift1, setSelectedShift1] = useState<ShiftData | null>();
     const [selectedbank, setSelectedbank] = useState<BankData | null>();
     const [selectedadj, setSelectedadj] = useState<AdjData | null>();
+    const [getNullObject, setNullObject] = useState([]);
     const [selectedpayment, setSelectedpayment] = useState<PaymentData | null>();
     const [selectedbranch, setSelectedbranch] = useState<BranchData | null>();
     const [initialLoading, setInitialLoading] = useState<boolean>(false);
@@ -1293,93 +1294,62 @@ const InquiryAdd: React.FC<Props> = ({
     //     }
     // }, [form.DsnCode, form.DsnName]);
 
+    let cancelToken: any;
+
+    const fetchBNullObject = async () => {
+        // setIsLoading(true);
+
+        const payload =
+        {
+            action: "view",
+            prpcpde: "SIP",
+            prptype: "S",
+            yearno: "26",
+            fromdate: "",
+            todate: "",
+            txntype: "mob_collection"
+        }
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/inquiry_crud`, payload, { headers, cancelToken: cancelToken.token });
+            console.log('🔵 response', response);
+
+            if (response.data?.success) {
+                console.log('🔵 response data', response.data.data.inquires);
+                setNullObject(response.data.data.inquires[0]);
+            } else {
+                // setPOTData([]);
+            }
+        } catch (err) {
+            console.error('❌ inquiry error', err?.response || err);
+
+        } finally {
+            // setIsLoading(false);
+        }
+    };
+
 
 
     console.log('selectedYearNo:', selectedYearNo, 'selectedItems:', selectedProperty, selectedChecker1, 'form:', form);
 
     useEffect(() => {
         ShowAdjustmentData();
+        fetchBNullObject();
     }, [form.AccCode, selectedParty]);
 
     // ========== SAVE FUNCTIONS ==========
-    const origSavePart2 = async (payload: any) => {
-        console.log("Save FUnction Called", form);
-
-        const itmcode = form.items.map(i => i.itmcode);
-
-        const itmname = form.items.map(i => i.itmname);
-
-        const shdcode = form.items.flatMap(i =>
-            i.shades?.map(s => s.shdcode) || []
-        );
-
-        const shdname = form.items.flatMap(i =>
-            i.shades?.map(s => s.shdname) || []
-        );
-
-
-        const d1Obj: d1Data = {
-            font: 0,
-            MacCode: form.selectedMachine.MacCode || '',
-            MacName: form.selectedMachine.MacName || '',
-            TakaNo: form.TakaNo || '',
-            BeamNo: form.selectedMachine.BeamNo || '',
-            DsnCode: form.selectedMachine.DsnCode || '',
-            DsnName: form.selectedMachine.DsnName || '',
-            WarpLen: form.selectedMachine.WarpLen || '',
-            BalLen: null,
-            CutLen: null,
-            UId: form.selectedMachine.UId || '',
-            SrNo: 0,
-            BeamUId: form.selectedMachine.BeamUId || '',
-            PlanUId: null,
-            PlanSrNo: null,
-            Status: form.selectedMachine.Status || '',
-            Qty: form.Qty || '',
-            Wt: form.Wt || '',
-            AvgWt: form.AvgWt || '',
-            GrdCode: form.GrdCode || '',
-            GrdName: form.GrdName || '',
-            Remarks: '',
-            ChkCode: form.EmpCode || '',
-            ChkName: form.EmpName || '',
-            SupCode: '',
-            SupName: '',
-            TechSup: '',
-            TechSupName: '',
-            QltWt: form.selectedMachine.QltWt || '',
-            RecType: null,
-            OQty: null,
-            GStatus: null,
-            WvrCode: '',
-            WvrName: '',
-            ismending: form.isMending || '',
-            islasttaka: form.islasttakas || '',
-            isalldata: 0,
-        };
-
-        const formatDateToDDMMYYYY = (dateString) => {
-            if (!dateString) return '';
-            const [year, month, day] = dateString.split('-');
-            return `${day}-${month}-${year}`;
-        };
-
-        const payload123 = {
-            itmcode,
-            itmname,
-            shdcode,
-            shdname
-        };
-
-        console.log('payload:', payload123);
-
-        try {
-            await AsyncStorage.setItem('taka_checking_entry_final_paylaod', JSON.stringify(payload123));
-        } catch (err) {
-            console.log(err);
-        }
-
-
+    const origSavePart2 = async (token, payload: any) => {
+        console.log("Save FUnction Called", form, getNullObject);
+        setIsLoading(true);
 
         const headers = {
             Authorization: `Bearer ${token}`,
@@ -1387,321 +1357,85 @@ const InquiryAdd: React.FC<Props> = ({
             'X-Requested-with': 'XMLHttpRequest',
         };
 
-        const response = await axios.post(
-            // `https://apig.tms-webapp.com/api/collection_crud`,
-            `${API}/api/add_checking_detail`,
-            payload,
-            { headers, cancelToken: cancelTokenRef.current?.token }
-        );
+        // Format dates as DD-MM-YYYY and YYYYMMDD
+        const formatDate = (dateString) => {
+            if (!dateString) return { formatted: null, numeric: null };
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return {
+                formatted: `${day}-${month}-${year}`,
+                numeric: `${year}${month}${day}`,
+            };
+        };
 
-        // const response = {
-        //     data: {
-        //         "success": true,
-        //         "message": "yeeehhhhh"
-        //     }
-        // }
+        const { formatted: deliveryDateFormatted, numeric: deliveryDateNumeric } = formatDate(form.DeliveryDate);
 
-        if (response.data.success === true) {
-            setForm({
-                ChkDate: new Date().toISOString().split('T')[0],
-                selectedMachine: null,
-                EDate: "",
-                PrpCode: "",
-                AccCode: "",
-                AccName: "",
-                BankName: "",
-                BankBr: "",
-                ChqNo: "",
-                ChqDate: "",
-                Amount: "",
-                Remark: "",
-                AdjType: "",
-                AttachImage: "",
-                PayType: "",
-                ParAdd: "",
-                MacCode: "",
-                MacName: "",
-                DsnCode: "",
-                DsnName: "",
-                BeamNo: "",
-                QltWt: "",
-                WarpLen: "",
-                MacName: "",
-                d2: []
-            });
+        const payloadToSend = {
+            txntype: "mob_inquires",
+            action: "add",
+            id: "0",
+            prpcode: form.PrpCode || "SIP",
+            prptype: "S",
+            yearno: "26", // Fixed or dynamic as per your logic
+            createdAt: formatDate(new Date().toISOString()).formatted,
+            ncreatedAt: formatDate(new Date().toISOString()).numeric,
+            data: [
+                {
+                    id: "0",
+                    partyname: form.accname || null,
+                    partycode: form.acccode || null,
+                    items: form.items?.map((item, itemIndex) => ({
+                        id: "0",
+                        srno: String(itemIndex + 1),
+                        itemtitle: item.itmname || null,
+                        itemtitlecode: item.itmcode || null,
+                        shades: item.shades?.map((shade, shadeIndex) => ({
+                            id: "0",
+                            srno: String(itemIndex + 1),
+                            subsr: String(shadeIndex + 1),
+                            shadename: shade.shdname || null,
+                            shadecode: shade.shdcode || null,
+                            quantity: shade.qty || "0.000",
+                            rate: shade.rate || "0.00",
+                            deliverydate: deliveryDateFormatted,
+                            remarks: form.Remark || "",
+                            status: "P", // Default status
+                            ndeliverydate: deliveryDateNumeric,
+                        })) || [],
+                    })) || [],
+                },
+            ],
+        };
 
-            setSelectedShift(null);
-            setSelectedShift1(null);
-            setSelectedGrd1(null);
-            setSelectedGrd(null);
-            setSelectedChecker1(null);
-            setSelectedChecker(null);
-            setSelectedDesign1(null);
-            setSelectedDesign(null);
-            setSelectedMachine(null);
-            setSelectedMachine1(null);
-            setSelected(null);
-            setSelectedYearNo(null);
+        console.log("Payload to Send:", payloadToSend, token);
+        try {
 
-            setMachineData([]);
-            setMachineParentData([]);
-            setFaultsData([]);
-            setDesignData([]);
-            setCheckerData([]);
-            setShiftData([]);
-            setMainYearData([]);
 
-            fetchYear();
-            setSuccessModalVisible(true);
-        } else {
-            Alert.alert('Error', `${response.data.message}`);
+            const response = await axios.post(
+                `${API}/api/inquiry_crud`,
+                payloadToSend,
+                {
+                    headers,
+                    cancelToken: cancelToken?.token, // Optional chaining
+                }
+            );
+            console.log('🔵 response', response);
+
+            if (!response.data.success) {
+                setSaveLoading(false);
+                return Promise.reject(response.data.message);
+            }
+            setSaveLoading(false);
+            return response.data;
+        } catch (err) {
+            console.error('❌ inquiry error', err?.response || err);
+
+        } finally {
+            setIsLoading(false);
         }
-        // setForm({
-        //     // EDate: new Date().toISOString().split('T')[0],
-        //     ChkDate: new Date().toISOString().split('T')[0],
-        //     // PrpCode: "",
-        //     // AccCode: "",
-        //     // AccName: "",
-        //     // BankName: "",
-        //     // BankBr: "",
-        //     // ChqNo: "",
-        //     // ChqDate: "",
-        //     // Amount: "",
-        //     // Remark: "",
-        //     // AdjType: "",
-        //     // AttachImage: "",
-        //     // PayType: "",
-        //     // ParAdd: "",
-        //     // MacCode: "",
-        // MacName: ""
-        // d2 : []
 
-        //     selectedMachine: null,
-
-
-
-        //     EDate: "",
-
-        //     PrpCode: "",
-        //     AccCode: "",
-        //     AccName: "",
-        //     BankName: "",
-        //     BankBr: "",
-        //     ChqNo: "",
-        //     ChqDate: "",
-        //     Amount: "",
-        //     Remark: "",
-        //     AdjType: "",
-        //     AttachImage: "",
-        //     PayType: "",
-        //     ParAdd: "",
-        //     MacCode: "",
-
-        //     MacName: "",
-        //     DsnCode: "",
-        //     DsnName: "",
-        //     BeamNo: "",
-        //     QltWt: "",
-        //     WarpLen: "",
-
-        // });
-
-        // IMP -=============---------------------------------------------
-        // setSelectedShift(null);
-        // setSelectedShift1(null);
-        // setSelectedGrd1(null);
-        // setSelectedGrd(null);
-        // setSelectedChecker1(null);
-        // setSelectedChecker(null);
-        // setSelectedDesign1(null);
-        // setSelectedDesign(null);
-        // setSelectedMachine(null);
-        // setSelectedMachine1(null);
-        // setSelected(null);
-        // setSelectedYearNo(null);
-
-        // setMachineData([]);
-        // setMachineParentData([]);
-        // setFaultsData([]);
-        // setDesignData([]);
-        // setCheckerData([]);
-        // setShiftData([]);
-        // setMainYearData([]);
-
-        // fetchYear();
-        // IMP -=============---------------------------------------------
-
-        // if (getCardDataMode == 'edit') {
-        //     try {
-        //         setSaveLoading(true);
-        //         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-        //         const d1 = (form && form.d1) ?? payload.d1 ?? [];
-        //         const amount = parseFloat(form.Amount) || 0;
-
-        //         const setAmtSum = d1.reduce((sum, item) => {
-        //             const setAmt = parseFloat(item.SetAmt) || 0;
-        //             return sum + setAmt;
-        //         }, 0);
-
-        //         console.log('setAmtSum', setAmtSum, amount);
-
-        //         if (setAmtSum > amount) {
-        //             setSaveLoading(false);
-        //             Alert.alert(
-        //                 "Validation Error",
-        //                 "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
-        //                 [{ text: "OK" }]
-        //             );
-        //             return;
-        //         }
-
-        //         console.log('[ChequeForm] part1 payload', payload, 'addResponse', getResponse);
-        //         delete payload.d2;
-
-        //         const isValueEmpty = (v: any) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
-        //         const isAllObjectValuesEmpty = (obj: any) => {
-        //             if (!obj || typeof obj !== 'object') return true;
-        //             const keys = Object.keys(obj);
-        //             if (keys.length === 0) return true;
-        //             return keys.every(k => isValueEmpty(obj[k]));
-        //         };
-
-        //         let adjType = 'ADJ';
-        //         if (!d1 || (Array.isArray(d1) && d1.length === 0)) {
-        //             adjType = 'ACC';
-        //         } else if (Array.isArray(d1) && d1.length === 1 && isAllObjectValuesEmpty(d1[0])) {
-        //             adjType = 'ACC';
-        //         }
-
-        //         // const params = {
-        //         //     ...getResponse,
-        //         //     ...payload,
-        //         //     UId: payload.UId,
-        //         //     ChqDate: isoToDDMMYYYY(payload.ChqDate ?? payload.ChqDate ?? ""),
-        //         //     EDate: isoToDDMMYYYY(payload.EDate ?? payload.EDate ?? ""),
-        //         //     ParAdd: payload.ParAdd || form.ParAdd,
-        //         //     txntype: "mob_collection",
-        //         //     action: "edit",
-        //         //     AdjType: adjType,
-        //         //     d1delete: []
-        //         // };
-        //         const params = {
-        //             ...getResponse,
-        //             ...payload,
-        //             UId: payload.UId,
-        //             // ChqDate: isoToDDMMYYYY(payload.ChqDate ?? payload.ChqDate ?? ""),
-        //             ChqDate: (payload.PayType === 'NEFT' || payload.PayType === 'RTGS' || form.PayType === 'NEFT' || form.PayType === 'RTGS')
-        //                 ? (payload.ChqDate ? isoToDDMMYYYY(payload.ChqDate) : isoToDDMMYYYY(payload.EDate))
-        //                 : isoToDDMMYYYY(payload.ChqDate ?? ""),
-        //             EDate: isoToDDMMYYYY(payload.EDate ?? payload.EDate ?? ""),
-        //             PayType: payload.PayType || form.PayType,
-        //             ParAdd: payload.ParAdd || form.ParAdd,
-        //             txntype: "mob_collection",
-        //             action: "edit",
-        //             AdjType: adjType,
-        //             d1delete: []
-        //         };
-
-        //         console.log('[ChequeForm] final edit payload', params);
-        //         const res = await axios.post(
-        //             // 'https://apig.tms-webapp.com/api/collection_crud',
-        //             `${API}/api/collection_crud`,
-        //             params,
-        //             { headers }
-        //         );
-        //         console.log('[ChequeForm] part1 res', res);
-        //         if (!res.data.success) {
-        //             setSaveLoading(false);
-        //             return Promise.reject(res.data.message);
-        //         }
-        //         setSaveLoading(false);
-        //         return res.data;
-        //     } catch (err) {
-        //         setSaveLoading(false);
-        //         return Promise.reject(err);
-        //     }
-        // } else {
-        //     try {
-        //         setSaveLoading(true);
-        //         const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-
-        //         // === START: Validation for SetAmt sum <= Amount ===
-        //         const d1 = (form && form.d1) ?? payload.d1 ?? [];
-        //         const amount = parseFloat(form.Amount) || 0;
-
-        //         // Calculate sum of all SetAmt in d1
-        //         const setAmtSum = d1.reduce((sum, item) => {
-        //             const setAmt = parseFloat(item.SetAmt) || 0;
-        //             return sum + setAmt;
-        //         }, 0);
-
-        //         console.log('setAmtSum', setAmtSum, amount);
-
-        //         // Check if sum > Amount
-        //         if (setAmtSum > amount) {
-        //             setSaveLoading(false);
-        //             Alert.alert(
-        //                 "Validation Error",
-        //                 "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
-        //                 [{ text: "OK" }]
-        //             );
-        //             return;
-        //         }
-        //         console.log('[ChequeForm] part1 payload', payload, 'addResponse', getResponse);
-        //         delete payload.d2;
-
-        //         // const d1 = (form && form.d1) ?? payload.d1 ?? null;
-        //         const isValueEmpty = (v: any) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
-        //         const isAllObjectValuesEmpty = (obj: any) => {
-        //             if (!obj || typeof obj !== 'object') return true;
-        //             const keys = Object.keys(obj);
-        //             if (keys.length === 0) return true;
-        //             return keys.every(k => isValueEmpty(obj[k]));
-        //         };
-
-        //         let adjType = 'ADJ';
-        //         if (!d1 || (Array.isArray(d1) && d1.length === 0)) {
-        //             adjType = 'ACC';
-        //         } else if (Array.isArray(d1) && d1.length === 1 && isAllObjectValuesEmpty(d1[0])) {
-        //             adjType = 'ACC';
-        //         }
-
-        //         const params = {
-        //             ...getResponse,
-        //             ...payload,
-        //             UId: payload.UId,
-        //             // ChqDate: isoToDDMMYYYY(payload.ChqDate ?? payload.ChqDate ?? ""),
-        //             ChqDate: (payload.PayType === 'NEFT' || payload.PayType === 'RTGS' || form.PayType === 'NEFT' || form.PayType === 'RTGS')
-        //                 ? (payload.ChqDate ? isoToDDMMYYYY(payload.ChqDate) : isoToDDMMYYYY(payload.EDate))
-        //                 : isoToDDMMYYYY(payload.ChqDate ?? ""),
-        //             EDate: isoToDDMMYYYY(payload.EDate ?? payload.EDate ?? ""),
-        //             PayType: payload.PayType || form.PayType,
-        //             ParAdd: payload.ParAdd || form.ParAdd,
-        //             txntype: "mob_collection",
-        //             action: "add",
-        //             AdjType: adjType,
-        //             d1delete: []
-        //         };
-
-        //         console.log('[ChequeForm] final payload', params);
-        //         const res = await axios.post(
-        //             // 'https://apig.tms-webapp.com/api/collection_crud',
-        //             `${API}/api/collection_crud`,
-        //             params,
-        //             { headers }
-        //         );
-        //         console.log('[ChequeForm] part1 res', res);
-        //         if (!res.data.success) {
-        //             setSaveLoading(false);
-        //             return Promise.reject(res.data.message);
-        //         }
-        //         setSaveLoading(false);
-        //         return res.data;
-        //     } catch (err) {
-        //         setSaveLoading(false);
-        //         return Promise.reject(err);
-        //     }
-        // }
     };
     const origSaveFaults = async (payload: any) => {
         try {
@@ -1740,7 +1474,7 @@ const InquiryAdd: React.FC<Props> = ({
 
     const handleSavePart2 = async (payload: any) => {
         try {
-            const result = await origSavePart2(payload);
+            const result = await origSavePart2(token, payload);
             if (result && result.success) {
                 setSuccessModalPayload(result.data ?? payload ?? null);
                 setSuccessModalVisible(true);
@@ -1768,7 +1502,7 @@ const InquiryAdd: React.FC<Props> = ({
     const closeSuccessModal = () => setSuccessModalVisible(false);
     const viewDataAndClose = () => {
         setSuccessModalVisible(false);
-        navigation.navigate('Taka Checking Entry View Data');
+        navigation.navigate('Inquiry');
     };
 
     const handleSave = () => {
@@ -1916,12 +1650,13 @@ const InquiryAdd: React.FC<Props> = ({
                     getFaultsLoading={getFaultsLoading}
                     navigation={navigation}
                     onExeChange={setSelectedProperty}
+                    isLoading={isLoading}
                 />
             )}
             <SuccessModal
                 visible={successModalVisible}
-                title="Taka Saved"
-                message="The taka data has been saved successfully."
+                title="Inquiry Saved"
+                message="The inquiry data has been saved successfully."
                 onClose={closeSuccessModal}
                 onView={viewDataAndClose}
             />

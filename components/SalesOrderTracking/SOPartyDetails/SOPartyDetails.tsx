@@ -63,6 +63,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
     const [isAccordionOpen, setIsAccordionOpen] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [getChallanPayload, setChallanPayload] = useState({});
+    const [getPartyName, setPartyName] = useState("");
     const [filteredOrders, setFilteredOrders] = useState<PartyDetail[]>([]);
     const itemsPerPage = 50;
 
@@ -71,6 +72,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             try {
                 const parties_tracking_details = await AsyncStorage.getItem('parties_tracking_details');
                 const parties_tracking_details_challan_payload = await AsyncStorage.getItem('parties_tracking_details_challan_payload');
+                const parties_tracking_details_party_name = await AsyncStorage.getItem('parties_tracking_details_party_name');
                 if (parties_tracking_details_challan_payload) {
                     setChallanPayload(parties_tracking_details_challan_payload ? JSON.parse(parties_tracking_details_challan_payload) : {});
                 }
@@ -79,6 +81,9 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     setDetailData(data);
                     setFilteredOrders(data.partydetails);
                     setRenderedOrders(data.partydetails.slice(0, itemsPerPage));
+                }
+                if (parties_tracking_details_party_name) {
+                    setPartyName(parties_tracking_details_party_name);
                 }
             } catch (error) {
                 console.error("Initialization error:", error);
@@ -141,7 +146,8 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             <>
                 <HeaderBarwithBack
                     userName={username}
-                    header={party && party?.partyname || party || ""}
+                    // header={party && party?.partyname || party || ""}
+                    header={getPartyName || ""}
                     subHeader={'Manage your Sales Orders'}
                     backNavigateScreen={'Sales Order Tracking'}
                 />

@@ -51,6 +51,7 @@ import { ThemeProvider } from './android/app/src/ThemeContext';
 import { API, initAPI } from './common/API/dynamicAPI';
 import { handleNotification } from './android/app/src/utils/notificationHandler';
 import SalesAnalysis from './components/SalesAnalysis/SalesAnalysis';
+import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOrderTracking';
 
 const Stack = createNativeStackNavigator();
 
@@ -537,6 +538,12 @@ export default function App() {
                     <Stack.Screen name="Sales Analysis">{(props) =>
                       <>
                         <SalesAnalysis {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Purchase Order Tracking">{(props) =>
+                      <>
+                        <PurchaseOrderTracking {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>

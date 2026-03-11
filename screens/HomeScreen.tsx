@@ -167,12 +167,12 @@ const APP_SECTIONS = [
             { id: '18', name: 'Sales Order Tracking', screen: 'Sales Order Tracking', icon: 'track-changes', iconColor: '#DB945A' },
         ],
     },
-    // {
-    //     title: 'Y',
-    //     data: [
-    //         { id: '19', name: 'Yarn Stock Verification', screen: 'Yarn Stock Verification', icon: 'check-circle', iconColor: '#008080' },
-    //     ],
-    // },
+    {
+        title: 'Y',
+        data: [
+            { id: '19', name: 'Yarn Stock Verification', screen: 'Yarn Stock Verification', icon: 'check-circle', iconColor: '#008080' },
+        ],
+    },
     // {
     //     title: 'C',
     //     data: [

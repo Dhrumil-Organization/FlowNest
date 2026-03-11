@@ -30,6 +30,7 @@ import {
     getAllChats,
     deleteAfterMessage
 } from "../../common/utils/chatDB";
+import AILoading from "../Loader/AILoading";
 
 const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
@@ -42,7 +43,8 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     const [menuVisible, setMenuVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(null);
     const [updatedDate, setUpdatedDate] = useState('');
-
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [isVoiceSupported, setIsVoiceSupported] = useState(true);
     const flatListRef = useRef(null);
     const controllerRef = useRef(null);
     const firstLoadRef = useRef(true);
@@ -56,17 +58,22 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
         initDB();
         loadChats();
 
-        Voice.onSpeechResults = onSpeechResults;
-        Voice.onSpeechPartialResults = e => {
-            if (e.value) setInputText(e.value[0]);
-        };
-        Voice.onSpeechEnd = () => setIsListening(false);
 
+
+    }, []);
+
+
+    useEffect(() => {
+        Voice.onSpeechError = (e) => {
+            console.log("Speech error:", e);
+            setIsListening(false);
+            Alert.alert("Error", "Voice recognition failed. Please try again.");
+        };
         return () => {
             Voice.destroy().then(Voice.removeAllListeners);
         };
-
     }, []);
+
 
     useEffect(() => {
 
@@ -100,8 +107,14 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
         updateCache(getUserPrptype);
     }, []);
 
-    const updateCache = async (getUserPrptype) => {
 
+    useEffect(() => {
+        Voice.isAvailable().then(setIsVoiceSupported).catch(() => setIsVoiceSupported(false));
+    }, []);
+
+
+    const updateCache = async (getUserPrptype) => {
+        setIsUpdating(true);
         try {
 
             const payload = {
@@ -120,17 +133,28 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
             );
 
             const data = response.data.response.updateddate;
-            console.log("updated date", response);
+            console.log("updated date", payload, response);
 
             setUpdatedDate(data);
+            // setIsUpdating(false);
 
         } catch (error) {
-
+            // setIsUpdating(false);
             console.log("update cache error", error);
 
+        } finally {
+            setIsUpdating(false); // Loader hide karo
         }
 
     };
+
+    if (!isVoiceSupported) {
+        return (
+            <TouchableOpacity disabled>
+                <Icon name="mic-off" size={26} color="#ccc" />
+            </TouchableOpacity>
+        );
+    }
 
     const loadChats = async () => {
 
@@ -154,29 +178,63 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     };
 
     const requestPermission = async () => {
-
-        if (Platform.OS === "android") {
-            const granted = await PermissionsAndroid.request(
-                PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
-            );
-            return granted === PermissionsAndroid.RESULTS.GRANTED;
+        try {
+            if (Platform.OS === 'android') {
+                const result = await PermissionsAndroid.check(
+                    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+                );
+                if (!result) {
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+                        {
+                            title: "Microphone Permission Needed",
+                            message: "This app needs access to your microphone to record voice input.",
+                            buttonNeutral: "Ask Me Later",
+                            buttonNegative: "Cancel",
+                            buttonPositive: "OK"
+                        }
+                    );
+                    return granted === PermissionsAndroid.RESULTS.GRANTED;
+                }
+                return true;
+            }
+            return true;
+        } catch (err) {
+            console.warn('Permission error:', err);
+            return false;
         }
-
-        return true;
-
     };
+
 
     const startListening = async () => {
         const ok = await requestPermission();
-        if (!ok) return;
-
-        setIsListening(true);
-        await Voice.start("en-IN");
+        if (!ok) {
+            Alert.alert(
+                "Permission Required",
+                "Please enable microphone permission in settings to use voice input.",
+                [{ text: "OK" }]
+            );
+            return;
+        }
+        try {
+            setIsListening(true);
+            await Voice.start("en-IN");
+        } catch (e) {
+            console.log("Voice start error:", e);
+            Alert.alert("Error", "Could not start voice recognition. Please try again.");
+            setIsListening(false);
+        }
     };
 
+
     const stopListening = async () => {
-        await Voice.stop();
-        setIsListening(false);
+        try {
+            await Voice.stop();
+        } catch (e) {
+            console.log("Voice stop error:", e);
+        } finally {
+            setIsListening(false);
+        }
     };
 
     const streamText = (text) => {
@@ -387,7 +445,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                     styles.bubble,
                     isUser ? styles.userBubble : styles.aiBubble
                 ]}>
-                    
+
 
                     {isEditing ? (
 
@@ -432,7 +490,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                                 </Markdown>
 
                             </TouchableOpacity>
-                            
+
                         </>
 
                     )}
@@ -448,131 +506,137 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     };
 
     return (
-
-        <View style={{ flex: 1, backgroundColor: "#F7F7F7" }}>
-
-            <HeaderBarwithBack
-                userName={username}
-                header="Sales AI"
-                subHeader="Smart Sales Assistant"
-            />
-
-            <View style={styles.topRow}>
-
-                <Text style={styles.updateText}>
-                    {updatedDate}
-                </Text>
-
-                <TouchableOpacity
-                    onPress={handleClearChat}
-                >
-                    <Text style={{ color: '#0A7EA4' }}>Clear Chat</Text>
-                </TouchableOpacity>
-
-            </View>
+        <>
+            {isUpdating ? (<>
+                <AILoading visible={isUpdating} />
+            </>) : (<>
+                <View style={{ flex: 1, backgroundColor: "#F7F7F7" }}>
 
 
-            <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={renderItem}
-                keyExtractor={(_, i) => i.toString()}
-                contentContainerStyle={{ padding: 16 }}
-                onContentSizeChange={() => {
-                    if (firstLoadRef.current) {
-                        scrollToBottom();
-                        firstLoadRef.current = false;
-                    }
-                }}
-            />
+                    <HeaderBarwithBack
+                        userName={username}
+                        header="Sales AI"
+                        subHeader="Smart Sales Assistant"
+                    />
 
-            {isTyping && (
-                <View style={[styles.typingRow, { marginTop: -10 }]}>
 
-                    <Animated.View style={[styles.dot, { opacity: dot1 }]} />
-                    <Animated.View style={[styles.dot, { opacity: dot2 }]} />
-                    <Animated.View style={[styles.dot, { opacity: dot3 }]} />
+                    <View style={styles.topRow}>
 
-                </View>
-
-            )}
-
-            {menuVisible && (
-
-                <View style={styles.menuOverlay}>
-
-                    <View style={styles.menuBox}>
+                        <Text style={styles.updateText}>
+                            {updatedDate}
+                        </Text>
 
                         <TouchableOpacity
-                            onPress={() => {
-                                Clipboard.setString(messages[selectedIndex].text);
-                                setMenuVisible(false);
-                            }}
+                            onPress={handleClearChat}
                         >
-                            <Text style={styles.menuItem}>Copy</Text>
-                        </TouchableOpacity>
-
-                        {messages[selectedIndex]?.type === "user" && (
-
-                            <TouchableOpacity
-                                onPress={() => {
-                                    startEdit(selectedIndex);
-                                    setMenuVisible(false);
-                                }}
-                            >
-                                <Text style={styles.menuItem}>Edit</Text>
-                            </TouchableOpacity>
-
-                        )}
-
-                        <TouchableOpacity
-                            onPress={() => setMenuVisible(false)}
-                        >
-                            <Text style={styles.menuCancel}>Cancel</Text>
+                            <Text style={{ color: '#0A7EA4' }}>Clear Chat</Text>
                         </TouchableOpacity>
 
                     </View>
 
-                </View>
 
-            )}
-
-            <View style={styles.inputContainer}>
-
-                <TouchableOpacity
-                    onPress={isListening ? stopListening : startListening}
-                >
-
-                    <Icon
-                        name="mic"
-                        size={26}
-                        color={isListening ? "#ff4d4f" : "#0A7EA4"}
+                    <FlatList
+                        ref={flatListRef}
+                        data={messages}
+                        renderItem={renderItem}
+                        keyExtractor={(_, i) => i.toString()}
+                        contentContainerStyle={{ padding: 16 }}
+                        onContentSizeChange={() => {
+                            if (firstLoadRef.current) {
+                                scrollToBottom();
+                                firstLoadRef.current = false;
+                            }
+                        }}
                     />
 
-                </TouchableOpacity>
+                    {isTyping && (
+                        <View style={[styles.typingRow, { marginTop: -10 }]}>
 
-                <TextInput
-                    style={styles.input}
-                    value={inputText}
-                    onChangeText={setInputText}
-                    placeholder="Ask sales analysis..."
-                    multiline
-                />
+                            <Animated.View style={[styles.dot, { opacity: dot1 }]} />
+                            <Animated.View style={[styles.dot, { opacity: dot2 }]} />
+                            <Animated.View style={[styles.dot, { opacity: dot3 }]} />
 
-                <TouchableOpacity
-                    onPress={isTyping ? cancelRequest : () => sendMessage()}
-                >
-                    <Icon
-                        name={isTyping ? "pause" : "send"}
-                        size={26}
-                        color="#0A7EA4"
-                    />
-                </TouchableOpacity>
+                        </View>
 
-            </View>
+                    )}
 
-        </View>
+                    {menuVisible && (
 
+                        <View style={styles.menuOverlay}>
+
+                            <View style={styles.menuBox}>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        Clipboard.setString(messages[selectedIndex].text);
+                                        setMenuVisible(false);
+                                    }}
+                                >
+                                    <Text style={styles.menuItem}>Copy</Text>
+                                </TouchableOpacity>
+
+                                {messages[selectedIndex]?.type === "user" && (
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            startEdit(selectedIndex);
+                                            setMenuVisible(false);
+                                        }}
+                                    >
+                                        <Text style={styles.menuItem}>Edit</Text>
+                                    </TouchableOpacity>
+
+                                )}
+
+                                <TouchableOpacity
+                                    onPress={() => setMenuVisible(false)}
+                                >
+                                    <Text style={styles.menuCancel}>Cancel</Text>
+                                </TouchableOpacity>
+
+                            </View>
+
+                        </View>
+
+                    )}
+
+                    <View style={styles.inputContainer}>
+
+                        <TouchableOpacity
+                            onPress={isListening ? stopListening : startListening}
+                        >
+
+                            <Icon
+                                name="mic"
+                                size={26}
+                                color={isListening ? "#ff4d4f" : "#0A7EA4"}
+                            />
+
+                        </TouchableOpacity>
+
+                        <TextInput
+                            style={styles.input}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            placeholder="Ask sales analysis..."
+                            multiline
+                        />
+
+                        <TouchableOpacity
+                            onPress={isTyping ? cancelRequest : () => sendMessage()}
+                        >
+                            <Icon
+                                name={isTyping ? "pause" : "send"}
+                                size={26}
+                                color="#0A7EA4"
+                            />
+                        </TouchableOpacity>
+
+                    </View>
+
+                </View></>)}
+
+        </>
     );
 
 };
@@ -659,7 +723,8 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
-        marginHorizontal: 10
+        marginHorizontal: 10,
+        color: "#000"
     },
     menuOverlay: {
         position: "absolute",

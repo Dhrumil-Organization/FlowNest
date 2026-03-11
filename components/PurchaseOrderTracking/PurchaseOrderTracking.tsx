@@ -186,25 +186,50 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }
     }, [selectedProperty]);
 
+
     useEffect(() => {
+        if (
+            lastViewedParcode &&
+            !hasAutoScrolled &&
+            isListReady &&
+            flatListRef.current &&
+            (searchQueryPOT.trim() ? filteredData.length > 0 : renderedData.length > 0)
+        ) {
+            const dataToUse = searchQueryPOT.trim() ? filteredData : renderedData;
+            const index = dataToUse.findIndex(item => item.parcode === lastViewedParcode);
+            if (index !== -1) {
+                setTimeout(() => {
+                    flatListRef.current?.scrollToIndex({ index, animated: true });
+                    setHasAutoScrolled(true);
+                }, 300);
+            }
+        }
+    }, [lastViewedParcode, filteredData, renderedData, searchQueryPOT, hasAutoScrolled, isListReady]);
+
+    useEffect(() => {
+
         if (!searchQueryPOT.trim()) {
-            setFilteredData(salesdata.slice(0, itemsPerPage));
+            setFilteredData(salessumdata.slice(0, itemsPerPage));
             setPage(1);
             return;
         }
+
         const lowercasedQuery = searchQueryPOT.toLowerCase();
-        const filtered = salesdata.filter(
-            (item) =>
-                item?.partyname && item?.partyname.toLowerCase().includes(lowercasedQuery) ||
-                item?.parcode && item?.parcode.toLowerCase().includes(lowercasedQuery) ||
-                item?.noof && item?.noof.toLowerCase().includes(lowercasedQuery) ||
-                item?.totmtr && item?.totmtr.toLowerCase().includes(lowercasedQuery) ||
-                item?.pendingmtr && item?.pendingmtr.toLowerCase().includes(lowercasedQuery) ||
-                item?.pendingamt && item?.pendingamt.toLowerCase().includes(lowercasedQuery)
+
+        const filtered = salessumdata.filter((item) =>
+            String(item?.party || '').toLowerCase().includes(lowercasedQuery) ||            
+            String(item?.parcode || '').toLowerCase().includes(lowercasedQuery) ||
+            String(item?.itmcode || '').toLowerCase().includes(lowercasedQuery) ||
+            String(item?.itmname || '').toLowerCase().includes(lowercasedQuery) ||
+            String(item?.unitrate || '').toLowerCase().includes(lowercasedQuery) ||
+            String(item?.qty || '').toLowerCase().includes(lowercasedQuery) ||
+            String(item?.bqty || '').toLowerCase().includes(lowercasedQuery)
         );
-        setFilteredData(filtered.slice(0, itemsPerPage));
+
+        setFilteredData(filtered);
         setPage(1);
-    }, [searchQueryPOT, salesdata]);
+
+    }, [searchQueryPOT, salessumdata]);
 
 
     useEffect(() => {
@@ -352,7 +377,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
             <FlatList
                 ref={flatListRef}
-                data={salessumdata}
+                // data={salessumdata}
+                data={searchQueryPOT.trim() ? filteredData : salessumdata}
                 keyExtractor={(item, index) => index.toString()}
                 showsVerticalScrollIndicator={true}
                 contentContainerStyle={{ paddingBottom: 120 }}

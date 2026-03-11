@@ -2308,21 +2308,45 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
     });
 
+    // const filteredData12 = useMemo(() => {
+
+    //     const data = modalTab === "SalesExecutiveWise"
+    //         ? (selectedExe || [])
+    //         : (partyData || []);
+
+    //     if (!Array.isArray(data)) return [];
+
+    //     if (!sexeSearchQuery) return data;
+
+    //     return data.filter(item =>
+    //         Object.values(item || {}).some(val =>
+    //             String(val || "")
+    //                 .toLowerCase()
+    //                 .includes(sexeSearchQuery.toLowerCase())
+    //         )
+    //     );
+
+    // }, [modalTab, selectedExe, partyData, sexeSearchQuery]);
+
     const filteredData12 = useMemo(() => {
 
-        const data = modalTab === "SalesExecutiveWise"
-            ? (selectedExe || [])
-            : (partyData || []);
+        let data = [];
 
-        if (!Array.isArray(data)) return [];
+        if (modalTab === "SalesExecutiveWise") {
+            data = Array.isArray(selectedExe) ? selectedExe : [];
+        } else {
+            data = Array.isArray(partyData) ? partyData : [];
+        }
 
-        if (!sexeSearchQuery) return data;
+        if (!sexeSearchQuery?.trim()) return data;
+
+        const query = sexeSearchQuery.toLowerCase();
 
         return data.filter(item =>
             Object.values(item || {}).some(val =>
                 String(val || "")
                     .toLowerCase()
-                    .includes(sexeSearchQuery.toLowerCase())
+                    .includes(query)
             )
         );
 
@@ -3003,7 +3027,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
                                             {/* Content */}
 
-                                            <ScrollView
+                                            {/* <ScrollView
                                                 contentContainerStyle={{ paddingBottom: 120 }}
                                                 showsVerticalScrollIndicator={false}
                                                 keyboardShouldPersistTaps="handled"
@@ -3041,10 +3065,48 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
                                                 )}
 
+                                            </ScrollView> */}
+
+
+                                            <ScrollView
+                                                contentContainerStyle={{ paddingBottom: 120 }}
+                                                showsVerticalScrollIndicator={false}
+                                                keyboardShouldPersistTaps="handled"
+                                            >
+
+                                                {filteredData12.length > 0 ? (
+
+                                                    <>
+                                                        {modalTab === "PartyWise" && renderItemsInGrid(filteredData12, "PartyWise")}
+                                                        {modalTab === "SalesExecutiveWise" && renderItemsInGrid(filteredData12, "SalesExecutiveWise")}
+                                                    </>
+
+                                                ) : (
+
+                                                    <View style={{
+                                                        flex: 1,
+                                                        justifyContent: "center",
+                                                        alignItems: "center",
+                                                        padding: 40,
+                                                        marginTop: 60
+                                                    }}>
+
+                                                        <Icon name="search-off" size={48} color="#666" />
+
+                                                        <Text style={{
+                                                            color: "#666",
+                                                            fontSize: 16,
+                                                            marginTop: 12,
+                                                            textAlign: 'center'
+                                                        }}>
+                                                            No records found
+                                                        </Text>
+
+                                                    </View>
+
+                                                )}
+
                                             </ScrollView>
-
-
-
                                             {/* Totals Footer */}
 
                                             <View style={{

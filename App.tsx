@@ -51,6 +51,9 @@ import { ThemeProvider } from './android/app/src/ThemeContext';
 import { API, initAPI } from './common/API/dynamicAPI';
 import { handleNotification } from './android/app/src/utils/notificationHandler';
 import SalesAnalysis from './components/SalesAnalysis/SalesAnalysis';
+import { initDB } from './common/utils/chatDB';
+import { initGlobalCacheDB, updateGlobalCacheInBackground } from './common/utils/sqliteCacheManager';
+import CheckingScanner from './components/CheckingScanner/CheckingScanner';
 import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOrderTracking';
 
 const Stack = createNativeStackNavigator();
@@ -118,7 +121,23 @@ export default function App() {
   //   return unsubscribe;
   // }, []);
 
-  console.log("API:", API);
+  const initializeDatabases = async () => {
+    try {
+      await initDB(); // Initialize chat.db
+      await initGlobalCacheDB(); // Initialize GlobalCache.db
+      console.log('✅ All databases initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing databases:', error);
+      // Retry or show user-friendly error
+    }
+  };
+
+  // Call this function when your app starts
+  useEffect(() => {
+    initializeDatabases();
+  }, []);
+
+
 
 
   // Add this to your App.tsx
@@ -176,6 +195,7 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
 
   const checkToken = useCallback(async () => {
     try {
@@ -517,7 +537,7 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
-                     <Stack.Screen name="Sales Order Tracking">{(props) =>
+                    <Stack.Screen name="Sales Order Tracking">{(props) =>
                       <>
                         <SalesOrderTracking {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
@@ -541,6 +561,15 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="Checking Scanner">
+                      {
+                        (props) =>
+                          <>
+                            <CheckingScanner {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                            <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
+                          </>
+                      }
+                    </Stack.Screen>
                     <Stack.Screen name="Purchase Order Tracking">{(props) =>
                       <>
                         <PurchaseOrderTracking {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />

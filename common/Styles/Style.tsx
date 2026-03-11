@@ -1068,37 +1068,222 @@ export const crlimtreq_styles = StyleSheet.create({
     rateColumn: { width: 100 },
     amountColumn: { width: 120 },
     discColumn: { width: 80 },
-    gridCard:{
-        flex:1,
-        backgroundColor:"#fafafa",
-        borderRadius:10,
-        padding:12,
-        marginBottom:10,
-        marginHorizontal:4,
-        borderWidth:1,
-        borderColor:"#eee"
-        },
-        
-        gridRow:{
-        flexDirection:"row",
-        justifyContent:"space-between",
-        alignItems:"flex-start",
-        marginBottom:6
-        },
-        
-        gridLabel:{
-        fontSize:12,
-        color:"#666",
-        fontWeight:"500",
-        flex:1
-        },
-        
-        gridValue:{
-        fontSize:12.5,
-        fontWeight:"700",
-        color:"#222",
-        flex:1,
-        textAlign:"right",
-        flexWrap:"wrap"
-        }
+    gridCard: {
+        flex: 1,
+        backgroundColor: "#fafafa",
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 10,
+        marginHorizontal: 4,
+        borderWidth: 1,
+        borderColor: "#eee"
+    },
+
+    gridRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: 6
+    },
+
+    gridLabel: {
+        fontSize: 12,
+        color: "#666",
+        fontWeight: "500",
+        flex: 1
+    },
+
+    gridValue: {
+        fontSize: 12.5,
+        fontWeight: "700",
+        color: "#222",
+        flex: 1,
+        textAlign: "right",
+        flexWrap: "wrap"
+    }
+});
+
+export const checkingScannerStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        backgroundColor: '#f8f9fa', // Light gray background
+        paddingBottom: 80,
+    },
+    flexContainer: {
+        flexDirection: 'row',
+        //margin: 20
+        paddingHorizontal: 10,
+        paddingVertical: 20
+    },
+    titleTextWithIcon: {
+        fontSize: 18,
+        color: '#000',
+        width: '66.8%',
+        fontWeight: 'bold'
+    },
+    cameraIcon: {
+        color: '#007EA7',
+        fontSize: 25,
+        marginRight: 10,
+    },
+    cameraBox: {
+        width: 300,
+        height: 250,
+        borderWidth: 2,
+        borderColor: 'black',
+        overflow: 'hidden'
+    },
+    cameraView: {
+        width: '100%',
+        height: 350,
+        borderRadius: 10,
+        overflow: 'hidden',
+        padding: 20,
+        margin: 20
+    },
+    cameraContainer: {
+        width: '100%',
+        height: 300,
+        alignSelf: 'center',
+        marginTop: 0,
+        borderRadius: 10,
+        overflow: 'hidden'
+    },
+
+    camera: {
+        width: '100%',
+        height: '100%',
+        position: 'absolute'
+    },
+
+    overlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+
+    scanBox: {
+        width: 220,
+        height: 220,
+        borderWidth: 3,
+        borderColor: '#00FFAA',
+        borderRadius: 10
+    },
+    label: {
+        paddingVertical: 5,
+        //paddingHorizontal: 10,
+        color: '#000000',
+        marginTop: 10,
+        fontWeight: "500"
+    },
+
+    input: {
+        paddingVertical: 0,
+        paddingHorizontal: 20,
+        color: '#000000',
+        borderWidth: 1,
+        borderColor: "#000",
+        borderRadius: 6,
+        //padding: 10,
+        //marginTop: 5
+    },
+    inputDisabled: {
+        backgroundColor: '#DDD',
+        paddingVertical: 0,
+        paddingHorizontal: 20,
+        color: '#000000',
+        borderWidth: 1,
+        borderColor: "#000",
+        borderRadius: 6,
+        //padding: 10,
+        //marginTop: 5
+    },
+
+    // dropdown: {
+    //     borderWidth: 1,
+    //     borderColor: "#000",
+    //     borderRadius: 6,
+    //     marginTop: 5
+    // },
+
+
+
+    submitBtn: {
+        marginTop: 20,
+        backgroundColor: "#007EA7",
+        padding: 12,
+        borderRadius: 8,
+        alignItems: "center"
+    },
+
+    submitText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600"
+    },
+
+    infoBox: {
+        marginTop: 10,
+        backgroundColor: "#eef4ff",
+        padding: 5,
+        borderRadius: 6
+    },
+
+    infoText: {
+        color: "#5b6d8a",
+        textAlign: 'center'
+    },
+    row: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+
+    halfInput: {
+        flex: 1,
+        marginRight: 2
+    },
+
+    halfInputDisabled: {
+        flex: 1,
+        marginRight: 2,
+    },
+    halfInputLast: {
+        flex: 1
+    },
+    picker: {
+        color: '#000',
+        height: 50,
+    },
+    dropdownIcon: {
+        position: "absolute",
+        right: 8,
+        top: 5,
+        pointerEvents: "none"
+    },
+    dropdown: {
+        borderWidth: 1,
+        borderColor: "#000",
+        borderRadius: 6,
+        marginTop: 5,
+        height: 40,
+        justifyContent: 'center',
+        width: '90%'
+
+
+    },
+    dropdownIconDelete: {
+        position: "absolute",
+        right: -15,
+        top: -37,
+        //pointerEvents: "none",
+        color: 'red',
+        width: '10%',
+        //backgroundColor : '#ccc'
+
+    },
+    viewCustom: {
+
+    },
+    //absoluteFill: {}
 });

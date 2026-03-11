@@ -81,6 +81,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const flatListRef = useRef<FlatList>(null);
     const [selectedProperty, setSelectedProperty] = useState<any>(null);
 
+    console.log("slecetdparty", selectedParty);
+
     useEffect(() => {
         if (selectedProperty) {
             console.log("selectedProperty", selectedProperty);
@@ -162,7 +164,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             console.log("payload", payload)
             console.log("response", response)
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data Sexe:', response.data.response.data);
+                console.log('✅ Data Party:', response.data.response.data);
                 setPartyData(response.data.response.data);
             } else {
             }

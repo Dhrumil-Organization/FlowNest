@@ -287,6 +287,9 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         setIsDesignAccordionOpenparty(!isDesignAccordionOpenParty);
     };
 
+    useEffect(() => {
+        console.log("Selected Party :", selectedParty);
+    }, [selectedParty]);
 
     // Remove all selected designs
     const removeAllSelected = () => {
@@ -305,6 +308,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         onDesignSelect(selectedDesigns);
         onItemSelectItem(selectedItems);
         onItemSelectParty(selectedParty);
+        console.log("selectedParty", selectedParty)
     };
 
     const formatDate = (rawDate: any) => {
@@ -499,10 +503,15 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                         <TouchableOpacity
                                             style={styles.selectAllButton}
                                             onPress={() => {
+                                                // const filtered12 = getPartyData.filter(
+                                                //     (party) =>
+                                                //         party.acccode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                //         party.accountname.toLowerCase().includes(searchQuery.toLowerCase())
+                                                // );
                                                 const filtered12 = getPartyData.filter(
                                                     (party) =>
-                                                        party.acccode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                        party.accountname.toLowerCase().includes(searchQuery.toLowerCase())
+                                                        party.acccode.toLowerCase().includes(searchQueryParty.toLowerCase()) ||
+                                                        party.accountname.toLowerCase().includes(searchQueryParty.toLowerCase())
                                                 );
                                                 setSelectedParty(filtered12);
                                             }}

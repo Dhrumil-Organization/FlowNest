@@ -1100,7 +1100,62 @@ export const crlimtreq_styles = StyleSheet.create({
         flex: 1,
         textAlign: "right",
         flexWrap: "wrap"
-    }
+    },
+    // 
+    carouselCardContainer: {
+        paddingVertical: 50,
+        alignItems: 'center', // Center the cards horizontally
+        justifyContent: 'center', // Center the cards vertically (if needed).
+        // height: '100%', 
+        
+      },
+
+    // Individual carousel card
+    carouselCard: {
+        width: 280, // Adjust width as needed
+        borderRadius: 10,
+        overflow: 'hidden',
+        elevation: 3, // For Android shadow
+        shadowColor: '#000', // For iOS shadow
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        marginHorizontal: 8, // Space between cards.
+    },
+
+    // Header container with gradient
+    headerContainer: {
+        padding: 15,
+    },
+
+    // Content inside the card
+    carouselCardContent: {
+        padding: 10,
+    },
+
+    // Title of the card
+    carouselCardTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+
+    // Key label (e.g., "Design Name:")
+    carouselCardKey: {
+        fontSize: 14,
+        color: '#fff',
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+
+    // Value text (e.g., "DIRECTOR")
+    carouselCardText: {
+        fontSize: 14,
+        color: '#fff',
+        fontWeight: 'normal',
+    },
 });
 
 export const checkingScannerStyles = StyleSheet.create({

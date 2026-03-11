@@ -809,7 +809,8 @@ import {
     getChat,
     clearChat,
     getAllChats,
-    deleteAfterMessage
+    deleteAfterMessage,
+    debugDB
 } from "../../common/utils/chatDB";
 import AILoading from "../Loader/AILoading";
 
@@ -908,8 +909,51 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
         Voice.isAvailable().then(setIsVoiceSupported).catch(() => setIsVoiceSupported(false));
     }, []);
 
-    const updateCache = async (getUserPrptype) => {
+    useEffect(() => {
+        // Debug: Check DB on mount
+        const checkDB = async () => {
+            const records = await debugDB();
+            console.log('🏁 Initial DB records:', records.length);
+        };
+        checkDB();
+    }, []);
+
+    // const updateCache = async (getUserPrptype) => {
+
+
+    //     setIsUpdating(true);
+    //     try {
+    //         const payload = {
+    //             prptype: getUserPrptype
+    //         };
+
+    //         const headers = {
+    //             Authorization: `Bearer ${token}`,
+    //             'Content-Type': 'application/json'
+    //         };
+
+    //         const response = await axios.post(
+    //             `${API}/api/updatecache`,
+    //             payload,
+    //             { headers }
+    //         );
+
+    //         const data = response.data.response.updateddate;
+    //         console.log("updated date", payload, response);
+
+    //         setUpdatedDate(data);
+
+    //     } catch (error) {
+    //         console.log("update cache error", error);
+    //     } finally {
+    //         setIsUpdating(false);
+    //     }
+    // };
+
+    const updateCache = async (getUserPrptype, retryCount = 0) => {
         setIsUpdating(true);
+        const MAX_RETRIES = 3;
+
         try {
             const payload = {
                 prptype: getUserPrptype
@@ -920,19 +964,114 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                 'Content-Type': 'application/json'
             };
 
+            // Show retry status if this is a retry attempt
+            if (retryCount > 0) {
+                console.log(`Retry attempt ${retryCount}/${MAX_RETRIES} for updateCache`);
+            }
+
             const response = await axios.post(
                 `${API}/api/updatecache`,
                 payload,
                 { headers }
             );
 
-            const data = response.data.response.updateddate;
-            console.log("updated date", payload, response);
+            console.log("update cache full response:", response);
+            console.log("update cache data:", response.data);
 
-            setUpdatedDate(data);
+            // Check for Python API Failed error
+            if (response.data?.success === true &&
+                response.data?.response?.error === true &&
+                response.data?.response?.message === "Python API Failed") {
+
+                console.log(`❌ Python API Failed on attempt ${retryCount + 1}`);
+
+                if (retryCount < MAX_RETRIES) {
+                    // Show retry message
+                    if (retryCount === 0) {
+                        Alert.alert(
+                            "Retrying Update",
+                            "Cache update encountered an issue. Retrying...",
+                            [{ text: "OK" }]
+                        );
+                    }
+
+                    // Exponential backoff - increase wait time with each retry
+                    const waitTime = 2000 * (retryCount + 1);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                    // Recursive retry
+                    return updateCache(getUserPrptype, retryCount + 1);
+                } else {
+                    // Max retries reached
+                    Alert.alert(
+                        "Update Failed",
+                        "Unable to update cache after multiple attempts. Please try again later or contact support.",
+                        [{ text: "OK" }]
+                    );
+                    setUpdatedDate('Update failed - API error');
+                }
+            }
+            // Check for successful response with updated date
+            else if (response.data?.response?.updateddate) {
+                console.log("✅ Cache updated successfully with date:", response.data.response.updateddate);
+                setUpdatedDate(response.data.response.updateddate);
+
+                // Show success message if it was a retry
+                if (retryCount > 0) {
+                    Alert.alert(
+                        "Success",
+                        `Cache updated successfully after ${retryCount} retry/retries.`,
+                        [{ text: "OK" }]
+                    );
+                }
+            }
+            // Handle other response formats
+            else {
+                console.log("Unexpected response format:", JSON.stringify(response.data));
+
+                if (retryCount < MAX_RETRIES) {
+                    // Retry for unexpected format too
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    return updateCache(getUserPrptype, retryCount + 1);
+                } else {
+                    setUpdatedDate('Invalid response');
+                    Alert.alert(
+                        "Update Warning",
+                        "Received unexpected response from server. Please try again later.",
+                        [{ text: "OK" }]
+                    );
+                }
+            }
 
         } catch (error) {
-            console.log("update cache error", error);
+            console.log("update cache network error:", error);
+
+            // Network errors - retry
+            if (retryCount < MAX_RETRIES) {
+                console.log(`Network error, retry attempt ${retryCount + 1}/${MAX_RETRIES}`);
+
+                // Show network error message on first failure
+                if (retryCount === 0) {
+                    Alert.alert(
+                        "Network Issue",
+                        "Connection problem detected. Retrying...",
+                        [{ text: "OK" }]
+                    );
+                }
+
+                // Exponential backoff for network errors
+                const waitTime = 2000 * (retryCount + 1);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                return updateCache(getUserPrptype, retryCount + 1);
+            } else {
+                Alert.alert(
+                    "Update Failed",
+                    "Network error persists. Please check your internet connection and try again.",
+                    [{ text: "OK" }]
+                );
+                setUpdatedDate('Network error');
+            }
         } finally {
             setIsUpdating(false);
         }
@@ -1013,43 +1152,131 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
         }
     };
 
+    // const sendMessage = async (textParam = null) => {
+    //     const userText = textParam ?? inputText;
+    //     if (!userText.trim()) return;
+
+    //     let updated = [...messages];
+
+    //     if (editingIndex !== null) {
+    //         const editedUserText = messages[editingIndex].text;
+
+    //         updated[editingIndex].text = userText;
+    //         updated = updated.slice(0, editingIndex + 1);
+
+    //         setMessages(updated);
+    //         deleteAfterMessage(editedUserText);
+    //         setEditingIndex(null);
+    //     } else {
+    //         updated.push({ type: "user", text: userText });
+    //         setMessages(updated);
+    //     }
+
+    //     setInputText("");
+    //     scrollToBottom();
+    //     setIsTyping(true);
+    //     controllerRef.current = new AbortController();
+
+    //     try {
+    //         const cached = await getChat(userText);
+
+    //         if (cached) {
+    //             setIsTyping(false);
+    //             setMessages(prev => [
+    //                 ...prev,
+    //                 { type: "ai", text: cached.aiText }
+    //             ]);
+    //             return;
+    //         }
+
+    //         const res = await axios.post(
+    //             `${API}/api/salesanalysisvoice`,
+    //             {
+    //                 prptype: getUserPrptype,
+    //                 text: userText
+    //             },
+    //             {
+    //                 headers: { Authorization: `Bearer ${token}` },
+    //                 signal: controllerRef.current.signal
+    //             }
+    //         );
+
+    //         console.log("res:", res);
+
+    //         const aiText = res?.data?.response?.output ?? "No response";
+
+    //         setMessages(prev => [
+    //             ...prev,
+    //             { type: "ai", text: aiText }
+    //         ]);
+
+    //         scrollToBottom();
+    //         saveChat(userText, aiText);
+
+    //     } catch (e) {
+    //         if (e.name !== "CanceledError") {
+    //             const errorText = "⚠️ Server error";
+    //             setMessages(prev => [
+    //                 ...prev,
+    //                 { type: "ai", text: errorText }
+    //             ]);
+    //             saveChat(userText, errorText);
+    //         }
+    //     } finally {
+    //         setIsTyping(false);
+    //         controllerRef.current = null;
+    //     }
+    // };
     const sendMessage = async (textParam = null) => {
         const userText = textParam ?? inputText;
         if (!userText.trim()) return;
 
+        console.log('📤 Sending message:', userText);
+
         let updated = [...messages];
 
         if (editingIndex !== null) {
-            const editedUserText = messages[editingIndex].text;
+            const editedMessage = messages[editingIndex];
+            const editedUserText = editedMessage.text;
 
             updated[editingIndex].text = userText;
             updated = updated.slice(0, editingIndex + 1);
-
             setMessages(updated);
-            deleteAfterMessage(editedUserText);
+
+            if (editedMessage.id) {
+                await deleteAfterMessage(editedUserText);
+            }
+
             setEditingIndex(null);
+            setInputText("");
+            scrollToBottom();
+            setIsTyping(true);
         } else {
             updated.push({ type: "user", text: userText });
             setMessages(updated);
+            setInputText("");
+            scrollToBottom();
+            setIsTyping(true);
         }
 
-        setInputText("");
-        scrollToBottom();
-        setIsTyping(true);
         controllerRef.current = new AbortController();
 
         try {
+            // Check cache
             const cached = await getChat(userText);
 
             if (cached) {
+                console.log('📦 Using cached response');
                 setIsTyping(false);
                 setMessages(prev => [
                     ...prev,
-                    { type: "ai", text: cached.aiText }
+                    { type: "ai", text: cached.aiText, id: cached.id }
                 ]);
+                scrollToBottom();
                 return;
             }
 
+            console.log('🌐 Fetching from API');
             const res = await axios.post(
                 `${API}/api/salesanalysisvoice`,
                 {
@@ -1062,26 +1289,29 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                 }
             );
 
-            console.log("res:", res);
-
             const aiText = res?.data?.response?.output ?? "No response";
+            console.log('📥 Received response:', aiText.substring(0, 50) + '...');
 
+            // Save to cache
+            await saveChat(userText, aiText);
+
+            // Add to UI
             setMessages(prev => [
                 ...prev,
                 { type: "ai", text: aiText }
             ]);
 
             scrollToBottom();
-            saveChat(userText, aiText);
 
         } catch (e) {
             if (e.name !== "CanceledError") {
+                console.log('❌ API Error:', e);
                 const errorText = "⚠️ Server error";
                 setMessages(prev => [
                     ...prev,
                     { type: "ai", text: errorText }
                 ]);
-                saveChat(userText, errorText);
+                await saveChat(userText, errorText);
             }
         } finally {
             setIsTyping(false);

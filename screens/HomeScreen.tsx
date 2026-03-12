@@ -191,12 +191,6 @@ const APP_SECTIONS = [
     //         { id: '22', name: 'Design Authorization', screen: 'Design Authorization', icon: 'edit', iconColor: '#4B0082' },
     //     ],
     // },
-    {
-        title: 'C',
-        data: [
-            { id: '20', name: 'Checking Scanner', screen: 'Checking Scanner', icon: 'document-scanner', iconColor: '#4169E1' },
-        ],
-    },
     // 
     {
         title: 'S',

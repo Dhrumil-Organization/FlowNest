@@ -2045,7 +2045,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3F6FA',
         borderRadius: 8,
         paddingHorizontal: 10,
-        marginRight: 8
+        marginRight: 8,
+        color: '#000',
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        borderWidth: 1,
+        textAlign: 'right'
     },
 
     bulkBtnGrid: {
@@ -2128,6 +2132,7 @@ const styles = StyleSheet.create({
         minHeight: 100,
         borderWidth: 1,
         borderColor: '#E5EAF0',
+        color: '#000',
     },
 
 

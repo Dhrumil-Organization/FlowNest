@@ -105,6 +105,32 @@ interface AllHistoryData {
     crdays: string;
 }
 
+type Inquiry = {
+    id: string;
+    prpcode: string;
+    prptype: string;
+    yearno: string;
+    createdAt: string;
+    status: string;
+    deliveryDate: string;
+    party: {
+        partyname: string;
+        partycode: string;
+        items: Array<{
+            itemtitle: string;
+            itemtitlecode: string;
+            shades: Array<{
+                shadename: string;
+                shadecode: string;
+                quantity: string;
+                rate: string;
+                deliverydate: string;
+                remarks: string;
+                status: string;
+            }>;
+        }>;
+    };
+};
 const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username, setIsLoggedIn }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchhistoryQuery, setSearchhistoryQuery] = useState('');
@@ -179,110 +205,6 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
     const [selectedItems, setSelectedItems] = useState([])
     const [selectedItemStatus, setSelectedItemStatus] = useState('All');
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    // const [gePOTData, setPOTData] = useState([
-    //     {
-    //         "UId": "370000035",
-    //         "PrpCode": "SIP",
-    //         "AccCode": "10291",
-    //         "EDate": "28/11/2025",
-    //         "ParCode": "",
-    //         "BankName": "",
-    //         "BankBr": "",
-    //         "ChqNo": "258095",
-    //         "ChqDate": "29/11/2025",
-    //         "Remark": "knfnfsdf sdfknskfna askdndklasd aksjdnlasd as,dnasld asdknldksdas kdnadasdasldmnasld  aldfnasfB  fhASDFASIF adfhakdasldasld",
-    //         "Amount": "950000.00",
-    //         "AdjType": "ACC",
-    //         "UsrCode": "1",
-    //         "LastDate": "20251128",
-    //         "LastTime": "11.20",
-    //         "UUsrCode": "",
-    //         "ULastDate": "0",
-    //         "ULastTime": ".00",
-    //         "AttachImage": "https://apig.tms-webapp.com/images/image_1751343358.png",
-    //         "PayType": "",
-    //         "IsAuth": "1",
-    //         "ARemark": "",
-    //         "AUsrCode": "",
-    //         "ALastDate": "0",
-    //         "ALastTime": ".00",
-    //         "nEDate": "20251128",
-    //         "nChqDate": "20251129",
-    //         "AccName": "K.G.MARDA [KOLKATA ]",
-    //         "BankNo": "0",
-    //         "IFSCode": "",
-    //         "ParName": "",
-    //         "authorisedby": ""
-    //     },
-    //     {
-    //         "UId": "370000036",
-    //         "PrpCode": "SIP",
-    //         "AccCode": "10291",
-    //         "EDate": "28/11/2025",
-    //         "ParCode": "",
-    //         "BankName": "ICICI Bank",
-    //         "BankBr": "Adarsh Nagar",
-    //         "ChqNo": "258095",
-    //         "ChqDate": "29/11/2025",
-    //         "Remark": "Demo",
-    //         "Amount": "2580000.00",
-    //         "AdjType": "ACC",
-    //         "UsrCode": "1",
-    //         "LastDate": "20251128",
-    //         "LastTime": "11.20",
-    //         "UUsrCode": "",
-    //         "ULastDate": "0",
-    //         "ULastTime": ".00",
-    //         "AttachImage": "",
-    //         "PayType": "",
-    //         "IsAuth": "0",
-    //         "ARemark": "",
-    //         "AUsrCode": "",
-    //         "ALastDate": "0",
-    //         "ALastTime": ".00",
-    //         "nEDate": "20251128",
-    //         "nChqDate": "20251129",
-    //         "AccName": "K.G.MARDA [KOLKATA ]",
-    //         "BankNo": "0",
-    //         "IFSCode": "",
-    //         "ParName": "",
-    //         "authorisedby": ""
-    //     },
-    //     {
-    //         "UId": "370000037",
-    //         "PrpCode": "SIP",
-    //         "AccCode": "10291",
-    //         "EDate": "28/11/2025",
-    //         "ParCode": "",
-    //         "BankName": "",
-    //         "BankBr": "",
-    //         "ChqNo": "258095",
-    //         "ChqDate": "29/11/2025",
-    //         "Remark": "Demo",
-    //         "Amount": "2580000.00",
-    //         "AdjType": "ACC",
-    //         "UsrCode": "1",
-    //         "LastDate": "20251128",
-    //         "LastTime": "11.20",
-    //         "UUsrCode": "",
-    //         "ULastDate": "0",
-    //         "ULastTime": ".00",
-    //         "AttachImage": "https://apig.tms-webapp.com/images/image_1751343358.png",
-    //         "PayType": "",
-    //         "IsAuth": "0",
-    //         "ARemark": "",
-    //         "AUsrCode": "",
-    //         "ALastDate": "0",
-    //         "ALastTime": ".00",
-    //         "nEDate": "20251128",
-    //         "nChqDate": "20251129",
-    //         "AccName": "K.G.MARDA [KOLKATA ]",
-    //         "BankNo": "0",
-    //         "IFSCode": "",
-    //         "ParName": "",
-    //         "authorisedby": ""
-    //     }
-    // ])
     const [gePOTData, setPOTData] = useState([])
     const [getpayload, setPayload] = useState([])
 
@@ -292,8 +214,6 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
     // Set default dates
     useEffect(() => {
         const today = new Date();
-        // const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        // const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         setFromDate(today);
         setToDate(today);
     }, []);
@@ -656,9 +576,71 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
     };
 
 
+    // const fetchBrowseData = async (payload) => {
+    //     setIsLoading(true);
+
+    //     if (cancelToken?.cancel) cancelToken.cancel();
+    //     cancelToken = axios.CancelToken.source();
+
+    //     try {
+    //         const headers = {
+    //             Authorization: `Bearer ${getToken()}`,
+    //             'Content-Type': 'application/json',
+    //             'X-Requested-with': 'XMLHttpRequest',
+    //         };
+
+    //         const response = await axios.post(`${API}/api/inquiry_crud`, payload, { headers, cancelToken: cancelToken.token });
+    //         console.log('🔵 response', response);
+
+    //         if (response.data?.success) {
+    //             const inquiries = response.data.data.inquires.map(inquiry => {
+    //                 const partyData = inquiry.data[0];
+    //                 const firstItem = partyData.items[0];
+    //                 const firstShade = firstItem.shades[0];
+
+    //                 const items = partyData.items.map(item => {
+    //                     return {
+    //                         itemtitle: item.itemtitle,
+    //                         itemtitlecode: item.itemtitlecode,
+    //                         shades: item.shades,
+    //                     };
+    //                 });
+
+    //                 return {
+    //                     id: inquiry.id,
+    //                     prpcode: inquiry.prpcode,
+    //                     prptype: inquiry.prptype,
+    //                     yearno: inquiry.yearno,
+    //                     createdAt: inquiry.createdAt,
+    //                     status: firstShade.status,
+    //                     deliveryDate: firstShade.deliverydate,
+    //                     party: {
+    //                         partyname: partyData.partyname,
+    //                         partycode: partyData.partycode,
+    //                         items: items,
+    //                     },
+    //                 };
+    //             });
+
+    //             setPOTData(inquiries);
+    //             closeDrawer();
+    //         } else {
+    //             setPOTData([]);
+    //         }
+    //     } catch (err) {
+    //         console.error('❌ inquiry error', err?.response || err);
+    //         Alert.alert(
+    //             'Server Error',
+    //             err?.response?.status === 503
+    //                 ? 'Apache rejected request (fixed by withCredentials)'
+    //                 : 'Failed to load inquiries'
+    //         );
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
     const fetchBrowseData = async (payload) => {
         setIsLoading(true);
-
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
 
@@ -675,9 +657,6 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
             if (response.data?.success) {
                 const inquiries = response.data.data.inquires.map(inquiry => {
                     const partyData = inquiry.data[0];
-                    const firstItem = partyData.items[0];
-                    const firstShade = firstItem.shades[0];
-
                     const items = partyData.items.map(item => {
                         return {
                             itemtitle: item.itemtitle,
@@ -692,12 +671,17 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                         prptype: inquiry.prptype,
                         yearno: inquiry.yearno,
                         createdAt: inquiry.createdAt,
-                        status: firstShade.status,
-                        deliveryDate: firstShade.deliverydate,
+                        // Do NOT set status here; it will be determined per-shade in the UI
+                        deliveryDate: inquiry.data[0].items[0].shades[0].deliverydate, // or use a common delivery date logic
                         party: {
                             partyname: partyData.partyname,
                             partycode: partyData.partycode,
                             items: items,
+                            id: inquiry.id,
+                            prpcode: inquiry.prpcode,
+                            prptype: inquiry.prptype,
+                            yearno: inquiry.yearno,
+                            createdAt: inquiry.createdAt,
                         },
                     };
                 });
@@ -720,7 +704,73 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
         }
     };
 
+    const handleUpdateShadeFromList = async (shade: any, context: { itemtitle: string; party: Inquiry['party']; inquiry: Inquiry; status: string }) => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
 
+        try {
+            const payload = {
+                id: shade?.id || "",
+                prpcode: context.inquiry.prpcode || "",
+                yearno: context.inquiry.yearno || "",
+                createdAt: context.inquiry.createdAt || "",
+                txntype: "mob_inquires",
+                action: "update_status",
+                srno: shade?.srno || "",
+                subsr: shade?.subsr || "",
+                status: context.status, // Use the selected status
+            };
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            console.log('Update payload:', payload);
+            const response = await axios.post(`${API}/api/inquiry_crud`, payload, { headers, cancelToken: cancelToken.token });
+            console.log('Update response:', response);
+
+            if (response.data?.success) {
+                // Update the local state with the new data
+                const updatedInquiry = response.data.data.inquires[0];
+                const partyData = updatedInquiry.data[0];
+
+                const updatedCard = {
+                    id: updatedInquiry.id,
+                    prpcode: updatedInquiry.prpcode,
+                    prptype: updatedInquiry.prptype,
+                    yearno: updatedInquiry.yearno,
+                    createdAt: updatedInquiry.createdAt,
+                    deliveryDate: partyData.items[0].shades[0].deliverydate,
+                    party: {
+                        partyname: partyData.partyname,
+                        partycode: partyData.partycode,
+                        items: partyData.items.map(item => ({
+                            itemtitle: item.itemtitle,
+                            itemtitlecode: item.itemtitlecode,
+                            shades: item.shades,
+                        })),
+                    },
+                };
+
+                setPOTData(prevData =>
+                    prevData.map(card =>
+                        card.id === updatedCard.id ? updatedCard : card
+                    )
+                );
+
+                Alert.alert('Success', 'Shade status updated successfully.');
+            } else {
+                Alert.alert('Error', response.data?.message || 'Failed to update shade status.');
+            }
+        } catch (err) {
+            if (!axios.isCancel(err)) {
+                console.error('Update error:', err);
+                Alert.alert('Error', 'Failed to update shade status.');
+            }
+        }
+    };
 
 
     const handleDelete = async (item: any) => {
@@ -915,7 +965,7 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                         </TouchableOpacity>
 
                         {/* Main Content: Replace Text with ProdOrderTrackingTable */}
-                        <CollectionCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} onDelete={(item) => handleDelete(item)} onAuthorize={handleAuthorizeFromList} setIsLoggedIn={setIsLoggedIn}
+                        <CollectionCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} onDelete={(item) => handleDelete(item)} onAuthorize={handleAuthorizeFromList} setIsLoggedIn={setIsLoggedIn} onUpdateShade={handleUpdateShadeFromList}
                             isConnected={isConnected} />
                     </View></>)}
                 </View>
@@ -936,11 +986,7 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                     designData={designData}
                     isLoading={isLoading}
                     setIsLoading={setIsLoading}
-                    // onDesignSelect={handleDesignSelect}
-                    // onItemSelectItem={handleItemSelect}
                     selectedDesigns={selectedDesigns}
-                    // setSelectedDesigns={setSelectedDesigns}
-                    // setSelectedItems={setSelectedItems}
                     selectedItems={selectedItems}
                     itemData={itemData}
                     getPropertyData={getPropertyData}
@@ -949,73 +995,8 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                     setForm={setForm}
                     setIsLoggedIn={setIsLoggedIn}
                     isConnected={isConnected}
-                // selectedItemStatus={selectedItemStatus}
-                // onItemStatusChange={handleItemStatusChange}
+
                 />
-                {/* <ChequeForm
-                token={token}
-                isConnected={isConnected}
-                username={username}
-                getPropertyData={getPropertyData}
-                getPartyData={getPartyData}
-                setSelectedProperty={setSelectedProperty}
-                selectedProperty={selectedProperty}
-                setSelectedParty={setSelectedParty}
-                selectedParty={selectedParty}
-                selected={selected}
-                setSelected={setSelected}
-                getBankData={getBankData}
-                getBranchData={getBranchData}
-                // setBankData={setBankData}
-                setSelectedBank={setSelectedBank}
-                selectedBank={selectedBank}
-                selectedBranch={selectedBranch}
-                setSelectedbank={setSelectedbank}
-                setSelectedbranch={setSelectedbranch}
-                selectedbank={selectedbank}
-                selectedbranch={selectedbranch}
-                getPartyLoading={getPartyLoading}
-                getBankLoading={getBankLoading}
-                getBranchLoading={getBranchLoading}
-                form={form}
-                setForm={setForm}
-                ShowChequeData={ShowChequeData}
-                initialLoading={initialLoading}
-                // setInitialLoading,
-                initialModalVisible={initialModalVisible}
-                setInitialModalVisible={setInitialModalVisible}
-                onSavePart1={async (payload) => {
-                    // Example: call your API to save part1
-                    try {
-                        // replace with your actual endpoint & headers
-                        const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-                        console.log('[ChequeForm] part1 payload', payload, 'addResponse', getResponse);
-                        const params = { ...getResponse, ...payload, ChqDate: isoToDDMMYYYY(payload.ChqDate ?? payload.ChqDate ?? ""), EDate: isoToDDMMYYYY(payload.EDate ?? payload.EDate ?? ""), txntype: "mob_collection", action: "add", d1delete: [] };
-                        // Example axios call (uncomment if you want it now)
-                        console.log('[ChequeForm] part1 payload', params);
-                        const res = await axios.post('https://apig.tms-webapp.com/api/collection_crud', params, { headers });
-                        console.log('[ChequeForm] part1 res', res);
-                        if (!res.data.success) {
-                            return Promise.reject(res.data.message);
-                        }
-
-                        // return res.data;
-
-                        return Promise.resolve({ success: true });
-                    } catch (err) {
-                        return Promise.reject(err);
-                    }
-                }}
-                onSavePart2={async (payload) => {
-                    try {
-                        // const res = await axios.post('https://apig.tms-webapp.com/api/save_cheque_part2', payload, { headers: {...} });
-                        console.log('[ChequeForm] part2 payload', payload);
-                        return Promise.resolve({ success: true });
-                    } catch (err) {
-                        return Promise.reject(err);
-                    }
-                }}
-            /> */}
             </GestureHandlerRootView>
         </>
     );

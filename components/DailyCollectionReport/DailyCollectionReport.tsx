@@ -371,7 +371,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
-
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
             console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
             if (response.data.success) {
@@ -395,7 +394,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
 
     // cards detail api start here 
-
     const handlecardpress = (item) => {
         const yearValue = selectedYear.split('-')[1].substring(2);
         console.log({
@@ -408,7 +406,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             fromdate: form.fromdate,
             todate: form.fromdate
         });
-
         const formatDate = (dateStr) => {
             if (!dateStr) return "";
             const [year, month, day] = dateStr.split('-');
@@ -429,47 +426,33 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const fetchcarddata = async (payload) => {
-
         setDetailLoading(true);
-
         try {
-
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
                 "X-Requested-with": "XMLHttpRequest",
             };
-
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
-
             console.log("CARD DETAIL RESPONSE:", response?.data);
-
             if (response?.data?.success) {
-
                 const apiData = response?.data?.data?.data || [];
-
                 if (Array.isArray(apiData)) {
                     setCardDetailData(apiData);
                     setDetailModalVisible(true);   // modal yaha open karo
                 }
-
             } else {
                 setCardDetailData([]);
             }
-
         } catch (error) {
-
             console.log("Card detail error:", error);
             setCardDetailData([]);
 
         } finally {
-
             setDetailLoading(false);
 
         }
-
     };
-
     // cards detail api end here 
 
     useEffect(() => {
@@ -513,7 +496,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             THRESHOLD: 0.7
         };
         const groupCol = "grpname";
-
         const columns = useMemo(() => {
             if (!data || data.length === 0) return [];
             return Object.keys(data[0]);
@@ -683,17 +665,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             if (value === undefined || value === null) return '-';
             const colIndex = columns.indexOf(colName);
             const isNumeric = filterDataTypes[colIndex] === 'N';
-
             const moneyColumns = ["clramt", "tranamt"];
             const codeColumns = ["uid", "acccode", "SExe", "srno"];
-            const dateColumns = ["chqdate"];   // 👈 DATE COLUMN
-
+            const dateColumns = ["chqdate"];   
             const lowerCol = colName.toLowerCase();
-
             if (dateColumns.includes(lowerCol)) {
                 return formatDate(value);
             }
-
             if (
                 isNumeric &&
                 moneyColumns.includes(lowerCol) &&
@@ -704,20 +682,16 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     maximumFractionDigits: 2
                 })}`;
             }
-
             if (codeColumns.includes(lowerCol)) {
                 return String(value);
             }
-
             if (isNumeric && !isNaN(parseFloat(value))) {
                 return parseFloat(value).toLocaleString('en-IN', {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 2
                 });
             }
-
             return String(value);
-
         }, [columns, filterDataTypes]);
 
         // const handleCardLongPress = useCallback((item, colors) => {

@@ -185,12 +185,12 @@ const APP_SECTIONS = [
             { id: '21', name: 'Purchase Order Tracking', screen: 'Purchase Order Tracking', icon: 'shopping-cart', iconColor: '#228B22' },
         ],
     },
-    // {
-    //     title: 'D',
-    //     data: [
-    //         { id: '22', name: 'Design Authorization', screen: 'Design Authorization', icon: 'edit', iconColor: '#4B0082' },
-    //     ],
-    // },
+    {
+        title: 'D',
+        data: [
+            { id: '22', name: 'Design Authorization', screen: 'Design Authorization', icon: 'edit', iconColor: '#4B0082' },
+        ],
+    },
     // 
     {
         title: 'S',

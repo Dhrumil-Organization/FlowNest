@@ -12,6 +12,8 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
+import axios from 'axios';
+import { API } from '../../common/API/dynamicAPI';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import theme from '../../android/app/src/theme';
 import Footer from '../Footer/Footer';
@@ -123,7 +125,8 @@ const CollectionCard: React.FC<{
     isConnected?: boolean | null;
     setIsLoggedIn?: (v: boolean) => void;
     onUpdateShade?: any;
-}> = ({ gePOTData = [], searchQueryPOT = '', isConnected, setIsLoggedIn, onUpdateShade }) => {
+    token: string;
+}> = ({ gePOTData = [], searchQueryPOT = '', isConnected, setIsLoggedIn, onUpdateShade, token }) => {
     const [data, setData] = useState<Inquiry[]>(gePOTData);
     const [activeTab, setActiveTab] = useState<StatusType>('All');
     const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
@@ -488,7 +491,7 @@ const CollectionCard: React.FC<{
                     keyExtractor={(sh, i) => `${sh.shadecode}-${i}`}
                     renderItem={({ item: sh }) => (
                         <View style={styles.shadeRow}>
-                            <View style={{ flex: 1 }}>
+                            {/* <View style={{ flex: 1 }}>
                                 <Text
                                     style={[styles.shadeName, { flexWrap: 'wrap' }]}
                                     numberOfLines={2}
@@ -501,23 +504,77 @@ const CollectionCard: React.FC<{
                                     <Text style={styles.metaText}>Rate: ₹{sh.rate}</Text>
                                     <Text style={styles.amountText}>Amt: ₹{(parseFloat(sh.quantity) * parseFloat(sh.rate)).toFixed(2)}</Text>
                                 </View>
-                            </View>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sh.status) }]}>
-                                <Text style={styles.statusBadgeText}>
-                                    {STATUS_TABS.find(tab => tab.key === sh.status)?.label || sh.status}
+                            </View> */}
+                            <View style={{ flex: 1, marginBottom: 3 }}>
+                                <Text
+                                    style={[styles.shadeName, { flexWrap: 'wrap' }]}
+                                    numberOfLines={2}
+                                    ellipsizeMode="tail"
+                                >
+                                    {sh.shadename}
                                 </Text>
+                                <View style={styles.shadeRowData}>
+                                    <Text style={styles.metaText}>Qty: {sh.quantity}</Text>
+                                    <Text style={styles.metaText}>Rate: ₹{sh.rate}</Text>
+                                    <Text style={styles.amountText}>Amt: ₹{(parseFloat(sh.quantity) * parseFloat(sh.rate)).toFixed(2)}</Text>
+                                </View>
                             </View>
-                            <TouchableOpacity
-                                style={styles.updateButton}
-                                onPress={() => handleUpdateShade(sh, { itemtitle, party, inquiry })}
-                            >
-                                <Icon name="edit" size={18} color="white" />
-                            </TouchableOpacity>
+                            <View style={styles.shadeRowData}>
+
+                                <TouchableOpacity
+                                    style={[styles.statusBadge1, { backgroundColor: theme.BRAND_ACCENT }]}
+                                    onPress={() => handleUpdateShade(sh, { itemtitle, party, inquiry })}
+                                >
+                                    <Icon style={{ marginRight: 2 }} name="edit" size={12} color="white" />
+                                    <Text style={styles.updateButtonText}>Update Status</Text>
+                                </TouchableOpacity>
+                                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sh.status) }]}>
+                                    <Text style={styles.statusBadgeText}>
+                                        {STATUS_TABS.find(tab => tab.key === sh.status)?.label || sh.status}
+                                    </Text>
+                                </View>
+                            </View>
+
                         </View>
                     )}
                 />
             </View>
         );
+    };
+    const deleteInquiry = async (inquiry: Inquiry) => {
+        try {
+            const payload = {
+                prpcode: inquiry.prpcode,
+                createdAt: inquiry.createdAt,
+                id: inquiry.id,
+                action: "delete",
+                txntype: "mob_inquires",
+                module: "Inquires"
+            };
+
+            const response = await axios.post(
+                `${API}/api/inquiry_crud`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+            console.log("Delete response:", response, payload)
+
+            if (response.data.success === true) {
+                // Remove the deleted card from the list
+                setData(prevData => prevData.filter(it => it.id !== inquiry.id));
+                // Alert.alert('Success', 'Inquiry deleted successfully!');
+            } else {
+                Alert.alert('Error', 'Failed to delete inquiry.');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            Alert.alert('Error', 'Server error. Please try again.');
+        }
     };
 
 
@@ -531,6 +588,21 @@ const CollectionCard: React.FC<{
             'Cancelled': '#FF0000'
         }[statusLabel] || '#808080';
 
+        const handleDelete = () => {
+            Alert.alert(
+                'Delete Inquiry',
+                'Are you sure you want to delete this inquiry?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => deleteInquiry(item),
+                    },
+                ]
+            );
+        };
+
         return (
             <TouchableOpacity
                 style={styles.card}
@@ -542,12 +614,22 @@ const CollectionCard: React.FC<{
                 <View style={styles.cardHeader}>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.partyName}>{item.party.partyname}</Text>
-                        <Text style={styles.jobText}>{item.party.partycode} • {item.yearno} • {item.prpcode}</Text>
+                        <View style={{ display: "flex", flexDirection: "row" }}>
+                            <View>
+                                <Text style={styles.jobText}>{item.party.partycode} • {item.yearno} • {item.prpcode}</Text>
+                            </View>
+                            <TouchableOpacity onPress={handleDelete} style={styles.deleteIcon}>
+                                <Icon name="delete" size={20} color="#FF0000" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <View style={[styles.statusTooltip, { backgroundColor: statusColor }]}>
+                    {/* <View style={[styles.statusTooltip, { backgroundColor: statusColor }]}>
                         <Text style={styles.tooltipText}>{statusLabel}</Text>
-                    </View>
+                    </View> */}
                 </View>
+                {/* <TouchableOpacity onPress={handleDelete} style={styles.deleteIcon}>
+                    <Icon name="delete" size={20} color="#FF0000" />
+                </TouchableOpacity> */}
                 <View style={styles.detailRow}>
                     <Text style={styles.label}>Delivery Date</Text>
                     <Text style={styles.value}>{getRelativeTime(item.deliveryDate)}</Text>
@@ -566,7 +648,7 @@ const CollectionCard: React.FC<{
                                     <Text style={styles.itemTitle}>{it.itemtitle}</Text>
                                 </View>
                                 <View style={styles.itemHeaderRight}>
-                                    <Text style={styles.itemCount}>({it.shades.length})</Text>
+                                    {/* <Text style={styles.itemCount}>({it.shades.length})</Text> */}
                                     <Icon name={expandedItemId === it.itemtitlecode ? 'expand-less' : 'expand-more'} size={22} color={theme.TEXT_SECONDARY} />
                                 </View>
                             </TouchableOpacity>
@@ -720,13 +802,19 @@ const styles = StyleSheet.create({
     itemCount: { fontSize: 12, fontWeight: '700', color: theme.TEXT_SECONDARY, marginRight: 4 },
     shadeContainer: { padding: 12 },
     shadeRow: {
-        flexDirection: 'row',
+        flexDirection: 'column',
         alignItems: 'center',
         paddingVertical: 12,
         paddingHorizontal: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
         backgroundColor: '#fff',
+    },
+    shadeRowData: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        justifyContent: 'space-between',
     },
     shadeName: {
         fontSize: 13,
@@ -744,6 +832,16 @@ const styles = StyleSheet.create({
         minWidth: 80,
         alignItems: 'center',
     },
+    statusBadge1: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginRight: 8,
+        alignSelf: 'center',
+        minWidth: 80,
+        alignItems: 'center',
+        flexDirection: 'row',
+    },
     statusBadgeText: {
         color: 'white',
         fontSize: 12,
@@ -751,15 +849,18 @@ const styles = StyleSheet.create({
     },
     updateButton: {
         backgroundColor: theme.BRAND_ACCENT,
-        padding: 6,
+        // padding: 2,
         borderRadius: 20,
-        width: 32,
+        width: 72,
         height: 32,
-        justifyContent: 'center',
+        justifyContent: 'space-around',
         alignItems: 'center',
+        flexDirection: 'row',
+        fontSize: 10,
+        paddingHorizontal: 8,
     },
 
-    shadeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+    shadeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, },
     metaText: { fontSize: 11, color: '#666' },
     amountText: { fontSize: 11, fontWeight: '900', color: theme.BRAND_ACCENT },
     modalContainer: { flex: 1, backgroundColor: '#fff', padding: 16 },
@@ -1010,6 +1111,7 @@ const styles = StyleSheet.create({
     updateButtonText: {
         color: 'white',
         fontWeight: 'bold',
+        fontSize: 11,
     },
     // statusBadge: {
     //     backgroundColor: '#e0e0e0',
@@ -1099,6 +1201,10 @@ const styles = StyleSheet.create({
     statusOptionTextBase: {
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    deleteIcon: {
+        // padding: 8,
+        marginLeft: 8,
     },
 
 

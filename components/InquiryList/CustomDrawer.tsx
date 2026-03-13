@@ -246,7 +246,7 @@ const CustomDrawer: React.FC<CustomListDrawerProps> = ({
                             nestedScrollEnabled={true}
                         >
                             {/* Property */}
-                            <View style={{ marginBottom: 10 }} >
+                            {/* <View style={{ marginBottom: 10 }} >
                                 <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
 
                                 <SearchableDropdown
@@ -263,7 +263,7 @@ const CustomDrawer: React.FC<CustomListDrawerProps> = ({
                                     multiple={false}
                                     emptyMessage="No properties available"
                                 />
-                            </View>
+                            </View> */}
                             {/* From Date */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>From Date</Text>

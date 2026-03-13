@@ -576,6 +576,21 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
     };
 
 
+    useEffect(() => {
+        const yearValue = selectedYear.split('-')[1].substring(2);
+        const payload = {
+            fromDate: fromDate.toISOString().split('T')[0],
+            toDate: toDate.toISOString().split('T')[0],
+            yearno: yearValue,
+            prpcode: form.PrpCode,
+            action: 'browse',
+            txntype: "mob_collection",
+            prptype: selectedProperty?.PrpOf
+        }
+        fetchBrowseData(payload as any);
+    }, []);
+
+
     // const fetchBrowseData = async (payload) => {
     //     setIsLoading(true);
 
@@ -760,7 +775,7 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                     )
                 );
 
-                Alert.alert('Success', 'Shade status updated successfully.');
+                // Alert.alert('Success', 'Shade status updated successfully.');
             } else {
                 Alert.alert('Error', response.data?.message || 'Failed to update shade status.');
             }
@@ -965,8 +980,8 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                         </TouchableOpacity>
 
                         {/* Main Content: Replace Text with ProdOrderTrackingTable */}
-                        <CollectionCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} onDelete={(item) => handleDelete(item)} onAuthorize={handleAuthorizeFromList} setIsLoggedIn={setIsLoggedIn} onUpdateShade={handleUpdateShadeFromList}
-                            isConnected={isConnected} />
+                        <CollectionCard gePOTData={gePOTData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} onDelete={(item) => handleDelete(item)} onAuthorize={handleAuthorizeFromList} setIsLoggedIn={setIsLoggedIn} onUpdateShade={handleUpdateShadeFromList}
+                            isConnected={isConnected} token={token} />
                     </View></>)}
                 </View>
 

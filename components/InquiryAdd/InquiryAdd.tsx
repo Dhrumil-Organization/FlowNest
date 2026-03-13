@@ -1376,8 +1376,8 @@ const InquiryAdd: React.FC<Props> = ({
             txntype: "mob_inquires",
             action: "add",
             id: "0",
-            prpcode: form.PrpCode || "SIP",
-            prptype: "S",
+            prpcode: "MT",
+            prptype: "R",
             yearno: "26", // Fixed or dynamic as per your logic
             createdAt: formatDate(new Date().toISOString()).formatted,
             ncreatedAt: formatDate(new Date().toISOString()).numeric,

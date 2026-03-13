@@ -1087,7 +1087,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     const scrollToBottom = () => {
         setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+        }, 50);
     };
 
     const onSpeechResults = (e) => {
@@ -1372,6 +1372,9 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     const renderItem = ({ item, index }) => {
         const isUser = item.type === "user";
         const isEditing = editingIndex === index;
+        const messageTime = new Date(item.createdAt || Date.now()); // Use createdAt from DB
+        const timestamp = messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const date = messageTime.toLocaleDateString('en-GB'); // DD/MM/YYYY format
 
         return (
             <View style={[
@@ -1429,6 +1432,9 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                             <Markdown style={isUser ? userMarkdownStyles : aiMarkdownStyles}>
                                 {item.text}
                             </Markdown>
+                            <Text style={isUser ? styles.userTimestamp : styles.timestamp}>
+                                {date} • {timestamp} {/* Date + Time */}
+                            </Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -1832,6 +1838,18 @@ const styles = StyleSheet.create({
     },
     cancelText: {
         color: '#FF6B6B',
+    },
+    timestamp: {
+        fontSize: 10,
+        color: '#888',
+        marginTop: 4,
+        alignSelf: 'flex-end',
+    },
+    userTimestamp: {
+        fontSize: 10,
+        color: '#fff',
+        marginTop: 4,
+        alignSelf: 'flex-end',
     },
 });
 

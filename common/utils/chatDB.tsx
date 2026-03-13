@@ -166,7 +166,7 @@ export const saveChat = (userText, aiText) => {
         'INSERT INTO chat(userText, aiText, createdAt, isEdited) VALUES (?,?,?,?)',
         [userText, aiText, Date.now(), 0],
         (_, result) => {
-          console.log('✅ Chat saved successfully:', userText.substring(0, 20) + '...');
+          console.log('✅ Chat saved with timestamp:', new Date().toLocaleTimeString());
           resolve(true);
         },
         (_, err) => {
@@ -177,6 +177,7 @@ export const saveChat = (userText, aiText) => {
     });
   });
 };
+
 
 // Delete all messages after a specific message (for edit functionality)
 export const deleteAfterMessage = (userText) => {

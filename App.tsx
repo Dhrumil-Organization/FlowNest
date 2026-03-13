@@ -77,7 +77,7 @@ export default function App() {
   // App.tsx
   // In your App.tsx
   useEffect(() => {
-    initDatabase();
+    // initDatabase();
     initAPI();
   }, []);
 

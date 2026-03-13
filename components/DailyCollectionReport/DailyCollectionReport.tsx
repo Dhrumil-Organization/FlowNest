@@ -172,8 +172,9 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     const [partyWiseModalVisible, setPartyWiseModalVisible] = useState(false);
     const [partySearchQuery, setPartySearchQuery] = useState("");
     const [filterpartyData, setfilterpartydata] = useState([]);
-    
-    console.log("selected tab", modalTab);
+
+    // console.log("selected tab", modalTab);
+    // console.log("filterpartyData", filterpartyData)
     useEffect(() => {
         if (rightsMenuApps && rightsMenuApps.length > 0) {
             const hasReport = rightsMenuApps.some(
@@ -250,18 +251,21 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     // ------browser api ----------
+
     const handleLoadPress = () => {
+
         const yearValue = selectedYear.split('-')[1].substring(2);
-        console.log({
-            prptype: form?.PrpOf || "",
-            prpcodes: form.PrpCode,
-            action: 'collect_report',
-            txntype: "mob_daily_collection_report",
-            rpttype: 1,
-            sexe: form?.SexeCode || {},
-            fromdate: form.fromdate,
-            todate: form.fromdate
-        });
+        // console.log({
+        //     prptype: form?.PrpOf || "",
+        //     prpcodes: form.PrpCode,
+        //     action: 'collect_report',
+        //     txntype: "mob_daily_collection_report",
+        //     rpttype: 1,
+        //     sexe: form?.SexeCode || {},
+        //     fromdate: form.fromdate,
+        //     todate: form.fromdate
+        // });
+
         const formatDate = (dateStr) => {
             if (!dateStr) return "";
             const [year, month, day] = dateStr.split('-');
@@ -281,7 +285,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const fetchBrowseData = async (payload: any) => {
-        console.log("Browse API running");
+        // console.log("Browse API running");
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoading(true);
@@ -292,11 +296,11 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         };
         try {
             const params = { ...payload };
-            console.log("🔵 payload browse", params);
+            // console.log("🔵 payload browse", params);
             setPayload(params as any);
             const response = await axios.post(`${API}/api/collection_crud`, params, { headers });
             if (response?.data?.success && response?.data?.data?.data) {
-                console.log("Browse API running");
+                // console.log("Browse API running");
                 let apiData = response.data.data.data;
                 if (!Array.isArray(apiData)) {
                     apiData = Object.values(apiData);
@@ -310,18 +314,22 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 }));
                 setPOTData(tableData);
                 closeDrawer();
+
             } else {
                 setPOTData([]);
             }
+
         } catch (error) {
             if (!axios.isCancel(error)) {
                 setPOTData([]);
             }
+
         } finally {
             setIsLoading(false);
         }
     };
     // brwoser api finsih
+
 
     // party wise and sales excutive wise api start here 
     const handleLoadPressSEXE = (item) => {
@@ -341,6 +349,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             acccode: item?.acccode
                 ? item.acccode.split(',').map(val => val.trim())
                 : [],
+            // acccode: item.acccode || [],
             rpttype: 2,
             txntype: item?.acccode && item.acccode.length > 0
                 ? "collection_acc"
@@ -351,7 +360,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const fetchBrowseDataSEXE = async (payload: any) => {
-        console.log('🔵 Final Details payload', payload);
+        // console.log('🔵 Final Details payload', payload);
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         // setIsLoading(true);
@@ -371,8 +380,9 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
+
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
-            console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
+            // console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
             if (response.data.success) {
                 setSexeLoading(false);
                 const res_data = response.data.data.data.filter(
@@ -394,18 +404,20 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
 
     // cards detail api start here 
+
     const handlecardpress = (item) => {
         const yearValue = selectedYear.split('-')[1].substring(2);
-        console.log({
-            prptype: form?.PrpOf || "",
-            prpcodes: form.PrpCode,
-            action: 'collect_report',
-            txntype: "mob_daily_collection_report",
-            rpttype: 1,
-            sexe: form?.SexeCode || {},
-            fromdate: form.fromdate,
-            todate: form.fromdate
-        });
+        // console.log({
+        //     prptype: form?.PrpOf || "",
+        //     prpcodes: form.PrpCode,
+        //     action: 'collect_report',
+        //     txntype: "mob_daily_collection_report",
+        //     rpttype: 1,
+        //     sexe: form?.SexeCode || {},
+        //     fromdate: form.fromdate,
+        //     todate: form.fromdate
+        // });
+
         const formatDate = (dateStr) => {
             if (!dateStr) return "";
             const [year, month, day] = dateStr.split('-');
@@ -426,33 +438,47 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const fetchcarddata = async (payload) => {
+
         setDetailLoading(true);
+
         try {
+
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
                 "X-Requested-with": "XMLHttpRequest",
             };
+
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
-            console.log("CARD DETAIL RESPONSE:", response?.data);
+
+            // console.log("CARD DETAIL RESPONSE:", response?.data);
+
             if (response?.data?.success) {
+
                 const apiData = response?.data?.data?.data || [];
+
                 if (Array.isArray(apiData)) {
                     setCardDetailData(apiData);
                     setDetailModalVisible(true);   // modal yaha open karo
                 }
+
             } else {
                 setCardDetailData([]);
             }
+
         } catch (error) {
-            console.log("Card detail error:", error);
+
+            // console.log("Card detail error:", error);
             setCardDetailData([]);
 
         } finally {
+
             setDetailLoading(false);
 
         }
+
     };
+
     // cards detail api end here 
 
     useEffect(() => {
@@ -496,6 +522,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             THRESHOLD: 0.7
         };
         const groupCol = "grpname";
+
         const columns = useMemo(() => {
             if (!data || data.length === 0) return [];
             return Object.keys(data[0]);
@@ -665,13 +692,17 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             if (value === undefined || value === null) return '-';
             const colIndex = columns.indexOf(colName);
             const isNumeric = filterDataTypes[colIndex] === 'N';
+
             const moneyColumns = ["clramt", "tranamt"];
             const codeColumns = ["uid", "acccode", "SExe", "srno"];
-            const dateColumns = ["chqdate"];   
+            const dateColumns = ["chqdate"];   // 👈 DATE COLUMN
+
             const lowerCol = colName.toLowerCase();
+
             if (dateColumns.includes(lowerCol)) {
                 return formatDate(value);
             }
+
             if (
                 isNumeric &&
                 moneyColumns.includes(lowerCol) &&
@@ -682,16 +713,20 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     maximumFractionDigits: 2
                 })}`;
             }
+
             if (codeColumns.includes(lowerCol)) {
                 return String(value);
             }
+
             if (isNumeric && !isNaN(parseFloat(value))) {
                 return parseFloat(value).toLocaleString('en-IN', {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 2
                 });
             }
+
             return String(value);
+
         }, [columns, filterDataTypes]);
 
         // const handleCardLongPress = useCallback((item, colors) => {
@@ -962,7 +997,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         ]);
 
         const CardDetailModal = useCallback(() => {
-            console.log("MODAL SELECTED CARD:", selectedCard);
+            // console.log("MODAL SELECTED CARD:", selectedCard);
 
             const renderRows = () => {
 
@@ -1395,7 +1430,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         isLoadingSummary,
         onCardPress
     }) => {
-        console.log("hiiii")
+        // console.log("hiiii")
         const visibleColumns = [
             "PrpName",
             "ToDaysCollection",
@@ -1480,7 +1515,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             return String(value);
         };
 
-        const renderCard = (item, index) => {
+        const renderCard = (item, index, tabType) => {
             const colors = DASHBOARD_COLORS[index % DASHBOARD_COLORS.length];
             const isActive = activeSlab === item.PrpCode;
             const cardHeight = Math.max(140, visibleColumns.length * 45 + 50);
@@ -1735,6 +1770,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
 
     const filteredPartyData = useMemo(() => {
+        // console.log("filterpartyData ---", filterpartyData)
         if (!partySearchQuery.trim()) return filterpartyData;
         const query = partySearchQuery.toLowerCase();
         return filterpartyData.filter(item =>
@@ -1776,6 +1812,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
     // Render Party Wise And Excutive vise card display
     const renderCard = (item, index) => {
+        // console.log("filterpartyData ::::", filterpartyData)
         const colors = getSexeLoading ? ["#C0C0C0", "#C0C0C0"] : CARD_COLORS[index % CARD_COLORS.length];
         const isAllCard = item.SalesExecutive === "ALL";
 
@@ -1813,17 +1850,18 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 // }}
 
                 onPress={async () => {
-                    if (getSexeLoading) return;
-                    setLoadingStates({ [item.Code || "ALL"]: true });
-                    setSelectedSexeName(item.SalesExecutive);
-                    handleLoadPressSEXE(item);
                     if (modalTab === "SalesExecutiveWise") {
                         setLoadingStates({ [item.Code || "ALL"]: true });
                         setSelectedSexeName(item.SalesExecutive);
                         await handlesalesexcutivefetch(item.PrpCode, item);
+                    } else {
+                        if (getSexeLoading) return;
+                        setLoadingStates({ [item.Code || "ALL"]: true });
+                        setSelectedSexeName(item.SalesExecutive);
+                        handleLoadPressSEXE(item);
                     }
                 }}
-                disabled={getSexeLoading} 
+                disabled={getSexeLoading}
             >
                 <LinearGradient
                     colors={colors}
@@ -1933,19 +1971,134 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         return rows;
     };
 
-    const renderItemsInGridPartyWise = (data, tabType) => {
 
+
+    const renderPartyCard = (item, index) => {
+        const colors = getSexeLoading ? ["#C0C0C0", "#C0C0C0"] : CARD_COLORS[index % CARD_COLORS.length];
+        const isAllCard = item.SalesExecutive === "ALL";
+        const totalToDaysCollection = filteredPartyData.reduce(
+            (sum, dataItem) => sum + parseFloat(dataItem.ToDaysCollection || '0'),
+            0
+        );
+        const totalCrInBankAccCollection = filteredPartyData.reduce(
+            (sum, dataItem) => sum + parseFloat(dataItem.CrInBankAccCollection || '0'),
+            0
+        );
+
+        return (
+            <TouchableOpacity
+                key={item.Code || index}
+                style={{
+                    width: gridConfig123.cardWidth,
+                    minHeight: isAllCard ? 160 : 120, // Taller card for "ALL"
+                    borderRadius: 8,
+                    marginBottom: gridConfig123.gutter,
+                    overflow: "hidden",
+                    elevation: 3,
+                    backgroundColor: "#121212",
+                    borderWidth: isAllCard ? 1 : 0,
+                    borderColor: isAllCard ? theme.BRAND_GRADIENT_END : "transparent",
+                }}
+                activeOpacity={0.9}
+                onPress={async () => {
+                    if (getSexeLoading) return;
+                    setLoadingStates({ [item.Code || "ALL"]: true });
+                    setSelectedSexeName(item.SalesExecutive);
+                    handleLoadPressSEXE(item);
+                }}
+                disabled={getSexeLoading}
+            >
+                <LinearGradient
+                    colors={colors}
+                    style={{ flex: 1, padding: 12 }}
+                >
+                    <View style={{ alignItems: 'flex-end', flex: 1 }}>
+                        {/* Sales Executive Name */}
+                        <Text
+                            style={{
+                                color: "#fff",
+                                fontSize: isAllCard ? 16 : 14,
+                                fontWeight: isAllCard ? "bold" : "bold",
+                                textAlign: 'right',
+                                marginBottom: 4,
+                            }}
+                        >
+                            {item.SalesExecutive}
+                        </Text>
+
+                        {/* Code (skip for "ALL") */}
+                        {!isAllCard && (
+                            <Text style={{
+                                color: "rgba(255, 255, 255, 0.7)",
+                                fontSize: 11,
+                                textAlign: 'right',
+                                marginBottom: 8,
+                            }}>
+                                Code: {item.SExe}
+                            </Text>
+                        )}
+
+                        {/* Today's Collection */}
+                        <View style={{ marginBottom: 6 }}>
+                            <Text style={{
+                                color: "rgba(255, 255, 255, 0.7)",
+                                fontSize: 11,
+                                textAlign: 'right',
+                            }}>
+                                Collection:
+                            </Text>
+                            <Text style={{
+                                color: "#fff",
+                                fontSize: isAllCard ? 14 : 12,
+                                fontWeight: "bold",
+                                textAlign: 'right',
+                            }}>
+                                ₹{isAllCard
+                                    ? totalToDaysCollection.toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    })
+                                    : item.ToDaysCollection}
+                            </Text>
+                        </View>
+
+                        {/* Credit in Bank */}
+                        <View>
+                            <Text style={{
+                                color: "rgba(255, 255, 255, 0.7)",
+                                fontSize: 11,
+                                textAlign: 'right',
+                            }}>
+                                Credit in Bank:
+                            </Text>
+                            <Text style={{
+                                color: "#fff",
+                                fontSize: isAllCard ? 14 : 12,
+                                fontWeight: "bold",
+                                textAlign: 'right',
+                            }}>
+                                ₹{isAllCard
+                                    ? totalCrInBankAccCollection.toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    })
+                                    : item.CrInBankAccCollection}
+                            </Text>
+                        </View>
+                    </View>
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderPartyItemsInGrid = (data) => {
         if (!data || data.length === 0) return null;
-
         const rows = [];
-
         for (let i = 0; i < data.length; i += gridConfig123.numColumns) {
-
             const rowItems = data.slice(i, i + gridConfig123.numColumns);
-
             rows.push(
                 <View
-                    key={`party-row-${i}`}
+                    key={`row-${i}`}
                     style={{
                         flexDirection: 'row',
                         justifyContent: 'flex-start',
@@ -1954,7 +2107,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     }}
                 >
                     {rowItems.map((item, index) =>
-                        renderCard(item, i + index, "PartyWise")
+                        renderPartyCard(item, i + index)   // 👈 tabType pass
                     )}
                 </View>
             );
@@ -1962,6 +2115,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
         return rows;
     };
+
     // Render Party Wise And Excutive vise card display over
 
     //  Party Wise and excutive wise api start
@@ -1984,9 +2138,9 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             todate: formatDate(form.todate)
         }
         await SalesExeMain(card.PrpCode, payload);
-        console.log("Clicked Card:", card);
-        console.log("Card SExe:", card?.SExe);
-        console.log("Final Sexe Payload:", payload.sexe);
+        // console.log("Clicked Card:", card);
+        // console.log("Card SExe:", card?.SExe);
+        // console.log("Final Sexe Payload:", payload.sexe);
 
     }, [form, modalTab]);
 
@@ -2011,7 +2165,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 fromdate: detailPayload.fromdate,
                 todate: detailPayload.todate
             };
-            console.log("Payload", payloadSexe)
+            // console.log("Payload", payloadSexe)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
@@ -2022,7 +2176,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 payloadSexe,
                 { headers }
             );
-            console.log("responsesexe", responsesexe);
+            // console.log("responsesexe", responsesexe);
             if (responsesexe?.data?.success) {
                 setSexeLoading(false);
                 setIsLoadingSummary(false);
@@ -2030,8 +2184,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 const partyData = responsesexe?.data?.data?.party || [];
                 const sexeData = responsesexe?.data?.data?.sexe || [];
 
-                console.log("partyData", partyData);
-                console.log("sexeData", sexeData);
+                // console.log("partyData", partyData);
+                // console.log("sexeData", sexeData);
 
                 // 🔹 length check
                 const mappedExe = Array.isArray(sexeData) && sexeData.length > 0
@@ -2089,6 +2243,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             setSexeLoading(false);
         }
     };
+
     //  Party Wise and excutive wise api over
 
     // sales excutive wise party
@@ -2112,7 +2267,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             todate: formatDate(form.todate)
         }
         await SalesExeMaindetail(card.PrpCode, payload);
-        console.log("payload", payload)
+        // console.log("payload", payload)
 
     }, [form]);
 
@@ -2131,11 +2286,11 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 action: "daily_collection_report",
                 txntype: "mob_daily_collection_report",
                 rpttype: 1,
-                sexe: payload.sexe || [],
+                sexe: payload?.sexe || [],
                 fromdate: detailPayload.fromdate,
                 todate: detailPayload.todate
             };
-            console.log("payloadSexe", payloadSexe)
+            // console.log("payloadSexe", payloadSexe)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
@@ -2146,7 +2301,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 payloadSexe,
                 { headers }
             );
-            console.log("responsesexe", responsesexe);
+            // console.log("responsesexe", responsesexe);
             if (responsesexe?.data?.success) {
                 setSexeLoading(false);
                 setIsLoadingSummary(false);
@@ -2154,8 +2309,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 const partyData = responsesexe?.data?.data?.party || [];
                 const sexeData = responsesexe?.data?.data?.sexe || [];
 
-                console.log("partyData", partyData);
-                console.log("sexeData", sexeData);
+                // console.log("partyData", partyData);
+                // console.log("sexeData", sexeData);
 
                 // 🔹 length check
                 const mappedExe = Array.isArray(sexeData) && sexeData.length > 0
@@ -2192,6 +2347,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 };
                 setfilterpartydata([customItem, ...mappedParty]);
                 setModalTab("SalesExecutiveWise");
+                setPartyWiseModalVisible(true);
                 // setSexeModalVisible(true);
             }
 
@@ -2280,6 +2436,16 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         handleConfirmActionNew(card?.PrpCode, card);
         setSexeModalVisible(true); // ✅ modal yaha open hoga
     };
+
+    const renderModalContent = () => {
+        if (!filteredData12.length) return null;
+        return renderItemsInGrid(filteredData12, modalTab);
+    };
+
+    const renderPartyModalContent = () => {
+        if (!filteredPartyData.length) return null;
+        return renderItemsInGrid(filteredData12, "PartyWise");
+    }
 
     return (
         <>
@@ -2434,14 +2600,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                             >
 
                                                 {filteredData12.length > 0 ? (
-
-                                                    <>
-                                                        {modalTab === "PartyWise" && renderItemsInGrid(filteredData12, "PartyWise")}
-                                                        {modalTab === "SalesExecutiveWise" && renderItemsInGrid(filteredData12, "SalesExecutiveWise")}
-                                                    </>
-
+                                                    renderModalContent()
                                                 ) : (
-
                                                     <View style={{
                                                         flex: 1,
                                                         justifyContent: "center",
@@ -2562,54 +2722,83 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                     animationType="slide"
                                     onRequestClose={() => setPartyWiseModalVisible(false)}
                                 >
+                                    {/* <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)" }}> */}
                                     <View style={{ flex: 1 }}>
                                         <View style={{
                                             flex: 1,
-                                            backgroundColor: "#fff",
-                                            margin: 10
+                                            // backgroundColor: "#121212", // Dark modal background
+                                            backgroundColor: "rgb(255, 255, 255)", // Dark modal background
+                                            margin: 10,
+                                            // borderRadius: 10,
+                                            // borderWidth: 1,
+                                            // borderColor: "#333",
                                         }}>
-                                            {/* HEADER */}
+                                            {/* Header */}
                                             <View style={{
                                                 flexDirection: "row",
                                                 justifyContent: "space-between",
                                                 alignItems: "center",
                                                 padding: 12,
-                                                backgroundColor: theme.BRAND_GRADIENT_END
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: "#333",
+                                                backgroundColor: theme.BRAND_GRADIENT_END,
+                                                borderTopLeftRadius: 10,
+                                                borderTopRightRadius: 10,
                                             }}>
                                                 <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                                    Party Wise
+                                                    {selectedSexeCard?.SalesExecutive || 'Party Wise Detail'}
                                                 </Text>
-                                                <TouchableOpacity
-                                                    onPress={() => setPartyWiseModalVisible(false)}
-                                                // onPress={() => {
-                                                //     setPartyWiseModalVisible(false);
-                                                //     setPartySearchQuery("");
-                                                // }}
-                                                >
+                                                <TouchableOpacity onPress={() => setPartyWiseModalVisible(false)}>
                                                     <Icon name="close" size={24} color="#fff" />
                                                 </TouchableOpacity>
                                             </View>
-                                            {/* SEARCH */}
-                                            <TextInput
-                                                placeholder="Search Party..."
-                                                value={partySearchQuery}
-                                                onChangeText={setPartySearchQuery}
-                                                style={{
-                                                    padding: 10,
+
+                                            {/* Search */}
+                                            {getSexeLoading ? (
+                                                <View style={{
+                                                    padding: 12,
                                                     borderWidth: 1,
-                                                    borderColor: "#ddd",
+                                                    borderColor: "rgba(0, 0, 0, 0.1)",
                                                     borderRadius: 5,
                                                     margin: 10,
-                                                    fontSize: 11
-                                                }}
-                                            />
-                                            {/* PARTY CARDS */}
+                                                    // fontSize: 11,
+                                                    // color: "#000",
+                                                    backgroundColor: "#fff",
+                                                    display: "flex",
+                                                }}>
+                                                    <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
+                                                    {/* <Text>Loading...</Text> */}
+                                                </View>
+                                            ) : (
+                                                <TextInput
+                                                    placeholder="Search..."
+                                                    value={sexeSearchQuery}
+                                                    onChangeText={setSexeSearchQuery}
+                                                    style={{
+                                                        padding: 10,
+                                                        borderWidth: 1,
+                                                        borderColor: "rgba(0, 0, 0, 0.1)",
+                                                        borderRadius: 5,
+                                                        margin: 10,
+                                                        fontSize: 11,
+                                                        color: "#000",
+                                                        backgroundColor: "#fff",
+                                                    }}
+                                                    placeholderTextColor="#999"
+                                                />
+                                            )}
+
+
+
+                                            {/* Content */}
                                             <ScrollView
-                                                contentContainerStyle={{ paddingBottom: 120 }}
+                                                contentContainerStyle={{ paddingBottom: 20 }}
                                                 showsVerticalScrollIndicator={false}
+                                                keyboardShouldPersistTaps="handled" // Fix search rerender focus issue
                                             >
                                                 {filteredPartyData.length > 0 ? (
-                                                    renderItemsInGridPartyWise(filteredPartyData, "PartyWise")
+                                                    // renderPartyItemsInGrid()
+                                                    renderPartyItemsInGrid(filteredPartyData)
                                                 ) : (
                                                     <View style={{
                                                         flex: 1,
@@ -2622,13 +2811,90 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                         <Text style={{
                                                             color: "#666",
                                                             fontSize: 16,
-                                                            marginTop: 12
+                                                            marginTop: 12,
+                                                            textAlign: 'center'
                                                         }}>
                                                             No records found
                                                         </Text>
                                                     </View>
                                                 )}
                                             </ScrollView>
+                                            <View style={{
+                                                position: "absolute",
+                                                bottom: 0,
+                                                left: 0,
+                                                right: 0,
+                                                padding: screenWidth <= 400 ? 10 : 12,
+                                                borderTopLeftRadius: 12,
+                                                borderTopRightRadius: 12,
+                                                elevation: 8,
+                                                shadowColor: "#000",
+                                                shadowOpacity: 0.2,
+                                                shadowRadius: 6,
+                                                shadowOffset: { width: 0, height: -2 },
+                                                backgroundColor: theme.BRAND_GRADIENT_END,
+                                                zIndex: 1000,
+                                            }}>
+                                                <Text style={{
+                                                    color: "#fff",
+                                                    fontSize: screenWidth <= 400 ? 11 : 12,
+                                                    fontWeight: "600",
+                                                    marginBottom: 8,
+                                                }}>
+                                                    Totals
+                                                </Text>
+
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
+                                                    {/* ToDaysCollection Total */}
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <Text style={{
+                                                            color: "rgba(255,255,255,0.9)",
+                                                            fontSize: screenWidth <= 400 ? 10 : 11,
+                                                            fontWeight: "500",
+                                                            marginRight: 8,
+                                                        }}>
+                                                            Today's Collection:
+                                                        </Text>
+                                                        <Text style={{
+                                                            color: "#fff",
+                                                            fontSize: screenWidth <= 400 ? 10 : 11,
+                                                            fontWeight: "600",
+                                                        }}>
+                                                            ₹{parseFloat(
+                                                                filteredData12.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
+                                                            ).toLocaleString('en-IN', {
+                                                                minimumFractionDigits: 2,
+                                                                maximumFractionDigits: 2
+                                                            })}
+                                                        </Text>
+                                                    </View>
+
+                                                    {/* CrInBankAccCollection Total */}
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                        <Text style={{
+                                                            color: "rgba(255,255,255,0.9)",
+                                                            fontSize: screenWidth <= 400 ? 10 : 11,
+                                                            fontWeight: "500",
+                                                            marginRight: 8,
+                                                        }}>
+                                                            Credit in Bank:
+                                                        </Text>
+                                                        <Text style={{
+                                                            color: "#fff",
+                                                            fontSize: screenWidth <= 400 ? 10 : 11,
+                                                            fontWeight: "600",
+                                                        }}>
+                                                            ₹{parseFloat(
+                                                                filteredData12.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
+                                                            ).toLocaleString('en-IN', {
+                                                                minimumFractionDigits: 2,
+                                                                maximumFractionDigits: 2
+                                                            })}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+
                                         </View>
                                     </View>
                                 </Modal>

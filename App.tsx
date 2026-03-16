@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { navigationRef } from './android/app/src/navigation/NavigationService';
+import { navigationRef } from './src/navigation/NavigationService';
 import messaging from '@react-native-firebase/messaging';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import LoginScreen from './components/LoginPage/LoginPage';
@@ -32,7 +32,7 @@ import TakaCheckingEntry from './components/TakaCheckingEntry/TakaCheckingEntry'
 import TakaCheckingViewData from './components/TakaCheckingViewData/TakaCheckingViewData';
 import InquiryAdd from './components/InquiryAdd/InquiryAdd';
 import Footer from './components/Footer/Footer';
-import NetworkSpeed from './components/NetworkSpeed/NetworkSpeed';
+//import NetworkSpeed from './components/NetworkSpeed/NetworkSpeed';
 import { Alert, BackHandler, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import SplashScreen from 'react-native-splash-screen';
 import DeviceInfo from 'react-native-device-info';
@@ -120,21 +120,21 @@ export default function App() {
   //   return unsubscribe;
   // }, []);
 
-  const initializeDatabases = async () => {
-    try {
-      await initDB(); // Initialize chat.db
-      await initGlobalCacheDB(); // Initialize GlobalCache.db
-      console.log('✅ All databases initialized successfully');
-    } catch (error) {
-      console.error('❌ Error initializing databases:', error);
-      // Retry or show user-friendly error
-    }
-  };
-
-  // Call this function when your app starts
-  useEffect(() => {
-    initializeDatabases();
-  }, []);
+//  const initializeDatabases = async () => {
+//    try {
+//      await initDB(); // Initialize chat.db
+//      await initGlobalCacheDB(); // Initialize GlobalCache.db
+//      console.log('✅ All databases initialized successfully');
+//    } catch (error) {
+//      console.error('❌ Error initializing databases:', error);
+//      // Retry or show user-friendly error
+//    }
+//  };
+//
+//  // Call this function when your app starts
+//  useEffect(() => {
+//    initializeDatabases();
+//  }, []);
 
 
 
@@ -607,3 +607,93 @@ function preview(account: any, arg1: number): any {
   throw new Error('Function not implemented.');
 }
 
+
+//
+//import React from 'react';
+//import {
+//  View,
+//  Text,
+//  StyleSheet,
+//  SafeAreaView,
+//  StatusBar,
+//  TouchableOpacity
+//} from 'react-native';
+//
+//export default function App() {
+//
+//  const handlePress = () => {
+//    console.log("Button Working 🚀");
+//  };
+//    
+//    console.log("APP STARTED 🚀");
+//
+//  return (
+//    <SafeAreaView style={styles.container}>
+//      <StatusBar barStyle="dark-content" />
+//
+//      <View style={styles.box}>
+//        <Text style={styles.title}>FlowNest</Text>
+//        <Text style={styles.subtitle}>iOS Test Screen</Text>
+//
+//        <TouchableOpacity style={styles.button} onPress={handlePress}>
+//          <Text style={styles.buttonText}>Test Button</Text>
+//        </TouchableOpacity>
+//
+//      </View>
+//    </SafeAreaView>
+//  );
+//}
+//
+//const styles = StyleSheet.create({
+//
+//  container:{
+//    flex:1,
+//    backgroundColor:"#f2f2f2",
+//    justifyContent:"center",
+//    alignItems:"center"
+//  },
+//
+//  box:{
+//    width:"85%",
+//    backgroundColor:"#fff",
+//    padding:30,
+//    borderRadius:16,
+//    alignItems:"center",
+//
+//    shadowColor:"#000",
+//    shadowOpacity:0.2,
+//    shadowOffset:{width:0,height:4},
+//    shadowRadius:10,
+//    elevation:6
+//  },
+//
+//  title:{
+//    fontSize:32,
+//    fontWeight:"bold",
+//    color:"#5B2EA6"
+//  },
+//
+//  subtitle:{
+//    fontSize:16,
+//    marginTop:10,
+//    color:"#555"
+//  },
+//
+//  button:{
+//    marginTop:30,
+//    backgroundColor:"#5B2EA6",
+//    paddingVertical:12,
+//    paddingHorizontal:40,
+//    borderRadius:10
+//  },
+//
+//  buttonText:{
+//    color:"#fff",
+//    fontSize:16,
+//    fontWeight:"600"
+//  }
+//
+//});
+
+
+//s

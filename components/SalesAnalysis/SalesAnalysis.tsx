@@ -7,15 +7,15 @@ import {
     TextInput,
     FlatList,
     PermissionsAndroid,
-    Platform,
+    Platform, 
     Animated,
     Alert
 } from "react-native";
 
 import Markdown from "react-native-markdown-display";
 import Clipboard from "@react-native-clipboard/clipboard";
-
-import Voice from "@react-native-voice/voice";
+               
+//import Voice from "@react-native-voice/voice";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import axios from "axios";
 
@@ -63,16 +63,16 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     }, []);
 
 
-    useEffect(() => {
-        Voice.onSpeechError = (e) => {
-            console.log("Speech error:", e);
-            setIsListening(false);
-            Alert.alert("Error", "Voice recognition failed. Please try again.");
-        };
-        return () => {
-            Voice.destroy().then(Voice.removeAllListeners);
-        };
-    }, []);
+//    useEffect(() => {
+//        Voice.onSpeechError = (e) => {
+//            console.log("Speech error:", e);
+//            setIsListening(false);
+//            Alert.alert("Error", "Voice recognition failed. Please try again.");
+//        };
+//        return () => {
+//            Voice.destroy().then(Voice.removeAllListeners);
+//        };
+//    }, []);
 
 
     useEffect(() => {
@@ -108,9 +108,9 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     }, []);
 
 
-    useEffect(() => {
-        Voice.isAvailable().then(setIsVoiceSupported).catch(() => setIsVoiceSupported(false));
-    }, []);
+//    useEffect(() => {
+//        Voice.isAvailable().then(setIsVoiceSupported).catch(() => setIsVoiceSupported(false));
+//    }, []);
 
 
     const updateCache = async (getUserPrptype) => {
@@ -148,13 +148,13 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
     };
 
-    if (!isVoiceSupported) {
-        return (
-            <TouchableOpacity disabled>
-                <Icon name="mic-off" size={26} color="#ccc" />
-            </TouchableOpacity>
-        );
-    }
+//    if (!isVoiceSupported) {
+//        return (
+//            <TouchableOpacity disabled>
+//                <Icon name="mic-off" size={26} color="#ccc" />
+//            </TouchableOpacity>
+//        );
+//    }
 
     const loadChats = async () => {
 
@@ -216,25 +216,25 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
             );
             return;
         }
-        try {
-            setIsListening(true);
-            await Voice.start("en-IN");
-        } catch (e) {
-            console.log("Voice start error:", e);
-            Alert.alert("Error", "Could not start voice recognition. Please try again.");
-            setIsListening(false);
-        }
+//        try {
+//            setIsListening(true);
+//            await Voice.start("en-IN");
+//        } catch (e) {
+//            console.log("Voice start error:", e);
+//            Alert.alert("Error", "Could not start voice recognition. Please try again.");
+//            setIsListening(false);
+//        }
     };
 
 
     const stopListening = async () => {
-        try {
-            await Voice.stop();
-        } catch (e) {
-            console.log("Voice stop error:", e);
-        } finally {
-            setIsListening(false);
-        }
+//        try {
+//            await Voice.stop();
+//        } catch (e) {
+//            console.log("Voice stop error:", e);
+//        } finally {
+//            setIsListening(false);
+//        }
     };
 
     const streamText = (text) => {

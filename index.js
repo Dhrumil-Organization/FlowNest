@@ -1,25 +1,32 @@
-// index.js (or index.tsx) — MUST BE FIRST
-import 'react-native-gesture-handler';
+//// index.js (or index.tsx) — MUST BE FIRST
+//import 'react-native-gesture-handler';
+//import { AppRegistry } from 'react-native';
+//import App from './App';
+//import { name as appName } from './app.json';
+//import { initAPI } from './common/API/dynamicAPI';
+//
+//// await initAPI();
+////initAPI();
+//AppRegistry.registerComponent(appName, () => App);
+//
+//// index.js (or index.tsx) — MUST BE FIRST
+//// import 'react-native-gesture-handler';
+//// import { AppRegistry } from 'react-native';
+//// import App from './App';
+//// import { name as appName } from './app.json';
+//// import { initAPI } from './common/API/dynamicAPI';
+//
+//// // AppRegistry.registerComponent(appName, () => App);
+//// const bootstraps = async () => {
+////   await initAPI(); // ✅ VERY IMPORTANT
+////   AppRegistry.registerComponent(appName, () => App);
+//// };
+//
+//// bootstrap();
 import { AppRegistry } from 'react-native';
 import App from './App';
 import { name as appName } from './app.json';
-import { initAPI } from './common/API/dynamicAPI';
 
-// await initAPI();
-initAPI();
+console.log('INDEX LOADED', appName);
+
 AppRegistry.registerComponent(appName, () => App);
-
-// index.js (or index.tsx) — MUST BE FIRST
-// import 'react-native-gesture-handler';
-// import { AppRegistry } from 'react-native';
-// import App from './App';
-// import { name as appName } from './app.json';
-// import { initAPI } from './common/API/dynamicAPI';
-
-// // AppRegistry.registerComponent(appName, () => App);
-// const bootstrap = async () => {
-//   await initAPI(); // ✅ VERY IMPORTANT
-//   AppRegistry.registerComponent(appName, () => App);
-// };
-
-// bootstrap();

@@ -1763,8 +1763,6 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - react-native-network-info (5.2.2):
-    - React
   - react-native-pdf (7.0.3):
     - boost
     - DoubleConversion
@@ -1885,8 +1883,6 @@ PODS:
   - react-native-sqlite-storage (6.0.1):
     - React-Core
   - react-native-vector-icons-material-icons (12.4.2)
-  - react-native-voice (3.2.4):
-    - React-Core
   - react-native-webview (13.16.1):
     - boost
     - DoubleConversion
@@ -2790,13 +2786,11 @@ DEPENDENCIES:
   - "react-native-blur (from `../node_modules/@react-native-community/blur`)"
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
-  - react-native-network-info (from `../node_modules/react-native-network-info`)
   - react-native-pdf (from `../node_modules/react-native-pdf`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - react-native-splash-screen (from `../node_modules/react-native-splash-screen`)
   - react-native-sqlite-storage (from `../node_modules/react-native-sqlite-storage`)
   - "react-native-vector-icons-material-icons (from `../node_modules/@react-native-vector-icons/material-icons`)"
-  - "react-native-voice (from `../node_modules/@react-native-voice/voice`)"
   - react-native-webview (from `../node_modules/react-native-webview`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
@@ -2950,8 +2944,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-image-picker"
   react-native-netinfo:
     :path: "../node_modules/@react-native-community/netinfo"
-  react-native-network-info:
-    :path: "../node_modules/react-native-network-info"
   react-native-pdf:
     :path: "../node_modules/react-native-pdf"
   react-native-safe-area-context:
@@ -2962,8 +2954,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-sqlite-storage"
   react-native-vector-icons-material-icons:
     :path: "../node_modules/@react-native-vector-icons/material-icons"
-  react-native-voice:
-    :path: "../node_modules/@react-native-voice/voice"
   react-native-webview:
     :path: "../node_modules/react-native-webview"
   React-NativeModulesApple:
@@ -3115,13 +3105,11 @@ SPEC CHECKSUMS:
   react-native-blur: 5a506f000323f8d51485f3756e63c2618fbcde37
   react-native-image-picker: cfc61ef63b2e9607d8c077e00e4dd912950ab931
   react-native-netinfo: 7f516c3392405e6b919a823735eeaecc23f5543f
-  react-native-network-info: 703d4b16ff0ff6f03127728348251bf5f12b823a
   react-native-pdf: 0a61ad1e926abcea5d973aa3649b6b56b1865ee7
   react-native-safe-area-context: e2733f7798246f783ed6daf8d75009363b5a2e1e
   react-native-splash-screen: 95994222cc95c236bd3cdc59fe45ed5f27969594
   react-native-sqlite-storage: 0c84826214baaa498796c7e46a5ccc9a82e114ed
   react-native-vector-icons-material-icons: 433cb95ee9de1246934b2ae8414f9c02b520b628
-  react-native-voice: 908a0eba96c8c3d643e4f98b7232c6557d0a6f9c
   react-native-webview: fdb6e33a5235cc18af65a9b37ce464ea4c526059
   React-NativeModulesApple: 00beb364b4dd0a64d91b07658a43628672e888cb
   React-oscompat: 114036cd8f064558c9c1a0c04fc9ae5e1453706a

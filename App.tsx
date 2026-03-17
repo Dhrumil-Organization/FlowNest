@@ -583,6 +583,13 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="Sales Order(Inactive)">{(props) =>
+                      <>
+                        <PurchaseOrderTracking {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
+                   
                   </Stack.Navigator>
                 </NavigationContainer>
               ) : (

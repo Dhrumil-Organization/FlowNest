@@ -3,10 +3,12 @@ import 'react-native-gesture-handler';
 import { AppRegistry } from 'react-native';
 import App from './App';
 import { name as appName } from './app.json';
-import { initAPI } from './common/API/dynamicAPI';
+import { initAPI, initAPIForPrinterList, initAPIForSticker } from './common/API/dynamicAPI';
 
 // await initAPI();
 initAPI();
+initAPIForPrinterList();
+initAPIForSticker();
 AppRegistry.registerComponent(appName, () => App);
 
 // index.js (or index.tsx) — MUST BE FIRST

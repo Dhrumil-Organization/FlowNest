@@ -12,14 +12,14 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import FullScreenLoader from '../Loader/Loader';
 import { checkingScannerStyles } from '../../common/Styles/Style';
-import { API } from '../../common/API/dynamicAPI';
+import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
 import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
 import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView } from 'react-native';
 import Snackbar from 'react-native-snackbar';
-
+import { Switch } from 'react-native';
 interface Props {
     token: string;
     navigation: any;
@@ -36,13 +36,11 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [scannedValue, setScannedValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [getData, setData] = useState([]);
-
     const [beamNo, setBeamNo] = useState('');
     const [takaNo, setTakaNo] = useState('');
     const [beamUid, setBeamUid] = useState('');
     const [prpCode, setPrpCode] = useState('');
     const [yearNo, setYearNo] = useState('');
-
     const [meter, setMeter] = useState('');
     const [kgs, setKgs] = useState('');
     const [validMeter, setValidMeter] = useState('');
@@ -56,6 +54,11 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [getScannedObj, setScannedObj] = useState({})
     const [shift, setShift] = useState('')
     const [getShiftData, setShiftData] = useState([]);
+    const [getDataSaved, setDataSaved] = useState(false)
+    const [getSavedData, setSavedData] = useState([]);
+    const [isMending, setIsMending] = useState(false);
+    const [getPrinters, setPrinters] = useState([])
+    const [printer, setPrinter] = useState('')
 
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
@@ -77,7 +80,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const codeScanner = useCodeScanner({
         codeTypes: ['qr'],
         onCodeScanned: (codes) => {
-
             setBeamNo('');
             setTakaNo('');
             setBeamUid('');
@@ -95,14 +97,17 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             setChecker('')
             setScannedObj({})
             setShift('')
+            setPrinter('')
+            setPrinters([])
 
             const value = codes[0]?.value || '';
 
             try {
 
                 const parsed = JSON.parse(value);
-                setScannedObj(parsed)
 
+                setScannedObj(parsed)
+                
                 setBeamNo(parsed.beamno || '');
                 setTakaNo(parsed.takano || '');
                 setBeamUid(parsed.beamuid || '');
@@ -135,24 +140,20 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 setChecker('')
                 setScannedObj({})
                 setShift('')
+                setPrinter('')
+                setPrinters([])
 
                 Alert.alert("Invalid QR", "QR format not valid");
             }
-
             setIsScanning(false);
         },
     });
 
     if (!device || !hasPermission) {
-        return (
-            <View>
-                <Text>No camera permission or device not available</Text>
-            </View>
-        );
+        return (<View><Text>No camera permission or device not available</Text></View>);
     }
 
     const getToken = () => {
-
         return token;
     };
 
@@ -171,7 +172,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 prpcode: qrValue.prpcode,
                 yearno: yno
             };
-
+            //console.log("grade api payload historyPayload :", historyPayload)
             const response = await axios.get(
                 `${API}/api/get_criterion`, getRequestConfig(
                     {
@@ -181,20 +182,13 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             );
 
             if (response.data.success && response.data.response.data.length > 0) {
-
                 setGradeData(response.data.response.data);
-
             } else {
-
                 setGradeData([]);
             }
-
         } catch (error) {
-
             console.log("grade API error:", error);
-
         } finally {
-
             setIsLoading(false)
         }
     }
@@ -205,9 +199,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         cancelToken = axios.CancelToken.source();
 
         try {
-
             let yno = await AsyncStorage.getItem('yno');
-
             const historyPayload = {
                 txntype: 'beam_checking_tablet',
                 referrer: 'dashboard',
@@ -225,32 +217,23 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             );
 
             if (response.data.success && response.data.response.data.length > 0) {
-
                 setCheckerData(response.data.response.data);
-
                 let tempChecker = '';
                 tempChecker = await AsyncStorage.getItem('csChecker');
 
                 if (typeof tempChecker != 'undefined' && tempChecker != null && tempChecker != '') {
-
                     response.data.response.data && response.data.response.data.filter((el, ind) => {
-
                         if (el.EmpCode == tempChecker) {
-
                             setChecker(tempChecker);
                         }
                     })
                 }
             } else {
-
                 setCheckerData([]);
             }
         } catch (error) {
-
             console.log("API getCheckers error:", error);
-
         } finally {
-
             setIsLoading(false);
         }
     }
@@ -272,7 +255,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 yearno: yno
 
             };
-
+            //console.log("get shift api historyPayload payload :", historyPayload)
             const response = await axios.get(
                 `${API}/api/get_criterion`, getRequestConfig(
                     {
@@ -282,19 +265,13 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             );
 
             if (response.data.success && response.data.response.data.length > 0) {
-
                 setShiftData(response.data.response.data);
-
             } else {
-
                 setShiftData([]);
             }
         } catch (error) {
-
             console.log("API getshifts error:", error);
-
         } finally {
-
             setIsLoading(false);
         }
     }
@@ -310,7 +287,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             let yno = await AsyncStorage.getItem('yno');
 
             let infoPyload = {
-
                 txntype: 'chekingScanner',
                 referrer: 'dashboard',
                 scannedString: temp,
@@ -322,28 +298,19 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
-
             const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
 
             if (response.data.success && response.data.response.data) {
-
                 setData(response.data.response.data);
                 setIsLoading(false);
-
             } else {
-
                 setIsLoading(false);
                 console.error('Unexpected response structure:', response.data);
-
                 Alert.alert(`${response.data}`);
-
             }
         } catch (error) {
-
-            console.log("API sendScannedValue error:", error);
-
+            //console.log("API sendScannedValue error:", error);
         } finally {
-
             setIsLoading(false);
         }
     };
@@ -351,20 +318,17 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const handleMeterChange = (value: string) => {
 
         if (typeof design == 'undefined' || design == null || design == '') {
-
             Alert.alert("Design", "Please select design first");
             return;
-
         } else {
-
             let qltWt = 0.00;
             getData && getData.filter((el, ind) => {
                 if (el.DsnCode == design) {
                     qltWt = el.QltWt;
                 }
             })
-            value = value.replace(',', '.');
 
+            value = value.replace(',', '.');
             const regex = /^\d*(?:\.\d{0,2})?$/;
 
             if (value === '' || regex.test(value)) {
@@ -389,7 +353,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const handleKgsChange = (value: string) => {
 
         value = value.replace(',', '.');
-
         const regex = /^\d*(?:\.\d{0,2})?$/;
 
         if (value === '' || regex.test(value)) {
@@ -411,58 +374,38 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const handleSubmitScan = async () => {
 
         if (typeof beamNo == 'undefined' || beamNo == null || beamNo == '') {
-
             Alert.alert('Beam no can not be blank');
             return false;
         } else if (typeof takaNo == 'undefined' || takaNo == null || takaNo == '') {
-
             Alert.alert('Taka no can not be blank');
             return false;
-
         } else if (typeof design == 'undefined' || design == null || design == '') {
-
             Alert.alert('Design can not be blank.');
             return false;
         } else if (typeof meter == 'undefined' || meter == null || meter == '' || parseInt(meter) <= 0) {
-
             Alert.alert('Meter can not be blank or 0.');
             return false;
-
         } else if (typeof meter == 'undefined' || meter == null || meter == '' || parseInt(meter) > 0 && (parseFloat(meter) > parseFloat(getWarpLen))) {
-
             Alert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
             return false;
-
         } else if (typeof kgs == 'undefined' || kgs == null || kgs == '' || parseInt(kgs) <= 0) {
-
             Alert.alert('Kgs can not be blank or 0.');
             return false;
-
         } else if (typeof kgs == 'undefined' || kgs == null || kgs == '' || parseInt(kgs) <= 0) {
-
             Alert.alert('Kgs can not be blank or 0.');
             return false;
-
         } else if (typeof grade == 'undefined' || grade == null || grade == '') {
-
             Alert.alert('Grade can not be blank.');
             return false;
-
         } else if (typeof checker == 'undefined' || checker == null || checker == '') {
-
             Alert.alert('Checker can not be blank.');
             return false;
-
         } else if (typeof shift == 'undefined' || shift == null || shift == '') {
-
             Alert.alert('Shift can not be blank.');
             return false;
-
         } else {
-
             let finalObj = new Object();
             getData && getData.filter((el, ind) => {
-
                 if (design == el.DsnCode) {
                     finalObj = el;
                 }
@@ -473,11 +416,8 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             setIsLoading(true);
 
             try {
-
                 let yno = await AsyncStorage.getItem('yno');
-
-                let payloadObj = new Object()
-
+                let payloadObj = new Object();
                 payloadObj = finalObj;
                 payloadObj['prpcode'] = getScannedObj.prpcode;
                 payloadObj['yearno'] = yno;
@@ -489,92 +429,61 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 payloadObj['Wt'] = kgs;
                 payloadObj['AvgWt'] = getavgWt;
                 payloadObj['txntype'] = 'chekingScanner';
-
                 payloadObj['ShfCode'] = shift;
                 payloadObj['SrNo'] = '0';
                 payloadObj['islasttaka'] = getScannedObj.islasttaka;
                 payloadObj['isfirsttaka'] = getScannedObj.isfirsttaka;
                 payloadObj['IsLastTaka'] = getScannedObj.islasttaka;
                 payloadObj['IsFirstTaka'] = getScannedObj.isfirsttaka;
+                payloadObj['ismending'] = isMending ? 1 : 0;
 
                 const headers = {
                     Authorization: `Bearer ${getToken()}`,
                     'Content-Type': 'application/json',
                     'X-Requested-with': 'XMLHttpRequest',
                 };
-
                 const response = await axios.post(`${API}/api/add_auto_checking_detail`, payloadObj, { headers });
 
                 if (response.data.success == true) {
-
                     setIsLoading(false);
+                    setDataSaved(true);
 
-                    setBeamNo('');
-                    setTakaNo('');
-                    setBeamUid('');
-                    setPrpCode('');
-                    setYearNo('')
-                    setMeter('')
-                    setKgs('');
-                    setavgWt('');
-                    setWarpLen('')
-                    setData([])
-                    setDesign('')
-                    setGradeData([])
-                    setGrade('')
-                    setCheckerData([]);
-                    setChecker('')
-                    setScannedObj({});
-                    setShift('');
-
+                    if (response.data.hasOwnProperty('data') && typeof response.data.data != 'undefined' && response.data.data && response.data.data.length > 0) {
+                        setSavedData(response.data.data.main[0])
+                    }
+                    getAllPrinters();
                     Snackbar.show({
                         text: 'Saved successfully',
                         duration: Snackbar.LENGTH_LONG,
                         backgroundColor: '#000',
-                        action: {
-                            text: 'OK',
-                            textColor: 'green',
-                        },
+                        action: { text: 'OK', textColor: 'green' },
                     });
-
                 } else if (response.data.success === false) {
-
                     setIsLoading(false);
-
+                    setDataSaved(false);
                     Snackbar.show({
                         text: response.data.message,
                         duration: Snackbar.LENGTH_LONG,
                         backgroundColor: '#000',
                         textColor: '#fff',
-                        action: {
-                            text: 'OK',
-                            textColor: 'yellow',
-                        },
+                        action: { text: 'OK', textColor: 'yellow' },
                     });
-
                 } else {
-
                     setIsLoading(false);
-
+                    setDataSaved(false);
                     Snackbar.show({
                         text: response.data.message,
                         duration: Snackbar.LENGTH_LONG,
                         backgroundColor: '#000',
                         textColor: '#fff',
-                        action: {
-                            text: 'OK',
-                            textColor: 'red',
-                        },
+                        action: { text: 'OK', textColor: 'red' },
                     });
                 }
-
             } catch (error) {
-
+                setDataSaved(false);
                 setIsLoading(false);
                 console.log("API handleSubmitScan error:", error);
-
             } finally {
-
                 setIsLoading(false);
             }
         }
@@ -587,18 +496,117 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         setKgs('')
         setavgWt('');
     };
-
     const clearGrade = () => {
         setGrade('');
     };
-
     const clearChecker = () => {
         setChecker('');
     };
-
     const clearShift = () => {
         setShift('');
     };
+    const clearPrinter = () => {
+        setPrinter('');
+    }
+
+    const printSticker = () => {
+        if (typeof printer == 'undefined' || printer == null || printer == '') {
+            Alert.alert('Please select printer first.');
+            return false;
+        } else {
+            setIsLoading(true);
+            console.log('printsticker function :', getSavedData);
+            let temppayloadObj = new Object();
+
+            if (Object.keys(getSavedData).length > 0) {
+                temppayloadObj = {
+                    uid: getSavedData.UId,
+                    inwno: "",
+                    inwdate: "",
+                    srno: getSavedData.SrNo,
+                    itmcode: "",
+                    itmname: "",
+                    dsncode: getSavedData.DsnCode,
+                    dsnname: getSavedData.DsnName,
+                    rcno: "",
+                    amount: "",
+                    subsr: getSavedData.subsr,
+                    takano: getSavedData.TakaNo,
+                    qty: getSavedData.Qty,
+                    trantype: getSavedData.trantype,
+                    ttype: "",
+                    dptname: "",
+                    shdcode: getSavedData.shdcode,
+                    shdname: getSavedData.shdname,
+                    whr: "",
+                    yarncostr: "",
+                    yard: "",
+                    sexecname: "",
+                    strcode: "",
+                    unqsrno: ""
+                }
+                const params = {
+                    data: [getSavedData],
+                    IskgQty: 0,
+                    printype: "Print",
+                    PrintFormat: 1,
+                    printerName: printer ? printer : '',
+                    txntype: 'chekingScanner'
+                };
+
+                axios.post(`${PRINTSTICKER}`, params)
+                    .then(response => {
+                        setIsLoading(false);
+                        const res = response.data;
+
+                        if (res.success) {
+                            Snackbar.show({
+                                text: '✅ ${res.printed} label(s) sent to printer.',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'green',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                        } else {
+                            Snackbar.show({
+                                text: res.message || 'Operation failed',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'red',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                        }
+                    }).catch(error => {
+                        setIsLoading(false);
+                        Snackbar.show({
+                            text: error?.response?.data?.error || error.message || 'Print failed',
+                            duration: Snackbar.LENGTH_LONG,
+                            backgroundColor: 'red',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
+                    });
+            } else {
+                setIsLoading(false);
+                Snackbar.show({
+                    text: 'printing sticker data is empty',
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: 'red',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: '#fff' },
+                });
+            }
+        }
+    }
+
+    const getAllPrinters = async () => {
+        try {
+            const res = await axios.get(PRINTERSLISTAPI);
+            const printerList = res.data?.printers || res.data || [];
+            setPrinters(printerList);
+        } catch (err) {
+            console.log("Printer API error:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
     return (
         <>
@@ -620,45 +628,40 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             <ScrollView
                 style={checkingScannerStyles.container}
                 contentContainerStyle={{ paddingBottom: 40 }}
-                keyboardShouldPersistTaps="handled"
-            >
-                {isScanning && (
-                    <View style={checkingScannerStyles.cameraContainer}>
-                        <>
-                            {device && hasPermission && (
-                                <Camera
-                                    style={checkingScannerStyles.camera}
-                                    device={device}
-                                    isActive={true}
-                                    codeScanner={codeScanner}
-                                />
-                            )}
-                            {/* Overlay */}
-                            <View style={checkingScannerStyles.overlay}>
-                                <View style={checkingScannerStyles.scanBox} />
-                            </View>
-                        </>
-                    </View>
-                )}
+                keyboardShouldPersistTaps="handled">
+                {
+                    isScanning &&
+                    (
+                        <View style={checkingScannerStyles.cameraContainer}>
+                            <>
+                                {device && hasPermission && (
+                                    <Camera
+                                        style={checkingScannerStyles.camera}
+                                        device={device}
+                                        isActive={true}
+                                        codeScanner={codeScanner}
+                                    />
+                                )}
+                                {/* Overlay */}
+                                <View style={checkingScannerStyles.overlay}>
+                                    <View style={checkingScannerStyles.scanBox} />
+                                </View>
+                            </>
+                        </View>
+                    )
+                }
                 <View style={checkingScannerStyles.container}>
-
                     <View style={checkingScannerStyles.row}>
-
                         <View style={checkingScannerStyles.halfInput}>
-                            <Text style={checkingScannerStyles.label}>
-                                Beam Number
-                                <Text style={{ color: 'red' }}> *</Text>
-                            </Text>
+                            <Text style={checkingScannerStyles.label}>Beam Number <Text style={{ color: 'red' }}> *</Text></Text>
                             <TextInput
                                 placeholder="Beam number"
                                 style={checkingScannerStyles.inputDisabled}
-                                //value={scannedValue}
                                 value={beamNo}
                                 onChangeText={setBeamNo}
                                 editable={false}
                             />
                         </View>
-
                         <View style={checkingScannerStyles.halfInput}>
                             <Text style={checkingScannerStyles.label}>
                                 Taka No
@@ -672,35 +675,25 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                 editable={false}
                             />
                         </View>
-
                     </View>
-
                     {/* Design */}
-                    <Text style={checkingScannerStyles.label}>
-                        Design
-                        <Text style={{ color: 'red' }}> *</Text>
-                    </Text>
-
+                    <Text style={checkingScannerStyles.label}>Design <Text style={{ color: 'red' }}> *</Text> </Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
                             mode="dialog"
                             style={checkingScannerStyles.picker}
                             selectedValue={design || ''}
                             onValueChange={(itemValue) => {
-
                                 setDesign(itemValue);
                                 const selectedRow = getData.find(el => el.DsnCode === itemValue);
-
                                 if (selectedRow) {
                                     setWarpLen(selectedRow.WarpLen || '0');
                                 } else {
                                     setWarpLen('0');
                                 }
-
                             }}
                         >
                             <Picker.Item label="Select Design" value="" enabled={false} />
-
                             {getData.map((item, index) => (
                                 <Picker.Item
                                     key={index}
@@ -717,19 +710,14 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                         />
                     </View>
                     <View style={checkingScannerStyles.viewCustom}>
-                        <TouchableOpacity
-                            onPress={clearDesign}
-                        >
+                        <TouchableOpacity onPress={clearDesign}>
                             <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
                         </TouchableOpacity>
                     </View>
                     {/* Meter */}
                     <View style={checkingScannerStyles.row}>
-
                         <View style={checkingScannerStyles.halfInput}>
-                            <Text style={checkingScannerStyles.label}>
-                                Meter (in meters)
-                                <Text style={{ color: 'red' }}> *</Text>
+                            <Text style={checkingScannerStyles.label}> Meter (in meters) <Text style={{ color: 'red' }}> *</Text>
                                 {
                                     typeof getWarpLen != 'undefined' && getWarpLen != '' && getWarpLen != null && parseFloat(getWarpLen) != 0 ? <Text style={{ fontSize: 11, color: '#000', }}> [ {getWarpLen} ] </Text> : null
                                 }
@@ -742,12 +730,8 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                 onChangeText={handleMeterChange}
                             />
                         </View>
-
                         <View style={checkingScannerStyles.halfInput}>
-                            <Text style={checkingScannerStyles.label}>
-                                Kgs
-                                <Text style={{ color: 'red' }}> *</Text>
-                            </Text>
+                            <Text style={checkingScannerStyles.label}> Kgs <Text style={{ color: 'red' }}> *</Text> </Text>
                             <TextInput
                                 placeholder="Enter kgs"
                                 style={checkingScannerStyles.input}
@@ -757,14 +741,9 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             />
                         </View>
                     </View>
-
                     <View style={checkingScannerStyles.row}>
-
                         <View style={checkingScannerStyles.halfInput}>
-                            <Text style={checkingScannerStyles.label}>
-                                Avg. Wt
-                                <Text style={{ color: 'red' }}> *</Text>
-                            </Text>
+                            <Text style={checkingScannerStyles.label}> Avg. Wt <Text style={{ color: 'red' }}> *</Text> </Text>
                             <TextInput
                                 placeholder="Enter meter"
                                 value={getavgWt}
@@ -774,24 +753,16 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             />
                         </View>
                     </View>
-
                     {/* Design */}
-                    <Text style={checkingScannerStyles.label}>
-                        Grade
-                        <Text style={{ color: 'red' }}> *</Text>
-                    </Text>
+                    <Text style={checkingScannerStyles.label}>Grade <Text style={{ color: 'red' }}> *</Text></Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
                             mode="dialog"
                             style={checkingScannerStyles.picker}
                             selectedValue={grade}
-                            //onValueChange={(itemValue) => setDesign(itemValue)}
-                            onValueChange={(itemValue) => {
-                                setGrade(itemValue)
-                            }}
+                            onValueChange={(itemValue) => { setGrade(itemValue) }}
                         >
                             <Picker.Item label="Select Grade" value="" enabled={false} />
-
                             {getGradeData.map((item, index) => (
                                 <Picker.Item
                                     key={index}
@@ -808,17 +779,12 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                         />
                     </View>
                     <View style={checkingScannerStyles.viewCustom}>
-                        <TouchableOpacity
-                            onPress={clearGrade}
-                        >
+                        <TouchableOpacity onPress={clearGrade}>
                             <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
                         </TouchableOpacity>
                     </View>
                     {/* Design */}
-                    <Text style={checkingScannerStyles.label}>
-                        Checker
-                        <Text style={{ color: 'red' }}> *</Text>
-                    </Text>
+                    <Text style={checkingScannerStyles.label}> Checker <Text style={{ color: 'red' }}> *</Text> </Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
                             mode="dialog"
@@ -827,11 +793,9 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             onValueChange={(itemValue) => {
                                 AsyncStorage.setItem('csChecker', itemValue);
                                 setChecker(itemValue);
-
                             }}
                         >
                             <Picker.Item label="Select Checker" value="" enabled={false} />
-
                             {getCheckerData.map((item, index) => (
                                 <Picker.Item
                                     key={index}
@@ -848,19 +812,11 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                         />
                     </View>
                     <View style={checkingScannerStyles.viewCustom}>
-                        <TouchableOpacity
-                            onPress={clearChecker}
-                        >
+                        <TouchableOpacity onPress={clearChecker}>
                             <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
                         </TouchableOpacity>
                     </View>
-
-
-
-                    <Text style={checkingScannerStyles.label}>
-                        Shift
-                        <Text style={{ color: 'red' }}> *</Text>
-                    </Text>
+                    <Text style={checkingScannerStyles.label}> Shift <Text style={{ color: 'red' }}> *</Text> </Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
                             mode="dialog"
@@ -868,11 +824,9 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             selectedValue={shift}
                             onValueChange={(itemValue) => {
                                 setShift(itemValue);
-
                             }}
                         >
                             <Picker.Item label="Select shift" value="" enabled={false} />
-
                             {getShiftData.map((item, index) => (
                                 <Picker.Item
                                     key={index}
@@ -889,29 +843,123 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                         />
                     </View>
                     <View style={checkingScannerStyles.viewCustom}>
-                        <TouchableOpacity
-                            onPress={clearShift}
-                        >
+                        <TouchableOpacity onPress={clearShift}>
                             <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
                         </TouchableOpacity>
                     </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                        <Text style={checkingScannerStyles.label1}>Is mending ? </Text>
+                        <Switch
+                            style={checkingScannerStyles.switch}
+                            value={isMending}
+                            onValueChange={(value) => setIsMending(value)}
+                            trackColor={{ false: "#ccc", true: "#007EA7" }}
+                            thumbColor={isMending ? "#fff" : "#fff"}
+                        />
+                    </View>
+                    {
+                        getPrinters && getPrinters.length > 0 ?
+                            (
+                                <>
+                                    <Text style={checkingScannerStyles.label}> Printer <Text style={{ color: 'red' }}> *</Text></Text>
+                                    <View style={checkingScannerStyles.dropdown}>
+                                        <Picker
+                                            mode="dialog"
+                                            style={checkingScannerStyles.picker}
+                                            selectedValue={printer}
+                                            onValueChange={(itemValue) => {
+                                                setPrinter(itemValue);
+
+                                            }}
+                                        >
+                                            <Picker.Item label="Select printer" value="" enabled={false} />
+
+                                            {getPrinters.map((item, index) => (
+                                                <Picker.Item
+                                                    key={index}
+                                                    label={item.Name}
+                                                    value={item.PortName}
+                                                />
+                                            ))}
+                                        </Picker>
+                                        <Icon
+                                            name="arrow-drop-down"
+                                            size={28}
+                                            color="#000"
+                                            style={checkingScannerStyles.dropdownIcon}
+                                        />
+                                    </View>
+                                    <View style={checkingScannerStyles.viewCustom}>
+                                        <TouchableOpacity
+                                            onPress={clearPrinter}
+                                        >
+                                            <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </>
+                            )
+                            :
+                            null
+                    }
                     <TouchableOpacity
                         style={checkingScannerStyles.submitBtn}
                         onPress={handleSubmitScan}
                     >
-                        <Text style={checkingScannerStyles.submitText}>
-                            Submit Scan
-                        </Text>
+                        <Text style={checkingScannerStyles.submitText}>Submit Scan</Text>
                     </TouchableOpacity>
 
+                    {/* Print + Clear Buttons */}
+                    {
+                        getDataSaved == true &&
+                        (
+                            <View style={checkingScannerStyles.actionRow}>
+                                <TouchableOpacity style={checkingScannerStyles.printBtn} onPress={printSticker}>
+                                    <Text style={checkingScannerStyles.actionText}>Print</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={checkingScannerStyles.clearBtn}
+                                    onPress={() => {
+                                        setBeamNo('');
+                                        setTakaNo('');
+                                        setBeamUid('');
+                                        setPrpCode('');
+                                        setYearNo('')
+                                        setMeter('')
+                                        setKgs('');
+                                        setavgWt('');
+                                        setWarpLen('')
+                                        setData([])
+                                        setDesign('')
+                                        setGradeData([])
+                                        setGrade('')
+                                        //setCheckerData([]);
+                                        //setChecker('')
+                                        setScannedObj({});
+                                        setShift('');
+                                        clearDesign();
+                                        clearGrade();
+                                        //clearChecker();
+                                        clearShift();
+                                        setShiftData([]);
+                                        setMeter('');
+                                        setKgs('');
+                                        setavgWt('');
+                                        setIsMending(false);
+                                        setPrinter('')
+                                        setPrinters([])
+                                        setDataSaved(false);
+                                    }}
+                                >
+                                    <Text style={checkingScannerStyles.actionText}>Clear</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )
+                    }
                     {/* Info */}
                     <View style={checkingScannerStyles.infoBox}>
-                        <Text style={checkingScannerStyles.infoText}>
-                            Fill all fields to enable submission
-                        </Text>
+                        <Text style={checkingScannerStyles.infoText}> Fill all fields to enable submission </Text>
                     </View>
                 </View>
-
             </ScrollView>
         </>
     );

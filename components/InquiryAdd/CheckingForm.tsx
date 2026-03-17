@@ -1577,7 +1577,7 @@ const CheckingForm: React.FC<Props> = ({
                                                     }}>
                                                         <Text style={styles.btnText}>Remove Both</Text>
                                                     </TouchableOpacity>
-                                                    <TouchableOpacity style={styles.btnApplyAll} onPress={() => {
+                                                    {/* <TouchableOpacity style={styles.btnApplyAll} onPress={() => {
                                                         const updated = form.items.map(i => {
                                                             if (i.itmcode === item.itmcode) {
                                                                 return {
@@ -1594,7 +1594,7 @@ const CheckingForm: React.FC<Props> = ({
                                                         setForm(prev => ({ ...prev, items: updated }));
                                                     }}>
                                                         <Text style={styles.btnText}>Apply All</Text>
-                                                    </TouchableOpacity>
+                                                    </TouchableOpacity> */}
                                                 </View>
 
                                             </View>

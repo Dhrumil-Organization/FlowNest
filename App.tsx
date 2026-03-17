@@ -54,6 +54,7 @@ import SalesAnalysis from './components/SalesAnalysis/SalesAnalysis';
 import { initDB } from './common/utils/chatDB';
 import { initGlobalCacheDB, updateGlobalCacheInBackground } from './common/utils/sqliteCacheManager';
 import CheckingScanner from './components/CheckingScanner/CheckingScanner';
+import YarnStockVerification from './components/YarnStockVerification/YarnStockVerification';
 
 const Stack = createNativeStackNavigator();
 
@@ -569,6 +570,12 @@ export default function App() {
                           </>
                       }
                     </Stack.Screen>
+                    <Stack.Screen name="Yarn Stock Verification">{(props) =>
+                      <>
+                        <YarnStockVerification {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
+                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
                   </Stack.Navigator>
                 </NavigationContainer>
               ) : (

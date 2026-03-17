@@ -1178,6 +1178,8 @@ export const checkingScannerStyles = StyleSheet.create({
         fontWeight: "500"
     },
 
+    
+
     input: {
         paddingVertical: 0,
         paddingHorizontal: 20,
@@ -1286,4 +1288,933 @@ export const checkingScannerStyles = StyleSheet.create({
 
     },
     //absoluteFill: {}
+    actionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 15
+    },
+
+    printBtn: {
+        flex: 1,
+        backgroundColor: '#28a745',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginRight: 8
+    },
+
+    clearBtn: {
+        flex: 1,
+        backgroundColor: '#dc3545',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginLeft: 8
+    },
+
+    actionText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold'
+    },
+    label1: {
+        paddingVertical: 5,
+        //paddingHorizontal: 10,
+        color: '#000000',
+        marginTop: 10,
+        fontWeight: "500",
+        marginRight: 20
+    },
+    switch: {
+        lineHeight: 1,
+        marginTop: 10
+    },
+});
+
+export const yarnstockverificatio_styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        backgroundColor: '#f8f9fa', // Light gray background
+        //paddingBottom: 80,
+        paddingBottom: 15,
+    },
+    containerTable: {
+        flex: 1,
+        // padding: 10,
+        paddingHorizontal: 10,
+        backgroundColor: '#f8f9fa', // Light gray background
+        // paddingBottom: 80,
+    },
+    pdfHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#f8f8f8',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    pdfHeaderButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+    },
+    pdfHeaderButtonText: {
+        marginLeft: 8,
+        fontSize: 16,
+        color: '#000',
+    },
+    pdfLoading: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    container_list: {
+        flex: 1,
+        // padding: 10,
+        backgroundColor: '#f8f9fa', // Light gray background
+        // paddingBottom: 80,
+    },
+    container_list123: {
+        // flex: 1,
+        height: '90%',
+        // padding: 10,
+        backgroundColor: '#f8f9fa', // Light gray background
+        // paddingBottom: 80,
+    },
+    disabledCard: {
+        opacity: 0.6,
+    },
+    closeButton: {
+        position: 'absolute',
+        bottom: 20,
+        right: 20,
+        zIndex: 1,
+        backgroundColor: theme.BRAND_GRADIENT_END, // Purple theme
+        padding: 10,
+        borderRadius: 5,
+    },
+    closeButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        marginBottom: 10,
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        elevation: 2,
+    },
+    searchInput: {
+        flex: 1,
+        backgroundColor: '#fff',
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    list: {
+        paddingBottom: 20,
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        marginVertical: 8,
+        padding: 15,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        borderWidth: 2,
+        borderColor: 'rgb(229, 216, 255)',
+    },
+    acceptedCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        marginVertical: 8,
+        padding: 15,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        borderWidth: 2,
+        borderColor: 'rgb(164, 255, 167)',
+    },
+    rejectedCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        marginVertical: 8,
+        padding: 15,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        borderWidth: 2,
+        borderColor: 'rgb(255, 193, 193)',
+    },
+    dateContainer: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        backgroundColor: '#F5F5F5',
+        borderWidth: 1,
+        borderColor: '#BDBDBD',
+        borderRadius: 15,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        zIndex: 1,
+    },
+    dateText: {
+        fontSize: 12,
+        color: '#555',
+    },
+    cardHeaderContainer: {
+        backgroundColor: '#E3F2FD', // Light blue (optional: change to light purple)
+        padding: 10,
+        borderTopLeftRadius: 9,
+        borderTopRightRadius: 9,
+        marginTop: -15,
+        marginHorizontal: -15,
+        marginBottom: 10,
+    },
+    cardHeader: {
+        width: '70%',
+    },
+    overlayContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    overlay: {
+        width: '90%',
+        borderRadius: 15,
+        backgroundColor: 'white',
+        padding: 25,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+    },
+    overlayGradient: {
+        padding: 25,
+    },
+    overlayTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        textAlign: 'center',
+        marginBottom: 15,
+    },
+    loadingText: {
+        fontSize: 16,
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        textAlign: 'center',
+        marginBottom: 20,
+        fontWeight: '600',
+    },
+    responseText: {
+        fontSize: 16,
+        color: 'green',
+        textAlign: 'center',
+        marginBottom: 20,
+        fontWeight: '600',
+    },
+    overlayPartyName: {
+        fontSize: 16,
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        textAlign: 'center',
+        marginBottom: 20,
+        fontWeight: '600',
+    },
+    overlayButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
+    overlayButton: {
+        flex: 1,
+        marginHorizontal: 5,
+        padding: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    overlayButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
+    cardHeaderText: {
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    cardSubHeader: {
+        borderColor: '#B3E5FC',
+        borderWidth: 1,
+        padding: 10,
+        borderRadius: 5,
+        marginBottom: 10,
+        alignSelf: 'flex-start',
+        width: '100%',
+        maxWidth: '100%',
+    },
+    cardSubHeaderText: {
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    cardSubHeaderhistory: {
+        // borderColor: theme.BRAND_GRADIENT_END,
+        // borderWidth: 2,
+        padding: 10,
+        borderRadius: 5,
+        // marginBottom: 10,
+        alignSelf: 'center',
+        width: '100%',
+        maxWidth: '100%',
+        backgroundColor: theme.BRAND_GRADIENT_END,
+    },
+    cardSubHeaderTexthistory: {
+        color: '#fff', // Purple theme
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    twoColumnRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    keyValuePair: {
+        width: '48%',
+    },
+    fullWidthRow: {
+        marginBottom: 10,
+    },
+    key: {
+        fontWeight: 'bold',
+        fontSize: 13,
+        color: '#555',
+        marginBottom: 3,
+    },
+    value: {
+        fontSize: 14,
+        color: '#333',
+    },
+    valueWord: {
+        fontSize: 13,
+        color: 'gray',
+        fontStyle: 'italic',
+        alignSelf: 'flex-end',
+    },
+    Authvalue: {
+        fontSize: 14,
+        color: theme.BRAND_GRADIENT_END,
+        fontWeight: 'bold',
+    },
+    valueAuthorised: {
+        fontSize: 14,
+        color: 'rgba(0, 128, 0, 0.8)',
+        fontWeight: 'bold',
+    },
+    valueRejected: {
+        fontSize: 14,
+        color: 'rgba(255, 0, 0, 0.8)',
+        fontWeight: 'bold',
+    },
+    valueBold: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: 'bold',
+    },
+    valuegreen: {
+        fontSize: 14,
+        color: 'rgba(0, 128, 0, 0.8)',
+    },
+    editableValue: {
+        fontSize: 14,
+        color: 'rgba(255, 0, 0, 0.8)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        borderRadius: 5,
+        padding: 4,
+        backgroundColor: 'rgb(255, 255, 255)',
+    },
+    editableValueBlack: {
+        fontSize: 14,
+        color: 'rgb(0, 0, 0)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        borderRadius: 5,
+        padding: 4,
+        backgroundColor: 'rgb(255, 255, 255)',
+    },
+    editableValue1: {
+        fontSize: 14,
+        color: 'rgba(255, 0, 0, 0.8)',
+        // borderWidth: 1,
+        // borderColor: 'rgba(0, 0, 0, 0.1)',
+        // borderRadius: 5,
+        padding: 4,
+        backgroundColor: 'rgb(255, 255, 255)',
+    },
+    cardActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    overlayText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    stampContainer: {
+        position: 'absolute',
+        top: '80%',
+        left: '80%',
+        marginLeft: -50,
+        marginTop: 20,
+        zIndex: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stampContainerPOS: {
+        position: 'absolute',
+        top: '52%',
+        left: '90%',
+        marginLeft: -50,
+        marginTop: 20,
+        zIndex: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stampContainerYOS: {
+        position: 'absolute',
+        top: '57%',
+        left: '93%',
+        marginLeft: -50,
+        marginTop: 20,
+        zIndex: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stamp: {
+        width: 100,
+        height: 60,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        transform: [{ rotate: '0deg' }],
+        borderWidth: 1,
+        borderColor: '#999',
+    },
+    stampAccepted: {
+        backgroundColor: 'rgba(76, 175, 80, 0.7)',
+        borderColor: 'rgba(46, 125, 50, 0.9)',
+    },
+    stampRejected: {
+        backgroundColor: 'rgba(244, 67, 54, 0.7)',
+        borderColor: 'rgba(198, 40, 40, 0.9)',
+    },
+    stampText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+    topButton: {
+        position: 'absolute',
+        right: 20,
+        bottom: 100,
+        backgroundColor: '#fff', // Purple theme
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.26)',
+        alignItems: 'center',
+        elevation: 5, // shadow Android
+        shadowColor: '#000', // shadow iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        zIndex: 1,
+    },
+    historyButton: {
+        position: 'absolute',
+        right: 20,
+        top: 100, // Adjusted to avoid overlap with header
+        backgroundColor: 'rgba(106, 13, 173, 0.4)', // Purple theme
+        width: 40,
+        height: 40,
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        zIndex: 1,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: '#999',
+    },
+    modalContainer: {
+        flex: 1,
+        backgroundColor: '#f8f9fa', // Light gray background
+        paddingTop: 50,
+    },
+
+    tabContainer: {
+        flexDirection: 'row',
+        marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        backgroundColor: '#fff',
+        paddingVertical: 10,
+    },
+    tab: {
+        flex: 1,
+        padding: 12,
+        alignItems: 'center',
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    activeTab: {
+        borderBottomColor: theme.BRAND_GRADIENT_END, // Purple theme
+    },
+    tabText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+    },
+    modalSearchInput: {
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        padding: 12,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    listIconContainer: {
+        position: 'absolute',
+        top: -50,
+        right: 20,
+        zIndex: 1,
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        color: '#fff',
+        borderRadius: 3,
+        padding: 4,
+    },
+    listIconContaineradd: {
+        position: 'absolute',
+        bottom: 140,
+        right: 15,
+        zIndex: 1,
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        color: '#fff',
+        borderRadius: 10,
+        padding: 10,
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    listIconText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: 'bold',
+        alignSelf: 'center',
+    },
+    horizontalListContainer: {
+        flex: 1,
+    },
+    horizontalCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    cardContent: {
+        padding: 12,
+    },
+    partyName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 6,
+        color: '#333',
+    },
+    partyAddress: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 8,
+    },
+    partyDetails: {
+        fontSize: 14,
+        color: '#555',
+        marginBottom: 4,
+    },
+    historyDate: {
+        fontSize: 12,
+        color: '#999',
+        marginBottom: 4,
+    },
+    historyName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        color: '#333',
+    },
+    historyDetails: {
+        marginTop: 8,
+    },
+    historyKeyValue: {
+        fontSize: 14,
+        marginBottom: 4,
+        color: '#555',
+    },
+    label: {
+        fontWeight: 'bold',
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+    },
+    tabContainer1: {
+        flexDirection: 'row',
+        // marginBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        backgroundColor: '#fff',
+        paddingVertical: 1,
+    },
+    tab1: {
+        flex: 1,
+        padding: 12,
+        alignItems: 'center',
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    activeTab1: {
+        borderBottomColor: theme.BRAND_GRADIENT_END,
+    },
+    tabText1: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: theme.BRAND_GRADIENT_END,
+    },
+    pendingCardall: {
+        borderColor: 'rgba(112, 112, 112, 0.3)',
+    },
+    stampPendingall: {
+        backgroundColor: 'rgba(173, 173, 173, 0.7)',
+        borderColor: 'rgba(140, 140, 140, 0.9)',
+    },
+
+    noDataContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        height: '100%',
+        width: '100%',
+    },
+    noDataText: {
+        fontSize: 16,
+        color: '#000',
+    },
+
+
+    carouselCardActive: {
+        width: 280,
+        height: '90%',
+        transform: [{ scale: 1 }],
+        elevation: 12,
+        shadowOpacity: 0.4,
+    },
+    carouselCardInactive: {
+        width: 240,
+        height: '80%',
+        transform: [{ scale: 0.9 }],
+        opacity: 0.6,
+        elevation: 4,
+    },
+    // carouselCardContent: {
+    //     flex: 1,
+    //     padding: 10,
+    //     // borderStyle: 'solid',
+    //     // borderColor: 'rgb(255, 255, 255)',
+    // },
+    // carouselCardTitle: {
+    //     fontSize: 16,
+    //     fontWeight: 'bold',
+    //     // color: theme.BRAND_GRADIENT_END,
+    //     color: '#fff',
+    //     marginBottom: 8,
+    //     textAlign: 'center',
+    //     borderBottomColor: 'rgb(255, 255, 255)',
+    //     borderBottomWidth: 1,
+    //     paddingBottom: 6,
+
+    // },
+    // carouselCardText: {
+    //     fontSize: 13,
+    //     color: '#fff',
+    //     marginBottom: 5,
+    //     textAlign: 'left',
+    //     fontWeight: '800',
+    // },
+    // carouselCardKey: {
+    //     // fontWeight: 'bold',
+    //     color: '#fff',
+    //     fontSize: 13,
+    // },
+    infoIconContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    infoCount: {
+        color: '#2196F3',
+        fontWeight: 'bold',
+        marginLeft: 5,
+    },
+    //   
+    // ... aapke existing styles
+    carouselModalOverlay: {
+        flex: 1,
+        backgroundColor: 'white',  // Full-screen white
+    },
+    modalCloseButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 1,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 20,
+        padding: 8,
+    },
+    verticalScrollContainer: {
+        paddingTop: 50,  // Close button ke neeche space
+        paddingHorizontal: 10,
+    },
+    designCard: {
+        backgroundColor: '#f9f9f9',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    designCardTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        paddingBottom: 6,
+    },
+    itemCardTitle: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#555',
+        marginBottom: 10,
+    },
+    tableContainer: {
+        minWidth: 500,  // Horizontal scroll ke liye
+    },
+    tableScrollWrapper: {
+        width: 500,   // table width bigger than screen
+    },
+    tableHeader: {
+        flexDirection: "row",
+        backgroundColor: "#4a6fa5",
+        paddingVertical: 10,
+    },
+
+    tableRow: {
+        flexDirection: "row",
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    tableHeaderText: {
+        color: 'white',
+        fontWeight: '600',
+        textAlign: 'center',
+        paddingHorizontal: 4,
+        fontSize: 12,
+    },
+
+    tableCell: {
+        textAlign: 'center',
+        color: '#555',
+        paddingHorizontal: 4,
+        fontSize: 12,
+    },
+    rowCard: {
+        backgroundColor: "#fff",
+        borderRadius: 6,
+        padding: 10,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: "#eee"
+    },
+
+    rowItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 4
+    },
+
+    label: {
+        fontSize: 12,
+        color: "#666"
+    },
+
+    value: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#333"
+    },
+    accordionCard: {
+        backgroundColor: "#fff",
+        borderRadius: 10,
+        marginBottom: 14,
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        overflow: "hidden"
+    },
+
+    accordionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 14,
+        backgroundColor: "#f7f7f7",
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee"
+    },
+
+    accordionTitle: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: "#333"
+    },
+
+    accordionSubTitle: {
+        fontSize: 13,
+        color: "#666",
+        marginTop: 2
+    },
+
+    accordionBody: {
+        padding: 12
+    },
+
+    rowCard: {
+        backgroundColor: "#fafafa",
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: "#eee"
+    },
+
+    rowItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 4
+    },
+
+    label: {
+        fontSize: 12,
+        color: "#777"
+    },
+
+    value: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#222"
+    },
+    countBadge: {
+        backgroundColor: "#2196F3",
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginRight: 8
+    },
+
+    countText: {
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: "700"
+    },
+    // Column widths
+    shadeColumn: { width: 120 },
+    qtyColumn: { width: 80 },
+    rateColumn: { width: 100 },
+    amountColumn: { width: 120 },
+    discColumn: { width: 80 },
+    gridCard: {
+        flex: 1,
+        backgroundColor: "#fafafa",
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 10,
+        marginHorizontal: 4,
+        borderWidth: 1,
+        borderColor: "#eee"
+    },
+
+    gridRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: 6
+    },
+
+    gridLabel: {
+        fontSize: 12,
+        color: "#666",
+        fontWeight: "500",
+        flex: 1
+    },
+
+    gridValue: {
+        fontSize: 12.5,
+        fontWeight: "700",
+        color: "#222",
+        flex: 1,
+        textAlign: "right",
+        flexWrap: "wrap"
+    }
 });

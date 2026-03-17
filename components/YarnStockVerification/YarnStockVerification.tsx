@@ -296,7 +296,7 @@ const YarnStockVerification = (props) => {
                 setIsLoading(false)
             } else if (response.data.success === true && response.data.data.length > 0) {
                 //Alert.alert("Data Updated successfully.");
-                //setSavedCartons(getSavedCartons => [...getSavedCartons, response.data.data[0].UId])
+                setSavedCartons(getSavedCartons => [...getSavedCartons, response.data.data[0].UId])
                 // let mergedata1 = []
                 // let mergedata1Cntr = 0;
                 // let mergedata2 = []

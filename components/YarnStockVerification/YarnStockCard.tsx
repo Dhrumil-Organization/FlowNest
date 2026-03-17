@@ -493,7 +493,7 @@ const YarnStockCard: React.FC<POTDataProps> = ({
                 <View style={styles.field}>
                     <Text style={styles.label}>Tran. date:</Text>
                     {/* <Text style={styles.value}>{item.TranDate}</Text> */}
-                    <Text style={styles.value}>{convDate(item.TranDate)}</Text>
+                    <Text style={styles.value}>{convDate(item.TranDate)}{item.TranDate}</Text>
                 </View>
             </View>
             <View style={styles.row}>
@@ -878,10 +878,11 @@ const styles = StyleSheet.create({
     goButton: {
         position: "absolute",
         top: 2,
-        right: -12,
+        //right: -12,
+        right: 0,
         bottom: 0,
         backgroundColor: "#007EA7",
-        width: 45,
+        width: 55,
         height: 35,
         //borderRadius: 10,
         borderTopLeftRadius: 0,

@@ -2861,7 +2861,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             fontWeight: "600",
                                                         }}>
                                                             ₹{parseFloat(
-                                                                filteredData12.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
+                                                                filteredPartyData.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
                                                             ).toLocaleString('en-IN', {
                                                                 minimumFractionDigits: 2,
                                                                 maximumFractionDigits: 2
@@ -2885,7 +2885,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             fontWeight: "600",
                                                         }}>
                                                             ₹{parseFloat(
-                                                                filteredData12.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
+                                                                filteredPartyData.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
                                                             ).toLocaleString('en-IN', {
                                                                 minimumFractionDigits: 2,
                                                                 maximumFractionDigits: 2

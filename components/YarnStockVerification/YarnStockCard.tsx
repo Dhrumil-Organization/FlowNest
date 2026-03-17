@@ -529,7 +529,7 @@ const YarnStockCard: React.FC<POTDataProps> = ({
 
                 <View style={styles.field}>
                     <Text style={styles.label}>User code:</Text>
-                    <Text style={styles.value}>{item.UsrCode}-{item.UId}</Text>
+                    <Text style={styles.value}>{item.UsrCode}</Text>
                 </View>
             </View>
         </View>

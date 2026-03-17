@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, Modal, TextInput } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBar from '../HeaderBar/HeaderBar';
 import theme from '../../android/app/src/theme';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
+import LinearGradient from 'react-native-linear-gradient';
 import data from './data.json';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
+import { get } from 'lodash';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
@@ -80,6 +83,13 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [isListReady, setIsListReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
     const [selectedProperty, setSelectedProperty] = useState<any>(null);
+    const [numColumns, setNumColumns] = useState(1);
+    const { width: screenWidth } = useWindowDimensions();
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [getModalTableData, setModalTableData] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+
 
     console.log("slecetdparty", selectedParty);
 
@@ -217,7 +227,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         const lowercasedQuery = searchQueryPOT.toLowerCase();
 
         const filtered = salessumdata.filter((item) =>
-            String(item?.party || '').toLowerCase().includes(lowercasedQuery) ||            
+            String(item?.party || '').toLowerCase().includes(lowercasedQuery) ||
             String(item?.parcode || '').toLowerCase().includes(lowercasedQuery) ||
             String(item?.itmcode || '').toLowerCase().includes(lowercasedQuery) ||
             String(item?.itmname || '').toLowerCase().includes(lowercasedQuery) ||
@@ -272,8 +282,10 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             dsncodes: dsnCodes,
             parties: partyCodes,
             prptype: selectedProperty.PrpOf,
-            txntype: txntype
+            txntype: txntype,
+            fetch: "partywisesummary",
         };
+        setPayload(payload as any);
         console.log("Payload", payload)
         // Check cache first
         // const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
@@ -326,6 +338,78 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }
     };
 
+    const handleConfirmActionCard = async (item, getpayload) => {
+        setIsLoading(true);
+
+        const payload12 = {
+            fromdate: getpayload.fromdate,
+            todate: getpayload.todate,
+            yearno: getpayload.yearno,
+            sexes: getpayload.sexes,
+            type: getpayload.type,
+            dsncodes: getpayload.dsncodes,
+            parties: [item.parcode],
+            prptype: getpayload.prptype,
+            txntype: getpayload.txntype,
+            // fetch: "partywisesummary",
+        };
+        // setPayload(payload as any);
+        console.log("Card Payload", payload12)
+        // Check cache first
+        // const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
+        // if (cachedData && JSON.stringify(cachedData.payload) === JSON.stringify(payload)) {
+        //     setsalesdata(cachedData.response.data.salesdata);
+        //     setsalesdataTotal(cachedData.response.data.salesdata.length);
+        //     setsalessumdata(cachedData.response.data.salessumdata);
+        //     setIsLoading(false);
+        //     closeDrawer();
+        //     return;
+        // }
+
+        // If not in cache, proceed with API call
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Requested-with': 'XMLHttpRequest',
+        };
+        try {
+            const response12 = await axios.post(`${API}/api/purchaseordertracking`, payload12, { headers });
+            const responseData12 = response12?.data?.response?.data || [];
+           
+
+            console.log("🔵 response", payload12, responseData12);
+
+            if (response12.data.success === true) {
+
+                if (responseData12.length > 0) {
+                    setSelectedItem(item);
+                    setModalVisible(true);
+                    setModalTableData(responseData12);
+                    // setsalesdata(responseData12);
+                    // setsalesdataTotal(responseData12.length);
+                    // setsalessumdata(responseData12);
+                } else {
+                    // IMPORTANT: clear old data
+                    // setsalesdata([]);
+                    // setsalesdataTotal(0);
+                    // setsalessumdata([]);
+                }
+
+            } else {
+                Alert.alert(`${response12.data.message}`);
+                // setsalesdata([]);
+                // setsalessumdata([]);
+            }
+        } catch (error) {
+            Alert.alert('Server Error');
+            // setsalesdata([]);
+            // setsalessumdata([]);
+        } finally {
+            // setIsLoading(false);
+            // closeDrawer();
+        }
+    };
+
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
 
@@ -333,6 +417,62 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         if (!loading) return null;
         return <ActivityIndicator style={styles.loadingIndicator} size="large" color={theme.BRAND_GRADIENT_END} />;
     };
+
+    const CARD_COLORS = [
+        ["#4A6FA5", "#5C85D1"], ["#2E5BBA", "#4A7CC5"],
+        ["#3A7BD5", "#5A9BD5"], ["#00ABC5", "#00D4FF"],
+        ["#4CAF50", "#6BC96B"], ["#FF9800", "#FFB74D"],
+        ["#9C27B0", "#BA68C8"], ["#607D8B", "#90A4AE"],
+    ];
+
+    const getGridConfig = () => {
+        const padding = 12;
+        if (screenWidth < 600) {
+            return { numColumns: 1, cardWidth: screenWidth - (padding * 2) };
+        } else if (screenWidth < 900) {
+            return { numColumns: 2, cardWidth: (screenWidth - (padding * 3)) / 2 };
+        } else if (screenWidth < 1200) {
+            return { numColumns: 3, cardWidth: (screenWidth - (padding * 4)) / 3 };
+        } else if (screenWidth < 1500) {
+            return { numColumns: 4, cardWidth: (screenWidth - (padding * 5)) / 4 };
+        } else {
+            return { numColumns: 5, cardWidth: (screenWidth - (padding * 6)) / 5 };
+        }
+    };
+
+    useEffect(() => {
+        getGridConfig();
+    }, [screenWidth]);
+    const gridConfig = getGridConfig();
+
+    const { cardWidth } = getGridConfig();
+
+
+    const fixedLabels = {
+        party: "Account Name",
+        netamt: "Total",
+        bqty: "Balance Qty",
+        pono: "PO Number",
+        podate: "PO Date",
+        itmname: "Item Name",
+        qty: "Quantity",
+        unitrate: "Unit Rate",
+        amount: "Amount",
+    };
+
+    const tableColumns = [
+        { key: 'party', label: 'Account Name', width: 160, align: 'left' },
+        { key: 'netamt', label: 'Total', width: 120, align: 'right' },
+        { key: 'bqty', label: 'Balance Qty', width: 120, align: 'right' },
+        { key: 'pono', label: 'PO Number', width: 120, align: 'center' },
+        { key: 'podate', label: 'PO Date', width: 120, align: 'center' },
+        { key: 'itmname', label: 'Item Name', width: 160, align: 'left' },
+        { key: 'qty', label: 'Quantity', width: 120, align: 'right' },
+        { key: 'unitrate', label: 'Unit Rate', width: 120, align: 'right' },
+        { key: 'amount', label: 'Amount', width: 120, align: 'right' },
+    ];
+
+
 
     return (
         <>
@@ -375,67 +515,201 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                 onPropertySelect={setSelectedProperty}
             />
 
-            <FlatList
-                ref={flatListRef}
-                // data={salessumdata}
-                data={searchQueryPOT.trim() ? filteredData : salessumdata}
-                keyExtractor={(item, index) => index.toString()}
+
+
+            <ScrollView
+                contentContainerStyle={{ paddingTop: 20, paddingBottom: 20, paddingHorizontal: 12 }}
                 showsVerticalScrollIndicator={true}
-                contentContainerStyle={{ paddingBottom: 120 }}
-                renderItem={({ item, index }) => (
+            >
+                {Array.from({ length: Math.ceil((searchQueryPOT.trim() ? filteredData : salessumdata).length / gridConfig.numColumns) }).map((_, rowIndex) => {
+                    const rowItems = (searchQueryPOT.trim() ? filteredData : salessumdata).slice(
+                        rowIndex * gridConfig.numColumns,
+                        (rowIndex + 1) * gridConfig.numColumns
+                    );
+                    return (
+                        <View key={rowIndex} style={{ flexDirection: 'row', marginBottom: 12 }}>
+                            {rowItems.map((item, index) => {
+                                const colors = CARD_COLORS[(rowIndex * gridConfig.numColumns + index) % CARD_COLORS.length];
+                                return (
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={{
+                                            width: gridConfig.cardWidth,
+                                            height: 180,
+                                            marginHorizontal: 6,
+                                            borderRadius: 12,
+                                            overflow: 'hidden',
+                                            elevation: 4,
+                                        }}
+                                        onPress={() => {
+                                            console.log("Clicked Item Data:", item, getpayload);
+                                            handleConfirmActionCard(item, getpayload);
+                                        }}
+                                    >
+                                        <LinearGradient
+                                            colors={colors}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={{
+                                                padding: 16,
+                                                height: '100%',
+                                            }}
+                                        >
+                                            {/* Header */}
+                                            <View style={{ alignItems: 'center', marginBottom: 10 }}>
+                                                <Text style={{
+                                                    color: "#fff",
+                                                    fontSize: 16,
+                                                    fontWeight: "700",
+                                                }}>
+                                                    {item.prpname}
+                                                </Text>
+                                                {/* <Text style={{
+                                                    color: "rgba(255,255,255,0.8)",
+                                                    fontSize: 12,
+                                                    fontWeight: "500",
+                                                }}>
+                                                    {item.strname}
+                                                </Text> */}
+                                            </View>
 
-                    <View style={styles.cardContainer}>
+                                            {/* Party and PO Number */}
+                                            <View style={{
+                                                flexDirection: 'row',
+                                                justifyContent: 'space-between',
+                                                marginBottom: 12,
+                                            }}>
+                                                <Text style={{
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    fontSize: 12,
+                                                    fontWeight: "600",
+                                                }}>
+                                                    {item.party}
+                                                </Text>
+                                                {/* <Text style={{
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    fontSize: 12,
+                                                    fontWeight: "600",
+                                                }}>
+                                                    PO: {item.pono}
+                                                </Text> */}
+                                            </View>
 
-                        <View style={crlimtreq_styles.dateContainer}>
-                            <Text style={crlimtreq_styles.dateText}>{item.podate}</Text>
+                                            {/* All Key-Value Pairs (Right-Aligned) */}
+                                            {Object.entries(item).map(([key, value]) => {
+                                                if (['prpname', 'strname', 'party', 'pono'].includes(key)) return null;
+                                                return (
+                                                    <View key={key} style={{
+                                                        flexDirection: 'row',
+                                                        justifyContent: 'space-between',
+                                                        marginBottom: 6,
+                                                    }}>
+                                                        <Text style={{
+                                                            color: "rgba(255,255,255,0.7)",
+                                                            fontSize: 11,
+                                                        }}>
+                                                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                        </Text>
+                                                        <Text style={{
+                                                            color: "#fff",
+                                                            fontSize: 12,
+                                                            fontWeight: "600",
+                                                            textAlign: 'right',
+                                                        }}>
+                                                            {value}
+                                                        </Text>
+                                                    </View>
+                                                );
+                                            })}
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
-
-                        <View style={{ alignItems: 'center', marginBottom: 5 }}>
-                            <Text style={styles.cardHeaderText}>{item.prpname}</Text>
-                        </View>
-
-                        <View style={{ alignItems: 'center' }}>
-                            <Text style={styles.cardSubHeaderText}>{item.strname}</Text>
-                        </View>
-
-                        <View style={styles.cardSubHeader}>
-                            <Text style={crlimtreq_styles.cardSubHeaderText}>
-                                {item.party}
-                            </Text>
-                            <Text style={crlimtreq_styles.cardSubHeaderText}>
-                                {item.pono}
-                            </Text>
-                        </View>
-
-                        <View style={crlimtreq_styles.cardContent}>
-
-                            <View style={crlimtreq_styles.twoColumnRow}>
-                                <View style={crlimtreq_styles.keyValuePair}>
-                                    <Text style={crlimtreq_styles.key}>Item Name</Text>
-                                    <Text style={crlimtreq_styles.valuegreen}>{item.itmname}</Text>
-                                </View>
-
-                                <View style={styles.twoColumnRow}>
-                                    <Text style={crlimtreq_styles.key}>Qty:</Text>
-                                    <Text style={crlimtreq_styles.valuegreen}>{item.qty}</Text>
-                                </View>
-                            </View>
-
-                            <View style={crlimtreq_styles.twoColumnRow}>
-                                <View style={crlimtreq_styles.keyValuePair}>
-                                    <Text style={crlimtreq_styles.key}>UnitRate</Text>
-                                    <Text style={crlimtreq_styles.valuegreen}>{item.unitrate}</Text>
-                                </View>
-
-                                <View style={styles.twoColumnRow}>
-                                    <Text style={crlimtreq_styles.key}>Balance Qty</Text>
-                                    <Text style={crlimtreq_styles.valuegreen}>{item.bqty}</Text>
-                                </View>
-                            </View>
-                        </View>
+                    );
+                })}
+            </ScrollView>
+            <Modal
+                visible={modalVisible}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <View style={modalStyles.modalContainer}>
+                    {/* Header */}
+                    <View style={modalStyles.modalHeader}>
+                        <Text style={modalStyles.modalTitle}>Purchase Order Details</Text>
+                        <TouchableOpacity onPress={() => setModalVisible(false)}>
+                            <Icon name="close" size={24} color="#fff" />
+                        </TouchableOpacity>
                     </View>
-                )}
-            />
+
+                    {/* Search Bar */}
+                    <TextInput
+                        placeholder="Search..."
+                        style={modalStyles.searchInput}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+
+                    {/* Table Container */}
+                    <View style={modalStyles.tableWrapper}>
+                        <ScrollView
+                            horizontal={true}
+                            showsHorizontalScrollIndicator={true}
+                            nestedScrollEnabled={true}
+                        >
+                            <View style={{ minWidth: 1200 }}>
+                                {/* Table Header (First Row) */}
+                                <View style={[modalStyles.tableRow, { backgroundColor: theme.BRAND_GRADIENT_END }]}>
+                                    {tableColumns.map(col => (
+                                        <Text key={col.key} style={[modalStyles.tableHeaderText, { width: col.width, textAlign: col.align }]}>
+                                            {col.label}
+                                        </Text>
+                                    ))}
+                                </View>
+
+                                {/* Table Body (Scrollable) */}
+                                <FlatList
+                                    data={getModalTableData.filter((item) =>
+                                        Object.keys(fixedLabels).some((key) =>
+                                            String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
+                                        )
+                                    )}
+                                    renderItem={({ item }) => (
+                                        <View style={modalStyles.tableRow}>
+                                            {tableColumns.map(col => (
+                                                <Text key={col.key} style={[modalStyles.tableCell, { width: col.width, textAlign: col.align }]}>
+                                                    {item[col.key]}
+                                                </Text>
+                                            ))}
+                                        </View>
+                                    )}
+                                    keyExtractor={(item, index) => index.toString()}
+                                    initialNumToRender={10}
+                                    maxToRenderPerBatch={10}
+                                    windowSize={5}
+                                    removeClippedSubviews={true}
+                                    showsVerticalScrollIndicator={true}
+                                    style={{ maxHeight: 400 }}
+                                />
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+
+
+
+
+
+
+
+
+
+
+
         </>
     );
 };
@@ -628,5 +902,58 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end'
     }
 });
+
+const modalStyles = StyleSheet.create({
+    modalContainer: {
+      flex: 1,
+      backgroundColor: '#fff',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: theme.BRAND_GRADIENT_END,
+      padding: 15,
+    },
+    modalTitle: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    searchInput: {
+      backgroundColor: '#fff',
+      padding: 10,
+      borderRadius: 5,
+      margin: 10,
+      borderWidth: 1,
+      borderColor: '#ddd',
+    },
+    tableWrapper: {
+      flex: 1,
+      margin: 10,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee',
+      padding: 10,
+      backgroundColor: '#fff',
+    },
+    tableHeaderText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      padding: 5,
+      textAlign: 'center',
+      fontSize: 12,
+    },
+    tableCell: {
+      color: '#333',
+      padding: 5,
+      textAlign: 'center',
+      fontSize: 12,
+    },
+  });
+  
+
 
 export default React.memo(PurchaseOrderTracking);

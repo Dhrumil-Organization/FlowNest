@@ -1,122 +1,3 @@
-// import SQLite from 'react-native-sqlite-storage';
-
-// const db = SQLite.openDatabase(
-//   { name: 'chat.db', location: 'default' },
-//   () => { },
-//   error => console.log(error)
-// );
-
-// export const initDB = () => {
-//   db.transaction(tx => {
-//     tx.executeSql(
-//       `CREATE TABLE IF NOT EXISTS chat(
-//         id INTEGER PRIMARY KEY AUTOINCREMENT,
-//         userText TEXT,
-//         aiText TEXT,
-//         createdAt INTEGER
-//       );`
-//     );
-//   });
-// };
-
-// export const saveChat = (userText, aiText) => {
-//   return new Promise((resolve) => {
-
-//     db.transaction(tx => {
-
-//       tx.executeSql(
-//         'INSERT INTO chat(userText, aiText, createdAt) VALUES (?,?,?)',
-//         [userText, aiText, Date.now()],
-//         () => resolve(true),
-//         (_, err) => {
-//           console.log("Save error", err);
-//           resolve(false);
-//         }
-//       );
-
-//     });
-
-//   });
-// };
-
-// export const deleteAfterMessage = (userText) => {
-
-//   db.transaction(tx => {
-
-//     tx.executeSql(
-//       `DELETE FROM chat 
-//        WHERE id > (
-//          SELECT id FROM chat WHERE userText=? ORDER BY id DESC LIMIT 1
-//        )`,
-//       [userText]
-//     );
-
-//   });
-
-// };
-
-// export const getChat = (userText) => {
-//   return new Promise((resolve) => {
-//     db.transaction(tx => {
-//       tx.executeSql(
-//         'SELECT * FROM chat WHERE userText=?',
-//         [userText],
-//         (_, res) => {
-//           if (res.rows.length > 0) {
-//             resolve(res.rows.item(0));
-//           } else {
-//             resolve(null);
-//           }
-//         }
-//       );
-//     });
-//   });
-// };
-
-// export const clearChat = () => {
-//   db.transaction(tx => {
-//     tx.executeSql('DELETE FROM chat');
-//   });
-// };
-
-// export const getAllChats = () => {
-//   return new Promise((resolve) => {
-
-//     db.transaction(tx => {
-
-//       tx.executeSql(
-//         'SELECT * FROM chat ORDER BY id ASC',
-//         [],
-//         (_, res) => {
-
-//           const arr: any[] = [];
-
-//           for (let i = 0; i < res.rows.length; i++) {
-
-//             const item = res.rows.item(i);
-
-//             arr.push({
-//               type: 'user',
-//               text: item.userText
-//             });
-
-//             arr.push({
-//               type: 'ai',
-//               text: item.aiText
-//             });
-
-//           }
-
-//           resolve(arr);
-
-//         }
-//       );
-
-//     });
-
-//   });
-// };
-
 import SQLite from 'react-native-sqlite-storage';
 
 const db = SQLite.openDatabase(
@@ -129,12 +10,14 @@ export const initDB = () => {
   db.transaction(tx => {
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS chat(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userText TEXT,
-        aiText TEXT,
-        createdAt INTEGER,
-        isEdited INTEGER DEFAULT 0
-      );`
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userText TEXT,
+  aiText TEXT,
+  userCreatedAt INTEGER,  -- User message timestamp
+  aiCreatedAt INTEGER,    -- AI response timestamp
+  isEdited INTEGER DEFAULT 0
+);
+`
     );
 
     // Check if isEdited column exists (optional)
@@ -158,15 +41,15 @@ export const initDB = () => {
   });
 };
 
-// Save chat WITHOUT duplicate check (always insert new)
-export const saveChat = (userText, aiText) => {
+// Save chat WITH timestamps
+export const saveChat = (userText, aiText, userTimestamp = Date.now(), aiTimestamp = Date.now()) => {
   return new Promise((resolve) => {
     db.transaction(tx => {
       tx.executeSql(
-        'INSERT INTO chat(userText, aiText, createdAt, isEdited) VALUES (?,?,?,?)',
-        [userText, aiText, Date.now(), 0],
+        'INSERT INTO chat(userText, aiText, userCreatedAt, aiCreatedAt, isEdited) VALUES (?,?,?,?,?)',
+        [userText, aiText, userTimestamp, aiTimestamp, 0],
         (_, result) => {
-          console.log('✅ Chat saved with timestamp:', new Date().toLocaleTimeString());
+          console.log('✅ Chat saved with timestamps - User:', new Date(userTimestamp).toLocaleString(), 'AI:', new Date(aiTimestamp).toLocaleString());
           resolve(true);
         },
         (_, err) => {
@@ -177,6 +60,7 @@ export const saveChat = (userText, aiText) => {
     });
   });
 };
+
 
 
 // Delete all messages after a specific message (for edit functionality)
@@ -226,7 +110,7 @@ export const deleteAfterMessage = (userText) => {
   });
 };
 
-// Get cached chat - simple exact match
+// Get cached chat with timestamps
 export const getChat = (userText) => {
   return new Promise((resolve) => {
     db.transaction(tx => {
@@ -237,6 +121,8 @@ export const getChat = (userText) => {
           if (res.rows.length > 0) {
             const item = res.rows.item(0);
             console.log('✅ Cache HIT for:', userText.substring(0, 20) + '...');
+            console.log('   User Time:', new Date(item.userCreatedAt).toLocaleString());
+            console.log('   AI Time:', new Date(item.aiCreatedAt).toLocaleString());
             resolve(item);
           } else {
             console.log('❌ Cache MISS for:', userText.substring(0, 20) + '...');
@@ -272,7 +158,7 @@ export const clearChat = () => {
   });
 };
 
-// Get all chats in correct order with user+AI pairs
+// Get all chats with proper timestamps
 export const getAllChats = () => {
   return new Promise((resolve) => {
     db.transaction(tx => {
@@ -280,41 +166,36 @@ export const getAllChats = () => {
         'SELECT * FROM chat ORDER BY id ASC',
         [],
         (_, res) => {
-          const arr: any[] = [];
-
-          console.log('📊 Loading chats from DB, total records:', res.rows.length);
-
+          const arr = [];
           for (let i = 0; i < res.rows.length; i++) {
             const item = res.rows.item(i);
 
-            // Add user message
+            // User message
             arr.push({
               type: 'user',
               text: item.userText,
-              id: item.id,
+              createdAt: item.userCreatedAt || Date.now(), // Fallback if null
+              id: `${item.id}_user`,
               isEdited: item.isEdited === 1
             });
 
-            // Add AI response
+            // AI message
             arr.push({
               type: 'ai',
               text: item.aiText,
-              id: item.id,
+              createdAt: item.aiCreatedAt || Date.now(), // Fallback if null
+              id: `${item.id}_ai`,
               isEdited: item.isEdited === 1
             });
           }
-
-          console.log('📊 Loaded messages count:', arr.length);
+          console.log(`📊 Loaded ${arr.length} messages with timestamps`);
           resolve(arr);
-        },
-        (_, err) => {
-          console.log("Get all error:", err);
-          resolve([]);
         }
       );
     });
   });
 };
+
 
 // Debug function to check DB contents
 export const debugDB = () => {

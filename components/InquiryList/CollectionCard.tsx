@@ -9,7 +9,11 @@ import {
     ScrollView,
     Modal,
     TextInput,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
+import axios from 'axios';
+import { API } from '../../common/API/dynamicAPI';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import theme from '../../android/app/src/theme';
 import Footer from '../Footer/Footer';
@@ -64,272 +68,55 @@ const formatDate = (d?: string) => {
 };
 
 const getRelativeTime = (dateString: string) => {
+    // Assuming dateString is in DD-MM-YYYY format
     const dateParts = dateString.split('-');
-    const date = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+    const inputDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
     const now = new Date();
 
-    let years = now.getFullYear() - date.getFullYear();
-    let months = now.getMonth() - date.getMonth();
-    let days = now.getDate() - date.getDate();
+    // Check if the input date is in the future
+    const isFuture = inputDate > now;
 
-    if (days < 0) {
+    // Calculate the absolute difference
+    let years = Math.abs(now.getFullYear() - inputDate.getFullYear());
+    let months = Math.abs(now.getMonth() - inputDate.getMonth());
+    let days = Math.abs(now.getDate() - inputDate.getDate());
+
+    // Adjust for negative days or months
+    if (days > 0 && now.getDate() > inputDate.getDate()) {
         months--;
-        days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+        days = new Date(now.getFullYear(), now.getMonth(), 0).getDate() - now.getDate() + inputDate.getDate();
     }
-    if (months < 0) {
+    if (months > 0 && now.getMonth() > inputDate.getMonth()) {
         years--;
-        months += 12;
+        months = 12 - months;
     }
 
+    // Build the result string
+    let result = '';
     if (years > 0) {
-        return `${years} year${years > 1 ? 's' : ''}${months > 0 ? `, ${months} month${months > 1 ? 's' : ''}` : ''}${days > 0 ? `, ${days} day${days > 1 ? 's' : ''}` : ''} ago`;
-    } else if (months > 0) {
-        return `${months} month${months > 1 ? 's' : ''}${days > 0 ? `, ${days} day${days > 1 ? 's' : ''}` : ''} ago`;
-    } else if (days > 0) {
-        return `${days} day${days > 1 ? 's' : ''} ago`;
-    } else {
+        result += `${years} year${years > 1 ? 's' : ''}`;
+    }
+    if (months > 0) {
+        if (result) result += ', ';
+        result += `${months} month${months > 1 ? 's' : ''}`;
+    }
+    if (days > 0) {
+        if (result) result += ', ';
+        result += `${days} day${days > 1 ? 's' : ''}`;
+    }
+
+    // If no difference, return "Today"
+    if (!result) {
         return 'Today';
     }
+
+    // Add "ago" or "from now" based on past or future
+    return isFuture ? `${result} from now` : `${result} ago`;
 };
+
 
 // Modal Table Component
-const ModalTable: React.FC<{
-    inquiry: Inquiry;
-    onClose: () => void;
-}> = ({ inquiry, onClose }) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [expandedItems, setExpandedItems] = useState<Set<string>>(
-        new Set(inquiry.party.items.map(item => item.itemtitlecode))
-    );
-    const [isFullScreen, setIsFullScreen] = useState(false);
 
-    // Format number in Indian format
-    const formatIndianNumber = (num: number) => {
-        return num.toLocaleString('en-IN', {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 2,
-        });
-    };
-
-    // Get first shade's delivery date and remarks
-    const firstShade = inquiry.party.items[0]?.shades[0] || {};
-    const commonDeliveryDate = firstShade.deliverydate || '-';
-    const commonRemarks = firstShade.remarks || '-';
-
-    // Flatten all shades
-    const allShades = useMemo(() => {
-        return inquiry.party.items.flatMap(item =>
-            item.shades.map(shade => ({
-                ...shade,
-                itemtitle: item.itemtitle,
-                itemtitlecode: item.itemtitlecode,
-            }))
-        );
-    }, [inquiry]);
-
-    // Filtered shades
-    const filteredShades = useMemo(() => {
-        if (!searchQuery.trim()) return allShades;
-        const q = searchQuery.toLowerCase();
-        return allShades.filter(shade =>
-            Object.values(shade).some(val =>
-                String(val).toLowerCase().includes(q)
-            )
-        );
-    }, [allShades, searchQuery]);
-
-    // Group by item
-    const groupedShades = useMemo(() => {
-        const groups: Record<string, typeof filteredShades> = {};
-        filteredShades.forEach(shade => {
-            if (!groups[shade.itemtitlecode]) {
-                groups[shade.itemtitlecode] = [];
-            }
-            groups[shade.itemtitlecode].push(shade);
-        });
-        return groups;
-    }, [filteredShades]);
-
-    // Toggle item expansion
-    const toggleItem = (itemtitlecode: string) => {
-        setExpandedItems(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(itemtitlecode)) {
-                newSet.delete(itemtitlecode);
-            } else {
-                newSet.add(itemtitlecode);
-            }
-            return newSet;
-        });
-    };
-
-    // Toggle full screen
-    const toggleFullScreen = () => {
-        setIsFullScreen(!isFullScreen);
-    };
-
-    // Calculate item totals
-    const getItemTotals = (shades: typeof filteredShades) => {
-        return shades.reduce(
-            (totals, shade) => ({
-                qty: totals.qty + parseFloat(shade.quantity),
-                amount: totals.amount + (parseFloat(shade.quantity) * parseFloat(shade.rate)),
-            }),
-            { qty: 0, amount: 0 }
-        );
-    };
-
-    // Calculate grand totals
-    const grandTotals = useMemo(() => {
-        return filteredShades.reduce(
-            (totals, shade) => ({
-                qty: totals.qty + parseFloat(shade.quantity),
-                amount: totals.amount + (parseFloat(shade.quantity) * parseFloat(shade.rate)),
-            }),
-            { qty: 0, amount: 0 }
-        );
-    }, [filteredShades]);
-
-    // Render shade row
-    const renderShadeRow = (shade: (typeof filteredShades)[0], index: number) => (
-        <View style={styles.tableRow} key={index}>
-            <Text style={[styles.tableCell, { width: 150, textAlign: 'left' }]}>{shade.shadename}</Text>
-            <Text style={[styles.tableCell, { width: 80, textAlign: 'right' }]}>
-                {formatIndianNumber(parseFloat(shade.quantity))}
-            </Text>
-            <Text style={[styles.tableCell, { width: 80, textAlign: 'right' }]}>
-                ₹{formatIndianNumber(parseFloat(shade.rate))}
-            </Text>
-            <Text style={[styles.tableCell, { width: 100, textAlign: 'right' }]}>
-                ₹{formatIndianNumber(parseFloat(shade.quantity) * parseFloat(shade.rate))}
-            </Text>
-        </View>
-    );
-
-    // Render item group
-    const renderItemGroup = (itemtitlecode: string) => {
-        const shades = groupedShades[itemtitlecode];
-        const item = inquiry.party.items.find(it => it.itemtitlecode === itemtitlecode);
-        if (!item) return null;
-
-        const { qty, amount } = getItemTotals(shades);
-
-        return (
-            <View style={styles.itemGroup} key={itemtitlecode}>
-                <TouchableOpacity
-                    style={styles.itemHeader}
-                    onPress={() => toggleItem(itemtitlecode)}
-                >
-                    <View style={styles.itemHeaderLeft}>
-                        <Icon
-                            name={expandedItems.has(itemtitlecode) ? 'expand-less' : 'expand-more'}
-                            size={20}
-                            color={theme.TEXT_SECONDARY}
-                        />
-                        <Text style={styles.itemTitle}>{item.itemtitle} ({shades.length})</Text>
-                    </View>
-                </TouchableOpacity>
-                {expandedItems.has(itemtitlecode) && (
-                    <>
-                        {shades.map((shade, index) => renderShadeRow(shade, index))}
-                        <View style={styles.itemFooter}>
-                            <Text style={[styles.itemFooterText, { width: 150, textAlign: 'left' }]}>Item Total</Text>
-                            <Text style={[styles.itemFooterTotal, { width: 80, textAlign: 'right' }]}>
-                                {formatIndianNumber(qty)}
-                            </Text>
-                            <Text style={[styles.itemFooterTotal, { width: 80, textAlign: 'right' }]}>-</Text>
-                            <Text style={[styles.itemFooterTotal, { width: 100, textAlign: 'right' }]}>
-                                ₹{formatIndianNumber(amount)}
-                            </Text>
-                        </View>
-                    </>
-                )}
-            </View>
-        );
-    };
-
-    return (
-        <View style={isFullScreen ? styles.fullScreenContainer : styles.modalContainer}>
-            {!isFullScreen && (
-                <>
-                    <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                        <Icon name="close" size={24} color={theme.TEXT_SECONDARY} />
-                    </TouchableOpacity>
-                    <Text style={styles.modalTitle}>{inquiry.party.partyname}</Text>
-
-                    {/* Common Info Header */}
-                    <View style={styles.commonInfoHeader}>
-                        <View style={styles.commonInfoRow}>
-                            <Text style={styles.commonInfoLabel}>Delivery Date:</Text>
-                            <Text style={styles.commonInfoValue}>{commonDeliveryDate}</Text>
-                        </View>
-                        <View style={styles.commonInfoRow}>
-                            <Text style={styles.commonInfoLabel}>Remarks:</Text>
-                            <Text style={[styles.commonInfoValue, { flex: 1, flexWrap: 'wrap' }]}>{commonRemarks}</Text>
-                        </View>
-                    </View>
-                </>
-            )}
-
-            {/* Search Bar with Full Screen Icon */}
-            <View style={[styles.searchContainer, isFullScreen ? styles.fullScreenSearch : null]}>
-                <Icon name="search" size={20} color={theme.TEXT_SECONDARY} style={styles.searchIcon} />
-                <TextInput
-                    style={isFullScreen ? styles.fullScreenSearchInput : styles.searchInput}
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-                {!isFullScreen && (
-                    <TouchableOpacity onPress={toggleFullScreen} style={styles.fullScreenIcon}>
-                        <Icon name="fullscreen" size={22} color={theme.TEXT_SECONDARY} />
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {/* Table */}
-            <ScrollView horizontal style={styles.tableScrollView}>
-                <View style={[styles.tableWrapper, isFullScreen ? styles.fullScreenTable : null]}>
-                    {/* Table Header */}
-                    <View style={styles.tableHeader}>
-                        <Text style={[styles.tableHeaderText, { width: 150, textAlign: 'left' }]}>Shade Name</Text>
-                        <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>Qty</Text>
-                        <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>Rate</Text>
-                        <Text style={[styles.tableHeaderText, { width: 100, textAlign: 'right' }]}>Amount</Text>
-                    </View>
-
-                    {/* Table Body */}
-                    <FlatList
-                        data={Object.keys(groupedShades)}
-                        keyExtractor={itemtitlecode => itemtitlecode}
-                        renderItem={({ item: itemtitlecode }) => renderItemGroup(itemtitlecode)}
-                        initialNumToRender={5}
-                        maxToRenderPerBatch={5}
-                        windowSize={10}
-                    />
-
-                    {/* Grand Total Footer */}
-                    <View style={styles.grandTotalFooter}>
-                        <Text style={[styles.grandTotalText, { width: 150, textAlign: 'left' }]}>Grand Total</Text>
-                        <Text style={[styles.grandTotalAmount, { width: 80, textAlign: 'right' }]}>
-                            {formatIndianNumber(grandTotals.qty)}
-                        </Text>
-                        <Text style={[styles.grandTotalAmount, { width: 80, textAlign: 'right' }]}>-</Text>
-                        <Text style={[styles.grandTotalAmount, { width: 100, textAlign: 'right' }]}>
-                            ₹{formatIndianNumber(grandTotals.amount)}
-                        </Text>
-                    </View>
-                </View>
-            </ScrollView>
-
-            {isFullScreen && (
-                <TouchableOpacity style={styles.fullScreenCloseButton} onPress={toggleFullScreen}>
-                    <Icon name="close" size={24} color={theme.TEXT_SECONDARY} />
-                </TouchableOpacity>
-            )}
-        </View>
-    );
-};
 
 
 const CollectionCard: React.FC<{
@@ -337,21 +124,36 @@ const CollectionCard: React.FC<{
     searchQueryPOT?: string;
     isConnected?: boolean | null;
     setIsLoggedIn?: (v: boolean) => void;
-}> = ({ gePOTData = [], searchQueryPOT = '', isConnected, setIsLoggedIn }) => {
+    onUpdateShade?: any;
+    token: string;
+}> = ({ gePOTData = [], searchQueryPOT = '', isConnected, setIsLoggedIn, onUpdateShade, token }) => {
     const [data, setData] = useState<Inquiry[]>(gePOTData);
     const [activeTab, setActiveTab] = useState<StatusType>('All');
     const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
+    const [updateModalVisible, setUpdateModalVisible] = useState(false);
+    const [selectedShade, setSelectedShade] = useState(null);
+    const [selectedContext, setSelectedContext] = useState(null);
+    const [selectedStatus, setSelectedStatus] = useState('P');
+    const [isUpdating, setIsUpdating] = useState(false);
+
 
     useEffect(() => {
         setData(gePOTData);
     }, [gePOTData]);
 
+    console.log("data:", data);
+
     const filteredByStatus = useMemo(() => {
         if (activeTab === 'All') return data;
-        return data.filter(d => d.status === activeTab);
+        return data.filter(d =>
+            d.party.items.some(item =>
+                item.shades.some(shade => shade.status === activeTab)
+            )
+        );
     }, [data, activeTab]);
+
 
     const filteredData = useMemo(() => {
         if (!searchQueryPOT.trim()) return filteredByStatus;
@@ -360,33 +162,422 @@ const CollectionCard: React.FC<{
     }, [filteredByStatus, searchQueryPOT]);
 
     const getStatusCounts = () => {
-        const counts = { All: data.length, P: 0, R: 0, C: 0, Ca: 0 };
+        const counts = { All: 0, P: 0, R: 0, C: 0, Ca: 0 };
         data.forEach(d => {
-            if (d.status in counts) {
-                counts[d.status]++;
-            }
+            d.party.items.forEach(item => {
+                item.shades.forEach(shade => {
+                    counts.All++;
+                    if (shade.status in counts) {
+                        counts[shade.status]++;
+                    }
+                });
+            });
         });
         return counts;
     };
 
-    const renderShades = (shades: Inquiry['party']['items'][0]['shades']) => (
-        <View style={styles.shadeContainer}>
-            <FlatList
-                data={shades}
-                keyExtractor={(sh, i) => `${sh.shadecode}-${i}`}
-                renderItem={({ item: sh }) => (
-                    <View style={styles.shadeRow}>
-                        <Text style={styles.shadeName}>{sh.shadename}</Text>
-                        <View style={styles.shadeMeta}>
-                            <Text style={styles.metaText}>Qty: {sh.quantity}</Text>
-                            <Text style={styles.metaText}>Rate: ₹{sh.rate}</Text>
-                            <Text style={styles.amountText}>Amt: ₹{(parseFloat(sh.quantity) * parseFloat(sh.rate)).toFixed(2)}</Text>
+    const ModalTable: React.FC<{
+        inquiry: Inquiry;
+        onClose: () => void;
+    }> = ({ inquiry, onClose }) => {
+        const [searchQuery, setSearchQuery] = useState('');
+        const [expandedItems, setExpandedItems] = useState<Set<string>>(
+            new Set(inquiry.party.items.map(item => item.itemtitlecode))
+        );
+        const [isFullScreen, setIsFullScreen] = useState(false);
+
+        // Format number in Indian format
+        const formatIndianNumber = (num: number) => {
+            return num.toLocaleString('en-IN', {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+            });
+        };
+
+        // Get first shade's delivery date and remarks
+        const firstShade = inquiry.party.items[0]?.shades[0] || {};
+        const commonDeliveryDate = firstShade.deliverydate || '-';
+        const commonRemarks = firstShade.remarks || '-';
+
+        // Flatten all shades
+        const allShades = useMemo(() => {
+            return inquiry.party.items.flatMap(item =>
+                item.shades.map(shade => ({
+                    ...shade,
+                    itemtitle: item.itemtitle,
+                    itemtitlecode: item.itemtitlecode,
+                }))
+            );
+        }, [inquiry]);
+
+        // Filtered shades
+        const filteredShades = useMemo(() => {
+            if (!searchQuery.trim()) return allShades;
+            const q = searchQuery.toLowerCase();
+            return allShades.filter(shade =>
+                Object.values(shade).some(val =>
+                    String(val).toLowerCase().includes(q)
+                )
+            );
+        }, [allShades, searchQuery]);
+
+        // Group by item
+        const groupedShades = useMemo(() => {
+            const groups: Record<string, typeof filteredShades> = {};
+            filteredShades.forEach(shade => {
+                if (!groups[shade.itemtitlecode]) {
+                    groups[shade.itemtitlecode] = [];
+                }
+                groups[shade.itemtitlecode].push(shade);
+            });
+            return groups;
+        }, [filteredShades]);
+
+        // Toggle item expansion
+        const toggleItem = (itemtitlecode: string) => {
+            setExpandedItems(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(itemtitlecode)) {
+                    newSet.delete(itemtitlecode);
+                } else {
+                    newSet.add(itemtitlecode);
+                }
+                return newSet;
+            });
+        };
+
+        // Toggle full screen
+        const toggleFullScreen = () => {
+            setIsFullScreen(!isFullScreen);
+        };
+
+        // Calculate item totals
+        const getItemTotals = (shades: typeof filteredShades) => {
+            return shades.reduce(
+                (totals, shade) => ({
+                    qty: totals.qty + parseFloat(shade.quantity),
+                    amount: totals.amount + (parseFloat(shade.quantity) * parseFloat(shade.rate)),
+                }),
+                { qty: 0, amount: 0 }
+            );
+        };
+
+        // Calculate grand totals
+        const grandTotals = useMemo(() => {
+            return filteredShades.reduce(
+                (totals, shade) => ({
+                    qty: totals.qty + parseFloat(shade.quantity),
+                    amount: totals.amount + (parseFloat(shade.quantity) * parseFloat(shade.rate)),
+                }),
+                { qty: 0, amount: 0 }
+            );
+        }, [filteredShades]);
+
+        // Render shade row
+        const renderShadeRow = (shade: (typeof filteredShades)[0], index: number) => (
+            <View style={styles.tableRow} key={index}>
+                <Text style={[styles.tableCell, { width: 150, textAlign: 'left' }]}>{shade.shadename}</Text>
+                <Text style={[styles.tableCell, { width: 80, textAlign: 'right' }]}>
+                    {formatIndianNumber(parseFloat(shade.quantity))}
+                </Text>
+                <Text style={[styles.tableCell, { width: 80, textAlign: 'right' }]}>
+                    ₹{formatIndianNumber(parseFloat(shade.rate))}
+                </Text>
+                <Text style={[styles.tableCell, { width: 100, textAlign: 'right' }]}>
+                    ₹{formatIndianNumber(parseFloat(shade.quantity) * parseFloat(shade.rate))}
+                </Text>
+                <Text style={[styles.tableCell, { width: 100, textAlign: 'center', color: 'white', marginLeft: 10, marginRight: 10 }, { backgroundColor: getStatusColor(shade.status) }]}>
+                    {/* {shade.status} */}
+                    {STATUS_TABS.find(tab => tab.key === shade.status)?.label || shade.status}
+                </Text>
+            </View>
+        );
+
+        // Render item group
+        const renderItemGroup = (itemtitlecode: string) => {
+            const shades = groupedShades[itemtitlecode];
+            const item = inquiry.party.items.find(it => it.itemtitlecode === itemtitlecode);
+            if (!item) return null;
+
+            const { qty, amount } = getItemTotals(shades);
+
+            return (
+                <View style={styles.itemGroup} key={itemtitlecode}>
+                    <TouchableOpacity
+                        style={styles.itemHeader}
+                        onPress={() => toggleItem(itemtitlecode)}
+                    >
+                        <View style={styles.itemHeaderLeft}>
+                            <Icon
+                                name={expandedItems.has(itemtitlecode) ? 'expand-less' : 'expand-more'}
+                                size={20}
+                                color={theme.TEXT_SECONDARY}
+                            />
+                            <Text style={styles.itemTitle}>{item.itemtitle} ({shades.length})</Text>
+                        </View>
+                    </TouchableOpacity>
+                    {expandedItems.has(itemtitlecode) && (
+                        <>
+                            {shades.map((shade, index) => renderShadeRow(shade, index))}
+                            <View style={styles.itemFooter}>
+                                <Text style={[styles.itemFooterText, { width: 150, textAlign: 'left' }]}>Item Total</Text>
+                                <Text style={[styles.itemFooterTotal, { width: 80, textAlign: 'right' }]}>
+                                    {formatIndianNumber(qty)}
+                                </Text>
+                                <Text style={[styles.itemFooterTotal, { width: 80, textAlign: 'right' }]}>-</Text>
+                                <Text style={[styles.itemFooterTotal, { width: 100, textAlign: 'right' }]}>
+                                    ₹{formatIndianNumber(amount)}
+                                </Text>
+                            </View>
+                        </>
+                    )}
+                </View>
+            );
+        };
+
+        return (
+            <View style={isFullScreen ? styles.fullScreenContainer : styles.modalContainer}>
+                {!isFullScreen && (
+                    <>
+                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                            <Icon name="close" size={24} color={theme.TEXT_SECONDARY} />
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>{inquiry.party.partyname}</Text>
+
+                        {/* Common Info Header */}
+                        <View style={styles.commonInfoHeader}>
+                            <View style={styles.commonInfoRow}>
+                                <Text style={styles.commonInfoLabel}>Delivery Date:</Text>
+                                <Text style={styles.commonInfoValue}>{commonDeliveryDate}</Text>
+                            </View>
+                            <View style={styles.commonInfoRow}>
+                                <Text style={styles.commonInfoLabel}>Remarks:</Text>
+                                <Text style={[styles.commonInfoValue, { flex: 1, flexWrap: 'wrap' }]}>{commonRemarks}</Text>
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                {/* Search Bar with Full Screen Icon */}
+                <View style={[styles.searchContainer, isFullScreen ? styles.fullScreenSearch : null]}>
+                    <Icon name="search" size={20} color={theme.TEXT_SECONDARY} style={styles.searchIcon} />
+                    <TextInput
+                        style={isFullScreen ? styles.fullScreenSearchInput : styles.searchInput}
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    {!isFullScreen && (
+                        <TouchableOpacity onPress={toggleFullScreen} style={styles.fullScreenIcon}>
+                            <Icon name="fullscreen" size={22} color={theme.TEXT_SECONDARY} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Table */}
+                <ScrollView horizontal style={styles.tableScrollView}>
+                    <View style={[styles.tableWrapper, isFullScreen ? styles.fullScreenTable : null]}>
+                        {/* Table Header */}
+                        <View style={styles.tableHeader}>
+                            <Text style={[styles.tableHeaderText, { width: 150, textAlign: 'left' }]}>Shade Name</Text>
+                            <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>Qty</Text>
+                            <Text style={[styles.tableHeaderText, { width: 80, textAlign: 'right' }]}>Rate</Text>
+                            <Text style={[styles.tableHeaderText, { width: 100, textAlign: 'right' }]}>Amount</Text>
+                            <Text style={[styles.tableHeaderText, { width: 100, textAlign: 'center' }]}>Status</Text>
+                        </View>
+
+                        {/* Table Body */}
+                        <FlatList
+                            data={Object.keys(groupedShades)}
+                            keyExtractor={itemtitlecode => itemtitlecode}
+                            renderItem={({ item: itemtitlecode }) => renderItemGroup(itemtitlecode)}
+                            initialNumToRender={5}
+                            maxToRenderPerBatch={5}
+                            windowSize={10}
+                        />
+
+                        {/* Grand Total Footer */}
+                        <View style={styles.grandTotalFooter}>
+                            <Text style={[styles.grandTotalText, { width: 150, textAlign: 'left' }]}>Grand Total</Text>
+                            <Text style={[styles.grandTotalAmount, { width: 80, textAlign: 'right' }]}>
+                                {formatIndianNumber(grandTotals.qty)}
+                            </Text>
+                            <Text style={[styles.grandTotalAmount, { width: 80, textAlign: 'right' }]}>-</Text>
+                            <Text style={[styles.grandTotalAmount, { width: 100, textAlign: 'right' }]}>
+                                ₹{formatIndianNumber(grandTotals.amount)}
+                            </Text>
                         </View>
                     </View>
+                </ScrollView>
+
+                {isFullScreen && (
+                    <TouchableOpacity style={styles.fullScreenCloseButton} onPress={toggleFullScreen}>
+                        <Icon name="close" size={24} color={theme.TEXT_SECONDARY} />
+                    </TouchableOpacity>
                 )}
-            />
-        </View>
-    );
+            </View>
+        );
+    };
+
+
+    // const handleUpdateShade = (shade: any, context: { itemtitle: string; party: Inquiry['party'] }) => {
+    //     console.log("Update shade:", shade, "Card context:", context);
+    //     const payload = {
+    //         id: shade?.id || "",
+    //         prpcode: context?.party?.prpcode || "",
+    //         yearno: context?.party?.yearno || "",
+    //         createdAt: context?.party?.createdAt || "",
+    //         txntype: "mob_inquires",
+    //         action: "update_status",
+    //         srno: shade?.srno || "",
+    //         subsr: shade?.subsr || "",
+    //         status: "C",
+    //     };
+
+    //     console.log("Final payload:", payload);
+    //     // Navigate to update screen or open modal with shade and card data
+    //     // Example: navigation.navigate('UpdateShade', { shade, card: context });
+    // };
+    const handleUpdateShade = (shade: any, context: { itemtitle: string; party: Inquiry['party']; inquiry: Inquiry }) => {
+        setSelectedShade(shade);
+        setSelectedContext(context);
+        setUpdateModalVisible(true);
+    };
+
+
+
+    const handleStatusSelect = (status: string) => {
+        setSelectedStatus(status);
+    };
+
+    const handleUpdateConfirm = async () => {
+        setIsUpdating(true);
+        try {
+            await onUpdateShade(selectedShade, {
+                ...selectedContext,
+                status: selectedStatus,
+                prpcode: selectedContext.inquiry.prpcode,
+                yearno: selectedContext.inquiry.yearno,
+                createdAt: selectedContext.inquiry.createdAt,
+            });
+            setUpdateModalVisible(false);
+        } catch (err) {
+            Alert.alert('Error', 'Failed to update status.');
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'P': return '#FFA500'; // Pending
+            case 'R': return '#0000FF'; // Running
+            case 'C': return '#008000'; // Closed
+            case 'Ca': return '#FF0000'; // Cancelled
+            default: return '#808080'; // Default
+        }
+    };
+
+    const renderShades = (shades: Inquiry['party']['items'][0]['shades'], itemtitle: string, party: Inquiry['party'], inquiry: Inquiry) => {
+        const filteredShades = activeTab === 'All'
+            ? shades
+            : shades.filter(shade => shade.status === activeTab);
+
+        return (
+            <View style={styles.shadeContainer}>
+                <FlatList
+                    data={filteredShades}
+                    keyExtractor={(sh, i) => `${sh.shadecode}-${i}`}
+                    renderItem={({ item: sh }) => (
+                        <View style={styles.shadeRow}>
+                            {/* <View style={{ flex: 1 }}>
+                                <Text
+                                    style={[styles.shadeName, { flexWrap: 'wrap' }]}
+                                    numberOfLines={2}
+                                    ellipsizeMode="tail"
+                                >
+                                    {sh.shadename}
+                                </Text>
+                                <View style={styles.shadeMeta}>
+                                    <Text style={styles.metaText}>Qty: {sh.quantity}</Text>
+                                    <Text style={styles.metaText}>Rate: ₹{sh.rate}</Text>
+                                    <Text style={styles.amountText}>Amt: ₹{(parseFloat(sh.quantity) * parseFloat(sh.rate)).toFixed(2)}</Text>
+                                </View>
+                            </View> */}
+                            <View style={{ flex: 1, marginBottom: 3 }}>
+                                <Text
+                                    style={[styles.shadeName, { flexWrap: 'wrap' }]}
+                                    numberOfLines={2}
+                                    ellipsizeMode="tail"
+                                >
+                                    {sh.shadename}
+                                </Text>
+                                <View style={styles.shadeRowData}>
+                                    <Text style={styles.metaText}>Qty: {sh.quantity}</Text>
+                                    <Text style={styles.metaText}>Rate: ₹{sh.rate}</Text>
+                                    <Text style={styles.amountText}>Amt: ₹{(parseFloat(sh.quantity) * parseFloat(sh.rate)).toFixed(2)}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.shadeRowData}>
+
+                                <TouchableOpacity
+                                    style={[styles.statusBadge1, { backgroundColor: theme.BRAND_ACCENT }]}
+                                    onPress={() => handleUpdateShade(sh, { itemtitle, party, inquiry })}
+                                >
+                                    <Icon style={{ marginRight: 2 }} name="edit" size={12} color="white" />
+                                    <Text style={styles.updateButtonText}>Update Status</Text>
+                                </TouchableOpacity>
+                                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sh.status) }]}>
+                                    <Text style={styles.statusBadgeText}>
+                                        {STATUS_TABS.find(tab => tab.key === sh.status)?.label || sh.status}
+                                    </Text>
+                                </View>
+                            </View>
+
+                        </View>
+                    )}
+                />
+            </View>
+        );
+    };
+    const deleteInquiry = async (inquiry: Inquiry) => {
+        try {
+            const payload = {
+                prpcode: inquiry.prpcode,
+                createdAt: inquiry.createdAt,
+                id: inquiry.id,
+                action: "delete",
+                txntype: "mob_inquires",
+                module: "Inquires"
+            };
+
+            const response = await axios.post(
+                `${API}/api/inquiry_crud`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+            console.log("Delete response:", response, payload)
+
+            if (response.data.success === true) {
+                // Remove the deleted card from the list
+                setData(prevData => prevData.filter(it => it.id !== inquiry.id));
+                // Alert.alert('Success', 'Inquiry deleted successfully!');
+            } else {
+                Alert.alert('Error', 'Failed to delete inquiry.');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            Alert.alert('Error', 'Server error. Please try again.');
+        }
+    };
+
+
 
     const renderInquiry = ({ item }: { item: Inquiry }) => {
         const statusLabel = STATUS_TABS.find(tab => tab.key === item.status)?.label || item.status;
@@ -396,6 +587,21 @@ const CollectionCard: React.FC<{
             'Closed': '#008000',
             'Cancelled': '#FF0000'
         }[statusLabel] || '#808080';
+
+        const handleDelete = () => {
+            Alert.alert(
+                'Delete Inquiry',
+                'Are you sure you want to delete this inquiry?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => deleteInquiry(item),
+                    },
+                ]
+            );
+        };
 
         return (
             <TouchableOpacity
@@ -408,12 +614,22 @@ const CollectionCard: React.FC<{
                 <View style={styles.cardHeader}>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.partyName}>{item.party.partyname}</Text>
-                        <Text style={styles.jobText}>{item.party.partycode} • {item.yearno} • {item.prpcode}</Text>
+                        <View style={{ display: "flex", flexDirection: "row" }}>
+                            <View>
+                                <Text style={styles.jobText}>{item.party.partycode} • {item.yearno} • {item.prpcode}</Text>
+                            </View>
+                            <TouchableOpacity onPress={handleDelete} style={styles.deleteIcon}>
+                                <Icon name="delete" size={20} color="#FF0000" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <View style={[styles.statusTooltip, { backgroundColor: statusColor }]}>
+                    {/* <View style={[styles.statusTooltip, { backgroundColor: statusColor }]}>
                         <Text style={styles.tooltipText}>{statusLabel}</Text>
-                    </View>
+                    </View> */}
                 </View>
+                {/* <TouchableOpacity onPress={handleDelete} style={styles.deleteIcon}>
+                    <Icon name="delete" size={20} color="#FF0000" />
+                </TouchableOpacity> */}
                 <View style={styles.detailRow}>
                     <Text style={styles.label}>Delivery Date</Text>
                     <Text style={styles.value}>{getRelativeTime(item.deliveryDate)}</Text>
@@ -432,17 +648,18 @@ const CollectionCard: React.FC<{
                                     <Text style={styles.itemTitle}>{it.itemtitle}</Text>
                                 </View>
                                 <View style={styles.itemHeaderRight}>
-                                    <Text style={styles.itemCount}>({it.shades.length})</Text>
+                                    {/* <Text style={styles.itemCount}>({it.shades.length})</Text> */}
                                     <Icon name={expandedItemId === it.itemtitlecode ? 'expand-less' : 'expand-more'} size={22} color={theme.TEXT_SECONDARY} />
                                 </View>
                             </TouchableOpacity>
-                            {expandedItemId === it.itemtitlecode && renderShades(it.shades)}
+                            {expandedItemId === it.itemtitlecode && renderShades(it.shades, it.itemtitle, item.party, item)}
                         </View>
                     )}
                 />
             </TouchableOpacity>
         );
     };
+
 
     const renderTabs = () => {
         const statusCounts = getStatusCounts();
@@ -492,6 +709,72 @@ const CollectionCard: React.FC<{
             >
                 {selectedInquiry && <ModalTable inquiry={selectedInquiry} onClose={() => setModalVisible(false)} />}
             </Modal>
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={updateModalVisible}
+                onRequestClose={() => setUpdateModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.updateModal}>
+                        <Text style={styles.modalTitle}>Update Shade Status</Text>
+                        <Text style={styles.modalSubtitle}>
+                            Party: {selectedContext?.party?.partyname}
+                        </Text>
+                        <Text style={styles.modalSubtitle}>
+                            Item: {selectedContext?.itemtitle}
+                        </Text>
+                        <Text style={styles.modalSubtitle}>
+                            Shade: {selectedShade?.shadename}
+                        </Text>
+                        <View style={styles.statusOptions}>
+                            {STATUS_TABS.filter(tab => tab.key !== 'All').map(tab => (
+                                <TouchableOpacity
+                                    key={tab.key}
+                                    style={[
+                                        styles.statusOptionBase,
+                                        {
+                                            backgroundColor: selectedStatus === tab.key ? getStatusColor(tab.key) : 'white',
+                                            borderColor: getStatusColor(tab.key),
+                                        }
+                                    ]}
+                                    onPress={() => handleStatusSelect(tab.key)}
+                                >
+                                    <Text style={[
+                                        styles.statusOptionTextBase,
+                                        {
+                                            color: selectedStatus === tab.key ? 'white' : getStatusColor(tab.key),
+                                        }
+                                    ]}>
+                                        {tab.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={() => setUpdateModalVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.confirmButton}
+                                onPress={handleUpdateConfirm}
+                                disabled={isUpdating}
+                            >
+                                {isUpdating ? (
+                                    <ActivityIndicator color="white" />
+                                ) : (
+                                    <Text style={styles.confirmButtonText}>Update</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
         </>
     );
 };
@@ -518,9 +801,66 @@ const styles = StyleSheet.create({
     itemTitle: { fontSize: 13, fontWeight: '800', color: '#222', flexShrink: 1 },
     itemCount: { fontSize: 12, fontWeight: '700', color: theme.TEXT_SECONDARY, marginRight: 4 },
     shadeContainer: { padding: 12 },
-    shadeRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#fff' },
-    shadeName: { fontSize: 12, fontWeight: '700', color: '#222' },
-    shadeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+    shadeRow: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        backgroundColor: '#fff',
+    },
+    shadeRowData: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        justifyContent: 'space-between',
+    },
+    shadeName: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#222',
+        flex: 1,
+        flexWrap: 'wrap',
+    },
+    statusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginRight: 8,
+        alignSelf: 'center',
+        minWidth: 80,
+        alignItems: 'center',
+    },
+    statusBadge1: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginRight: 8,
+        alignSelf: 'center',
+        minWidth: 80,
+        alignItems: 'center',
+        flexDirection: 'row',
+    },
+    statusBadgeText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    updateButton: {
+        backgroundColor: theme.BRAND_ACCENT,
+        // padding: 2,
+        borderRadius: 20,
+        width: 72,
+        height: 32,
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        flexDirection: 'row',
+        fontSize: 10,
+        paddingHorizontal: 8,
+    },
+
+    shadeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, },
     metaText: { fontSize: 11, color: '#666' },
     amountText: { fontSize: 11, fontWeight: '900', color: theme.BRAND_ACCENT },
     modalContainer: { flex: 1, backgroundColor: '#fff', padding: 16 },
@@ -762,7 +1102,133 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 12,
     },
+    // updateButton: {
+    //     backgroundColor: theme.BRAND_ACCENT,
+    //     padding: 8,
+    //     borderRadius: 4,
+    //     marginLeft: 8,
+    // },
+    updateButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 11,
+    },
+    // statusBadge: {
+    //     backgroundColor: '#e0e0e0',
+    //     paddingHorizontal: 6,
+    //     paddingVertical: 2,
+    //     borderRadius: 4,
+    //     marginRight: 4,
+    //     alignSelf: 'center',
+    // },
+    // statusBadgeText: {
+    //     fontSize: 10,
+    //     fontWeight: 'bold',
+    //     color: '#555',
+    // },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    updateModal: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 20,
+        width: '90%',
+        maxHeight: '70%',
+    },
 
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#555',
+        marginBottom: 5,
+    },
+    statusOptions: {
+        marginVertical: 15,
+    },
+
+
+    selectedStatusOption: {
+        backgroundColor: '#f0f0f0',
+    },
+    statusOptionText: {
+        fontSize: 14,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 15,
+    },
+    cancelButton: {
+        padding: 10,
+        borderRadius: 6,
+        backgroundColor: '#e0e0e0',
+        flex: 1,
+        marginRight: 8,
+        alignItems: 'center',
+    },
+    cancelButtonText: {
+        color: '#555',
+        fontWeight: 'bold',
+    },
+    confirmButton: {
+        padding: 10,
+        borderRadius: 6,
+        backgroundColor: theme.BRAND_ACCENT,
+        flex: 1,
+        marginLeft: 8,
+        alignItems: 'center',
+    },
+    confirmButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
+    statusOptionBase: {
+        padding: 12,
+        borderWidth: 1,
+        borderRadius: 6,
+        marginBottom: 8,
+        alignItems: 'center',
+    },
+    statusOptionTextBase: {
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    deleteIcon: {
+        // padding: 8,
+        marginLeft: 8,
+    },
+
+
+    // statusBadge: {
+    //     paddingHorizontal: 8,
+    //     paddingVertical: 4,
+    //     borderRadius: 12,
+    //     marginRight: 8,
+    //     alignSelf: 'center',
+    // },
+    // statusBadgeText: {
+    //     color: 'white',
+    //     fontSize: 10,
+    //     fontWeight: 'bold',
+    // },
+    // updateButton: {
+    //     backgroundColor: theme.BRAND_ACCENT,
+    //     padding: 8,
+    //     borderRadius: 20,
+    //     width: 36,
+    //     height: 36,
+    //     justifyContent: 'center',
+    //     alignItems: 'center',
+    // },
 
 });
 

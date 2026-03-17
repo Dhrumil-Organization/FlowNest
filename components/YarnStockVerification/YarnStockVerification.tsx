@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     fabAdd: {
         position: 'absolute',
         bottom: 75,
-        right: 20,
+        left: 20,
         backgroundColor: '#007EA7',
         width: 45,
         height: 45,

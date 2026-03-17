@@ -449,13 +449,12 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
 
     const fixedLabels = {
-        party: "Account Name",
-        netamt: "Total",
-        bqty: "Balance Qty",
+        prpcode: "Property",
         pono: "PO Number",
         podate: "PO Date",
         itmname: "Item Name",
-        qty: "Quantity",
+        netamt: "Total Qty",
+        bqty: "Balance Qty",
         unitrate: "Unit Rate",
         amount: "Amount",
     };
@@ -474,7 +473,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
 
     const tableColumns = [
-        // { key: 'party', label: 'Account Name', width: 160, align: 'left' },
+        { key: 'prpcode', label: 'Property', width: 160, align: 'center' },
         { key: 'pono', label: 'PO Number', width: 120, align: 'center' },
         { key: 'podate', label: 'PO Date', width: 120, align: 'center' },
         { key: 'itmname', label: 'Item Name', width: 160, align: 'left' },
@@ -569,13 +568,13 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         >
                                             {/* Header */}
                                             <View style={{ alignItems: 'center', marginBottom: 10 }}>
-                                                <Text style={{
+                                                {/* <Text style={{
                                                     color: "#fff",
                                                     fontSize: 16,
                                                     fontWeight: "700",
                                                 }}>
                                                     {item.prpname}
-                                                </Text>
+                                                </Text> */}
                                                 {/* <Text style={{
                                                     color: "rgba(255,255,255,0.8)",
                                                     fontSize: 12,

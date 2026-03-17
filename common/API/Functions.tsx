@@ -97,6 +97,7 @@ export const fetchPropertyData = async (token: string) => {
     try {
         // 1. Pehle cache check karo
         const cached = await AsyncStorage.getItem('get_property');
+        console.log("cached =====>:", cached)
         if (cached) {
             console.log('✅ Property from cache');
             const parsed = JSON.parse(cached);
@@ -928,8 +929,6 @@ export const processInBatches = async<T>(
     }
 };
 
-
-
 export const addPrptypeToIndex = async (prptype: string) => {
     const key = normalizePrptype(prptype);
     if (!key) return;
@@ -945,8 +944,6 @@ export const addPrptypeToIndex = async (prptype: string) => {
         console.warn('❌ Failed to update index:', err);
     }
 };
-
-
 
 // export const getPrptypeIndex = async (): Promise<{ prptypes: string[]; count: number }> => {
 //     try {
@@ -973,8 +970,6 @@ export const addPrptypeToIndex = async (prptype: string) => {
 //         return { prptypes: [], count: 0 };
 //     }
 // };
-
-
 
 /* ---------- load all caches (uses the read that supports chunking) ---------- */
 // export const loadAllPrptypeCaches = async (): Promise<Record<string, CachedPrptype | null>> => {
@@ -1008,7 +1003,6 @@ export const loadAllPrptypeCaches = async (): Promise<Record<string, CachedPrpty
         return {};
     }
 };
-
 
 /* ---------- summary + debug helpers ---------- */
 export const getPrptypeSummary = async (prptype: string): Promise<{
@@ -1141,3 +1135,134 @@ export const debugChunkedFiles = async (prptype: string) => {
         console.warn(`❌ Failed to debug files for ${prptype}:`, err);
     }
 };
+
+
+export const fetchAllPropertyData = async (token: string) => {
+    try {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        let params = null;
+        console.log("-----------------fetchAllPropertyData API URL ---------------------------------", `${API}/api/get_criterion?prptype=${userPtype}&txntype=mob_daily_collection_report&fetch=prp`)
+        const response = await axios.get(
+            //`${API}/api/get_criterion?prptype=${userPtype}&txntype=mob_daily_collection_report&fetch=prp`,
+            `${API}/api/get_criterion?prptype=S&txntype=mob_daily_collection_report&fetch=prp`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/javascript',
+                    Accept: 'application/json'
+                },
+                params
+            }
+        );
+
+        if (response.data.success && response.data.response.data.length > 0) {
+
+            const propertyGroupData = response.data.response.data;
+
+            return propertyGroupData;
+
+        } else {
+
+            return [];
+        }
+
+    } catch (error) {
+
+        if (!axios.isCancel(error)) {
+
+            console.log('fetchpropertyGroupData error', error);
+        }
+
+        return [];
+    }
+};
+
+export const fetchAllYeardata = async (token: string, prpcd = '') => {
+
+
+    try {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        let params = { prpcode: prpcd };
+        const response = await axios.get(
+            `${API}/api/getyear`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/javascript',
+                    Accept: 'application/json'
+                },
+                params
+            }
+        );
+
+        if (response.data.response.data && response.data.response.data.length > 0) {
+
+            const appYdata = response.data.response.data;
+
+            return appYdata;
+
+        } else {
+
+            return [];
+        }
+
+    } catch (error) {
+
+        if (!axios.isCancel(error)) {
+
+            console.log('fetchAllYeardata error', error);
+        }
+
+        return [];
+    }
+}
+
+export const fetchAllStoredata = async (token: string, prp = '', yrno = '') => {
+
+    try {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        let params = { prpcode: prp, yearno: yrno };
+        console.log("fetchAllStoredata api payload :", params)
+        console.log("fetchAllStoredata api url :", `${API}/api/getstore`)
+        const response = await axios.get(
+            `${API}/api/getstore`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/javascript',
+                    Accept: 'application/json'
+                },
+                params
+            }
+        );
+
+        console.log("fetchAllStoredata api response :", response.data)
+        if (response.data.response.data && response.data.response.data.length > 0) {
+
+            const appStoredata = response.data.response.data;
+
+            return appStoredata;
+
+        } else {
+
+            return [];
+        }
+
+    } catch (error) {
+
+        if (!axios.isCancel(error)) {
+
+            console.log('fetchAllStoredata error', error);
+        }
+
+        return [];
+    }
+}

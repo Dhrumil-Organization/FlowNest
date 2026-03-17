@@ -163,6 +163,7 @@ const LoginScreen: React.FC<Props> = ({
 
 
   const handleLogin = async () => {
+    console.log("`${API}/api/login`   :", `${API}/api/login`)
     if (!username || !password) {
       Alert.alert('❌ Error', 'Please enter username and password.');
       return;
@@ -177,6 +178,7 @@ const LoginScreen: React.FC<Props> = ({
     try {
       setIsLoading(true);
       const headers = { 'x-platform': 'mob' };
+      
       const response = await axios.post(
         // 'https://apig.tms-webapp.com/api/login',
         `${API}/api/login`,
@@ -185,12 +187,15 @@ const LoginScreen: React.FC<Props> = ({
       );
       console.log('✅ Login API Response:', response.data);
       const token = response.data.response.access_token;
+      
       const user_details = response.data.response.user?.first_name || 'user';
       const user_menu_apps = response.data.response.usermenu || '';
       const ismastersync = response.data.response.ismastersync || '';
       const ismastersyncData = response.data.response.mastersyncprptypes || [];
       const userof = response.data.response.userof;
       const yno = response.data.response.year.YearNo || '';
+      //const lui = response.data.response.user.id;
+      //console.log("lui =================================>", lui)
       if (response.data.success === true) {
         if (token && user_details && user_menu_apps) {
           await AsyncStorage.setItem('access_token', token);
@@ -200,6 +205,7 @@ const LoginScreen: React.FC<Props> = ({
           await AsyncStorage.setItem('login_user_name', username.trim());
           await AsyncStorage.setItem('login_user_passwd', password.trim());
           await AsyncStorage.setItem('yno', yno.trim());
+          //await AsyncStorage.setItem('lui', lui);
           setToken(token);
           setUserDetails(user_details);
           setMenuApps(user_menu_apps);

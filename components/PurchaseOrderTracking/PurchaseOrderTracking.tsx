@@ -375,7 +375,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         try {
             const response12 = await axios.post(`${API}/api/purchaseordertracking`, payload12, { headers });
             const responseData12 = response12?.data?.response?.data || [];
-           
+
 
             console.log("🔵 response", payload12, responseData12);
 
@@ -460,14 +460,26 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         amount: "Amount",
     };
 
+
+    const groupDataByParty = (data) => {
+        const grouped = {};
+        data.forEach((item) => {
+            if (!grouped[item.party]) {
+                grouped[item.party] = [];
+            }
+            grouped[item.party].push(item);
+        });
+        return Object.entries(grouped).map(([party, items]) => ({ party, items }));
+    };
+
+
     const tableColumns = [
-        { key: 'party', label: 'Account Name', width: 160, align: 'left' },
-        { key: 'netamt', label: 'Total', width: 120, align: 'right' },
-        { key: 'bqty', label: 'Balance Qty', width: 120, align: 'right' },
+        // { key: 'party', label: 'Account Name', width: 160, align: 'left' },
         { key: 'pono', label: 'PO Number', width: 120, align: 'center' },
         { key: 'podate', label: 'PO Date', width: 120, align: 'center' },
         { key: 'itmname', label: 'Item Name', width: 160, align: 'left' },
-        { key: 'qty', label: 'Quantity', width: 120, align: 'right' },
+        { key: 'netamt', label: 'Total Qty', width: 120, align: 'right' },
+        { key: 'bqty', label: 'Balance Qty', width: 120, align: 'right' },
         { key: 'unitrate', label: 'Unit Rate', width: 120, align: 'right' },
         { key: 'amount', label: 'Amount', width: 120, align: 'right' },
     ];
@@ -535,7 +547,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         key={index}
                                         style={{
                                             width: gridConfig.cardWidth,
-                                            height: 180,
+                                            height: 140,
                                             marginHorizontal: 6,
                                             borderRadius: 12,
                                             overflow: 'hidden',
@@ -597,7 +609,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
                                             {/* All Key-Value Pairs (Right-Aligned) */}
                                             {Object.entries(item).map(([key, value]) => {
-                                                if (['prpname', 'strname', 'party', 'pono'].includes(key)) return null;
+                                                if (['prpname', 'strname', 'party', 'pono', 'prpcode', 'parcode'].includes(key)) return null;
                                                 return (
                                                     <View key={key} style={{
                                                         flexDirection: 'row',
@@ -608,7 +620,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                                             color: "rgba(255,255,255,0.7)",
                                                             fontSize: 11,
                                                         }}>
-                                                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                                                            {key.replace(/([A-Z])/g, ' $1').trim() == 'bqty' ? 'Balance Qty' : key.replace(/([A-Z])/g, ' $1').trim() == 'recordcount' ? 'Number of Records' : key.replace(/([A-Z])/g, ' $1').trim()}
                                                         </Text>
                                                         <Text style={{
                                                             color: "#fff",
@@ -670,7 +682,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                 </View>
 
                                 {/* Table Body (Scrollable) */}
-                                <FlatList
+                                {/* <FlatList
                                     data={getModalTableData.filter((item) =>
                                         Object.keys(fixedLabels).some((key) =>
                                             String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
@@ -692,7 +704,45 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                     removeClippedSubviews={true}
                                     showsVerticalScrollIndicator={true}
                                     style={{ maxHeight: 400 }}
+                                /> */}
+                                <FlatList
+                                    data={groupDataByParty(getModalTableData.filter((item) =>
+                                        Object.keys(fixedLabels).some((key) =>
+                                            String(item[key]).toLowerCase().includes(searchQuery.toLowerCase())
+                                        )
+                                    ))}
+                                    renderItem={({ item: group }) => (
+                                        <>
+                                            {/* Party Sub-Header */}
+                                            <View style={[modalStyles.tableRow, { backgroundColor: '#f0f0f0' }]}>
+                                                <Text style={[modalStyles.tableHeaderText, { width: '100%', textAlign: 'left', fontWeight: 'bold', color: 'black' }]}>
+                                                    {group.party}
+                                                </Text>
+                                            </View>
+
+                                            {/* Table Rows for this Party */}
+                                            {group.items.map((row, rowIndex) => (
+                                                <View key={rowIndex} style={modalStyles.tableRow}>
+                                                    {tableColumns
+                                                        .filter(col => col.key !== 'party') // Remove 'party' column from rows
+                                                        .map(col => (
+                                                            <Text key={col.key} style={[modalStyles.tableCell, { width: col.width, textAlign: col.align }]}>
+                                                                {row[col.key]}
+                                                            </Text>
+                                                        ))}
+                                                </View>
+                                            ))}
+                                        </>
+                                    )}
+                                    keyExtractor={(item, index) => index.toString()}
+                                    initialNumToRender={10}
+                                    maxToRenderPerBatch={10}
+                                    windowSize={5}
+                                    removeClippedSubviews={true}
+                                    showsVerticalScrollIndicator={true}
+                                    style={{ maxHeight: 400 }}
                                 />
+
                             </View>
                         </ScrollView>
                     </View>
@@ -905,55 +955,55 @@ const styles = StyleSheet.create({
 
 const modalStyles = StyleSheet.create({
     modalContainer: {
-      flex: 1,
-      backgroundColor: '#fff',
+        flex: 1,
+        backgroundColor: '#fff',
     },
     modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      backgroundColor: theme.BRAND_GRADIENT_END,
-      padding: 15,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        padding: 15,
     },
     modalTitle: {
-      color: '#fff',
-      fontSize: 18,
-      fontWeight: 'bold',
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
     },
     searchInput: {
-      backgroundColor: '#fff',
-      padding: 10,
-      borderRadius: 5,
-      margin: 10,
-      borderWidth: 1,
-      borderColor: '#ddd',
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 5,
+        margin: 10,
+        borderWidth: 1,
+        borderColor: '#ddd',
     },
     tableWrapper: {
-      flex: 1,
-      margin: 10,
+        flex: 1,
+        margin: 10,
     },
     tableRow: {
-      flexDirection: 'row',
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-      padding: 10,
-      backgroundColor: '#fff',
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        padding: 10,
+        backgroundColor: '#fff',
     },
     tableHeaderText: {
-      color: '#fff',
-      fontWeight: 'bold',
-      padding: 5,
-      textAlign: 'center',
-      fontSize: 12,
+        color: '#fff',
+        fontWeight: 'bold',
+        padding: 5,
+        textAlign: 'center',
+        fontSize: 12,
     },
     tableCell: {
-      color: '#333',
-      padding: 5,
-      textAlign: 'center',
-      fontSize: 12,
+        color: '#333',
+        padding: 5,
+        textAlign: 'center',
+        fontSize: 12,
     },
-  });
-  
+});
+
 
 
 export default React.memo(PurchaseOrderTracking);

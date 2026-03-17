@@ -493,7 +493,7 @@ const YarnStockCard: React.FC<POTDataProps> = ({
                 <View style={styles.field}>
                     <Text style={styles.label}>Tran. date:</Text>
                     {/* <Text style={styles.value}>{item.TranDate}</Text> */}
-                    <Text style={styles.value}>{convDate(item.TranDate)}{item.TranDate}</Text>
+                    <Text style={styles.value}>{convDate(item.TranDate)}</Text>
                 </View>
             </View>
             <View style={styles.row}>

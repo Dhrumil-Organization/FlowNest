@@ -122,7 +122,6 @@ const YarnStockVerification = (props) => {
             txntype: 'prodordertrack',
             rowdata: {}
         };
-        console.log('🔵 payload', payload);
         const sendpayload = [sendCardPayload]
         setPayload(sendpayload as object as CardPayload[]);
         const headers = {
@@ -131,11 +130,8 @@ const YarnStockVerification = (props) => {
             'X-Requested-with': 'XMLHttpRequest',
         };
         try {
-            // const response = await axios.post(`https://apig.tms-webapp.com/api/prodorderlist`, payload, { headers });
             const response = await axios.post(`${API}/api/prodorderlist`, payload, { headers });
             const response_details = await axios.post(`${API}/api/getparentdesign`, payload, { headers });
-            console.log('🔵 parent design details response:', response_details, payload);
-            console.log('🔵 design details response 123:', response, payload);
             if (response.data.success === true && response.data.data.length === 0) {
                 setIsLoading(false);
                 Alert.alert('No Data Found');
@@ -154,7 +150,6 @@ const YarnStockVerification = (props) => {
                 setPOTData([]);
             }
             if (response_details.data.success === true && response_details.data.data.length > 0) {
-                console.log('🔵 parent design details response main:', response_details.data.data);
                 setParentDesignData(response_details.data.data);
             }
         } catch (error) {
@@ -168,17 +163,14 @@ const YarnStockVerification = (props) => {
 
     const handleDesignSelect = (designs: DesignData[]) => {
         setSelectedDesigns(designs);
-        console.log("Selected Designs in Parent:", designs);
     };
     const handleItemSelect = (items: ItemData[]) => {
         setSelectedItems(items);
-        console.log("Selected Items in Parent:", items);
     };
     const handleItemStatusChange = (status: ItemStatus) => {
         setSelectedItemStatus(status);
     };
 
-    // Handle Load Button Press
     const handleLoadPress = () => {
         handleConfirmAction();
     };
@@ -187,77 +179,48 @@ const YarnStockVerification = (props) => {
     const closeDrawer = () => setIsDrawerVisible(false);
     const openNewCatonDrawer = () => setIsCartonAddDrawerVisible(true);
     const closeNewCatonDrawer = () => setIsCartonAddDrawerVisible(false);
-    console.log('🔵 POT Data:', gePOTData);
 
     useEffect(() => {
         if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
-
             const testFinct = async () => {
                 const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
-                console.log("----------allyeardata----------", allyeardata, FormState.values)
                 setAllYearData(allyeardata)
-
             }
-
             testFinct();
         }
     }, [FormState.values.PrpCode])
 
     useEffect(() => {
         if (typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '') {
-
             const testFinctStore = async () => {
                 const allstoredata = await fetchAllStoredata(token, FormState.values.PrpCode, FormState.values.YearNo)
-                console.log("----------allstoredata----------", allstoredata, FormState.values)
                 setAllStoreData(allstoredata)
-
             }
-
             testFinctStore();
         }
     }, [FormState.values.YearNo])
 
-
-
-
-
-
-
-
     useEffect(() => {
         if (typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != '') {
-
             const testFinct = async () => {
                 const allyeardata = await fetchAllYeardata(token, FormCartonDataState.values.PrpCode)
-                console.log("----------allyeardata----------", allyeardata, FormCartonDataState.values)
                 setAllYearData(allyeardata)
-
             }
-
             testFinct();
         }
     }, [FormCartonDataState.values.PrpCode])
 
     useEffect(() => {
         if (typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != '') {
-
             const testFinctStore = async () => {
                 const allstoredata = await fetchAllStoredata(token, FormCartonDataState.values.PrpCode, FormCartonDataState.values.YearNo)
-                console.log("----------allstoredata----------", allstoredata, FormCartonDataState.values)
                 setAllStoreData(allstoredata)
-
             }
-
             testFinctStore();
         }
     }, [FormCartonDataState.values.YearNo])
 
-
-
-
     const updateStockData = async () => {
-        //getSelectedStockRow
-
         setModalOpen(false);
         setIsLoading(true)
         getSelectedStockRow['Chk'] = '1';
@@ -268,7 +231,7 @@ const YarnStockVerification = (props) => {
             prpcodes: [FormState.values.PrpCode],
             yearno: FormState.values.YearNo,
             strcode: FormState.values.StrCode,
-            updateStock: '1', //FormState.values.updateStock,
+            updateStock: FormState.values.updateStock,
             autoFound: typeof FormState.values.autoFound == 'undefined' || FormState.values.autoFound == null || FormState.values.autoFound == '' ? '0' : FormState.values.autoFound,
             manual: typeof FormState.values.manual == 'undefined' || FormState.values.manual == null || FormState.values.manual == '' ? '0' : FormState.values.manual,
             stockNotFound: typeof FormState.values.stockNotFound == 'undefined' || FormState.values.stockNotFound == null || FormState.values.stockNotFound == '' ? '0' : FormState.values.stockNotFound,
@@ -285,29 +248,13 @@ const YarnStockVerification = (props) => {
             'X-Requested-with': 'XMLHttpRequest',
         };
         try {
-
-            console.log("API URL :", `${API}/api/update_verify_manual_stock`)
             const response = await axios.post(`${API}/api/update_verify_manual_stock`, payload, { headers });
-
-            console.log("update_verify_manual_stock API response :", response.data)
 
             if (response.data.success === true && response.data.data.length === 0) {
                 Alert.alert('No Data Found');
                 setIsLoading(false)
             } else if (response.data.success === true && response.data.data.length > 0) {
-                //Alert.alert("Data Updated successfully.");
                 setSavedCartons(getSavedCartons => [...getSavedCartons, response.data.data[0].UId])
-                // let mergedata1 = []
-                // let mergedata1Cntr = 0;
-                // let mergedata2 = []
-                // let mergedata1Cntr2 = 0;
-
-                // getAllStockData && getAllStockData.filter((el, ind) => {
-                //     if()
-
-                // })
-
-                //handleStockData(mergedata)
                 Snackbar.show({
                     text: 'Data Updated successfully.',
                     duration: Snackbar.LENGTH_LONG,
@@ -327,39 +274,30 @@ const YarnStockVerification = (props) => {
             setIsLoading(false)
             Alert.alert('Server Error :' + error)
         }
-
         setModalOpen(false);
     }
-    console.log("FormState.values :", FormState.values)
 
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+            {
+                isLoading && <FullScreenLoader />
+            }
             <HeaderBar
                 userName={username}
                 onSearch={setSearchQueryPOT}
                 placeholder="Search Carton..."
             />
             <View style={yarnstockverificatio_styles.container}>
-                {/* Top-right List Icon */}
                 <TouchableOpacity style={styles.fab} onPress={openDrawer}>
                     <Icon name="read-more" size={20} color="#fff" />
                 </TouchableOpacity>
-
                 <TouchableOpacity style={styles.fabAdd} onPress={openNewCatonDrawer}>
                     <Icon name="add" size={20} color="#fff" />
                 </TouchableOpacity>
-
-                {/* <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
-                    <Icon name="list" size={24} color="white" />
-                </TouchableOpacity> */}
-                {/* Main Content: Replace Text with ProdOrderTrackingTable */}
                 <YarnStockCard gePOTData={getAllStockData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} parentDesignData={parentDesignData} setSelectedStockRow={setSelectedStockRow} getSelectedStockRow={getSelectedStockRow} setModalOpen={setModalOpen} setSavedCartons={setSavedCartons} getSavedCartons={getSavedCartons} />
             </View>
-
             <CartonAddDrawer
                 isVisible={isCartonAddDrawerVisible}
-                FormCartonDataState
                 onClose={closeNewCatonDrawer}
                 isLoading={isLoading}
                 getAllPropertyData={getAllPropertyData}
@@ -429,7 +367,7 @@ const YarnStockVerification = (props) => {
                                 <Text style={styles.confirmText}> Shade  : {getSelectedStockRow?.ShdName} </Text>
                                 <View style={styles.confirmButtons}>
                                     <TouchableOpacity
-                                        style={[styles.confirmBtn, { backgroundColor: "#ccc" }]}
+                                        style={[styles.confirmBtn, { backgroundColor: "red" }]}
                                         onPress={() => { setModalOpen(false) }}>
                                         <Text style={styles.confirmBtnText}>No</Text>
                                     </TouchableOpacity>
@@ -459,18 +397,6 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         padding: 4,
     },
-    // fab: {
-    //     position: 'absolute',
-    //     bottom: 25,
-    //     right: 20,
-    //     backgroundColor: '#007EA7',
-    //     width: 30,
-    //     height: 30,
-    //     borderRadius: 30,
-    //     justifyContent: 'center',
-    //     alignItems: 'center',
-    //     elevation: 3
-    // },
     fab: {
         position: 'absolute',
         bottom: 25,
@@ -481,9 +407,8 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         justifyContent: 'center',
         alignItems: 'center',
-
-        zIndex: 999,     // important
-        elevation: 10    // important for Android
+        zIndex: 999,
+        elevation: 10
     },
     fabAdd: {
         position: 'absolute',
@@ -495,19 +420,15 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         justifyContent: 'center',
         alignItems: 'center',
-
-        zIndex: 999,     // important
-        elevation: 10    // important for Android
+        zIndex: 999,
+        elevation: 10
     },
-
-    /**modal */
     confirmOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.4)",
         justifyContent: "center",
         alignItems: "center"
     },
-
     confirmBox: {
         width: "80%",
         backgroundColor: "#fff",
@@ -515,25 +436,21 @@ const styles = StyleSheet.create({
         padding: 20,
         elevation: 5
     },
-
     confirmTitle: {
         fontSize: 18,
         fontWeight: "bold",
         marginBottom: 10
     },
-
     confirmText: {
         fontSize: 15,
         marginBottom: 5,
         color: '#000'
     },
-
     confirmButtons: {
         flexDirection: "row",
         justifyContent: "flex-end",
         marginTop: 15
     },
-
     confirmBtn: {
         flex: 1,
         height: 40,
@@ -542,7 +459,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginHorizontal: 5
     },
-
     confirmBtnText: {
         fontSize: 16,
         fontWeight: "600",

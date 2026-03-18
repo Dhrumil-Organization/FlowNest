@@ -1151,10 +1151,9 @@ export const fetchAllPropertyData = async (token: string) => {
         cancelToken = axios.CancelToken.source();
 
         let params = null;
-        console.log("-----------------fetchAllPropertyData API URL ---------------------------------", `${API}/api/get_criterion?prptype=${userPtype}&txntype=mob_daily_collection_report&fetch=prp`)
+        console.log("fetchAllPropertyData api url :", `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`)
         const response = await axios.get(
-            //`${API}/api/get_criterion?prptype=${userPtype}&txntype=mob_daily_collection_report&fetch=prp`,
-            `${API}/api/get_criterion?prptype=S&txntype=mob_daily_collection_report&fetch=prp`,
+            `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -1166,30 +1165,20 @@ export const fetchAllPropertyData = async (token: string) => {
         );
 
         if (response.data.success && response.data.response.data.length > 0) {
-
             const propertyGroupData = response.data.response.data;
-
             return propertyGroupData;
-
         } else {
-
             return [];
         }
-
     } catch (error) {
-
         if (!axios.isCancel(error)) {
-
             console.log('fetchpropertyGroupData error', error);
         }
-
         return [];
     }
 };
 
 export const fetchAllYeardata = async (token: string, prpcd = '') => {
-
-
     try {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -1208,34 +1197,27 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
         );
 
         if (response.data.response.data && response.data.response.data.length > 0) {
-
             const appYdata = response.data.response.data;
-
             return appYdata;
-
         } else {
-
             return [];
         }
-
     } catch (error) {
-
         if (!axios.isCancel(error)) {
-
             console.log('fetchAllYeardata error', error);
         }
-
         return [];
     }
 }
 
-export const fetchAllStoredata = async (token: string, prp = '', yrno = '') => {
-
+export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn = '') => {
+    const userPtype = await AsyncStorage.getItem('user_prptype');
+    const platform = txn !== '' ? 'mob' : '';
     try {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
 
-        let params = { prpcode: prp, yearno: yrno };
+        let params = { prpcode: prp, yearno: yrno, txntype: txn, prptype: userPtype };
         console.log("fetchAllStoredata api payload :", params)
         console.log("fetchAllStoredata api url :", `${API}/api/getstore`)
         const response = await axios.get(
@@ -1244,32 +1226,24 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '') => {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/javascript',
-                    Accept: 'application/json'
+                    Accept: 'application/json',
+                    'x-platform': 'mob'
+                    //...(platform && { 'x-platform': platform }),
                 },
                 params
             }
         );
-
         console.log("fetchAllStoredata api response :", response.data)
         if (response.data.response.data && response.data.response.data.length > 0) {
-
             const appStoredata = response.data.response.data;
-
             return appStoredata;
-
         } else {
-
             return [];
         }
-
     } catch (error) {
-
         if (!axios.isCancel(error)) {
-
             console.log('fetchAllStoredata error', error);
         }
-
         return [];
     }
 }
-

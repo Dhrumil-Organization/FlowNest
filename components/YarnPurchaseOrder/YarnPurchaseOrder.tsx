@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -30,6 +30,9 @@ import { encodeData } from './encodingUtils';
 import LinearGradient from 'react-native-linear-gradient';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
+import CriteriaForm from './CriteriaForm';
+import {fetchAllStoredata } from '../../common/API/Functions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface CardData {
     [key: string]: string;
@@ -57,70 +60,6 @@ interface AllHistoryData {
     [key: string]: string;
     isProcessed: boolean;
     actionType: 'accept' | 'reject' | 'list' | 'pending' | 'verifyreject';
-    // UId: string;
-    // prptype: string;
-    // prptypename: string;
-    // // prpcode: string;
-    // date: string;
-    // parcode: string;
-    // parname: string;
-    // limit1: string;
-    // limit2: string;
-    // limit3: string;
-    // crday1: string;
-    // crday2: string;
-    // crday3: string;
-    // // IsAuth: string;
-    // status: string;
-    // ausrname: string;
-    // adate: string;
-    // // remark: string;
-    // // yearno: string;
-    // revertdate: string;
-    // // sexename: string;
-    // BrkAccName: string;
-    // crdays: string;
-    // // 
-    // ARemark: string;
-    // authorisedby: string;
-    // authoriseddate: string;
-    // AuthStatus: string;
-    // costdate: string;
-    // costdsncode: string;
-    // costdsnname: string;
-    // costuid: string;
-    // deliverydate: string;
-    // dsncode: string;
-    // dsnname: string;
-    // grdcode: string;
-    // grdname: string;
-    // // greystrcode: string;
-    // // IsAuth: string | number;
-    // itmcode: string;
-    // itmname: string;
-    // nvoudate: string;
-    // orderdesign: string;
-    // orderqty: string;
-    // partyname: string;
-    // pickrate: string;
-    // picks: string;
-    // prpcode: string;
-    // qty: string;
-    // rate: string;
-    // ratetype: string;
-    // remark: string;
-    // sampleno: string;
-    // sellingrate: string;
-    // sexename: string;
-    // shdcode: string;
-    // shdname: string;
-    // shkperc: string;
-    // strcode: string;
-    // // UId: string;
-    // voudate: string;
-    // vouno: string;
-    // yearno: string;
-    // 
     UId: string;
     PrpCode: string;
     GrpCode: string;
@@ -229,8 +168,37 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [showPdfModal, setShowPdfModal] = useState(false);
     const [getLocationLoading, setLocationLoading] = useState(false);
     const [selectedItem, setSelectedItem] = useState<CardData | null>(null);
-    // const [historyDataYPO, setHistoryDataYPO] = useState<AllHistoryData[]>([]);
-    // const [isHistoryLoading, setIsHistoryLoadingYPO] = useState(false);
+
+    const [criteriaFormOpen, setCriteriaFormOpen] = useState(false)
+    const [getAllStoreData, setAllStoreData] = useState([]);
+    const [FormState, setFormState] = useState({
+        values: {
+            PrpCode: '',
+            YearNo: '',
+            StrCode: ''
+        }
+    })
+    const didFetchStore = useRef(false);
+    const cancelTokenRef = useRef(null);
+    const didInitialFetch = useRef(false);
+
+
+    const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
+    const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
+
+    useEffect(() => {
+        if (didFetchStore.current) return;
+        didFetchStore.current = true;
+
+        const loadProperty = async () => {
+            let yno = await AsyncStorage.getItem('yno');
+            const allstoredata = await fetchAllStoredata(token, '', yno, 'purchase_order_detail')
+            setAllStoreData(allstoredata)
+        };
+        loadProperty();
+    }, []);
+
+
 
     let cancelToken: any;
 
@@ -244,28 +212,35 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         cancelToken: cancelToken?.token,
     });
 
+    /*
     const fetchData = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+
         try {
-            const payload = { txntype: 'purchase_order_detail', referrer: 'dashboard', prptype: 'S', yearno: '26', atype: 'B', strtype: 'Y' };
+            const payload = {
+                txntype: 'purchase_order_detail',
+                referrer: 'dashboard',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' ? FormState.values.StrCode : '',
+                atype: 'B',
+                strtype: 'Y'
+            };
+            console.log("fetchData request tab api payload :", payload)
+            console.log("fetchData request tab api url :", `${API}/api/purchaseorderbrowse`)
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/purchaseorderbrowse`,
                 `${API}/api/purchaseorderbrowse`,
                 getRequestConfig({ params: { ...payload } })
             );
-            console.log('🔵 payload & response', payload, response);
-            // if (response.data.success && response.data.response.data.length > 0) {
-            //     console.log('✅ Data:', response.data.response.data);
-            //     setData(response.data.response.data);
-            //     setAllHistoryDataYPO([])
-            //     setAllVerifyDataYPO([])
-            // } else {
-            //     setData([]);
-            // }
+            console.log('🔵 fetchData request tab api response', response);
+            if (response.data.success == false) {
+                Alert.alert(response.data.message)
+            }
             if (response.data.success && response.data.response.data.length > 0) {
-                // Update each item to add itemNameArray
                 const updatedData = response.data.response.data.map(item => {
                     const itemNames = item.d1.map(d => d.ItmName).join(', ');
                     return {
@@ -273,7 +248,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         itemNameArray: itemNames
                     };
                 });
-                console.log('✅ Updated Data:', updatedData);
                 setData(updatedData);
                 setAllHistoryDataYPO([]);
                 setAllVerifyDataYPO([]);
@@ -288,7 +262,68 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsLoadingYPO(false);
         }
     };
+    */
+    const fetchData = useCallback(async () => {
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
+        cancelTokenRef.current = axios.CancelToken.source();
 
+        setIsLoadingYPO(true);
+
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+
+        try {
+            const payload = {
+                txntype: 'purchase_order_detail',
+                referrer: 'dashboard',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
+                atype: 'B',
+                //strtype: 'Y',
+                strtype: strtypeFromApi
+            };
+            const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                params: payload,
+                cancelToken: cancelTokenRef.current.token
+            });
+            if (response.data.success && response.data.response.data.length > 0) {
+                const updatedData = response.data.response.data.map(item => ({
+                    ...item,
+                    itemNameArray: item.d1.map(d => d.ItmName).join(', ')
+                }));
+
+                setData(updatedData);
+                setAllHistoryDataYPO([]);
+                setAllVerifyDataYPO([]);
+            } else {
+                setData([]);
+            }
+
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', 'Server error');
+            }
+        } finally {
+            setIsLoadingYPO(false);
+        }
+
+    }, [FormState.values.StrCode, token]);
+
+    /*
     const fetchHistoryData = async (parcode: string, prptype: string) => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -301,8 +336,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 action: 'partyhistory',
                 prptype: prptype
             };
+            // const historyPayload = {
+            //     text: parcode,
+            //     txntype: 'creditlimithistory',
+            //     referrer: 'dashboard',
+            //     action: 'partyhistory',
+            //     prptype: prptype
+            // };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/crlimitreqbrowse`,
                 `${API}/api/crlimitreqbrowse`,
                 getRequestConfig({
                     params: {
@@ -310,9 +351,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     }
                 })
             );
-            console.log('🔵 history payload', historyPayload);
             if (response.data.success && response.data.data.length > 0) {
-                console.log('✅History Data:', response.data.data);
                 setHistoryDataYPO(response.data.data);
                 setAllVerifyDataYPO([]);
                 setData([]);
@@ -327,23 +366,70 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsHistoryLoadingYPO(false);
         }
     };
+    */
+    const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsHistoryLoadingYPO(true);
+        try {
+            const historyPayload = {
+                text: parcode,
+                txntype: 'creditlimithistory',
+                referrer: 'dashboard',
+                action: 'partyhistory',
+                prptype: prptype
+            };
+            // const historyPayload = {
+            //     text: parcode,
+            //     txntype: 'creditlimithistory',
+            //     referrer: 'dashboard',
+            //     action: 'partyhistory',
+            //     prptype: prptype
+            // };
+            const response = await axios.get(
+                `${API}/api/crlimitreqbrowse`,
+                getRequestConfig({
+                    params: {
+                        ...historyPayload
+                    }
+                })
+            );
+            if (response.data.success && response.data.data.length > 0) {
+                setHistoryDataYPO(response.data.data);
+                setAllVerifyDataYPO([]);
+                setData([]);
+            } else {
+                setHistoryDataYPO([]);
+            }
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', 'Server error');
+            }
+        } finally {
+            setIsHistoryLoadingYPO(false);
+        }
+    }, [FormState.values.StrCode]);
 
+    /*
     const fetchAllHistoryData = async () => {
-        // setActiveTabYPO('allhistory');
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+
         try {
             const allhistoryPayload = {
                 txntype: 'purchase_order_detail',
                 referrer: 'dashboard',
-                prptype: 'S',
-                yearno: '26',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' ? FormState.values.StrCode : '',
                 atype: 'H',
                 strtype: 'Y'
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/purchaseorderbrowse`,
                 `${API}/api/purchaseorderbrowse`,
                 getRequestConfig({
                     params: {
@@ -351,17 +437,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     }
                 })
             );
-            console.log('🔵all history payload', allhistoryPayload);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅All History Data:', response.data.response.data);
                 setAllHistoryDataYPO(response.data.response.data);
                 setData([]);
                 setAllVerifyDataYPO([]);
-
             } else {
                 setAllHistoryDataYPO([]);
-                // setPartyListYPO([]);
-                // setHistoryDataYPO([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
@@ -371,23 +452,77 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsLoadingYPO(false);
         }
     };
+    */
+    const fetchAllHistoryData = useCallback(async () => {
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
 
+        cancelTokenRef.current = axios.CancelToken.source();
+        setIsLoadingYPO(true);
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+
+        try {
+            const payload = {
+                txntype: 'purchase_order_detail',
+                referrer: 'dashboard',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
+                atype: 'H',
+                //strtype: 'Y',
+                strtype: strtypeFromApi
+            };
+
+            const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: payload,
+                cancelToken: cancelTokenRef.current.token
+            });
+
+            setAllHistoryDataYPO(response?.data?.response?.data || []);
+            setData([]);
+            setAllVerifyDataYPO([]);
+
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', 'Server error');
+            }
+        } finally {
+            setIsLoadingYPO(false);
+        }
+
+    }, [FormState.values.StrCode, token]);
+
+    /*
     const fetchAllVerifyData = async () => {
-        // setActiveTabYPO('allhistory');
+
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+
         try {
             const allhistoryPayload = {
                 txntype: 'purchase_order_detail',
                 referrer: 'dashboard',
-                prptype: 'S',
-                yearno: '26',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' ? FormState.values.StrCode : '',
                 atype: 'A',
                 strtype: 'Y'
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/purchaseorderbrowse`,
                 `${API}/api/purchaseorderbrowse`,
                 getRequestConfig({
                     params: {
@@ -395,18 +530,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     }
                 })
             );
-            console.log('🔵all history payload', allhistoryPayload);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅All History Data:', response.data.response.data);
-
                 setAllVerifyDataYPO(response.data.response.data);
                 setData([]);
                 setAllHistoryDataYPO([]);
-
             } else {
                 setAllVerifyDataYPO([]);
-                // setPartyListYPO([]);
-                // setHistoryDataYPO([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
@@ -416,8 +545,62 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsLoadingYPO(false);
         }
     };
+    */
+    const fetchAllVerifyData = useCallback(async () => {
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
+
+        cancelTokenRef.current = axios.CancelToken.source();
+        setIsLoadingYPO(true);
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+
+        try {
+            const payload = {
+                txntype: 'purchase_order_detail',
+                referrer: 'dashboard',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
+                atype: 'A',
+                //strtype: 'Y'
+                strtype: strtypeFromApi
+            };
+
+            const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: payload,
+                cancelToken: cancelTokenRef.current.token
+            });
+
+            setAllVerifyDataYPO(response?.data?.response?.data || []);
+            setData([]);
+            setAllHistoryDataYPO([]);
+
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', 'Server error');
+            }
+        } finally {
+            setIsLoadingYPO(false);
+        }
+
+    }, [FormState.values.StrCode, token]);
 
     useEffect(() => {
+        if (!didInitialFetch.current) {
+            didInitialFetch.current = true;
+            return;
+        }
+
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();
         } else if (activeTab1YPO === 'requests') {
@@ -425,13 +608,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         } else if (activeTab1YPO === 'verify') {
             fetchAllVerifyData();
         }
-    }, [activeTab1YPO]);
 
-    // const callhisttoryfunction = () => {
-    //     setShowPartyHistoryModalYPO(true);
-    //     setActiveTabYPO('allhistory');
-    //     fetchAllHistoryData();
-    // };
+        //}, [activeTab1YPO, fetchData, fetchAllHistoryData, fetchAllVerifyData]);
+    }, [activeTab1YPO]);
 
     const handleListIconClick = async (prpcode: string, prptype: string, yearno: string, parcode: string) => {
         setActiveTabYPO('party');
@@ -449,7 +628,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 fetch: 'dr'
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/get_criterion`,
                 `${API}/api/get_criterion`,
                 getRequestConfig({
                     params: {
@@ -457,10 +635,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     }
                 })
             );
-            console.log('🔵 Party payload', historyPayload);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ PartyList Data:', response);
-                console.log('✅ PartyList Data1:', response.data.response.data);
                 setPartyListYPO(response.data.response.data);
                 fetchHistoryData(parcode, prptype);
             } else {
@@ -474,11 +649,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsPrdoOrderLoadingYPO(false);
         }
     };
-
-    // useEffect(() => {
-    //     fetchData();
-    //     return () => cancelToken?.cancel();
-    // }, []);
 
     const filteredDataSPO = useMemo(() => {
         if (!searchQueryYPO) return data;
@@ -637,17 +807,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
     const handleConfirmAction = async () => {
         if (!selectedItemYPO) return;
-        //   delete d1 key form selectedItemYPO and use selectedItemYPO 
-        const removed1 = { ...selectedItemYPO }; // Create a copy of selectedItemYPO
-        delete removed1['d1']; // Remove the 'd1' key from the copy 
+        const removed1 = { ...selectedItemYPO };
+        delete removed1['d1'];
 
-        // const updatedItem = { ...selectedItemYPO };
         const updatedItemAccept = {
             ...removed1,
             ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             IsAuth: 1,
-            // prptype: 'S',
             referrer: 'dashboard',
             txntype: 'purchase_order_detail',
             action: 'edit'
@@ -657,7 +824,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             IsAuth: 0,
-            // prptype: 'S',
             referrer: 'dashboard',
             txntype: 'purchase_order_detail',
             action: 'edit'
@@ -667,7 +833,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             IsAuth: 2,
-            // prptype: 'S',
             referrer: 'dashboard',
             txntype: 'purchase_order_detail',
             action: 'edit'
@@ -677,33 +842,24 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
             IsAuth: 2,
-            // prptype: 'S',
             referrer: 'dashboard',
             txntype: 'purchase_order_detail',
             action: 'edit'
         };
         const payload = selectedActionYPO === 'accept' ? updatedItemAccept : selectedActionYPO === 'pending' ? updatedItemVerifyPending : selectedActionYPO === 'reject' ? updatedItemReject : selectedActionYPO === 'verifyreject' ? updatedItemVerifyReject : 'null';
 
-        console.log('✅ payload', payload);
-
         if (handleValidation(payload)) {
             setSuccessYPO(true);
             setresponsemessageYPO('Loading...');
 
-            console.log(`${selectedActionYPO} confirmed for:`, payload);
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
             try {
-                // const response = await axios.get(
-                //     `${GetApiLink()}/api/prodorderauthsudo`,
-                //     getRequestConfig({ params: payload })
-                //   );
                 const getRequestConfig = (props: any) => {
                     let params = props.params ? props.params : null;
-
                     let requestconfig = {
                         headers: {
                             Authorization: `Bearer ${getToken()}`,
@@ -714,7 +870,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     };
                     return requestconfig;
                 };
-                // const response = await axios.get(`https://apig.tms-webapp.com/api/authpo`, getRequestConfig({ params: payload }));
                 const response = await axios.get(`${API}/api/authpo`, getRequestConfig({ params: payload }));
                 if (response.data.success) {
                     setresponsemessageYPO(response.data.message || 'Success');
@@ -722,19 +877,19 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         setSuccessYPO(false);
                         setShowOverlayYPO(false);
                     }, 2000);
-                    // setProcessedCards(prev => new Set(prev).add(selectedItemYPO.UId));
+
                     setData(prevData => {
                         const newData = prevData.filter(item => item.UId !== selectedItemYPO.UId);
                         newData.push({ ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO });
                         return newData;
                     });
-                    // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+
                     setAllVerifyDataYPO(prevData => {
                         const newData = prevData.filter(item => item.UId !== selectedItemYPO.UId);
                         newData.push({ ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO });
                         return newData;
                     });
-                    // }
+
                     setTimeout(() => {
                         flatListRefYPO.current?.scrollToEnd({ animated: true });
                         flatVerifyListRefYPO.current?.scrollToEnd({ animated: true });
@@ -767,13 +922,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 'X-Requested-with': 'XMLHttpRequest',
             };
             const apiResp = await axios.post(
-                // 'https://apig.tms-webapp.com/api/new_account_reuest_print',
                 `${API}/api/saleschallanmultiprintnew`,
                 {
                     prpcode: item.PrpCode,
                     yearno: item.yearno,
                     strcode: item.StrCode,
-                    // accname: item.AccName,
                     printTypes: ['purchase_order_detail'],
                     uid: item.UId,
                     txntype: "purchase_order_detail",
@@ -782,7 +935,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 { headers }
             );
             const pdfUrlFromApi = apiResp?.data?.results?.purchase_order_detail;
-            console.log('pdfUrlFromApi:', apiResp, pdfUrlFromApi);
             if (!pdfUrlFromApi) {
                 Alert.alert('Error', 'PDF URL not found in server response');
                 return;
@@ -832,29 +984,10 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         const handleDownload = async () => {
             try {
                 if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
-
-                // iOS: open share sheet (no Downloads folder concept for RNFS copy)
                 if (Platform.OS === 'ios') {
                     await shareLocalFile(pdfUrl);
                     return;
                 }
-
-                // Android: friendly dialog -> request permission
-                // const ok = await askAndRequestStoragePermission();
-                // if (!ok) {
-                //     // user denied; offer share fallback
-                //     Alert.alert(
-                //         'Cannot save',
-                //         'Storage permission not granted. You can share the file to save it elsewhere.',
-                //         [
-                //             { text: 'Cancel', style: 'cancel' },
-                //             { text: 'Share', onPress: () => shareLocalFile(pdfUrl) }
-                //         ]
-                //     );
-                //     return;
-                // }
-
-                // proceed to copy to Downloads
                 const localPath = pdfUrl.startsWith('file://') ? pdfUrl.replace('file://', '') : pdfUrl;
                 const fileName = localPath.split('/').pop() || `document_${Date.now()}.pdf`;
                 const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
@@ -868,7 +1001,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     }
                 } catch (copyErr: any) {
                     console.error('copyFile failed', copyErr);
-                    // If copy fails due to Android 11+ restrictions, ask user to give All files access
                     Alert.alert(
                         'Save failed',
                         'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
@@ -906,20 +1038,23 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     </View>
 
                     <View style={{ flex: 1 }}>
-                        {pdfUrl ? (
-                            <Pdf
-                                source={{ uri: pdfUrl }}
-                                style={{ flex: 1 }}
-                                onError={(e) => {
-                                    console.error('react-native-pdf error', e);
-                                    Alert.alert('Error', 'Failed to render PDF');
-                                }}
-                            />
-                        ) : (
-                            <View style={crlimtreq_styles.pdfLoading}>
-                                <Text>No PDF</Text>
-                            </View>
-                        )}
+                        {
+                            pdfUrl ?
+                                (
+                                    <Pdf
+                                        source={{ uri: pdfUrl }}
+                                        style={{ flex: 1 }}
+                                        onError={(e) => {
+                                            console.error('react-native-pdf error', e);
+                                            Alert.alert('Error', 'Failed to render PDF');
+                                        }}
+                                    />
+                                )
+                                :
+                                (
+                                    <View style={crlimtreq_styles.pdfLoading}> <Text>No PDF</Text> </View>
+                                )
+                        }
                     </View>
                 </View>
             </Modal>
@@ -930,29 +1065,22 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
         <View style={[
             crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-            item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {item.isProcessed && (
-                <View style={[
-                    crlimtreq_styles.stampContainerYOS,
-                ]}>
-                    <View style={[
-                        crlimtreq_styles.stamp,
-                        item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
-                    ]}>
-                        <Text style={crlimtreq_styles.stampText}>
-                            {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                        </Text>
+            item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
+            {
+                item.isProcessed &&
+                (
+                    <View style={[crlimtreq_styles.stampContainerYOS,]}>
+                        <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
+                            <Text style={crlimtreq_styles.stampText}>
+                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-            )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-            </View>
+                )
+            }
+            <View style={crlimtreq_styles.dateContainer}><Text style={crlimtreq_styles.dateText}>{item.PODate}</Text></View>
             <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                </View>
+                <View style={crlimtreq_styles.cardHeader}><Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text></View>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
@@ -961,15 +1089,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
+                        <Text style={crlimtreq_styles.value}>{item.BAccName || ''}</Text>
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
+                        <Text style={crlimtreq_styles.value}> {item.NetAmt || ''}: </Text>
                     </View>
                 </View>
                 <View style={crlimtreq_styles.twoColumnRow}>
@@ -979,17 +1103,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             style={crlimtreq_styles.editableValueBlack}
                             value={editableValuesYPO[item.UId]?.ARemark || ''}
                             onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                        // keyboardType="numeric"
                         />
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthStatus || ''}
-                        </Text>
+                        <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
                     </View>
                 </View>
-
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
@@ -1006,13 +1126,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={() => { if (isConnected && !item.isProcessed) handleCallURL(item); }}
-                    disabled={!isConnected || item.isProcessed || getLocationLoading}
-                >
-                    {getLocationLoading ? (
-                        <ActivityIndicator size={40} color="#2196F3" />
-                    ) : (
-                        <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                    )}
+                    disabled={!isConnected || item.isProcessed || getLocationLoading}>
+                    {
+                        getLocationLoading ?
+                            (
+                                <ActivityIndicator size={40} color="#2196F3" />
+                            )
+                            :
+                            (
+                                <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
+                            )
+                    }
                 </TouchableOpacity>
             </View>
         </View>
@@ -1023,18 +1147,19 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             crlimtreq_styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
         ]}>
-            {item.IsAuth && (
-                <View style={crlimtreq_styles.stampContainerYOS}>
-                    <View style={[
-                        crlimtreq_styles.stamp,
-                        item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
-                    ]}>
-                        <Text style={crlimtreq_styles.stampText}>
-                            {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' ? 'REJECTED' : 'PENDING'}
-                        </Text>
+            {
+                item.IsAuth && (
+                    <View style={crlimtreq_styles.stampContainerYOS}>
+                        <View style={[
+                            crlimtreq_styles.stamp,
+                            item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
+                        ]}>
+                            <Text style={crlimtreq_styles.stampText}>
+                                {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' ? 'REJECTED' : 'PENDING'}
+                            </Text>
+                        </View>
                     </View>
-                </View>
-            )}
+                )}
             <View style={crlimtreq_styles.dateContainer}>
                 <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
             </View>
@@ -1094,12 +1219,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
             </View>
             <View style={crlimtreq_styles.cardActions}>
-                {/* <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity> */}
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
@@ -1114,7 +1233,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         <View style={[
             crlimtreq_styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
-            // item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
         ]}>
             {item.isProcessed ? (
                 <>
@@ -1177,7 +1295,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             style={crlimtreq_styles.editableValueBlack}
                             value={editableValuesYPO[item.UId]?.ARemark || ''}
                             onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                        // keyboardType="numeric"
                         />
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
@@ -1229,7 +1346,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     );
 
 
-    // eslint-disable-next-line react/no-unstable-nested-components
     const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>
             <TouchableOpacity
@@ -1257,11 +1373,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     return (
         <>
             {activeTab1YPO === 'requests' ? (
-                <HeaderBar
-                    userName={username}
-                    onSearch={setSearchQueryYPO}
-                    placeholder="Search purchase order..."
-                />
+                <>
+                    <HeaderBar
+                        userName={username}
+                        onSearch={setSearchQueryYPO}
+                        placeholder="Search purchase order..."
+                    />
+                </>
+
             ) : activeTab1YPO === 'history' ? (
                 <HeaderBar
                     userName={username}
@@ -1278,19 +1397,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             <View style={crlimtreq_styles.container}>
                 {isLoadingYPO && <FullScreenLoader message={activeTab1YPO === 'history' ? "Loading History..." : activeTab1YPO === 'verify' ? "Loading Verify..." : "Loading Request..."} />}
                 <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                {/* <TouchableOpacity
-                    style={crlimtreq_styles.closeButton}
-                    onPress={() => navigation.goBack()}
-                    disabled={!isConnected}
-                >
-                    <Text style={crlimtreq_styles.closeButtonText}>Home</Text>
-                </TouchableOpacity> */}
-                {/* <TouchableOpacity
-                    style={crlimtreq_styles.historyButton}
-                    onPress={callhisttoryfunction}
-                >
-                    <Icon name="history" size={24} color="white" />
-                </TouchableOpacity> */}
+                <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
+                    <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
+                </TouchableOpacity>
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
                         ref={flatListRefYPO}
@@ -1574,6 +1683,27 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     setPdfUrl('');
                     setPdfPublicUrl(null);
                 }}
+            />
+
+
+            <CriteriaForm
+                isVisible={criteriaFormOpen}
+                onClose={handleCriteriaFormClose}
+                isLoading={isLoadingYPO}
+                //getAllPropertyData={getAllPropertyData}
+                //setAllPropertyData={setAllPropertyData}
+                FormState={FormState}
+                setFormState={setFormState}
+                //getAllYearData={getAllYearData}
+                //setAllYearData={setAllYearData}
+                getAllStoreData={getAllStoreData}
+                setAllStoreData={setAllStoreData}
+                token={token}
+                fetchData={fetchData}
+                //fetchHistoryData={fetchHistoryData}
+                fetchAllHistoryData={fetchAllHistoryData}
+                fetchAllVerifyData={fetchAllVerifyData}
+                activeTab1YPO={activeTab1YPO}
             />
         </>
     );

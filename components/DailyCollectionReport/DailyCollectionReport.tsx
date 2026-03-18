@@ -621,18 +621,31 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             return map;
         }, [columns]);
 
+        // const totals = useMemo(() => {
+        //     const calculated = {};
+        //     columns.forEach((col, index) => {
+        //         if (sumFields[index] === 1 && filterDataTypes[index] === 'N') {
+        //             calculated[col] = filteredData.reduce(
+        //                 (sum, item) => sum + (parseFloat(item[col]) || 0),
+        //                 0
+        //             );
+        //         }
+        //     });
+        //     return calculated;
+        // }, [filteredData, columns, sumFields, filterDataTypes]);
+
         const totals = useMemo(() => {
-            const calculated = {};
-            columns.forEach((col, index) => {
-                if (sumFields[index] === 1 && filterDataTypes[index] === 'N') {
-                    calculated[col] = filteredData.reduce(
-                        (sum, item) => sum + (parseFloat(item[col]) || 0),
-                        0
-                    );
-                }
-            });
-            return calculated;
-        }, [filteredData, columns, sumFields, filterDataTypes]);
+            return {
+                tranamt: filteredData.reduce(
+                    (sum, item) => sum + (parseFloat(item.tranamt) || 0),
+                    0
+                ),
+                clramt: filteredData.reduce(
+                    (sum, item) => sum + (parseFloat(item.clramt) || 0),
+                    0
+                )
+            };
+        }, [filteredData]);
 
         const [expandedGroups, setExpandedGroups] = useState({});
         const [loadedItems, setLoadedItems] = useState({});
@@ -1264,12 +1277,68 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         }, [gridConfig, renderCard, loadedItems, isLoadingMore]);
 
         // Footer
+        // const Footer = useCallback(() => {
+        //     if (Object.keys(totals).length === 0) return null;
+
+        //     return (
+        //         <LinearGradient
+        //             // colors={['#4A6FA5', '#5C85D1']}
+        //             colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
+        //             style={{
+        //                 position: "absolute",
+        //                 bottom: 0,
+        //                 left: 0,
+        //                 right: 0,
+        //                 padding: screenWidth <= 400 ? 12 : 16,
+        //                 borderTopLeftRadius: 16,
+        //                 borderTopRightRadius: 16,
+        //                 elevation: 10,
+        //                 shadowColor: "#000",
+        //                 shadowOffset: { width: 0, height: -3 },
+        //                 shadowOpacity: 0.2,
+        //                 shadowRadius: 6,
+        //                 zIndex: 1000,
+        //             }}
+        //         >
+        //             <Text style={{
+        //                 color: "#fff",
+        //                 fontSize: screenWidth <= 400 ? 13 : 14,
+        //                 fontWeight: "700",
+        //                 marginBottom: 10,
+        //             }}>
+        //                 Totals
+        //             </Text>
+
+        //             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        //                 <View style={{ flexDirection: 'row', paddingRight: 20 }}>
+        //                     {Object.entries(totals).map(([col, value]) => (
+        //                         <View key={col} style={{
+        //                             marginLeft: 16,
+        //                             backgroundColor: 'rgba(255,255,255,0.15)',
+        //                             paddingHorizontal: 12,
+        //                             paddingVertical: 6,
+        //                             borderRadius: 20,
+        //                         }}>
+        //                             <Text style={{
+        //                                 color: "rgba(255,255,255,0.9)",
+        //                                 fontSize: screenWidth <= 400 ? 11 : 12,
+        //                                 fontWeight: "600",
+        //                             }}>
+        //                                 {labelMap[col]}: {formatValue(value, col)}
+        //                             </Text>
+        //                         </View>
+        //                     ))}
+        //                 </View>
+        //             </ScrollView>
+        //         </LinearGradient>
+        //     );
+        // }, [totals, labelMap, formatValue, screenWidth]);
+
         const Footer = useCallback(() => {
             if (Object.keys(totals).length === 0) return null;
 
             return (
                 <LinearGradient
-                    // colors={['#4A6FA5', '#5C85D1']}
                     colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
                     style={{
                         position: "absolute",
@@ -1299,19 +1368,25 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         <View style={{ flexDirection: 'row', paddingRight: 20 }}>
                             {Object.entries(totals).map(([col, value]) => (
-                                <View key={col} style={{
-                                    marginLeft: 16,
-                                    backgroundColor: 'rgba(255,255,255,0.15)',
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 6,
-                                    borderRadius: 20,
-                                }}>
+                                <View
+                                    key={col}
+                                    style={{
+                                        marginLeft: 16,
+                                        backgroundColor: 'rgba(255,255,255,0.15)',
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 6,
+                                        borderRadius: 20,
+                                    }}
+                                >
                                     <Text style={{
                                         color: "rgba(255,255,255,0.9)",
                                         fontSize: screenWidth <= 400 ? 11 : 12,
                                         fontWeight: "600",
                                     }}>
-                                        {labelMap[col]}: {formatValue(value, col)}
+                                        {labelMap[col] || col}: ₹ {value.toLocaleString('en-IN', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        })}
                                     </Text>
                                 </View>
                             ))}
@@ -1319,8 +1394,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     </ScrollView>
                 </LinearGradient>
             );
-        }, [totals, labelMap, formatValue, screenWidth]);
-
+        }, [totals, labelMap, screenWidth]);
         // Empty state
         const EmptyState = useCallback(() => (
             <View style={{
@@ -2666,7 +2740,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             fontWeight: "500",
                                                             marginRight: 8,
                                                         }}>
-                                                            Today's Collection:
+                                                            Collection:
                                                         </Text>
 
                                                         <Text style={{
@@ -2861,7 +2935,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             fontWeight: "600",
                                                         }}>
                                                             ₹{parseFloat(
-                                                                filteredData12.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
+                                                                filteredPartyData.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
                                                             ).toLocaleString('en-IN', {
                                                                 minimumFractionDigits: 2,
                                                                 maximumFractionDigits: 2
@@ -2885,7 +2959,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             fontWeight: "600",
                                                         }}>
                                                             ₹{parseFloat(
-                                                                filteredData12.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
+                                                                filteredPartyData.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
                                                             ).toLocaleString('en-IN', {
                                                                 minimumFractionDigits: 2,
                                                                 maximumFractionDigits: 2

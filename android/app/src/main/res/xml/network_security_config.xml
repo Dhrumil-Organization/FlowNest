@@ -8,6 +8,9 @@
         <domain includeSubdomains="true">192.168.1.1</domain>
         <domain includeSubdomains="true">103.214.226.148:8005</domain>
         <domain includeSubdomains="true">103.214.226.148</domain>
+        <!-- new addded -->
+         <domain includeSubdomains="true">192.168.13.100</domain>
+         <domain includeSubdomains="true">192.168.13.130</domain>
         <!-- apna backend IP ya domain yahan daalo -->
         <!-- <domain>88.xxx.xxx.xxx</domain> -->
     </domain-config>

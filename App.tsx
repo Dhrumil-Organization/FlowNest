@@ -55,6 +55,11 @@ import { initDB } from './common/utils/chatDB';
 import { initGlobalCacheDB, updateGlobalCacheInBackground } from './common/utils/sqliteCacheManager';
 import CheckingScanner from './components/CheckingScanner/CheckingScanner';
 import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOrderTracking';
+import SalesOrderInActive from './components/SalesOrderInActive/SalesOrderInActive';
+import MergeMasterAuth from './components/MergeMasterAuth/MergeMasterAuth';
+
+
+
 
 const Stack = createNativeStackNavigator();
 
@@ -576,6 +581,17 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="Sales Order(InActive)">{(props) =>
+                      <>
+                        <SalesOrderInActive {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Merge Master Auth.">{(props) =>
+                      <>
+                        <MergeMasterAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                      </>
+                    }</Stack.Screen>
+
                   </Stack.Navigator>
                 </NavigationContainer>
               ) : (

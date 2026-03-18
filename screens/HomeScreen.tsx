@@ -198,6 +198,18 @@ const APP_SECTIONS = [
             { id: '23', name: 'Sales Analysis', screen: 'Sales Analysis', icon: 'bar-chart', iconColor: '#221080' },
         ],
     },
+    {
+        title: 'S',
+        data: [
+            { id: '24', name: 'Sales Order(InActive)', screen: 'Sales Order(InActive)', icon: 'edit', iconColor: '#4B0082' },
+        ],
+    },
+    {
+        title: 'M',
+        data: [
+            { id: '25', name: 'Merge Master Auth.', screen: 'Merge Master Auth.', icon: 'merge', iconColor: '#008080' },
+        ],
+    },
 
 ];
 
@@ -336,65 +348,73 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
         } else {
             try {
                 const decodedValue = atob(getMenuApps);
-                const parsedValue = JSON.parse(decodedValue);
-                // const parsedValue = [
-                //     {
-                //         "title": "",
-                //         "pages": [
-                //             {
-                //                 "title": "Mobile App",
-                //                 "href": "#",
-                //                 "icon": "",
-                //                 "children": [
-                //                     {
-                //                         "title": "Upload",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Credit Limit Request",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Sudamo Production Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Yarn Purchase Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Collection",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "New Account Request",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Sales Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Grey Purchase Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Production Order Tracking",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Monthly Expense Report",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Inquiry",
-                //                         "href": "/"
-                //                     },
-                //                 ]
-                //             }
-                //         ]
-                //     }
-                // ];
+                // const parsedValue = JSON.parse(decodedValue);
+                const parsedValue = [
+                    {
+                        "title": "",
+                        "pages": [
+                            {
+                                "title": "Mobile App",
+                                "href": "#",
+                                "icon": "",
+                                "children": [
+                                    {
+                                        "title": "Upload",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Credit Limit Request",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Sudamo Production Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Yarn Purchase Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Collection",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "New Account Request",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Sales Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Grey Purchase Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Production Order Tracking",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Monthly Expense Report",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Inquiry",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Sales Order(InActive)",
+                                        "href": "/"
+                                    },
+                                     {
+                                        "title": "Merge Master Auth.",
+                                        "href": "/"
+                                    },
+                                ]
+                            }
+                        ]
+                    }
+                ];
                 console.log('Decoded getMenuApps:', parsedValue);
                 setDecodedMenuApps(parsedValue);
 

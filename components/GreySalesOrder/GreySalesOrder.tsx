@@ -774,7 +774,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 </View>
             )}
             <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
+                <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
             </View>
             <View style={crlimtreq_styles.cardHeaderContainer}>
                 <View style={crlimtreq_styles.cardHeader}>

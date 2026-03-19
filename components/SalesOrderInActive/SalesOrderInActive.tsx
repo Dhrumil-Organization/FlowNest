@@ -63,6 +63,8 @@ interface AllHistoryData {
     ActiveBy: string,
     ActiveDate: string,
     ActiveRemark: string,
+    SODate:string,
+    NSODate:string,
     d1: [D1datakeys];
 }
 

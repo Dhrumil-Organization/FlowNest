@@ -42,6 +42,11 @@ const CustomDrawer = (props) => {
     const [displayedItems, setDisplayedItems] = useState<ItemData[]>([]);
     const [hasMoreItem, setHasMoreItem] = useState(true);
     const [localItemStatus, setLocalItemStatus] = useState<ItemStatus>(selectedItemStatus || 'All');
+    const [getStockTypesFilterForm, setStockTypesFilterForm] = useState([
+        { 'label': 'All', 'value': 'A' },
+        { 'label': 'In house', 'value': 'I' },
+        { 'label': 'Process house', 'value': 'P' }
+    ]);
 
     useEffect(() => {
         if (exeData.length > 0 && !selectedExe) {
@@ -103,6 +108,14 @@ const CustomDrawer = (props) => {
                 textColor: '#fff',
                 action: { text: 'OK', textColor: 'white' },
             });
+        } else if (typeof FormState.values.StkType == 'undefined' || FormState.values.StkType == null || FormState.values.StkType == '') {
+            Snackbar.show({
+                text: 'Please select stock type',
+                duration: Snackbar.LENGTH_LONG,
+                backgroundColor: 'red',
+                textColor: '#fff',
+                action: { text: 'OK', textColor: 'white' },
+            });
         } else {
             setIsLoadingMore(true)
             setAllStockData([])
@@ -118,7 +131,8 @@ const CustomDrawer = (props) => {
                 autoNotFound: typeof FormState.values.autoNotFound == 'undefined' || FormState.values.autoNotFound == null || FormState.values.autoNotFound == '' ? '0' : FormState.values.autoNotFound,
                 autoForRepacking: typeof FormState.values.autoForRepacking == 'undefined' || FormState.values.autoForRepacking == null || FormState.values.autoForRepacking == '' ? '0' : FormState.values.autoForRepacking,
                 duplicate: typeof FormState.values.duplicate == 'undefined' || FormState.values.duplicate == null || FormState.values.duplicate == '' ? '0' : FormState.values.duplicate,
-                txntype: 'yarnStockVerification'
+                txntype: 'yarnStockVerification',
+                stktype: typeof FormState.values.StkType != 'undefined' && FormState.values.StkType != null && FormState.values.StkType != '' ? FormState.values.StkType : '',
             };
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
@@ -149,6 +163,20 @@ const CustomDrawer = (props) => {
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
     const selectedStore = getAllStoreData?.find((y) => y.StrCode == FormState.values.StrCode) || null;
+    const selectedStockTypeFilterForm = getStockTypesFilterForm?.find((y) => y.value == FormState.values.StkType) || null;
+
+
+    useEffect(() => {
+        if (!FormState.values.StkType) {
+            setFormState(prev => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    StkType: 'I'
+                }
+            }));
+        }
+    }, []);
 
     return (
         <>
@@ -233,6 +261,29 @@ const CustomDrawer = (props) => {
                                         }}
                                         multiple={false}
                                         emptyMessage="No stores data available" />
+                                </View>
+                                <View style={{ marginBottom: 10 }} >
+                                    <Text style={styles.label}>Select stock type <Text style={{ color: 'red' }}> * </Text></Text>
+                                    <SearchableDropdown
+                                        key={FormState.values.StkType}
+                                        data={getStockTypesFilterForm}
+                                        labelKey="label"
+                                        valueKey="value"
+                                        placeholder="Choose property..."
+                                        pageSize={10}
+                                        value={FormState.values.StkType}
+                                        initialValue={selectedStockTypeFilterForm}
+                                        onSelect={(stk) => {
+                                            setFormState(FormState => ({
+                                                ...FormState,
+                                                values: {
+                                                    ...FormState.values,
+                                                    StkType: stk?.value || '',
+                                                }
+                                            }));
+                                        }}
+                                        multiple={false}
+                                        emptyMessage="No stock types data available" />
                                 </View>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>

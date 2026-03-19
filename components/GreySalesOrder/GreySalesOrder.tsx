@@ -207,6 +207,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     });
 
     const fetchData = useCallback(async () => {
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        if (!FormState.values.StrCode) return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -278,8 +280,12 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     }, [FormState.values.StrCode, token]);
 
     const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
+
         setIsHistoryLoadingYPO(true);
         try {
             const historyPayload = {
@@ -317,7 +323,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     }, [FormState.values.StrCode]);
 
     const fetchAllHistoryData = useCallback(async () => {
-        // setActiveTabYPO('allhistory');
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
@@ -371,6 +379,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     }, [FormState.values.StrCode, token]);
 
     const fetchAllVerifyData = useCallback(async () => {
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
         // setActiveTabYPO('allhistory');
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -1117,7 +1126,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 <HeaderBar
                     userName={username}
                     onSearch={setSearchQueryYPO}
-                    placeholder="Search grey sales order..."
+                    placeholder="Search sales order..."
                 />
             ) : activeTab1YPO === 'history' ? (
                 <HeaderBar
@@ -1152,6 +1161,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                             !isLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1170,6 +1187,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                             !allhistoryLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1188,6 +1213,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                             !allhistoryLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No verify data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }

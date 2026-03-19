@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import HeaderBar from '../HeaderBar/HeaderBar';
@@ -17,7 +17,6 @@ import FullScreenLoader from '../Loader/Loader';
 //const YarnStockVerification: React.FC<Props> = ({ token, navigation, isConnected, username, getUserPrptype }) => {
 const YarnStockVerification = (props) => {
     const { token, navigation, isConnected, username, getUserPrptype } = props;
-    console.log("getUserPrptype ====>", getUserPrptype)
     const [isLoading, setIsLoading] = useState(false);
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
     const [isCartonAddDrawerVisible, setIsCartonAddDrawerVisible] = useState(false);
@@ -54,7 +53,8 @@ const YarnStockVerification = (props) => {
         values: {
             PrpCode: typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '' ? FormState.values.PrpCode : '',
             YearNo: typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '' ? FormState.values.YearNo : '',
-            StrCode: typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' ? FormState.values.StrCode : ''
+            StrCode: typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' ? FormState.values.StrCode : '',
+            grsWt: 0
         }
     })
     const [getAllStockData, setAllStockData] = useState([]);
@@ -241,7 +241,6 @@ const YarnStockVerification = (props) => {
             txntype: 'yarnStockVerification',
             isstockupdate: '1'
         };
-        console.log('payload for update_verify_manual_stock API ', payload);
         const headers = {
             Authorization: `Bearer ${getToken()}`,
             'Content-Type': 'application/json',
@@ -294,6 +293,47 @@ const YarnStockVerification = (props) => {
                 <TouchableOpacity style={styles.fabAdd} onPress={openNewCatonDrawer}>
                     <Icon name="add" size={20} color="#fff" />
                 </TouchableOpacity>
+                <View style={styles.v}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        //style={{ height: 16 }}
+                        contentContainerStyle={{
+                            alignItems: 'center',
+                            paddingVertical: 4,   // 👈 small spacing
+                        }}
+                    >
+                        <View style={styles.rowcolors}>
+                            <View style={styles.itemcolors}>
+                                <View style={[styles.boxcolors, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#000' }]} />
+                                <Text style={styles.labelcolors2}>Auto not found</Text>
+                            </View>
+
+                            <View style={styles.itemcolors}>
+                                <View style={[styles.boxcolors, { backgroundColor: '#F1FA73', borderWidth: 1, borderColor: '#000' }]} />
+                                <Text style={styles.labelcolors}>Auto found</Text>
+                            </View>
+
+                            <View style={styles.itemcolors}>
+                                <View style={[styles.boxcolors, { backgroundColor: '#B59AE3', borderWidth: 1, borderColor: '#000' }]} />
+                                <Text style={styles.labelcolors5}>Auto for repacking</Text>
+                            </View>
+
+                            <View style={styles.itemcolors}>
+                                <View style={[styles.boxcolors, { backgroundColor: '#98FAF3', borderWidth: 1, borderColor: '#000' }]} />
+                                <Text style={styles.labelcolors4}>Manual</Text>
+                            </View>
+                            <View style={styles.itemcolors}>
+                                <View style={[styles.boxcolors, { backgroundColor: '#678F76', borderWidth: 1, borderColor: '#000' }]} />
+                                <Text style={styles.labelcolors4}>Duplicate</Text>
+                            </View>
+                            <View style={styles.itemcolors}>
+                                <View style={[styles.boxcolors, { backgroundColor: '#DBA7D7', borderWidth: 1, borderColor: '#000' }]} />
+                                <Text style={styles.labelcolors3}>Stock not found</Text>
+                            </View>
+                        </View>
+                    </ScrollView>
+                </View>
                 <YarnStockCard gePOTData={getAllStockData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} parentDesignData={parentDesignData} setSelectedStockRow={setSelectedStockRow} getSelectedStockRow={getSelectedStockRow} setModalOpen={setModalOpen} setSavedCartons={setSavedCartons} getSavedCartons={getSavedCartons} />
             </View>
             <CartonAddDrawer
@@ -357,14 +397,58 @@ const YarnStockVerification = (props) => {
                         animationType="fade">
                         <View style={styles.confirmOverlay}>
                             <View style={styles.confirmBox}>
-                                <Text style={styles.confirmTitle}>Confirm</Text>
+
+                                <Text style={styles.confirmTitle}>Update confirm</Text>
+                                {/* <View style={styles.row}>
+                                    <Text style={styles.label}>UID :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.UId}</Text>
+                                </View> */}
+
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Carton :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.CartNo}</Text>
+                                </View>
+
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Item :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.ItmName} </Text>
+                                </View>
+
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Merge :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.MerName}</Text>
+                                </View>
+
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Grade :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.GrdName}</Text>
+                                </View>
+
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Shade :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.ShdName}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Chees :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.Chees}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Wt :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.Wt}</Text>
+                                </View>
+
+                                <View style={styles.row}>
+                                    <Text style={styles.label}>Stk. type :</Text>
+                                    <Text style={styles.value}>{getSelectedStockRow?.StkType}</Text>
+                                </View>
+                                {/* 
                                 <Text style={styles.confirmText}> Are you sure you want to update ? </Text>
                                 <Text style={styles.confirmText}> UID : {getSelectedStockRow?.UId} </Text>
                                 <Text style={styles.confirmText}> Carton  : {getSelectedStockRow?.CartNo} </Text>
                                 <Text style={styles.confirmText}> Item  : {getSelectedStockRow?.ItmName} </Text>
                                 <Text style={styles.confirmText}> Merge  : {getSelectedStockRow?.MerName} </Text>
                                 <Text style={styles.confirmText}> Grade  : {getSelectedStockRow?.GrdName} </Text>
-                                <Text style={styles.confirmText}> Shade  : {getSelectedStockRow?.ShdName} </Text>
+                                <Text style={styles.confirmText}> Shade  : {getSelectedStockRow?.ShdName} </Text> */}
                                 <View style={styles.confirmButtons}>
                                     <TouchableOpacity
                                         style={[styles.confirmBtn, { backgroundColor: "red" }]}
@@ -439,7 +523,15 @@ const styles = StyleSheet.create({
     confirmTitle: {
         fontSize: 18,
         fontWeight: "bold",
-        marginBottom: 10
+        marginBottom: 10,
+        color: 'darkblue',
+        textAlign: 'center'
+    },
+    confirmTextLabel: {
+        fontSize: 15,
+        marginBottom: 5,
+        color: '#000',
+        width: '8%'
     },
     confirmText: {
         fontSize: 15,
@@ -463,6 +555,104 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
         textAlign: "center"
+    },
+    row: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+
+    label: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
+        width: '25%'   // fixed label width
+    },
+
+    value: {
+        fontSize: 15,
+        color: '#000',
+        width: '80%',
+        textAlign: 'left'
+    },
+
+
+
+
+
+
+    rowcolors: {
+        flexDirection: 'row',
+
+    },
+    boxcolors: {
+        width: 20,
+        height: 20,
+        borderRadius: 2,
+        marginRight: 4,
+        
+        
+    },
+
+    labelcolors: {
+        fontSize: 15,
+        lineHeight: 18,
+        includeFontPadding: false,
+        color: '#000',
+        textAlign: 'left',   // 👈 CENTER TEXT        
+        width: 100,        // 👈 SAME WIDTH FOR ALL
+
+    },
+    labelcolors2: {
+        fontSize: 15,
+        lineHeight: 18,
+        includeFontPadding: false,
+        color: '#000',
+        textAlign: 'left',   // 👈 CENTER TEXT        
+        width: 120,        // 👈 SAME WIDTH FOR ALL
+    },
+    labelcolors3: {
+        fontSize: 15,
+        lineHeight: 18,
+        includeFontPadding: false,
+        color: '#000',
+        textAlign: 'left',   // 👈 CENTER TEXT        
+        width: 130,        // 👈 SAME WIDTH FOR ALL
+    },
+    labelcolors4: {
+        fontSize: 15,
+        lineHeight: 18,
+        includeFontPadding: false,
+        color: '#000',
+        textAlign: 'left',   // 👈 CENTER TEXT        
+        width: 90,        // 👈 SAME WIDTH FOR ALL
+    },
+    labelcolors5: {
+        fontSize: 15,
+        lineHeight: 18,
+        includeFontPadding: false,
+        color: '#000',
+        textAlign: 'left',   // 👈 CENTER TEXT        
+        width: 145,        // 👈 SAME WIDTH FOR ALL
+    },
+
+    itemcolors: {
+        flexDirection: 'row',
+        //alignItems: 'center',
+        //justifyContent: 'center',
+        //width: 140,        // 👈 SAME WIDTH FOR ALL
+        marginRight: 8,       
+    },
+    v:{
+        height: 25,
+        backgroundColor : '#f1e8e8',
+        padding: 5,
+        borderRadius: 8,
+        marginLeft: 7,
+        marginRight:7,
+        
+        
+        
     }
 });
 

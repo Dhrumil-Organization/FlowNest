@@ -31,7 +31,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
 import CriteriaForm from './CriteriaForm';
-import {fetchAllStoredata } from '../../common/API/Functions';
+import { fetchAllStoredata } from '../../common/API/Functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface CardData {
@@ -264,6 +264,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
     */
     const fetchData = useCallback(async () => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
         }
@@ -368,6 +371,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
     */
     const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsHistoryLoadingYPO(true);
@@ -454,6 +460,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
     */
     const fetchAllHistoryData = useCallback(async () => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
         }
@@ -547,6 +556,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
     */
     const fetchAllVerifyData = useCallback(async () => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
         }
@@ -1414,6 +1426,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             !isLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1432,6 +1452,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             !allhistoryLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1450,6 +1478,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             !allhistoryLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No verify data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }

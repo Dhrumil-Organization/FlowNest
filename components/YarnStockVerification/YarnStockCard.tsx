@@ -167,7 +167,7 @@ const YarnStockCard: React.FC<POTDataProps> = ({
                 </View>
                 <View style={styles.gridItem}>
                     <Text style={styles.gridLabel}>Transaction</Text>
-                    <Text style={styles.gridValue}>{item.TranName}</Text>
+                    <Text style={styles.gridValue1}>{item.TranName}</Text>
                 </View>
             </View>
             <View style={styles.bottomRow}>
@@ -349,6 +349,11 @@ const styles = StyleSheet.create({
     },
     gridValue: {
         fontSize: 18,
+        fontWeight: "600",
+        color: "#333"
+    },
+    gridValue1: {
+        fontSize: 14,
         fontWeight: "600",
         color: "#333"
     },

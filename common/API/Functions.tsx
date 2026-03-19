@@ -1151,7 +1151,6 @@ export const fetchAllPropertyData = async (token: string) => {
         cancelToken = axios.CancelToken.source();
 
         let params = null;
-        console.log("fetchAllPropertyData api url :", `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`)
         const response = await axios.get(
             `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`,
             {
@@ -1218,8 +1217,6 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
         cancelToken = axios.CancelToken.source();
 
         let params = { prpcode: prp, yearno: yrno, txntype: txn, prptype: userPtype };
-        console.log("fetchAllStoredata api payload :", params)
-        console.log("fetchAllStoredata api url :", `${API}/api/getstore`)
         const response = await axios.get(
             `${API}/api/getstore`,
             {
@@ -1233,7 +1230,6 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
                 params
             }
         );
-        console.log("fetchAllStoredata api response :", response.data)
         if (response.data.response.data && response.data.response.data.length > 0) {
             const appStoredata = response.data.response.data;
             return appStoredata;

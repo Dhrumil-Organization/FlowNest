@@ -207,8 +207,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     });
 
     const fetchData = useCallback(async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
+        cancelTokenRef.current = axios.CancelToken.source();
+
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
 
         let strtypeFromApi = '';
@@ -397,7 +403,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 strcode: FormState.values.StrCode || '',
                 atype: 'A',
                 strtype: strtypeFromApi
-            }; 
+            };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
@@ -430,6 +436,12 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     }, [FormState.values.StrCode, token]);
 
     useEffect(() => {
+        if (!didInitialFetch.current) {
+            didInitialFetch.current = true;
+            return;
+        }
+
+
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();
         } else if (activeTab1YPO === 'requests') {

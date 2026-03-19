@@ -70,6 +70,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
     const [gePOTData, setPOTData] = useState<POTData[]>([])
     const [getpayload, setPayload] = useState<CardPayload[]>([])
+    const [getUserRole, setUserRole] = useState([])
     const [getdashPrp, setdashPrp] = useState<DashPrp[]>([])
     const [getdashParty, setdashParty] = useState<DashParty[]>([])
     const [getdashSexe, setdashSexe] = useState<DashSexe[]>([])
@@ -92,10 +93,32 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     const [activeCard, setActiveCard] = useState(null);
     const [getActiveCardDetails, setActiveCardDetails] = useState(null);
     const [summaryDrawerVisible, setSummaryDrawerVisible] = useState(false);
+    const [hideprpGroup, sethideprpGroup] = useState(false);
     const summaryVisibleRef = useRef(false);
     const searchRef = useRef(searchQueryPOT);
     const searchRefDetails = useRef(searchQueryPOTDetails);
     const ROW_HEIGHT = 52;
+
+    useEffect(() => {
+        const initializeApp = async () => {
+            try {
+
+                const role = await AsyncStorage.getItem('user_details_role');
+
+                setUserRole(JSON.parse(role as any));
+
+
+
+            } catch (error) {
+                console.error("Initialization error:", error);
+
+            } finally {
+                // setIsLoading(false);
+            }
+        };
+
+        initializeApp();
+    }, []);
 
     useEffect(() => {
         summaryVisibleRef.current = summaryDrawerVisible;
@@ -143,6 +166,26 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             setSelectedPrpGrp(receivables_prpgroup[0]);
         }
     }, [receivables_prpgroup, selectedPrpgrp]);
+
+
+    console.log('getUserRole:', getUserRole);
+
+
+    useEffect(() => {
+        const getUserRoleString = getUserRole.toString();
+        console.log('getUserRole string:', getUserRoleString);
+
+        // 1. String ko array mein convert karein (comma se split karke)
+        const rolesArray = getUserRoleString.split(',');
+
+        // 2. "Receivables View Combine" check karein
+        const state = rolesArray.includes("Receivables View Combine");
+
+        // 3. Result print karein
+        console.log('getUserRole:', state); // Output: true
+        sethideprpGroup(state)
+    }, [getUserRole])
+
 
 
     // useEffect(() => {
@@ -294,13 +337,13 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         setdashPropertyLoading(true);
         try {
             const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 txntype: '/receivables-view'
             }
             // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
             // const receivables_prpgroup_from_cache = await AsyncStorage.getItem('receivables_prpgroup');
             const responseprp = await axios.get(
-                'https://apig.tms-webapp.com/api/dashprp',
+                `${API}/api/dashprp`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -332,14 +375,14 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         setdashSexeLoading(true);
         try {
             const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 fetch: 'dr',
                 dashview: 'outstanding',
                 txntype: '/receivables-view'
             }
 
             const payloadSexe = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 dashview: 'outstanding',
                 fetch: 'salesexe',
             }
@@ -358,7 +401,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 }
             );
             const responsesexe = await axios.get(
-                'https://apig.tms-webapp.com/api/get_criterion',
+                `${API}/api/get_criterion`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -394,7 +437,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
 
         const payload = {
-            prptype: selectedPrpgrp?.PrpTypeCode,
+            prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
             dashview: 'outstanding',
             prpcodes: Array.isArray(selectedDashPrp)
                 ? selectedDashPrp.map(item => item.PrpCode)
@@ -458,7 +501,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         try {
             console.log('🔵 🔵I am Calling3 dashAccount');
             const payload = {
-                prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'summary',
@@ -794,7 +837,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
-                prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 accounts: accountArray ? accountArray : [],
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
@@ -899,7 +942,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             const payload = {
                 CardName: CardName.toUpperCase(),
                 accounts: accountArray ? accountArray : [],
-                prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'slabdetail',
@@ -2086,6 +2129,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 selectedDashAccount={selectedDashAccount}
                 getdashAccountLoading={getdashAccountLoading}
                 setAccountLoading={setAccountLoading}
+                hideprpGroup={hideprpGroup}
             // 
             />
         </>

@@ -299,6 +299,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             // console.log("🔵 payload browse", params);
             setPayload(params as any);
             const response = await axios.post(`${API}/api/collection_crud`, params, { headers });
+            console.log("response", response)
             if (response?.data?.success && response?.data?.data?.data) {
                 // console.log("Browse API running");
                 let apiData = response.data.data.data;
@@ -1900,6 +1901,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             0
         );
 
+        const formatAmount = (value) => {
+            return Number(value || 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        };
+
         return (
             <TouchableOpacity
                 key={item.Code || index}
@@ -1982,12 +1990,19 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 fontWeight: "bold",
                                 textAlign: 'right',
                             }}>
-                                ₹{isAllCard
+                                {/* ₹{isAllCard
                                     ? totalToDaysCollection.toLocaleString('en-IN', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2
                                     })
-                                    : item.ToDaysCollection}
+                                    : item.ToDaysCollection.toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    }) */}
+                                ₹{isAllCard
+                                    ? formatAmount(totalToDaysCollection)
+                                    : formatAmount(item.ToDaysCollection)
+                                }
                             </Text>
                         </View>
 
@@ -2006,12 +2021,16 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 fontWeight: "bold",
                                 textAlign: 'right',
                             }}>
-                                ₹{isAllCard
+                                {/* ₹{isAllCard
                                     ? totalCrInBankAccCollection.toLocaleString('en-IN', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2
                                     })
-                                    : item.CrInBankAccCollection}
+                                    : item.CrInBankAccCollection} */}
+                                ₹{isAllCard
+                                    ? formatAmount(totalCrInBankAccCollection)
+                                    : formatAmount(item.CrInBankAccCollection)
+                                }
                             </Text>
                         </View>
                     </View>
@@ -2058,6 +2077,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             (sum, dataItem) => sum + parseFloat(dataItem.CrInBankAccCollection || '0'),
             0
         );
+
+        const formatAmount = (value) => {
+            return Number(value || 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        };
 
         return (
             <TouchableOpacity
@@ -2127,12 +2153,16 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 fontWeight: "bold",
                                 textAlign: 'right',
                             }}>
-                                ₹{isAllCard
+                                {/* ₹{isAllCard
                                     ? totalToDaysCollection.toLocaleString('en-IN', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2
                                     })
-                                    : item.ToDaysCollection}
+                                    : item.ToDaysCollection} */}
+                                ₹{isAllCard
+                                    ? formatAmount(totalToDaysCollection)
+                                    : formatAmount(item.ToDaysCollection)
+                                }
                             </Text>
                         </View>
 
@@ -2151,12 +2181,16 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 fontWeight: "bold",
                                 textAlign: 'right',
                             }}>
-                                ₹{isAllCard
+                                {/* ₹{isAllCard
                                     ? totalCrInBankAccCollection.toLocaleString('en-IN', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2
                                     })
-                                    : item.CrInBankAccCollection}
+                                    : item.CrInBankAccCollection} */}
+                                ₹{isAllCard
+                                    ? formatAmount(totalCrInBankAccCollection)
+                                    : formatAmount(item.CrInBankAccCollection)
+                                }
                             </Text>
                         </View>
                     </View>
@@ -2740,7 +2774,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             fontWeight: "500",
                                                             marginRight: 8,
                                                         }}>
-                                                            Today's Collection:
+                                                            Collection:
                                                         </Text>
 
                                                         <Text style={{

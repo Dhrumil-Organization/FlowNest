@@ -81,7 +81,8 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     setSelectedDashAccount,
     selectedDashAccount,
     getdashAccountLoading,
-    setAccountLoading
+    setAccountLoading,
+    hideprpGroup
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
@@ -123,6 +124,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     const [isDashSexeAccordionOpen, setIsDashSexeAccordionOpen] = useState(false);
     const [isDashAccountAccordionOpen, setIsDashAccountAccordionOpen] = useState(false);
     const [isDashSubHeadAccordionOpen, setIsDashSubHeadAccordionOpen] = useState(false);
+    const [hineidePrp, setHidePrp] = useState(false);
     // 
     const [searchQueryItem, setSearchQueryItem] = useState('');
     // const [selectedItems, setSelectedItems] = useState<ItemData[]>([]);
@@ -148,6 +150,14 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
 
     console.log("designData:", designData, "itemData:", itemData);
+    
+    useEffect(() => {
+      if(hideprpGroup){
+          setHidePrp(hideprpGroup);
+      }
+    }, [hideprpGroup]);
+
+    console.log("hineidePrp:", hineidePrp)
 
     // useEffect(() => {
     //     if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "")) {
@@ -606,46 +616,48 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             </View>
 
                             {/* Property Group Dropdown */}
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.label}>Sales Property Group</Text>
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
-                                >
-                                    <Text style={styles.dropdownText}>{selectedPrpgrp}</Text>
-                                </TouchableOpacity>
-                                {isExeDropdownOpen && (
-                                    <View style={styles.dropdownOptionsContainer}>
-                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                                            <TouchableOpacity
-                                                style={styles.dropdownOption}
-                                                onPress={() => {
-                                                    onExeChangeReceive(null); // Send empty value
-                                                    setIsExeDropdownOpen(false);
-                                                }}
-                                            >
-                                                <Text style={styles.dropdownOptionText}>Select Property Group</Text>
-                                            </TouchableOpacity>
-                                            {receivables_prpgroup.map((exe) => (
+                            {hineidePrp === false ? (<>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.label}>Sales Property Group</Text>
+                                    <TouchableOpacity
+                                        style={styles.dropdownButton}
+                                        onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
+                                    >
+                                        <Text style={styles.dropdownText}>{selectedPrpgrp}</Text>
+                                    </TouchableOpacity>
+                                    {isExeDropdownOpen && (
+                                        <View style={styles.dropdownOptionsContainer}>
+                                            <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
                                                 <TouchableOpacity
-                                                    key={exe.PrpTypeCode}
-                                                    style={[
-                                                        styles.dropdownOption,
-                                                        selectedPrpgrp === exe.PrpTypeOf && styles.selectedOption,
-                                                    ]}
+                                                    style={styles.dropdownOption}
                                                     onPress={() => {
-                                                        onExeChangeReceive(exe);
+                                                        onExeChangeReceive(null); // Send empty value
                                                         setIsExeDropdownOpen(false);
                                                     }}
                                                 >
-                                                    <Text style={styles.dropdownOptionText}>{exe.PrpTypeOf}</Text>
+                                                    <Text style={styles.dropdownOptionText}>Select Property Group</Text>
                                                 </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
+                                                {receivables_prpgroup.map((exe) => (
+                                                    <TouchableOpacity
+                                                        key={exe.PrpTypeCode}
+                                                        style={[
+                                                            styles.dropdownOption,
+                                                            selectedPrpgrp === exe.PrpTypeOf && styles.selectedOption,
+                                                        ]}
+                                                        onPress={() => {
+                                                            onExeChangeReceive(exe);
+                                                            setIsExeDropdownOpen(false);
+                                                        }}
+                                                    >
+                                                        <Text style={styles.dropdownOptionText}>{exe.PrpTypeOf}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    )}
 
-                            </View>
+                                </View></>) : (<></>)}
+
 
                             {/* Accordion for Design Selection */}
                             {getdashPropertyLoading ? (<>

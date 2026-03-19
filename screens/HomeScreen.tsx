@@ -201,7 +201,7 @@ const APP_SECTIONS = [
     {
         title: 'S',
         data: [
-            { id: '24', name: 'Sales Order(Inactive)', screen: 'Sales Analysis', icon: 'bar-chart', iconColor: '#221080' },
+            { id: '24', name: 'Sales Order(Inactive)', screen: 'Sales Order(Inactive)', icon: 'bar-chart', iconColor: '#221080' },
         ],
     },
     // mob_sales_order_Inactive

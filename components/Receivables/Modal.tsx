@@ -83,12 +83,13 @@ export interface CustomDrawerReceiveableProps {
     getdashAccount: DashAccount[];
     getdashSubHead: DashSubHead[];
     getAccountLoading: boolean;
-    dashAccount: Function
-    getdashPropertyLoading: boolean
-    getdashPartyLoading: boolean
-    getdashSubHeadLoading: boolean
-    getdashSexeLoading: boolean
-    getdashAccountLoading: boolean
+    dashAccount: Function;
+    getdashPropertyLoading: boolean;
+    getdashPartyLoading: boolean;
+    getdashSubHeadLoading: boolean;
+    getdashSexeLoading: boolean;
+    getdashAccountLoading: boolean;
+    hideprpGroup: boolean;
     // setAccountLoading: void
     // New prop
 }

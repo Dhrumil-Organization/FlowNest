@@ -201,7 +201,7 @@ const APP_SECTIONS = [
     {
         title: 'S',
         data: [
-            { id: '24', name: 'Sales Order(Inactive)', screen: 'Sales Analysis', icon: 'bar-chart', iconColor: '#221080' },
+            { id: '24', name: 'Sales Order(Inactive)', screen: 'Sales Order(Inactive)', icon: 'bar-chart', iconColor: '#221080' },
         ],
     },
     // mob_sales_order_Inactive
@@ -343,73 +343,77 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
         } else {
             try {
                 const decodedValue = atob(getMenuApps);
-                const parsedValue = JSON.parse(decodedValue);
-                // const parsedValue = [
-                //     {
-                //         "title": "",
-                //         "pages": [
-                //             {
-                //                 "title": "Mobile App",
-                //                 "href": "#",
-                //                 "icon": "",
-                //                 "children": [
-                //                     {
-                //                         "title": "Upload",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Credit Limit Request",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Sudamo Production Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Yarn Purchase Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Collection",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "New Account Request",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Sales Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Grey Purchase Order",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Production Order Tracking",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Monthly Expense Report",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Inquiry",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Checking Scanner",
-                //                         "href": "/"
-                //                     },
-                //                     {
-                //                         "title": "Yarn Stock Verification",
-                //                         "href": "/"
-                //                     },
-                //                 ]
-                //             }   
-                //         ]
-                //     }
-                // ];
+                // const parsedValue = JSON.parse(decodedValue);
+                const parsedValue = [
+                    {
+                        "title": "",
+                        "pages": [
+                            {
+                                "title": "Mobile App",
+                                "href": "#",
+                                "icon": "",
+                                "children": [
+                                    {
+                                        "title": "Upload",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Credit Limit Request",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Sudamo Production Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Yarn Purchase Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Collection",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "New Account Request",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Sales Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Grey Purchase Order",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Production Order Tracking",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Monthly Expense Report",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Inquiry",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Checking Scanner",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Yarn Stock Verification",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Sales Order(Inactive)",
+                                        "href": "/"
+                                    },
+                                ]
+                            }   
+                        ]
+                    }
+                ];
                 console.log('Decoded getMenuApps:', parsedValue);
                 setDecodedMenuApps(parsedValue);
 

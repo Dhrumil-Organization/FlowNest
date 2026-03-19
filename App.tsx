@@ -56,6 +56,7 @@ import { initGlobalCacheDB, updateGlobalCacheInBackground } from './common/utils
 import CheckingScanner from './components/CheckingScanner/CheckingScanner';
 import YarnStockVerification from './components/YarnStockVerification/YarnStockVerification';
 import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOrderTracking';
+import SalesOrderInActive from './components/SalesOrderInActive/SalesOrderInActive';
 
 const Stack = createNativeStackNavigator();
 
@@ -585,7 +586,7 @@ export default function App() {
                     }</Stack.Screen>
                     <Stack.Screen name="Sales Order(Inactive)">{(props) =>
                       <>
-                        <PurchaseOrderTracking {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        <SalesOrderInActive {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />  
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>

@@ -162,6 +162,88 @@ const LoginScreen: React.FC<Props> = ({
   };
 
 
+  // const handleLogin = async () => {
+  //   if (!username || !password) {
+  //     Alert.alert('❌ Error', 'Please enter username and password.');
+  //     return;
+  //   }
+  //   const payload = {
+  //     name: username.trim(),
+  //     password: password.trim(),
+  //     checkdevice: getDeviceId,
+  //     noti_token: getNoti_Token
+  //   };
+  //   console.log('🔵 Sending login payload:', payload);
+  //   try {
+  //     setIsLoading(true);
+  //     const headers = { 'x-platform': 'mob' };
+  //     const response = await axios.post(
+  //       // 'https://apig.tms-webapp.com/api/login',
+  //       `${API}/api/login`,
+  //       payload,
+  //       { headers }
+  //     );
+  //     console.log('✅ Login API Response:', response.data);
+  //     const token = response.data.response.access_token;
+  //     const user_details = response.data.response.user?.first_name || 'user';
+  //     const user_menu_apps = response.data.response.usermenu || '';
+  //     const ismastersync = response.data.response.ismastersync || '';
+  //     const ismastersyncData = response.data.response.mastersyncprptypes || [];
+  //     const userof = response.data.response.userof;
+  //     const yno = response.data.response.year.YearNo || '';
+  //     const role1 = response.data.response.role1;
+  //     if (response.data.success === true) {
+  //       if (token && user_details && user_menu_apps) {
+  //         await AsyncStorage.setItem('access_token', token);
+  //         await AsyncStorage.setItem('user_details', user_details);
+  //         await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
+  //         await AsyncStorage.setItem('user_prptype', userof);
+  //         await AsyncStorage.setItem('login_user_name', username.trim());
+  //         await AsyncStorage.setItem('login_user_passwd', password.trim());
+  //         await AsyncStorage.setItem('yno', yno.trim());
+  //         await AsyncStorage.setItem('user_details_role', JSON.stringify(role1));
+  //         setToken(token);
+  //         setUserDetails(user_details);
+  //         setMenuApps(user_menu_apps);
+  //         setIsLoggedIn(true);
+  //         // const cachedParty = await getCachedGlobalData('party').catch(() => []);
+  //         const cachePopulated = await isCachePopulated();
+  //         if (!cachePopulated) {
+  //           await fetchAndCacheGlobalData(token); // Only fetch if cache is empty
+  //         } else {
+  //           console.log('✅ Using existing cached data');
+  //         }
+  //         await fetchAndCacheGlobalData(token); // Cache global data
+  //         // await fetchAndCacheGlobalData(token);
+  //         await AsyncStorage.setItem('master_sync_data_common', JSON.stringify(ismastersyncData));
+  //         if (ismastersync == 1 || ismastersync === '1' || ismastersync === true) {
+  //           try {
+  //             await AsyncStorage.setItem('master_sync_data', JSON.stringify(ismastersyncData));
+  //             await initDatabase();
+  //             await fetchMasterSyncPartyDataPerPrptypeCache(token || '', ismastersyncData);
+  //             for (const itm of ismastersyncData) {
+  //               const key = normalizePrptype(itm.prptype ?? itm.PrpType ?? '');
+  //               const summary = await getPrptypeSummary(key);
+  //               console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
+  //             }
+  //             // await printCachedPrptypesWithData();
+  //           } catch (err) {
+  //             console.warn('Master-sync or verification failed:', err);
+  //           }
+  //         }
+  //       } else {
+  //         Alert.alert('❌ Error', `${response.data.response.message}`);
+  //       }
+  //     } else {
+  //       Alert.alert('❌ Error', `${response.data.message}`);
+  //     }
+  //   } catch (error) {
+  //     console.error('❌ Login API Error:', error);
+  //     Alert.alert('Error', 'Server error');
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert('❌ Error', 'Please enter username and password.');
@@ -184,13 +266,14 @@ const LoginScreen: React.FC<Props> = ({
         { headers }
       );
       console.log('✅ Login API Response:', response.data);
-      const token = response.data.response.access_token;
-      const user_details = response.data.response.user?.first_name || 'user';
-      const user_menu_apps = response.data.response.usermenu || '';
-      const ismastersync = response.data.response.ismastersync || '';
-      const ismastersyncData = response.data.response.mastersyncprptypes || [];
-      const userof = response.data.response.userof;
-      const yno = response.data.response.year.YearNo || '';
+      const token = response.data.response?.access_token;
+      const user_details = response.data.response?.user?.first_name || 'user';
+      const user_menu_apps = response.data.response?.usermenu || '';
+      const ismastersync = response.data.response?.ismastersync || '';
+      const ismastersyncData = response.data.response?.mastersyncprptypes || [];
+      const userof = response.data.response?.userof;
+      const yno = response.data.response?.year?.YearNo || '';
+      const role1 = response.data.response?.role1;
       if (response.data.success === true) {
         if (token && user_details && user_menu_apps) {
           await AsyncStorage.setItem('access_token', token);
@@ -200,6 +283,7 @@ const LoginScreen: React.FC<Props> = ({
           await AsyncStorage.setItem('login_user_name', username.trim());
           await AsyncStorage.setItem('login_user_passwd', password.trim());
           await AsyncStorage.setItem('yno', yno.trim());
+          await AsyncStorage.setItem('user_login_role', JSON.stringify(role1));
           setToken(token);
           setUserDetails(user_details);
           setMenuApps(user_menu_apps);

@@ -97,6 +97,17 @@ interface D1datakeys {
 }
 
 const styles = StyleSheet.create({
+    card: {
+        marginVertical: 10,
+        backgroundColor: theme.SURFACE,
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: theme.SHADOW,
+        elevation: 3,
+        marginHorizontal: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.06)',
+    },
     cardActions: {
         flexDirection: "row",
         justifyContent: "space-around",
@@ -106,18 +117,34 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderColor: "#eee",
     },
+    textBtn: {
+        flex: 1,
+        marginHorizontal: 5,
+        paddingVertical: 10,
+        borderRadius: 8,
 
-    actionBtn: {
-        backgroundColor: "#fff",
-        padding: 8,
-        borderRadius: 10,
-        elevation: 2,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
+        alignItems: "center",
+        justifyContent: "center",
+
+        elevation: 2, // Android shadow
     },
 
+    btnText: {
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: "bold",
+    },
+
+    infoBadge: {
+        marginLeft: 6,
+        backgroundColor: "#fff",
+        color: "#2196F3",
+        fontSize: 10,
+        fontWeight: "bold",
+        paddingHorizontal: 5,
+        borderRadius: 10,
+        overflow: "hidden",
+    },
     infoIconContainer: {
         position: "relative",
         justifyContent: "center",
@@ -148,12 +175,13 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: "#ccc",
         borderRadius: 6,
-        height: 28,
+        height: 25,
         paddingHorizontal: 8,
         paddingVertical: 2,
         fontSize: 15,
         minWidth: 120
     },
+
     cardSubHeader: {
         flexDirection: 'row',
         paddingHorizontal: 10,
@@ -220,6 +248,80 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         zIndex: 1,
     },
+    actionBtn: {
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        padding: 10,
+        marginHorizontal: 6,
+
+        // Shadow (Android + iOS)
+        elevation: 3, // Android
+        shadowColor: "#000", // iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+
+        alignItems: "center",
+        justifyContent: "center",
+
+        // Fixed size for consistency
+        width: 50,
+        height: 50,
+    },
+    cardSubHeader1: {
+        borderColor: '#0b0c0c',
+        borderWidth: 0,
+        padding: 10,
+        borderRadius: 0,
+        // marginBottom: 10,
+        alignSelf: 'flex-start',
+        width: '100%',
+        maxWidth: '100%',
+    },
+    cardSubHeaderText1: {
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: "center"
+    },
+    key: {
+        fontWeight: 'bold',
+        marginRight: 5,
+        color: '#555',
+        marginLeft: 10
+    },
+    keyValuePair2: {
+        alignSelf: "flex-end",
+        flexDirection: 'row',
+        marginRight: 15
+    },
+    rowBetween: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginVertical: 6
+    },
+    label: {
+        fontWeight: "600",
+        color: "#555",
+        width: 80
+    },
+    value: {
+        fontWeight: "500",
+        color: "#000",
+        textAlign: "right",
+        flex: 1,
+        flexWrap: "wrap",
+    },
+    textBtn1: {
+        alignSelf: "center",
+        width: 150,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: "center",
+        justifyContent: "center",
+        elevation: 2,
+    }
 
 });
 
@@ -770,9 +872,13 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
         }
     };
 
+    const displayValue = (val) => {
+        return val === null || val === undefined || val === '' || val === 0 ? '-' : val;
+    };
+
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'Active' | 'InActive' } }) => (
         <View style={[
-            crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
+            styles.card, !isConnected && crlimtreq_styles.disabledCard,
             item.actionType === 'Active' ? crlimtreq_styles.acceptedCard : item.actionType === 'InActive' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
         ]}>
             {item.isProcessed && (
@@ -801,89 +907,114 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                 <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
             </View> */}
             <View style={styles.cardHeaderContainer}>
-
-                {/* LEFT SIDE (SONo + StrName) */}
                 <View style={styles.leftSection}>
                     <Text style={styles.cardHeaderText}>{item.SONo}</Text>
                     <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
                 </View>
-
-                {/* RIGHT SIDE (Date) */}
                 <View style={styles.dateContainer}>
                     <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
                 </View>
 
             </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
+            <View style={styles.cardSubHeader1}>
+                <Text style={styles.cardSubHeaderText1}>{item.PrpName}</Text>
             </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <RNTextInput
-                            style={styles.editableValueBlack}
-                            value={editableValuesYPO[item.UId]?.Remark || ''}
-                            onChangeText={(text) => handleEdit(item.UId, 'Remark', text)}
-                        />
-                    </View>
-                    <View style={styles.keyValuePair1}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.Status || ''}
-                        </Text>
-                    </View>
-                </View>
+            {/* Party */}
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Party:</Text>
+                <Text style={styles.value} numberOfLines={2}>{item.ParName || ''}</Text>
+            </View>
 
+            {/* Broker */}
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Broker:</Text>
+                <Text style={styles.value}>{item.BAccName || ''}</Text>
+            </View>
+
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Sales Exe.</Text>
+                <Text style={styles.value}>{item.SlExeName || ''}</Text>
+            </View>
+            {/* Net Amount */}
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Net Amt:</Text>
+                <Text style={crlimtreq_styles.value}>
+                    ₹ {item.NetAmt || ''}
+                </Text>
+            </View>
+
+            {/* Remark */}
+
+            {/* Status */}
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Status:</Text>
+                <Text style={styles.value}>{item.Status || ''}</Text>
+            </View>
+
+
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Remark:</Text>
+                <RNTextInput
+                    style={styles.editableValueBlack}
+                    value={editableValuesYPO[item.UId]?.Remark || ''}
+                    onChangeText={(text) => handleEdit(item.UId, 'Remark', text)}
+                />
             </View>
             <View style={crlimtreq_styles.cardActions}>
+
+                {/* Active Order */}
                 <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={[
+                        styles.textBtn,
+                        { backgroundColor: (!isConnected || item.isProcessed) ? "#ccc" : "#4CAF50" }
+                    ]}
                     onPress={() => handleIconPress(item, 'Active')}
                     disabled={!isConnected || item.isProcessed}
+                    activeOpacity={0.7}
                 >
-                    <Icon name="save" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                    <Text style={styles.btnText}>ACTIVE</Text>
                 </TouchableOpacity>
 
+                {/* Close Order */}
                 <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={[
+                        styles.textBtn,
+                        { backgroundColor: (!isConnected || item.isProcessed) ? "#ccc" : "#F44336" }
+                    ]}
                     onPress={() => handleIconPress(item, 'InActive')}
                     disabled={!isConnected || item.isProcessed}
+                    activeOpacity={0.7}
                 >
-                    <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                    <Text style={styles.btnText}>CLOSE</Text>
                 </TouchableOpacity>
 
+                {/* Info */}
                 <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={[
+                        styles.textBtn,
+                        { backgroundColor: (!isConnected) ? "#ccc" : "#2196F3" }
+                    ]}
                     onPress={() => handleInfoPress(item.d1, item)}
                     disabled={!isConnected}
+                    activeOpacity={0.7}
                 >
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={30} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Text style={styles.btnText}>INFO</Text>
+                        {item.d1 && (
+                            <Text style={styles.infoBadge}>
+                                {item.d1.length}
+                            </Text>
+                        )}
                     </View>
                 </TouchableOpacity>
+
             </View>
-        </View>
+        </View >
     );
 
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
         <View style={[
-            crlimtreq_styles.card,
+            styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
         ]}>
             {item.IsAuth && (
@@ -898,94 +1029,77 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                     </View>
                 </View>
             )}
-            {/* <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
-            </View>
             <View style={styles.cardHeaderContainer}>
-                <View style={styles.cardHeader1}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.SONo}</Text>
-                </View>
-            </View>
-            <View style={styles.cardSubHeader}>
-                <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
-            </View> */}
-            <View style={styles.cardHeaderContainer}>
-
-                {/* LEFT SIDE (SONo + StrName) */}
                 <View style={styles.leftSection}>
                     <Text style={styles.cardHeaderText}>{item.SONo}</Text>
                     <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
                 </View>
-
-                {/* RIGHT SIDE (Date) */}
                 <View style={styles.dateContainer}>
                     <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
                 </View>
-
             </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
+            <View style={styles.cardSubHeader1}>
+                <Text style={styles.cardSubHeaderText1}>{item.PrpName}</Text>
             </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Party:</Text>
+                <Text style={styles.value}>{item.ParName || ''}</Text>
+            </View>
 
-                            {/* {item.NetAmt !== null && item.NetAmt !== undefined && item.NetAmt !== ''
-                                ? parseFloat(item.NetAmt).toFixed(2)
-                                : ''} */}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Active By:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.ActiveBy || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Active Date:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.ActiveDate || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.ActiveRemark || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.Status || ''}
-                        </Text>
-                    </View>
-                </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Broker:</Text>
+                <Text style={styles.value}>{item.BAccName || ''}</Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Sales Exe. :</Text>
+                <Text style={styles.value}>{item.SlExeName || ''}</Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Net Amt:</Text>
+                <Text style={styles.value}>
+                    ₹ {item.NetAmt || ''}
+                </Text>
+            </View>
 
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Active By:</Text>
+                <Text style={styles.value}>
+                    {displayValue(item.ActiveBy || '-')}
+                </Text>
+            </View>
+
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Active Date:</Text>
+                <Text style={styles.value}>
+                    {displayValue(item.ActiveDate || '')}
+                </Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Status:</Text>
+                <Text style={styles.value}>
+                    {item.Status || ''}
+                </Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Remark:</Text>
+                <Text style={styles.value}>
+                    {item.ActiveRemark || ''}
+                </Text>
             </View>
             <View style={crlimtreq_styles.cardActions}>
-                {/* <TouchableOpacity onPress={() => handleIconPress(item, 'Active')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'InActive')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity> */}
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
+                <TouchableOpacity
+                    style={[
+                        styles.textBtn1,
+                        { backgroundColor: (!isConnected) ? "#ccc" : "#2196F3" }
+                    ]}
+                    onPress={() => handleInfoPress(item.d1, item)}
+                    disabled={!isConnected}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Text style={styles.btnText}>INFO</Text>
+                        {item.d1 &&
+                            <Text style={styles.infoBadge}>
+                                {item.d1.length}
+                            </Text>}
                     </View>
                 </TouchableOpacity>
             </View>
@@ -994,7 +1108,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
 
     const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'Active' | 'InActive' } }) => (
         <View style={[
-            crlimtreq_styles.card,
+            styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
         ]}>
             {item.IsAuth && (
@@ -1009,90 +1123,80 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                     </View>
                 </View>
             )}
-            {/* <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
-            </View>
             <View style={styles.cardHeaderContainer}>
-                <View style={styles.cardHeader1}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.SONo}</Text>
-                </View>
-            </View>
-            <View style={styles.cardSubHeader}>
-                <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
-            </View> */}
-            <View style={styles.cardHeaderContainer}>
-
-                {/* LEFT SIDE (SONo + StrName) */}
                 <View style={styles.leftSection}>
                     <Text style={styles.cardHeaderText}>{item.SONo}</Text>
                     <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
                 </View>
 
-                {/* RIGHT SIDE (Date) */}
                 <View style={styles.dateContainer}>
                     <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
                 </View>
 
             </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Closed By:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.CloseBy || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Close Date:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.CloseDate || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Remark:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.CloseRemark || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.Status || ''}
-                        </Text>
-                    </View>
-                </View>
 
+            <View style={styles.cardSubHeader1}>
+                <Text style={styles.cardSubHeaderText1}>{item.PrpName}</Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Party:</Text>
+                <Text style={styles.value}>{item.ParName || ''}</Text>
+            </View>
+
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Broker:</Text>
+                <Text style={styles.value}>{item.BAccName || ''}</Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Sales Exe. :</Text>
+                <Text style={styles.value}>{item.SlExeName || ''}</Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Net Amt:</Text>
+                <Text style={styles.value}>
+                    ₹ {item.NetAmt || ''}
+                </Text>
+            </View>
+
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Closed By:</Text>
+                <Text style={styles.value}>
+                    {displayValue(item.CloseBy || '-')}
+                </Text>
+            </View>
+
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Close Date:</Text>
+                <Text style={styles.value}>
+                    {displayValue(item.CloseDate || '')}
+                </Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Status:</Text>
+                <Text style={styles.value}>
+                    {item.Status || ''}
+                </Text>
+            </View>
+            <View style={styles.rowBetween}>
+                <Text style={styles.label}>Remark:</Text>
+                <Text style={styles.value}>
+                    {item.CloseRemark || ''}
+                </Text>
             </View>
             <View style={crlimtreq_styles.cardActions}>
-                {/* <TouchableOpacity onPress={() => handleIconPress(item, 'Active')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'InActive')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity> */}
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
+                <TouchableOpacity
+                    style={[
+                        styles.textBtn1,
+                        { backgroundColor: (!isConnected) ? "#ccc" : "#2196F3" }
+                    ]}
+                    onPress={() => handleInfoPress(item.d1, item)}
+                    disabled={!isConnected}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Text style={styles.btnText}>INFO</Text>
+                        {item.d1 &&
+                            <Text style={styles.infoBadge}>
+                                {item.d1.length}
+                            </Text>}
                     </View>
                 </TouchableOpacity>
             </View>

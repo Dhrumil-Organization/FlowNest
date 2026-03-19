@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -27,6 +27,9 @@ import { encodeData } from './encodingUtils';
 import LinearGradient from 'react-native-linear-gradient';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
+import CriteriaForm from './CriteriaForm';
+import { fetchAllStoredata } from '../../common/API/Functions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface CardData {
     [key: string]: string;
@@ -54,70 +57,6 @@ interface AllHistoryData {
     [key: string]: string;
     isProcessed: boolean;
     actionType: 'accept' | 'reject' | 'list' | 'pending' | 'verifyreject';
-    // UId: string;
-    // prptype: string;
-    // prptypename: string;
-    // // prpcode: string;
-    // date: string;
-    // parcode: string;
-    // parname: string;
-    // limit1: string;
-    // limit2: string;
-    // limit3: string;
-    // crday1: string;
-    // crday2: string;
-    // crday3: string;
-    // // IsAuth: string;
-    // status: string;
-    // ausrname: string;
-    // adate: string;
-    // // remark: string;
-    // // yearno: string;
-    // revertdate: string;
-    // // sexename: string;
-    // BrkAccName: string;
-    // crdays: string;
-    // // 
-    // ARemark: string;
-    // authorisedby: string;
-    // authoriseddate: string;
-    // AuthStatus: string;
-    // costdate: string;
-    // costdsncode: string;
-    // costdsnname: string;
-    // costuid: string;
-    // deliverydate: string;
-    // dsncode: string;
-    // dsnname: string;
-    // grdcode: string;
-    // grdname: string;
-    // // greystrcode: string;
-    // // IsAuth: string | number;
-    // itmcode: string;
-    // itmname: string;
-    // nvoudate: string;
-    // orderdesign: string;
-    // orderqty: string;
-    // partyname: string;
-    // pickrate: string;
-    // picks: string;
-    // prpcode: string;
-    // qty: string;
-    // rate: string;
-    // ratetype: string;
-    // remark: string;
-    // sampleno: string;
-    // sellingrate: string;
-    // sexename: string;
-    // shdcode: string;
-    // shdname: string;
-    // shkperc: string;
-    // strcode: string;
-    // // UId: string;
-    // voudate: string;
-    // vouno: string;
-    // yearno: string;
-    // 
     UId: string;
     PrpCode: string;
     GrpCode: string;
@@ -217,8 +156,35 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     const [showCarouselModal, setShowCarouselModal] = useState(false);
     const [selectedD1Data, setSelectedD1Data] = useState<D1datakeys[]>([]);
     const [openAccordion, setOpenAccordion] = useState({})
-    // const [historyDataYPO, setHistoryDataYPO] = useState<AllHistoryData[]>([]);
-    // const [isHistoryLoading, setIsHistoryLoadingYPO] = useState(false);
+
+    const [criteriaFormOpen, setCriteriaFormOpen] = useState(false)
+    const [getAllStoreData, setAllStoreData] = useState([]);
+    const [FormState, setFormState] = useState({
+        values: {
+            PrpCode: '',
+            YearNo: '',
+            StrCode: ''
+        }
+    })
+    const didFetchStore = useRef(false);
+    const cancelTokenRef = useRef(null);
+    const didInitialFetch = useRef(false);
+
+
+    const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
+    const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
+
+    useEffect(() => {
+        if (didFetchStore.current) return;
+        didFetchStore.current = true;
+
+        const loadProperty = async () => {
+            let yno = await AsyncStorage.getItem('yno');
+            const allstoredata = await fetchAllStoredata(token, '', yno, 'sales_order')
+            setAllStoreData(allstoredata)
+        };
+        loadProperty();
+    }, []);
 
     let cancelToken: any;
 
@@ -240,28 +206,56 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         cancelToken: cancelToken?.token,
     });
 
-    const fetchData = async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+    const fetchData = useCallback(async () => {
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        if (!FormState.values.StrCode) return;
+
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
+        cancelTokenRef.current = axios.CancelToken.source();
+
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
+
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+
         try {
-            const payload = { txntype: 'sales_order', referrer: 'dashboard', prptype: 'S', yearno: '26', atype: 'B', strtype: 'G' };
+            // const payload = { 
+            //     txntype: 'sales_order', 
+            //     referrer: 'dashboard', 
+            //     prptype: 'S', 
+            //     yearno: '26', 
+            //     atype: 'B', 
+            //     strtype: 'G' 
+            // };
+
+            const payload = {
+                txntype: 'sales_order',
+                referrer: 'dashboard',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
+                atype: 'B',
+                strtype: strtypeFromApi
+            };
+            console.log("fetchData API payload :", payload)
+            console.log("fetchData API URL :", `${API}/api/sosortbrowse`)
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
                 getRequestConfig({ params: { ...payload } })
             );
-            console.log('🔵 payload & response', payload, response);
-            // if (response.data.success && response.data.response.data.length > 0) {
-            //     console.log('✅ Data:', response.data.response.data);
-            //     setData(response.data.response.data);
-            //     setAllHistoryDataYPO([])
-            //     setAllVerifyDataYPO([])
-            // } else {
-            //     setData([]);
-            // }
+            console.log("fetchData API response :", response.data)
             if (response.data.success && response.data.response.data.length > 0) {
-                // Update each item to add itemNameArray
                 const updatedData = response.data.response.data.map(item => {
                     const itemNames = item.d1.map(d => d.ItmName).join(', ');
                     return {
@@ -283,11 +277,15 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         } finally {
             setIsLoadingYPO(false);
         }
-    };
+    }, [FormState.values.StrCode, token]);
 
-    const fetchHistoryData = async (parcode: string, prptype: string) => {
+    const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
+
         setIsHistoryLoadingYPO(true);
         try {
             const historyPayload = {
@@ -322,24 +320,36 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         } finally {
             setIsHistoryLoadingYPO(false);
         }
-    };
+    }, [FormState.values.StrCode]);
 
-    const fetchAllHistoryData = async () => {
-        // setActiveTabYPO('allhistory');
+    const fetchAllHistoryData = useCallback(async () => {
+
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+
         try {
             const allhistoryPayload = {
                 txntype: 'sales_order',
                 referrer: 'dashboard',
-                prptype: 'S',
-                yearno: '26',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
                 atype: 'H',
-                strtype: 'G'
+                strtype: strtypeFromApi
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
                 getRequestConfig({
                     params: {
@@ -366,21 +376,42 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         } finally {
             setIsLoadingYPO(false);
         }
-    };
+    }, [FormState.values.StrCode, token]);
 
-    const fetchAllVerifyData = async () => {
+    const fetchAllVerifyData = useCallback(async () => {
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
         // setActiveTabYPO('allhistory');
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+
         try {
+            // const allhistoryPayload = {
+            //     txntype: 'sales_order',
+            //     referrer: 'dashboard',
+            //     prptype: 'S',
+            //     yearno: '26',
+            //     atype: 'A',
+            //     strtype: 'G'
+            // };
+
             const allhistoryPayload = {
                 txntype: 'sales_order',
                 referrer: 'dashboard',
-                prptype: 'S',
-                yearno: '26',
+                prptype: userPtype,
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
                 atype: 'A',
-                strtype: 'G'
+                strtype: strtypeFromApi
             };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
@@ -411,9 +442,15 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         } finally {
             setIsLoadingYPO(false);
         }
-    };
+    }, [FormState.values.StrCode, token]);
 
     useEffect(() => {
+        if (!didInitialFetch.current) {
+            didInitialFetch.current = true;
+            return;
+        }
+
+
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();
         } else if (activeTab1YPO === 'requests') {
@@ -422,12 +459,6 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             fetchAllVerifyData();
         }
     }, [activeTab1YPO]);
-
-    // const callhisttoryfunction = () => {
-    //     setShowPartyHistoryModalYPO(true);
-    //     setActiveTabYPO('allhistory');
-    //     fetchAllHistoryData();
-    // };
 
     const handleListIconClick = async (prpcode: string, prptype: string, yearno: string, parcode: string) => {
         setActiveTabYPO('party');
@@ -1095,7 +1126,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 <HeaderBar
                     userName={username}
                     onSearch={setSearchQueryYPO}
-                    placeholder="Search grey sales order..."
+                    placeholder="Search sales order..."
                 />
             ) : activeTab1YPO === 'history' ? (
                 <HeaderBar
@@ -1113,19 +1144,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             <View style={crlimtreq_styles.container}>
                 {isLoadingYPO && <FullScreenLoader message={activeTab1YPO === 'history' ? "Loading History..." : activeTab1YPO === 'verify' ? "Loading Verify..." : "Loading Request..."} />}
                 <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                {/* <TouchableOpacity
-                    style={crlimtreq_styles.closeButton}
-                    onPress={() => navigation.goBack()}
-                    disabled={!isConnected}
-                >
-                    <Text style={crlimtreq_styles.closeButtonText}>Home</Text>
-                </TouchableOpacity> */}
-                {/* <TouchableOpacity
-                    style={crlimtreq_styles.historyButton}
-                    onPress={callhisttoryfunction}
-                >
-                    <Icon name="history" size={24} color="white" />
-                </TouchableOpacity> */}
+                <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
+                    <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
+                </TouchableOpacity>
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
                         ref={flatListRefYPO}
@@ -1140,6 +1161,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                             !isLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1158,6 +1187,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                             !allhistoryLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No history data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1176,6 +1213,14 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                             !allhistoryLoadingYPO ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
                                     <Text style={crlimtreq_styles.emptyText}>No verify data found!</Text>
+                                    {
+                                        typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '' ?
+                                            (
+                                                <Text style={crlimtreq_styles.emptyTextRed}>No store Selected</Text>
+                                            )
+                                            :
+                                            null
+                                    }
                                 </View>
                             ) : null
                         }
@@ -1424,6 +1469,22 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
 
                     </View>
                 </Modal>
+
+                <CriteriaForm
+                    isVisible={criteriaFormOpen}
+                    onClose={handleCriteriaFormClose}
+                    isLoading={isLoadingYPO}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllStoreData={getAllStoreData}
+                    setAllStoreData={setAllStoreData}
+                    token={token}
+                    fetchData={fetchData}
+                    fetchAllHistoryData={fetchAllHistoryData}
+                    fetchAllVerifyData={fetchAllVerifyData}
+                    activeTab1YPO={activeTab1YPO}
+                />
+
 
             </View>
         </>

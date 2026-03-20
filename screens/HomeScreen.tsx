@@ -406,9 +406,9 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Sales Order(Inactive)",
+                //                         "title": "Daily Collection Report",
                 //                         "href": "/"
-                //                     },
+                //                     },                                    
                 //                 ]
                 //             }   
                 //         ]

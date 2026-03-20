@@ -150,11 +150,11 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
 
     console.log("designData:", designData, "itemData:", itemData);
-    
+
     useEffect(() => {
-      if(hideprpGroup){
-          setHidePrp(hideprpGroup);
-      }
+        if (hideprpGroup) {
+            setHidePrp(hideprpGroup);
+        }
     }, [hideprpGroup]);
 
     console.log("hineidePrp:", hineidePrp)
@@ -616,7 +616,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             </View>
 
                             {/* Property Group Dropdown */}
-                            {hineidePrp === false ? (<>
+                            {/* {hineidePrp === false ? (<>
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Sales Property Group</Text>
                                     <TouchableOpacity
@@ -656,7 +656,47 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         </View>
                                     )}
 
-                                </View></>) : (<></>)}
+                                </View></>) : (<></>)} */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Sales Property Group</Text>
+                                <TouchableOpacity
+                                    style={styles.dropdownButton}
+                                    onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}
+                                >
+                                    <Text style={styles.dropdownText}>{selectedPrpgrp}</Text>
+                                </TouchableOpacity>
+                                {isExeDropdownOpen && (
+                                    <View style={styles.dropdownOptionsContainer}>
+                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
+                                            <TouchableOpacity
+                                                style={styles.dropdownOption}
+                                                onPress={() => {
+                                                    onExeChangeReceive(null); // Send empty value
+                                                    setIsExeDropdownOpen(false);
+                                                }}
+                                            >
+                                                <Text style={styles.dropdownOptionText}>Select Property Group</Text>
+                                            </TouchableOpacity>
+                                            {receivables_prpgroup.map((exe) => (
+                                                <TouchableOpacity
+                                                    key={exe.PrpTypeCode}
+                                                    style={[
+                                                        styles.dropdownOption,
+                                                        selectedPrpgrp === exe.PrpTypeOf && styles.selectedOption,
+                                                    ]}
+                                                    onPress={() => {
+                                                        onExeChangeReceive(exe);
+                                                        setIsExeDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    <Text style={styles.dropdownOptionText}>{exe.PrpTypeOf}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
+
+                            </View>
 
 
                             {/* Accordion for Design Selection */}

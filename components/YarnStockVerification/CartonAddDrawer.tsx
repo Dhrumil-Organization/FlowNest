@@ -75,12 +75,9 @@ const CartonAddDrawer = (props) => {
             'Content-Type': 'application/json',
             'X-Requested-with': 'XMLHttpRequest',
         };
-        console.log('get_verify_manual_stock API payload : ', payload)
-        console.log('get_verify_manual_stock API URL : ', `${API}/api/get_verify_manual_stock`)
         try {
             const response = await axios.post(`${API}/api/get_verify_manual_stock`, payload, { headers });
 
-            console.log('get_verify_manual_stock API Response : ', response.data)
             if (response.data.success === true && response.data.response.data.length === 0) {
 
                 Alert.alert('No Data Found');
@@ -133,6 +130,8 @@ const CartonAddDrawer = (props) => {
     }
 
     const handleSaveCarton = async () => {
+        console.log("FormState", FormState)
+        console.log("FormCartonDataState", FormCartonDataState)
         if (typeof FormCartonDataState.values.PrpCode == 'undefined' || FormCartonDataState.values.PrpCode == null || FormCartonDataState.values.PrpCode == '') {
             Snackbar.show({
                 text: 'Please select property',
@@ -508,9 +507,18 @@ const CartonAddDrawer = (props) => {
         setFormCartonDataState(prev => ({
             ...prev,
             values: {
-                //PrpCode: '',
-                //YearNo: '',
-                //StrCode: '',
+                PrpCode: typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != '' 
+                ?  FormCartonDataState.values.PrpCode 
+                : typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '' 
+                ? FormState.values.PrpCode : '', 
+                YearNo: typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != '' 
+                ?  FormCartonDataState.values.YearNo 
+                : typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '' 
+                ? FormState.values.YearNo : '', 
+                StrCode: typeof FormCartonDataState.values.StrCode != 'undefined' && FormCartonDataState.values.StrCode != null && FormCartonDataState.values.StrCode != '' 
+                ?  FormCartonDataState.values.StrCode 
+                : typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' 
+                ? FormState.values.StrCode : '',
                 CartNo: '',
                 Chees: '',
                 ItmCode: '',
@@ -520,11 +528,11 @@ const CartonAddDrawer = (props) => {
                 Denier: '',
                 grsWt: 0,
                 netWt: '',
-                StkType: ''
+                StkType: typeof FormCartonDataState.values.StkType != 'undefined' && FormCartonDataState.values.StkType != null && FormCartonDataState.values.StkType != '' 
+                ?  FormCartonDataState.values.StkType : ''
             }
         }));
     };
-
 
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode === FormCartonDataState.values.PrpCode) || FormState.values.PrpCode;
     const selectedYear = getAllYearData?.find((y) => y.YearNo === FormCartonDataState.values.YearNo) || FormState.values.YearNo;
@@ -567,7 +575,7 @@ const CartonAddDrawer = (props) => {
                                 style={castyles.scrollableFormContainer}
                                 contentContainerStyle={castyles.scrollableFormContent}
                                 nestedScrollEnabled={true}>
-                                <View style={{ marginBottom: 10, display: 'none' }} >
+                                <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select Property <Text style={{ color: 'red' }}> * </Text></Text>
 
                                     <SearchableDropdown
@@ -580,19 +588,19 @@ const CartonAddDrawer = (props) => {
                                         pageSize={10}
                                         initialValue={selectedProperty}
                                         value={FormCartonDataState.values.PrpCode || FormState.values.PrpCode}
-                                        // onSelect={(item) => {
-                                        //     setFormCartonDataState(FormCartonDataState => ({
-                                        //         ...FormCartonDataState,
-                                        //         values: {
-                                        //             ...FormCartonDataState.values,
-                                        //             PrpCode: item?.PrpCode || '',
-                                        //         }
-                                        //     }));
-                                        // }}
+                                        onSelect={(item) => {
+                                            setFormCartonDataState(FormCartonDataState => ({
+                                                ...FormCartonDataState,
+                                                values: {
+                                                    ...FormCartonDataState.values,
+                                                    PrpCode: item?.PrpCode || '',
+                                                }
+                                            }));
+                                        }}
                                         multiple={false}
                                         emptyMessage="No properties available" />
                                 </View>
-                                <View style={{ marginBottom: 10, display: 'none' }} >
+                                <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select Year <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormCartonDataState.values.YearNo}
@@ -603,19 +611,19 @@ const CartonAddDrawer = (props) => {
                                         pageSize={10}
                                         initialValue={selectedYear}
                                         value={FormCartonDataState.values.YearNo || FormState.values.YearNo}
-                                        // onSelect={(yr) => {
-                                        //     setFormCartonDataState(FormCartonDataState => ({
-                                        //         ...FormCartonDataState,
-                                        //         values: {
-                                        //             ...FormCartonDataState.values,
-                                        //             YearNo: yr?.YearNo || '',
-                                        //         }
-                                        //     }));
-                                        // }}
+                                        onSelect={(yr) => {
+                                            setFormCartonDataState(FormCartonDataState => ({
+                                                ...FormCartonDataState,
+                                                values: {
+                                                    ...FormCartonDataState.values,
+                                                    YearNo: yr?.YearNo || '',
+                                                }
+                                            }));
+                                        }}
                                         multiple={false}
                                         emptyMessage="No years data available" />
                                 </View>
-                                <View style={{ marginBottom: 10, display: 'none' }} >
+                                <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select store <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormCartonDataState.values.StrCode}
@@ -626,15 +634,15 @@ const CartonAddDrawer = (props) => {
                                         pageSize={10}
                                         value={FormCartonDataState.values.StrCode || FormState.values.StrCode}
                                         initialValue={selectedStore}
-                                        // onSelect={(str) => {
-                                        //     setFormCartonDataState(FormCartonDataState => ({
-                                        //         ...FormCartonDataState,
-                                        //         values: {
-                                        //             ...FormCartonDataState.values,
-                                        //             StrCode: str?.StrCode || '',
-                                        //         }
-                                        //     }));
-                                        // }}
+                                        onSelect={(str) => {
+                                            setFormCartonDataState(FormCartonDataState => ({
+                                                ...FormCartonDataState,
+                                                values: {
+                                                    ...FormCartonDataState.values,
+                                                    StrCode: str?.StrCode || '',
+                                                }
+                                            }));
+                                        }}
                                         multiple={false}
                                         emptyMessage="No stores data available" />
                                 </View>

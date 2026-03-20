@@ -247,14 +247,11 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 atype: 'B',
                 strtype: strtypeFromApi
             };
-            console.log("fetchData API payload :", payload)
-            console.log("fetchData API URL :", `${API}/api/sosortbrowse`)
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
                 getRequestConfig({ params: { ...payload } })
             );
-            console.log("fetchData API response :", response.data)
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => {
                     const itemNames = item.d1.map(d => d.ItmName).join(', ');
@@ -413,6 +410,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 atype: 'A',
                 strtype: strtypeFromApi
             };
+            console.log("fetchAllVerifyData AOI payload" , allhistoryPayload)
+            console.log("fetchAllVerifyData AOI URL" , `${API}/api/sosortbrowse`)
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
@@ -422,7 +421,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     }
                 })
             );
-            console.log('🔵all history payload', allhistoryPayload);
+            console.log("fetchAllVerifyData AOI response" , response.data)
+            
             if (response.data.success && response.data.response.data.length > 0) {
                 console.log('✅All History Data:', response.data.response.data);
 
@@ -805,7 +805,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 </View>
             )}
             <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
+                <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
             </View>
             <View style={crlimtreq_styles.cardHeaderContainer}>
                 <View style={crlimtreq_styles.cardHeader}>

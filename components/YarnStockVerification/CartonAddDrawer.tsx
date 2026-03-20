@@ -80,7 +80,6 @@ const CartonAddDrawer = (props) => {
         try {
             const response = await axios.post(`${API}/api/get_verify_manual_stock`, payload, { headers });
 
-            console.log('get_verify_manual_stock API Response : ', response.data)
             if (response.data.success === true && response.data.response.data.length === 0) {
 
                 Alert.alert('No Data Found');
@@ -133,6 +132,8 @@ const CartonAddDrawer = (props) => {
     }
 
     const handleSaveCarton = async () => {
+        console.log("FormState", FormState)
+        console.log("FormCartonDataState", FormCartonDataState)
         if (typeof FormCartonDataState.values.PrpCode == 'undefined' || FormCartonDataState.values.PrpCode == null || FormCartonDataState.values.PrpCode == '') {
             Snackbar.show({
                 text: 'Please select property',
@@ -508,9 +509,18 @@ const CartonAddDrawer = (props) => {
         setFormCartonDataState(prev => ({
             ...prev,
             values: {
-                //PrpCode: '',
-                //YearNo: '',
-                //StrCode: '',
+                PrpCode: typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != '' 
+                ?  FormCartonDataState.values.PrpCode 
+                : typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '' 
+                ? FormState.values.PrpCode : '', 
+                YearNo: typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != '' 
+                ?  FormCartonDataState.values.YearNo 
+                : typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '' 
+                ? FormState.values.YearNo : '', 
+                StrCode: typeof FormCartonDataState.values.StrCode != 'undefined' && FormCartonDataState.values.StrCode != null && FormCartonDataState.values.StrCode != '' 
+                ?  FormCartonDataState.values.StrCode 
+                : typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' 
+                ? FormState.values.StrCode : '',
                 CartNo: '',
                 Chees: '',
                 ItmCode: '',
@@ -520,11 +530,11 @@ const CartonAddDrawer = (props) => {
                 Denier: '',
                 grsWt: 0,
                 netWt: '',
-                StkType: ''
+                StkType: typeof FormCartonDataState.values.StkType != 'undefined' && FormCartonDataState.values.StkType != null && FormCartonDataState.values.StkType != '' 
+                ?  FormCartonDataState.values.StkType : ''
             }
         }));
     };
-
 
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode === FormCartonDataState.values.PrpCode) || FormState.values.PrpCode;
     const selectedYear = getAllYearData?.find((y) => y.YearNo === FormCartonDataState.values.YearNo) || FormState.values.YearNo;
@@ -603,15 +613,15 @@ const CartonAddDrawer = (props) => {
                                         pageSize={10}
                                         initialValue={selectedYear}
                                         value={FormCartonDataState.values.YearNo || FormState.values.YearNo}
-                                        // onSelect={(yr) => {
-                                        //     setFormCartonDataState(FormCartonDataState => ({
-                                        //         ...FormCartonDataState,
-                                        //         values: {
-                                        //             ...FormCartonDataState.values,
-                                        //             YearNo: yr?.YearNo || '',
-                                        //         }
-                                        //     }));
-                                        // }}
+                                        onSelect={(yr) => {
+                                            setFormCartonDataState(FormCartonDataState => ({
+                                                ...FormCartonDataState,
+                                                values: {
+                                                    ...FormCartonDataState.values,
+                                                    YearNo: yr?.YearNo || '',
+                                                }
+                                            }));
+                                        }}
                                         multiple={false}
                                         emptyMessage="No years data available" />
                                 </View>

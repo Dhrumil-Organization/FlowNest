@@ -661,6 +661,14 @@ export const crlimtreq_styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
         color: '#999',
+        width: '100%',
+        textAlign: 'center'
+    },
+    emptyTextRed: {
+        fontSize: 16,
+        color: 'red',
+        width: '100%',
+        textAlign: 'center'
     },
     modalContainer: {
         flex: 1,
@@ -1389,7 +1397,10 @@ export const checkingScannerStyles = StyleSheet.create({
 export const yarnstockverificatio_styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 10,
+        paddingTop: 3,
+        paddingRight: 10,
+        paddingBottom: 10,
+        paddingLeft: 10,
         backgroundColor: '#f8f9fa', // Light gray background
         //paddingBottom: 80,
         paddingBottom: 15,

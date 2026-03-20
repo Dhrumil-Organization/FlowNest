@@ -63,8 +63,8 @@ interface AllHistoryData {
     ActiveBy: string,
     ActiveDate: string,
     ActiveRemark: string,
-    SODate:string,
-    NSODate:string,
+    SODate: string,
+    NSODate: string,
     d1: [D1datakeys];
 }
 
@@ -124,10 +124,8 @@ const styles = StyleSheet.create({
         marginHorizontal: 5,
         paddingVertical: 10,
         borderRadius: 8,
-
         alignItems: "center",
         justifyContent: "center",
-
         elevation: 2, // Android shadow
     },
 
@@ -216,7 +214,6 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     cardHeaderContainer: {
-        // width: '100%',
         flexDirection: 'row',   // ⭐ important
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -227,7 +224,6 @@ const styles = StyleSheet.create({
         marginTop: -15,
         marginLeft: -15,     // ⭐ add this
         marginRight: -15,
-        // marginHorizontal: -15,
         marginBottom: 10,
     },
 
@@ -236,11 +232,9 @@ const styles = StyleSheet.create({
     },
     leftSection: {
         flexDirection: 'row',   // ⭐ column se row kar diya
-        // alignItems: 'center',
     },
     dateContainer: {
         position: 'absolute',
-        // top: 10,
         right: 10,
         backgroundColor: '#F5F5F5',
         borderWidth: 1,
@@ -255,18 +249,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 10,
         marginHorizontal: 6,
-
-        // Shadow (Android + iOS)
-        elevation: 3, // Android
-        shadowColor: "#000", // iOS
+        elevation: 3,
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 3,
-
         alignItems: "center",
         justifyContent: "center",
-
-        // Fixed size for consistency
         width: 50,
         height: 50,
     },
@@ -275,13 +264,12 @@ const styles = StyleSheet.create({
         borderWidth: 0,
         padding: 10,
         borderRadius: 0,
-        // marginBottom: 10,
         alignSelf: 'flex-start',
         width: '100%',
         maxWidth: '100%',
     },
     cardSubHeaderText1: {
-        color: theme.BRAND_GRADIENT_END, // Purple theme
+        color: theme.BRAND_GRADIENT_END,
         fontSize: 14,
         fontWeight: '600',
         textAlign: "center"
@@ -324,7 +312,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         elevation: 2,
     }
-
 });
 
 
@@ -596,6 +583,18 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
         }
     };
 
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return '';
+
+        // NSODate: 20260319
+        if (/^\d{8}$/.test(dateStr)) {
+            return `${dateStr.substring(6, 8)}/${dateStr.substring(4, 6)}/${dateStr.substring(0, 4)}`;
+        }
+
+        // SODate already dd/MM/yyyy
+        return dateStr;
+    };
+
     const filteredDataSPO = useMemo(() => {
         if (!searchQueryYPO) return data;
         return data.filter((item) =>
@@ -616,6 +615,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
 
     const filteredverifyDataSPO = useMemo(() => {
         if (!searchverifyQueryYPO) return allverifyDataYPO;
+        
         return allverifyDataYPO.filter((item) =>
             filterKeyYPO === 'all'
                 ? Object.values(item).some((val) => String(val).toLowerCase().includes(searchverifyQueryYPO.toLowerCase()))
@@ -623,6 +623,61 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
         );
     }, [allverifyDataYPO, searchverifyQueryYPO, filterKeyYPO]);
 
+    // const filteredverifyDataSPO = useMemo(() => {
+    //     if (!searchverifyQueryYPO) return allverifyDataYPO;
+    //     const search = searchverifyQueryYPO.trim();
+    //     // 🔥 STRONG DATE CHECK
+    //     const parts = search.split('/');
+    //     const isFullDate = parts.length === 3 && parts[2].length === 4;
+    //     console.log("🔍 Search:", search);
+    //     console.log("📅 Is Full Date:", isFullDate);
+    //     const normalizeDate = (date: string) => {
+    //         if (!date) return '';
+    //         const parts = date.split('/');
+    //         if (parts.length !== 3) return date.trim();
+    //         const dd = parts[0].padStart(2, '0');
+    //         const mm = parts[1].padStart(2, '0');
+    //         const yyyy = parts[2];
+    //         return `${dd}/${mm}/${yyyy}`;
+    //     };
+    //     return allverifyDataYPO.filter((item) => {
+    //         let soDateMatch = false;
+    //         let nsoDateMatch = false;
+    //         const searchDate = normalizeDate(search);
+    //         // ✅ SODate
+    //         if (item.SODate) {
+    //             const soDate = normalizeDate(item.SODate.trim());
+    //             soDateMatch = isFullDate
+    //                 ? soDate === searchDate
+    //                 : soDate.includes(search);
+    //         }
+    //         // ✅ NSODate
+    //         if (item.NSODate) {
+    //             const n = item.NSODate;
+    //             const formatted = `${n.substring(6, 8)}/${n.substring(4, 6)}/${n.substring(0, 4)}`;
+    //             const nsoDate = normalizeDate(formatted);
+
+    //             nsoDateMatch = isFullDate
+    //                 ? nsoDate === searchDate
+    //                 : nsoDate.includes(search);
+    //         }
+
+    //         // 🔥 FINAL LOGIC (IMPORTANT)
+    //         if (isFullDate) {
+    //             return soDateMatch || nsoDateMatch;  // ONLY DATE
+    //         }
+
+    //         // ✅ normal search
+    //         const otherMatch = Object.entries(item).some(([key, val]) => {
+    //             if (key === 'SODate' || key === 'NSODate') return false;
+    //             return String(val).toLowerCase().includes(search.toLowerCase());
+    //         });
+
+    //         return soDateMatch || nsoDateMatch || otherMatch;
+
+    //     });
+
+    // }, [allverifyDataYPO, searchverifyQueryYPO]);
 
     const formatToIndianCurrency = (value: string | number) => {
         const numericValue = typeof value === 'string'
@@ -668,12 +723,6 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
             setShowOverlayYPO(true);
             return;
         }
-        // else if (action === 'InActive') {
-        //     setSelectedItemYPO(item);
-        //     setSelectedActionYPO(action);
-        //     setShowOverlayYPO(true);
-        //     return;
-        // }
         else if (action === 'InActive') {
             const remark = editableValuesYPO[item.UId]?.Remark || item.Remark || '';
             if (!remark.trim()) {
@@ -803,8 +852,6 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                     setData(prevData =>
                         prevData.filter(item => item.UId !== selectedItemYPO.UId)
                     );
-
-                    // ✅ ADD to CLOSE history (sirf yaha push hoga)
                     setAllVerifyDataYPO(prevData => [
                         { ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO },
                         ...prevData
@@ -832,7 +879,6 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                         }
                     };
                 };
-                // payload directly body me jayega
                 const response = await axios.post(
                     `${API}/api/closesalesorder`,
                     payload,
@@ -849,13 +895,9 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                         setSuccessYPO(false);
                         setShowOverlayYPO(false);
                     }, 2000);
-
-                    // ✅ REMOVE from request tab
                     setData(prevData =>
                         prevData.filter(item => item.UId !== selectedItemYPO.UId)
                     );
-
-                    // ✅ ADD to Close History
                     setAllVerifyDataYPO(prevData => [
                         { ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO },
                         ...prevData
@@ -898,17 +940,6 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                     </View>
                 </View>
             )}
-            {/* <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.SODate}</Text>
-            </View>
-            <View style={styles.cardHeaderContainer}>
-                <View style={styles.cardHeader1}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.SONo}</Text>
-                </View>
-            </View>
-            <View style={styles.cardSubHeader}>
-                <Text style={styles.cardSubHeaderText}>{item.StrName}</Text>
-            </View> */}
             <View style={styles.cardHeaderContainer}>
                 <View style={styles.leftSection}>
                     <Text style={styles.cardHeaderText}>{item.SONo}</Text>
@@ -1205,116 +1236,6 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
             </View>
         </View>
     );
-
-    // const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'Active' | 'InActive' | 'pending' } }) => (
-    //     <View style={[
-    //         crlimtreq_styles.card,
-    //         item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
-    //         // item.actionType === 'Active' ? crlimtreq_styles.acceptedCard : item.actionType === 'InActive' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-    //     ]}>
-    //         {item.isProcessed ? (
-    //             <>
-    //                 <View style={crlimtreq_styles.stampContainerYOS}>
-    //                     <View style={[
-    //                         crlimtreq_styles.stamp,
-    //                         item.actionType === 'Active' ? crlimtreq_styles.stampAccepted : item.actionType === 'pending' ? crlimtreq_styles.stampPendingall : item.actionType === 'InActive' ? crlimtreq_styles.stampRejected : item.actionType === 'verifyreject' ? crlimtreq_styles.stampRejected : '',
-    //                     ]}>
-    //                         <Text style={crlimtreq_styles.stampText}>
-    //                             {item.actionType === 'Active' ? 'APPROVED' : item.actionType === 'InActive' ? 'REJECTED' : item.actionType === 'pending' ? 'PENDING' : item.actionType === 'verifyreject' ? 'REJECTED' : ''}
-    //                         </Text>
-    //                     </View>
-    //                 </View>
-    //             </>
-
-    //         ) : (
-    //             <>
-    //                 <View style={crlimtreq_styles.stampContainerYOS}>
-    //                     <View style={[
-    //                         crlimtreq_styles.stamp,
-    //                         item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : item.IsAuth === '0' || item.IsAuth === 0 ? crlimtreq_styles.stampPendingall : '',
-    //                     ]}>
-    //                         <Text style={crlimtreq_styles.stampText}>
-    //                             {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' || item.IsAuth === 2 ? 'REJECTED' : item.IsAuth === '0' || item.IsAuth === 0 ? 'PENDING' : ''}
-    //                         </Text>
-    //                     </View>
-    //                 </View>
-    //             </>
-    //         )}
-    //         <View style={crlimtreq_styles.dateContainer}>
-    //             <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-    //         </View>
-    //         <View style={crlimtreq_styles.cardHeaderContainer}>
-    //             <View style={crlimtreq_styles.cardHeader}>
-    //                 <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-    //             </View>
-    //         </View>
-    //         <View style={crlimtreq_styles.cardSubHeader}>
-    //             <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-    //         </View>
-    //         <View style={crlimtreq_styles.cardContent}>
-    //             <View style={crlimtreq_styles.twoColumnRow}>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Broker:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.BAccName || ''}
-    //                     </Text>
-    //                 </View>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.NetAmt || ''}:
-    //                     </Text>
-    //                 </View>
-    //             </View>
-    //             <View style={crlimtreq_styles.twoColumnRow}>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Authorised By:</Text>
-    //                     <Text style={crlimtreq_styles.Authvalue}>
-    //                         {item.AuthorisedBy || ''}
-    //                     </Text>
-    //                 </View>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.AuthorisedDate || ''}
-    //                     </Text>
-    //                 </View>
-    //             </View>
-    //             <View style={crlimtreq_styles.twoColumnRow}>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-    //                     <RNTextInput
-    //                         style={crlimtreq_styles.editableValueBlack}
-    //                         value={editableValuesYPO[item.UId]?.Remark || ''}
-    //                         onChangeText={(text) => handleEdit(item.UId, 'Remark', text)}
-    //                     // keyboardType="numeric"
-    //                     />
-    //                 </View>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Status:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.Status || ''}
-    //                     </Text>
-    //                 </View>
-    //             </View>
-
-    //         </View>
-    //         <View style={crlimtreq_styles.cardActions}>
-    //             <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-    //                 <Icon name="save" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-    //             </TouchableOpacity>
-    //             <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-    //                 <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-    //             </TouchableOpacity>
-    //             <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-    //                 <View style={crlimtreq_styles.infoIconContainer}>
-    //                     <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-    //                     {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-    //                 </View>
-    //             </TouchableOpacity>
-    //         </View>
-    //     </View>
-    // );
 
     const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>

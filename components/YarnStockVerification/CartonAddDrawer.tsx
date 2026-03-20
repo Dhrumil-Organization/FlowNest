@@ -577,7 +577,7 @@ const CartonAddDrawer = (props) => {
                                 style={castyles.scrollableFormContainer}
                                 contentContainerStyle={castyles.scrollableFormContent}
                                 nestedScrollEnabled={true}>
-                                <View style={{ marginBottom: 10, display: 'none' }} >
+                                <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select Property <Text style={{ color: 'red' }}> * </Text></Text>
 
                                     <SearchableDropdown
@@ -602,7 +602,7 @@ const CartonAddDrawer = (props) => {
                                         multiple={false}
                                         emptyMessage="No properties available" />
                                 </View>
-                                <View style={{ marginBottom: 10, display: 'none' }} >
+                                <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select Year <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormCartonDataState.values.YearNo}
@@ -625,7 +625,7 @@ const CartonAddDrawer = (props) => {
                                         multiple={false}
                                         emptyMessage="No years data available" />
                                 </View>
-                                <View style={{ marginBottom: 10, display: 'none' }} >
+                                <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select store <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormCartonDataState.values.StrCode}

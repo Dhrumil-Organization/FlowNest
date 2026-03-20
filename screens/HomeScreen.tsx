@@ -204,6 +204,12 @@ const APP_SECTIONS = [
             { id: '24', name: 'Sales Order(Inactive)', screen: 'Sales Order(Inactive)', icon: 'bar-chart', iconColor: '#221080' },
         ],
     },
+    {
+        title: 'I',
+        data: [
+            { id: '25', name: 'Item Authorization', screen: 'Item Authorization', icon: 'product', iconColor: '#221080' },
+        ],
+    },
     // mob_sales_order_Inactive
 
 ];
@@ -408,13 +414,17 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Daily Collection Report",
                 //                         "href": "/"
-                //                     }, 
+                //                     },
                 //                     {
                 //                         "title": "Sales Order(Inactive)",
                 //                         "href": "/"
-                //                     },                                    
+                //                     },
+                //                     {
+                //                         "title": " Item Authorization",
+                //                         "href": "/"
+                //                     },
                 //                 ]
-                //             }   
+                //             }
                 //         ]
                 //     }
                 // ];

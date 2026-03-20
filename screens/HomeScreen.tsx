@@ -408,6 +408,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Daily Collection Report",
                 //                         "href": "/"
+                //                     }, 
+                //                     {
+                //                         "title": "Sales Order(Inactive)",
+                //                         "href": "/"
                 //                     },                                    
                 //                 ]
                 //             }   

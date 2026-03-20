@@ -337,7 +337,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         setdashPropertyLoading(true);
         try {
             const payload = {
-                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp?.PrpTypeCode,
                 txntype: '/receivables-view'
             }
             // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
@@ -375,14 +375,14 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         setdashSexeLoading(true);
         try {
             const payload = {
-                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp?.PrpTypeCode,
                 fetch: 'dr',
                 dashview: 'outstanding',
                 txntype: '/receivables-view'
             }
 
             const payloadSexe = {
-                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp?.PrpTypeCode,
                 dashview: 'outstanding',
                 fetch: 'salesexe',
             }
@@ -437,7 +437,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
 
         const payload = {
-            prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
+            prptype: selectedPrpgrp?.PrpTypeCode,
             dashview: 'outstanding',
             prpcodes: Array.isArray(selectedDashPrp)
                 ? selectedDashPrp.map(item => item.PrpCode)
@@ -501,7 +501,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         try {
             console.log('🔵 🔵I am Calling3 dashAccount');
             const payload = {
-                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'summary',
@@ -837,7 +837,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
-                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp?.PrpTypeCode,
                 accounts: accountArray ? accountArray : [],
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
@@ -942,7 +942,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             const payload = {
                 CardName: CardName.toUpperCase(),
                 accounts: accountArray ? accountArray : [],
-                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'slabdetail',

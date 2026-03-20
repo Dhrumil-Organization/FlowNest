@@ -20,6 +20,7 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import Snackbar from 'react-native-snackbar';
 import FullScreenLoader from '../Loader/Loader';
+import { values } from 'lodash';
 
 const CartonAddDrawer = (props) => {
     const { isVisible,
@@ -44,8 +45,8 @@ const CartonAddDrawer = (props) => {
     const [getGradeData, setGradeData] = useState([]);
     const [getShadeData, setShadeData] = useState([]);
     const [getStockTypes, setStockTypes] = useState([
-        { 'label': 'I', 'value': 'I' },
-        { 'label': 'P', 'value': 'P' }
+        { 'label': 'In house', 'value': 'I' },
+        { 'label': 'Process house', 'value': 'P' }
     ]);
     const [loading, setLoading] = useState(false)
 
@@ -66,7 +67,8 @@ const CartonAddDrawer = (props) => {
             autoNotFound: typeof FormState.values.autoNotFound == 'undefined' || FormState.values.autoNotFound == null || FormState.values.autoNotFound == '' ? '0' : FormState.values.autoNotFound,
             autoForRepacking: typeof FormState.values.autoForRepacking == 'undefined' || FormState.values.autoForRepacking == null || FormState.values.autoForRepacking == '' ? '0' : FormState.values.autoForRepacking,
             duplicate: typeof FormState.values.duplicate == 'undefined' || FormState.values.duplicate == null || FormState.values.duplicate == '' ? '0' : FormState.values.duplicate,
-            txntype: 'yarnStockVerification'
+            txntype: 'yarnStockVerification',
+            stktype: typeof FormState.values.StkType != 'undefined' && FormState.values.StkType != null && FormState.values.StkType != '' ? FormState.values.StkType : '',
         };
         const headers = {
             Authorization: `Bearer ${getToken()}`,
@@ -76,10 +78,8 @@ const CartonAddDrawer = (props) => {
         try {
             const response = await axios.post(`${API}/api/get_verify_manual_stock`, payload, { headers });
 
-            console.log('============response==========', response.data)
-
             if (response.data.success === true && response.data.response.data.length === 0) {
-                
+
                 Alert.alert('No Data Found');
             } else if (response.data.success === true && response.data.response.data.length > 0) {
                 if (newdata && newdata.length > 0) {
@@ -89,8 +89,6 @@ const CartonAddDrawer = (props) => {
                         cartons.push(el.CartNo);
                     })
 
-                    console.log("cartons =====>", cartons)
-
                     let finalrespo = []
                     let finalrespoCntr = 0
                     response.data.response.data && response.data.response.data.filter((el, ind) => {
@@ -99,21 +97,11 @@ const CartonAddDrawer = (props) => {
                             finalrespoCntr++;
                         }
                     })
-
-                    console.log("newdata =====>", newdata)
-                    console.log("finalrespo =====>", finalrespo)
                     const alldt = newdata.concat(finalrespo)
-                    console.log("alldt =====>", alldt)
                     setAllStockData(alldt);
-                    
                 } else {
-                    
                     setAllStockData(response.data.response.data);
                 }
-
-                //const alldt = newdata.concat(response.data.response.data)
-                //setAllStockData(alldt);
-                //setAllStockData(response.data.response.data);
 
                 setFormState(FormState => ({
                     ...FormState,
@@ -127,13 +115,13 @@ const CartonAddDrawer = (props) => {
                 handleClearForm()
                 onClose()
             } else if (response.data.success === false) {
-                
+
                 Alert.alert(`${response.data.message}`);
             } else {
-                
+
                 Alert.alert(`${response.data.message}`);
             }
-        } catch (error) {            
+        } catch (error) {
             Alert.alert('Server Error :' + error)
         } finally {
             setLoading(false)
@@ -142,6 +130,8 @@ const CartonAddDrawer = (props) => {
     }
 
     const handleSaveCarton = async () => {
+        console.log("FormState", FormState)
+        console.log("FormCartonDataState", FormCartonDataState)
         if (typeof FormCartonDataState.values.PrpCode == 'undefined' || FormCartonDataState.values.PrpCode == null || FormCartonDataState.values.PrpCode == '') {
             Snackbar.show({
                 text: 'Please select property',
@@ -222,15 +212,17 @@ const CartonAddDrawer = (props) => {
                 textColor: '#fff',
                 action: { text: 'OK', textColor: 'white' },
             });
-        } else if (typeof FormCartonDataState.values.grsWt == 'undefined' || FormCartonDataState.values.grsWt == null || FormCartonDataState.values.grsWt == '' || parseFloat(FormCartonDataState.values.grsWt) <= 0) {
-            Snackbar.show({
-                text: 'Gross wt. can not be balnk or empty or 0',
-                duration: Snackbar.LENGTH_LONG,
-                backgroundColor: 'red',
-                textColor: '#fff',
-                action: { text: 'OK', textColor: 'white' },
-            });
-        } else if (typeof FormCartonDataState.values.netWt == 'undefined' || FormCartonDataState.values.netWt == null || FormCartonDataState.values.netWt == '' || parseFloat(FormCartonDataState.values.netWt) <= 0) {
+        } 
+        // else if (typeof FormCartonDataState.values.grsWt == 'undefined' || FormCartonDataState.values.grsWt == null || FormCartonDataState.values.grsWt == '' || parseFloat(FormCartonDataState.values.grsWt) <= 0) {
+        //     Snackbar.show({
+        //         text: 'Gross wt. can not be balnk or empty or 0',
+        //         duration: Snackbar.LENGTH_LONG,
+        //         backgroundColor: 'red',
+        //         textColor: '#fff',
+        //         action: { text: 'OK', textColor: 'white' },
+        //     });
+        // } 
+        else if (typeof FormCartonDataState.values.netWt == 'undefined' || FormCartonDataState.values.netWt == null || FormCartonDataState.values.netWt == '' || parseFloat(FormCartonDataState.values.netWt) <= 0) {
             Snackbar.show({
                 text: 'Net wt. can not be balnk or empty or 0',
                 duration: Snackbar.LENGTH_LONG,
@@ -481,29 +473,6 @@ const CartonAddDrawer = (props) => {
         FormState.values.YearNo,
         FormState.values.StrCode
     ]);
-    // useEffect(() => {
-    //     setFormCartonDataState(FormCartonDataState => ({
-    //         ...FormCartonDataState,
-    //         values: {
-    //             ...FormCartonDataState.values,
-    //             PrpCode: typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != ''
-    //                 ? FormCartonDataState.values.PrpCode
-    //                 : typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != ''
-    //                     ? FormState.values.PrpCode
-    //                     : '',
-    //                 YearNo: typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != ''
-    //                 ? FormCartonDataState.values.YearNo
-    //                 : typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != ''
-    //                     ? FormState.values.YearNo
-    //                     : '',
-    //                 StrCode: typeof FormCartonDataState.values.StrCode != 'undefined' && FormCartonDataState.values.StrCode != null && FormCartonDataState.values.StrCode != ''
-    //                 ? FormCartonDataState.values.StrCode
-    //                 : typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != ''
-    //                     ? FormState.values.StrCode
-    //                     : ''                        
-    //         }
-    //     }));
-    // })
 
     useEffect(() => {
         const loadAllFunctions = async () => {
@@ -538,9 +507,18 @@ const CartonAddDrawer = (props) => {
         setFormCartonDataState(prev => ({
             ...prev,
             values: {
-                //PrpCode: '',
-                //YearNo: '',
-                //StrCode: '',
+                PrpCode: typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != '' 
+                ?  FormCartonDataState.values.PrpCode 
+                : typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '' 
+                ? FormState.values.PrpCode : '', 
+                YearNo: typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != '' 
+                ?  FormCartonDataState.values.YearNo 
+                : typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '' 
+                ? FormState.values.YearNo : '', 
+                StrCode: typeof FormCartonDataState.values.StrCode != 'undefined' && FormCartonDataState.values.StrCode != null && FormCartonDataState.values.StrCode != '' 
+                ?  FormCartonDataState.values.StrCode 
+                : typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' 
+                ? FormState.values.StrCode : '',
                 CartNo: '',
                 Chees: '',
                 ItmCode: '',
@@ -548,16 +526,15 @@ const CartonAddDrawer = (props) => {
                 GrdCode: '',
                 ShdCode: '',
                 Denier: '',
-                grsWt: '',
+                grsWt: 0,
                 netWt: '',
-                StkType: ''
+                StkType: typeof FormCartonDataState.values.StkType != 'undefined' && FormCartonDataState.values.StkType != null && FormCartonDataState.values.StkType != '' 
+                ?  FormCartonDataState.values.StkType : ''
             }
         }));
     };
 
-
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode === FormCartonDataState.values.PrpCode) || FormState.values.PrpCode;
-    console.log("=======================> selectedProperty", FormCartonDataState.values.PrpCode, '+', FormState.values.PrpCode)
     const selectedYear = getAllYearData?.find((y) => y.YearNo === FormCartonDataState.values.YearNo) || FormState.values.YearNo;
     const selectedStore = getAllStoreData?.find((y) => y.StrCode === FormCartonDataState.values.StrCode) || FormState.values.StrCode;
     const selectedItem = getItemData?.find((y) => y.ItmCode === FormCartonDataState.values.ItmCode) || null;
@@ -566,7 +543,18 @@ const CartonAddDrawer = (props) => {
     const selectedShade = getShadeData?.find((y) => y.ShdCode === FormCartonDataState.values.ShdCode) || null;
     const selectedStockType = getStockTypes?.find((y) => y.value === FormCartonDataState.values.StkType) || null;
 
-    console.log("FormCartonDataState : =========>", FormCartonDataState)
+
+    useEffect(() => {
+        if (!FormCartonDataState.values.StkType) {
+            setFormCartonDataState(prev => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    StkType: 'I'
+                }
+            }));
+        }
+    }, []);
 
     return (
         <>
@@ -591,14 +579,13 @@ const CartonAddDrawer = (props) => {
                                     <Text style={castyles.label}>Select Property <Text style={{ color: 'red' }}> * </Text></Text>
 
                                     <SearchableDropdown
-
-                                        //key={FormCartonDataState.values.PrpCode}
+                                        //containerStyle={{ backgroundColor: 'red' }}
+                                        //textStyle={{ color: '#000' }}
                                         data={getAllPropertyData}
                                         labelKey="LngName"
                                         valueKey="PrpCode"
                                         placeholder="Choose property..."
                                         pageSize={10}
-                                        //initialValue={FormCartonDataState.values.PrpCode ?? null}
                                         initialValue={selectedProperty}
                                         value={FormCartonDataState.values.PrpCode || FormState.values.PrpCode}
                                         onSelect={(item) => {
@@ -612,44 +599,6 @@ const CartonAddDrawer = (props) => {
                                         }}
                                         multiple={false}
                                         emptyMessage="No properties available" />
-                                    {/* <SearchableDropdown
-                                    data={getAllPropertyData}
-                                    labelKey="LngName"
-                                    valueKey="PrpCode"
-                                    placeholder="Choose property..."
-                                    pageSize={10}
-                                    value={FormCartonDataState.values.PrpCode}
-                                    onSelect={(item) => {
-                                        setFormCartonDataState(prev => ({
-                                            ...prev,
-                                            values: {
-                                                ...prev.values,
-                                                PrpCode: item?.PrpCode || '',
-                                            }
-                                        }));
-                                    }}
-                                /> */}
-                                    {/* <SearchableDropdown
-
-                                    key={FormCartonDataState.values.PrpCode}
-                                    data={getAllPropertyData}
-                                    labelKey="LngName"
-                                    valueKey="PrpCode"
-                                    placeholder="Choose property..."
-                                    pageSize={10}
-                                    //initialValue={getAllPropertyData ?? null}
-                                    value={FormCartonDataState.values.PrpCode}
-                                    onSelect={(item) => {
-                                        setFormCartonDataState(FormCartonDataState => ({
-                                            ...FormCartonDataState,
-                                            values: {
-                                                ...FormCartonDataState.values,
-                                                PrpCode: item?.PrpCode || '',
-                                            }
-                                        }));
-                                    }}
-                                    multiple={false}
-                                    emptyMessage="No properties available" /> */}
                                 </View>
                                 <View style={{ marginBottom: 10 }} >
                                     <Text style={castyles.label}>Select Year <Text style={{ color: 'red' }}> * </Text></Text>
@@ -660,9 +609,8 @@ const CartonAddDrawer = (props) => {
                                         valueKey="YearNo"
                                         placeholder="Choose year..."
                                         pageSize={10}
-                                        //initialValue={getAllYearData ?? null}
-                                        //value={FormCartonDataState.values.YearNo}
                                         initialValue={selectedYear}
+                                        value={FormCartonDataState.values.YearNo || FormState.values.YearNo}
                                         onSelect={(yr) => {
                                             setFormCartonDataState(FormCartonDataState => ({
                                                 ...FormCartonDataState,
@@ -684,8 +632,7 @@ const CartonAddDrawer = (props) => {
                                         valueKey="StrCode"
                                         placeholder="Choose sore..."
                                         pageSize={10}
-                                        //initialValue={getAllStoreData ?? null}
-                                        //value={FormCartonDataState.values.StrCode}
+                                        value={FormCartonDataState.values.StrCode || FormState.values.StrCode}
                                         initialValue={selectedStore}
                                         onSelect={(str) => {
                                             setFormCartonDataState(FormCartonDataState => ({
@@ -847,7 +794,7 @@ const CartonAddDrawer = (props) => {
                                         data={getStockTypes}
                                         labelKey="label"
                                         valueKey="value"
-                                        placeholder="Choose property..."
+                                        placeholder="Choose stock type..."
                                         pageSize={10}
                                         //initialValue={getStockTypes ?? null}
                                         value={FormCartonDataState.values.StkType}

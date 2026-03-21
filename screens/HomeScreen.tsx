@@ -207,9 +207,15 @@ const APP_SECTIONS = [
     {
         title: 'I',
         data: [
-            { id: '25', name: 'Item Authorization', screen: 'Item Authorization', icon: 'product', iconColor: '#221080' },
+            { id: '26', name: 'Item Authorization', screen: 'Item Authorization', icon: 'gite', iconColor: '#221080' },
         ],
     },
+    // {
+    //     title: 'I',
+    //     data: [
+    //         { id: '24', name: 'Item Authorization', screen: 'Item Authorization', icon: 'balance', iconColor: '#221080' },
+    //     ],
+    // },
     // mob_sales_order_Inactive
 
 ];
@@ -420,7 +426,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": " Item Authorization",
+                //                         "title": "Item Authorization",
                 //                         "href": "/"
                 //                     },
                 //                 ]

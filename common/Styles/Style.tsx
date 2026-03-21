@@ -1115,8 +1115,8 @@ export const crlimtreq_styles = StyleSheet.create({
         alignItems: 'center', // Center the cards horizontally
         justifyContent: 'center', // Center the cards vertically (if needed).
         // height: '100%', 
-        
-      },
+
+    },
 
     // Individual carousel card
     carouselCard: {
@@ -1241,7 +1241,7 @@ export const checkingScannerStyles = StyleSheet.create({
         fontWeight: "500"
     },
 
-    
+
 
     input: {
         paddingVertical: 0,
@@ -2283,4 +2283,25 @@ export const yarnstockverificatio_styles = StyleSheet.create({
         textAlign: "right",
         flexWrap: "wrap"
     }
+});
+
+export const StyleSheetPCA = StyleSheet.create({
+    container: {
+        flex: 1,
+        paddingTop: 0,
+        paddingRight: 0,
+        paddingLeft: 0,
+        backgroundColor: '#e5ebf1',
+        paddingBottom: 0,
+    },
+    listIconContainer: {
+        position: 'absolute',
+        top: -50,
+        right: 20,
+        zIndex: 1,
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        color: '#fff',
+        borderRadius: 3,
+        padding: 4,
+    },
 });

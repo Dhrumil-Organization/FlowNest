@@ -57,6 +57,8 @@ import CheckingScanner from './components/CheckingScanner/CheckingScanner';
 import YarnStockVerification from './components/YarnStockVerification/YarnStockVerification';
 import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOrderTracking';
 import SalesOrderInActive from './components/SalesOrderInActive/SalesOrderInActive';
+import ProcessCompleteAuth from './components/ProcessCompleteAuth/ProcessCompleteAuth';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -588,6 +590,11 @@ export default function App() {
                       <>
                         <SalesOrderInActive {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />  
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Process complete auth.">{(props) =>
+                      <>
+                        <ProcessCompleteAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
                       </>
                     }</Stack.Screen>
                    

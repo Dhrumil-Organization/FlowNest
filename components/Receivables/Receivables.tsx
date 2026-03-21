@@ -4,6 +4,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import qs from 'qs';
 import axios from 'axios';
 import { FlashList } from '@shopify/flash-list';
+import {
+    format,
+
+} from 'date-fns';
 import HeaderBar from '../HeaderBar/HeaderBar';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import CustomDrawer from './CustomDrawer';
@@ -334,10 +338,11 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
 
 
     const dashProperty = useCallback(async (selectedPrpgrp) => {
+        console.log("🔵 dashPrp API Response:", hideprpGroup);
         setdashPropertyLoading(true);
         try {
             const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 txntype: '/receivables-view'
             }
             // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
@@ -368,21 +373,21 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             setdashPropertyLoading(false);
             console.error("Token check error:", error);
         }
-    }, []);
+    }, [hideprpGroup]);
 
     const dashParty = useCallback(async (selectedPrpgrp) => {
         setdashPartyLoading(true);
         setdashSexeLoading(true);
         try {
             const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 fetch: 'dr',
                 dashview: 'outstanding',
                 txntype: '/receivables-view'
             }
 
             const payloadSexe = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 dashview: 'outstanding',
                 fetch: 'salesexe',
             }
@@ -430,14 +435,14 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             setdashSexeLoading(false);
             console.error("Token check error:", error);
         }
-    }, []);
+    }, [hideprpGroup]);
 
-    const dashSubHead = async (selectedPrpgrp, selectedDashPrp) => {
+    const dashSubHead = useCallback(async (selectedPrpgrp, selectedDashPrp) => {
         setdashSubHeadLoading(true);
         console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
 
         const payload = {
-            prptype: selectedPrpgrp?.PrpTypeCode,
+            prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
             dashview: 'outstanding',
             prpcodes: Array.isArray(selectedDashPrp)
                 ? selectedDashPrp.map(item => item.PrpCode)
@@ -467,7 +472,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         }
 
 
-    };
+    }, [hideprpGroup]);
 
 
 
@@ -501,7 +506,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         try {
             console.log('🔵 🔵I am Calling3 dashAccount');
             const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'summary',
@@ -564,7 +569,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         } finally {
             setAccountLoading(false);
         }
-    }, [selectedPrpgrp, selectedInternal]);
+    }, [selectedPrpgrp, selectedInternal, hideprpGroup]);
 
 
 
@@ -833,19 +838,23 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         const sexeArray = selectedDashSexe.map(item => item.Code);
         const accountArray = selectedDashAccount.map(item => item.AccCode);
         console.log('🔵 🔵I am Callin2 Table');
+        const fdate = fromDate ? format(fromDate, 'yyyy-MM-dd') : null;
+        const tdate = toDate ? format(toDate, 'yyyy-MM-dd') : null;
         try {
             console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 accounts: accountArray ? accountArray : [],
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'summary',
                 dashstyle: '1',
                 dashview: 'outstanding',
-                fromdate: fromdate,
-                todate: todate,
+                // fromdate: fromdate,
+                fromdate: fdate,
+                // todate: todate,
+                todate: tdate,
                 for: 'sales',
                 uom: '1',
                 uomname: '',
@@ -853,7 +862,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 gridgroup: '',
                 showinternal: selectedInternal && selectedInternal?.value,
                 storecode: '',
-                stockdate: todate,
+                // stockdate: todate,
+                stockdate: tdate,
                 ageing: '30',
                 ageing2: '60',
                 display: '1',
@@ -905,7 +915,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         } finally {
             setIsLoading(false);
         }
-    }, [selectedPrpgrp, selectedInternal]);
+    }, [selectedPrpgrp, selectedInternal, hideprpGroup, fromDate, toDate]);
 
 
     const handleConfirmActionNew = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0, card) => {
@@ -942,7 +952,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             const payload = {
                 CardName: CardName.toUpperCase(),
                 accounts: accountArray ? accountArray : [],
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: hideprpGroup === true ? 'R' : selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'slabdetail',
@@ -1012,7 +1022,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         } finally {
             setIsLoading(false);
         }
-    }, [selectedPrpgrp, selectedInternal]);
+    }, [selectedPrpgrp, selectedInternal, hideprpGroup]);
 
     useEffect(() => {
         if (fromDate && toDate && selectedYear) {
@@ -1941,6 +1951,10 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     console.log('🔵 selectedPrpgrp', selectedPrpgrp, selectedPrpgrp?.PrpTypeCode, selectedPrpgrp?.PrpTypeOf);
     console.log('🔵 selectedInternal', selectedInternal, selectedInternal?.lable, selectedInternal?.value);
 
+
+    console.log("aaa parent Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
+    console.log("aaa parent Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
+
     return (
         <>
             {/* Narration bar */}
@@ -2072,6 +2086,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 onClose={closeDrawer}
                 fromDate={fromDate}
                 toDate={toDate}
+                setFromDate={setFromDate}
+                setToDate={setFromDate}
                 selectedYear={selectedYear}
                 onFromDateChange={setFromDate}
                 onToDateChange={setToDate}

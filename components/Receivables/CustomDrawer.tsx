@@ -15,6 +15,26 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from 'react-native-linear-gradient';
+import {
+    Calendar,
+    DateData,
+    LocaleConfig
+} from 'react-native-calendars';
+import {
+    format,
+    subDays,
+    startOfWeek,
+    endOfWeek,
+    startOfMonth,
+    endOfMonth,
+    subMonths,
+    startOfYear,
+    endOfYear,
+    subYears,
+    isSameDay,
+    isBefore,
+    isAfter
+} from 'date-fns';
 import { CustomDrawerProps, CustomDrawerReceiveableProps, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ItemData, ItemStatus } from './Modal';
 import theme from '../../android/app/src/theme';
 
@@ -25,6 +45,8 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     onClose,
     fromDate,
     toDate,
+    setFromDate,
+    setToDate,
     selectedYear,
     selectedPrpgrp,
     setSelectedDashPrp,
@@ -131,10 +153,21 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     const [displayedItems, setDisplayedItems] = useState<ItemData[]>([]);
     const [isLoadingMoreItem, setIsLoadingMoreItem] = useState(false);
     const [hasMoreItem, setHasMoreItem] = useState(true);
+    // const [fromDate, setFromDate] = useState<Date | null>(null);
+    // const [toDate, setToDate] = useState<Date | null>(null);
+    const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+
     const scrollViewRefItem = useRef<ScrollView>(null); 163
 
     const [isDesignAccordionOpenItem, setIsDesignAccordionOpenItem] = useState(false);
     const [localItemStatus, setLocalItemStatus] = useState<ItemStatus>(selectedItemStatus || 'All');
+    // 
+    // Add these state variables inside the component
+    const [startDate, setStartDate] = useState<Date | null>(null);
+    const [endDate, setEndDate] = useState<Date | null>(null);
+    const [calendarMarkedDates, setCalendarMarkedDates] = useState<any>({});
+    const [dateSelectionMode, setDateSelectionMode] = useState<'start' | 'end'>('start');
+    const [currentMonth, setCurrentMonth] = useState(format(new Date(), 'yyyy-MM-dd'));
 
     const [step, setStep] = useState(1);
     // 
@@ -145,6 +178,20 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     const isDashSexeAutoSelected = useRef(false);
     const isDashSubHeadAutoSelected = useRef(false);
     const isDashAccountAutoSelected = useRef(false);
+
+
+    // Configure calendar locale (optional)
+    LocaleConfig.locales['en'] = {
+        monthNames: [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ],
+        monthNamesShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+        dayNamesShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        today: 'Today'
+    };
+    LocaleConfig.defaultLocale = 'en';
 
 
     const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
@@ -172,7 +219,9 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
 
 
-
+    
+    // console.log("aaa Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
+    // console.log("aaa Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
 
     useEffect(() => {
@@ -543,13 +592,269 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
         // dashAccount(selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedPrpgrp, selectedInternal);
     };
 
-    const formatDate = (rawDate: any) => {
-        let day = rawDate.getDate().toString().padStart(2, '0') || '';
-        let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || ''; // Month is 0-indexed
-        let year = rawDate.getFullYear() || '';
-        return `${day}-${month}-${year}`;
+    const formatDate = (rawDate: Date) => {
+        let day = rawDate.getDate().toString().padStart(2, '0');
+        let month = (rawDate.getMonth() + 1).toString().padStart(2, '0');
+        let year = rawDate.getFullYear();
+        return `${day}-${month}-${year}`; // Format: DD-MM-YYYY
     };
 
+
+    const getCurrentFinancialYear = () => {
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth() + 1; // Months are 0-indexed
+
+        // FY starts from 1st April
+        if (currentMonth >= 4) {
+            return `${currentYear}-${currentYear + 1}`;
+        } else {
+            return `${currentYear - 1}-${currentYear}`;
+        }
+    };
+
+    const getFinancialYearStartDate = (fyString) => {
+        const [startYear, endYear] = fyString.split('-').map(Number);
+        return new Date(startYear, 3, 1); // 1st April of startYear
+    };
+
+    const getFinancialYearEndDate = (fyString) => {
+        const [startYear, endYear] = fyString.split('-').map(Number);
+        return new Date(endYear, 2, 31); // 31st March of endYear
+    };
+
+    // Add this useEffect to initialize calendar when modal opens
+    // Add this useEffect to sync fromDate/toDate with startDate/endDate when modal opens
+    useEffect(() => {
+        if (showDateRangePicker) {
+            if (fromDate && toDate) {
+                setStartDate(fromDate);
+                setEndDate(toDate);
+                updateCalendarMarkings(fromDate, toDate);
+                setDateSelectionMode('start');
+            }
+            if (startDate) {
+                setCurrentMonth(format(startDate, 'yyyy-MM-dd'));
+            } else if (fromDate) {
+                setCurrentMonth(format(fromDate, 'yyyy-MM-dd'));
+            } else {
+                setCurrentMonth(format(new Date(), 'yyyy-MM-dd'));
+            }
+        }
+    }, [showDateRangePicker]);
+
+    // Update the predefined ranges to use consistent date objects
+    const predefinedRanges = [
+        { label: "Today", start: new Date(), end: new Date() },
+        { label: "Yesterday", start: new Date(new Date().setDate(new Date().getDate() - 1)), end: new Date(new Date().setDate(new Date().getDate() - 1)) },
+        {
+            label: "This week",
+            start: new Date(new Date().setDate(new Date().getDate() - new Date().getDay())),
+            end: new Date()
+        },
+        {
+            label: "Last 7 days",
+            start: new Date(new Date().setDate(new Date().getDate() - 6)),
+            end: new Date()
+        },
+        {
+            label: "Last 30 days",
+            start: new Date(new Date().setDate(new Date().getDate() - 29)),
+            end: new Date()
+        },
+        {
+            label: "This month",
+            start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            end: new Date()
+        },
+        {
+            label: "Last month",
+            start: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1),
+            end: new Date(new Date().getFullYear(), new Date().getMonth(), 0)
+        },
+        {
+            label: "This year",
+            start: new Date(new Date().getFullYear(), 0, 1),
+            end: new Date()
+        },
+        {
+            label: "Last year",
+            start: new Date(new Date().getFullYear() - 1, 0, 1),
+            end: new Date(new Date().getFullYear() - 1, 11, 31)
+        },
+        {
+            label: "Current FY",
+            start: getFinancialYearStartDate(getCurrentFinancialYear()),
+            end: getFinancialYearEndDate(getCurrentFinancialYear())
+        },
+        {
+            label: "Previous FY",
+            start: getFinancialYearStartDate(`${Number(getCurrentFinancialYear().split('-')[0]) - 1}-${Number(getCurrentFinancialYear().split('-')[0])}`),
+            end: getFinancialYearEndDate(`${Number(getCurrentFinancialYear().split('-')[0]) - 1}-${Number(getCurrentFinancialYear().split('-')[0])}`)
+        },
+    ];
+
+    // Add helper functions
+    const formatDateToYYYYMMDD = (date: Date): string => {
+        return format(date, 'yyyy-MM-dd');
+    };
+
+    const formatDateToDisplay = (date: Date | null): string => {
+        if (!date) return 'Select Date';
+        return format(date, 'dd MMM yyyy');
+    };
+
+    const formatRangeToDisplay = (start: Date | null, end: Date | null): string => {
+        if (!start && !end) return 'Select Date Range';
+        if (start && !end) return `${formatDateToDisplay(start)} - Select End Date`;
+        if (!start && end) return `Select Start Date - ${formatDateToDisplay(end)}`;
+        return `${formatDateToDisplay(start)} - ${formatDateToDisplay(end)}`;
+    };
+
+    // Handle date selection
+    const handleDateSelect = (day: DateData) => {
+        const selectedDate = new Date(day.dateString);
+
+        if (dateSelectionMode === 'start') {
+            // Clear previous selection if start date is after end date
+            if (endDate && isAfter(selectedDate, endDate)) {
+                setStartDate(selectedDate);
+                setEndDate(null);
+            } else {
+                setStartDate(selectedDate);
+            }
+            setDateSelectionMode('end');
+            updateCalendarMarkings(selectedDate, endDate);
+        } else {
+            // End date selection
+            if (startDate && isBefore(selectedDate, startDate)) {
+                // If selected end date is before start date, swap them
+                setEndDate(startDate);
+                setStartDate(selectedDate);
+            } else {
+                setEndDate(selectedDate);
+            }
+            setDateSelectionMode('start');
+            updateCalendarMarkings(startDate, selectedDate);
+        }
+    };
+
+    // Update calendar markings based on selected dates
+    const updateCalendarMarkings = (start: Date | null, end: Date | null) => {
+        const markings: any = {};
+
+        if (start && end && !isSameDay(start, end)) {
+            // Mark range
+            let currentDate = new Date(start);
+            while (currentDate <= end) {
+                const dateStr = formatDateToYYYYMMDD(currentDate);
+                if (isSameDay(currentDate, start)) {
+                    markings[dateStr] = {
+                        startingDay: true,
+                        color: theme.BRAND_GRADIENT_START,
+                        textColor: '#ffffff',
+                        customStyles: {
+                            container: { backgroundColor: theme.BRAND_GRADIENT_START },
+                            text: { color: '#ffffff' }
+                        }
+                    };
+                } else if (isSameDay(currentDate, end)) {
+                    markings[dateStr] = {
+                        endingDay: true,
+                        color: theme.BRAND_GRADIENT_START,
+                        textColor: '#ffffff',
+                        customStyles: {
+                            container: { backgroundColor: theme.BRAND_GRADIENT_START },
+                            text: { color: '#ffffff' }
+                        }
+                    };
+                } else {
+                    markings[dateStr] = {
+                        color: theme.BRAND_GRADIENT_START + '80',
+                        textColor: '#ffffff',
+                        customStyles: {
+                            container: { backgroundColor: theme.BRAND_GRADIENT_START + '80' },
+                            text: { color: '#ffffff' }
+                        }
+                    };
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+        } else if (start && !end) {
+            // Single date selection
+            const dateStr = formatDateToYYYYMMDD(start);
+            markings[dateStr] = {
+                selected: true,
+                selectedColor: theme.BRAND_GRADIENT_START,
+                customStyles: {
+                    container: { backgroundColor: theme.BRAND_GRADIENT_START },
+                    text: { color: '#ffffff' }
+                }
+            };
+        }
+
+        setCalendarMarkedDates(markings);
+    };
+
+    // Handle predefined date ranges
+    const handlePredefinedRange = (range: { start: Date; end: Date; label: string }) => {
+        setStartDate(range.start);
+        setEndDate(range.end);
+        setFromDate(range.start);  // Add this to update fromDate
+        setToDate(range.end);      // Add this to update toDate
+        updateCalendarMarkings(range.start, range.end);
+        setDateSelectionMode('start');
+
+        // Auto-apply the range after selection
+        if (onFromDateChange && onToDateChange) {
+            onFromDateChange(range.start);
+            onToDateChange(range.end);
+        }
+        // setShowDateRangePicker(false);
+    };
+
+    // Apply selected date range
+    const applyDateRange = () => {
+        if (startDate && endDate) {
+            // Validate date range
+            if (isBefore(endDate, startDate)) {
+                // Show error or swap dates
+                alert('End date cannot be before start date');
+                return;
+            }
+
+            setFromDate(startDate);  // Add this
+            setToDate(endDate);      // Add this
+
+            onFromDateChange(startDate);
+            onToDateChange(endDate);
+            setShowDateRangePicker(false);
+        } else if (startDate && !endDate) {
+            alert('Please select both start and end dates');
+        } else if (!startDate && endDate) {
+            alert('Please select both start and end dates');
+        } else {
+            alert('Please select a date range');
+        }
+    };
+
+    // Clear selected dates
+    const clearDateRange = () => {
+        setStartDate(null);
+        setEndDate(null);
+        setFromDate(null);   // Add this
+        setToDate(null);     // Add this
+        setCalendarMarkedDates({});
+        setDateSelectionMode('start');
+        onFromDateChange(null);
+        onToDateChange(null);
+        // setShowDateRangePicker(false);
+    };
+
+    // console.log("aaa Sending to parent - From Date:", fromDate);
+    // console.log("aaa Sending to parent - To Date:", toDate);
+    // console.log("aaa Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
+    // console.log("aaa Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
     return (
         <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
@@ -616,7 +921,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             </View>
 
                             {/* Property Group Dropdown */}
-                            {/* {hineidePrp === false ? (<>
+                            {hineidePrp === false ? (<>
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.label}>Sales Property Group</Text>
                                     <TouchableOpacity
@@ -656,8 +961,8 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         </View>
                                     )}
 
-                                </View></>) : (<></>)} */}
-                            <View style={styles.inputGroup}>
+                                </View></>) : (<></>)}
+                            {/* <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Sales Property Group</Text>
                                 <TouchableOpacity
                                     style={styles.dropdownButton}
@@ -696,7 +1001,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                     </View>
                                 )}
 
-                            </View>
+                            </View> */}
 
 
                             {/* Accordion for Design Selection */}
@@ -1195,6 +1500,179 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
                                 </>
                             )}
+
+                            {/* Date Range Picker Button (Below Sales Executive Dropdown) */}
+                            <TouchableOpacity
+                                style={styles.dateRangeButton}
+                                onPress={() => setShowDateRangePicker(true)}
+                            >
+                                <Text style={styles.dateRangeButtonText}>
+                                    {fromDate && toDate
+                                        ? `${formatDate(fromDate)} ~ ${formatDate(toDate)}`
+                                        : "Select Date Range"}
+                                </Text>
+                                <Icon name="calendar-today" size={20} color="#fff" />
+                            </TouchableOpacity>
+
+                            {/* Date Range Picker Modal */}
+                            {/* Date Range Picker Modal */}
+                            <Modal
+                                visible={showDateRangePicker}
+                                transparent={true}
+                                animationType="slide"
+                                onRequestClose={() => setShowDateRangePicker(false)}
+                            >
+                                <View style={stylesEnhanced.modalOverlay}>
+                                    <View style={stylesEnhanced.modalContainer}>
+                                        {/* Header */}
+                                        <View style={stylesEnhanced.modalHeader}>
+                                            <TouchableOpacity onPress={() => setShowDateRangePicker(false)}>
+                                                <Icon name="close" size={24} color="#666" />
+                                            </TouchableOpacity>
+                                            <Text style={stylesEnhanced.modalTitle}>Select Date Range</Text>
+                                            <TouchableOpacity onPress={clearDateRange}>
+                                                <Text style={stylesEnhanced.clearButton}>Clear</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* Selected Range Display */}
+                                        <View style={stylesEnhanced.rangeDisplay}>
+                                            <View style={stylesEnhanced.rangeDisplayItem}>
+                                                <Text style={stylesEnhanced.rangeLabel}>Start Date</Text>
+                                                <Text style={stylesEnhanced.rangeValue}>
+                                                    {formatDateToDisplay(startDate)}
+                                                </Text>
+                                            </View>
+                                            <Icon name="arrow-forward" size={20} color="#999" />
+                                            <View style={stylesEnhanced.rangeDisplayItem}>
+                                                <Text style={stylesEnhanced.rangeLabel}>End Date</Text>
+                                                <Text style={stylesEnhanced.rangeValue}>
+                                                    {formatDateToDisplay(endDate)}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Predefined Ranges */}
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            style={stylesEnhanced.predefinedRangesContainer}
+                                            contentContainerStyle={stylesEnhanced.predefinedRangesContent}
+                                        >
+                                            {predefinedRanges.map((range, index) => (
+                                                <TouchableOpacity
+                                                    key={index}
+                                                    style={[
+                                                        stylesEnhanced.predefinedButton,
+                                                        startDate && endDate &&
+                                                        isSameDay(startDate, range.start) &&
+                                                        isSameDay(endDate, range.end) &&
+                                                        stylesEnhanced.predefinedButtonActive
+                                                    ]}
+                                                    onPress={() => handlePredefinedRange(range)}
+                                                >
+                                                    <Text style={[
+                                                        stylesEnhanced.predefinedButtonText,
+                                                        startDate && endDate &&
+                                                        isSameDay(startDate, range.start) &&
+                                                        isSameDay(endDate, range.end) &&
+                                                        stylesEnhanced.predefinedButtonTextActive
+                                                    ]}>
+                                                        {range.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+
+                                        {/* Calendar */}
+                                        <View style={stylesEnhanced.calendarContainer}>
+                                            <Calendar
+                                                current={currentMonth}
+                                                onMonthChange={(month: DateData) => setCurrentMonth(month.dateString)}
+                                                onDayPress={handleDateSelect}
+                                                markedDates={calendarMarkedDates}
+                                                markingType={'period'}
+                                                style={stylesEnhanced.calendar}
+                                                theme={{
+                                                    backgroundColor: '#ffffff',
+                                                    calendarBackground: '#ffffff',
+                                                    textSectionTitleColor: '#6c757d',
+                                                    textSectionTitleDisabledColor: '#d9e1e8',
+                                                    selectedDayBackgroundColor: theme.BRAND_GRADIENT_START,
+                                                    selectedDayTextColor: '#ffffff',
+                                                    todayTextColor: theme.BRAND_GRADIENT_START,
+                                                    dayTextColor: '#2d4150',
+                                                    textDisabledColor: '#d9e1e8',
+                                                    dotColor: '#00adf5',
+                                                    selectedDotColor: '#ffffff',
+                                                    arrowColor: theme.BRAND_GRADIENT_START,
+                                                    disabledArrowColor: '#d9e1e8',
+                                                    monthTextColor: '#212529',
+                                                    indicatorColor: theme.BRAND_GRADIENT_START,
+                                                    textDayFontWeight: '400',
+                                                    textMonthFontWeight: 'bold',
+                                                    textDayHeaderFontWeight: '600',
+                                                    textDayFontSize: 14,
+                                                    textMonthFontSize: 16,
+                                                    textDayHeaderFontSize: 12,
+                                                }}
+                                                enableSwipeMonths={true}
+                                                firstDay={1}
+                                                hideExtraDays={false}
+                                                showWeekNumbers={false}
+                                            />
+                                        </View>
+
+                                        {/* Action Buttons */}
+                                        <View style={stylesEnhanced.actionButtons}>
+                                            <TouchableOpacity
+                                                style={stylesEnhanced.cancelButton}
+                                                onPress={() => setShowDateRangePicker(false)}
+                                            >
+                                                <Text style={stylesEnhanced.cancelButtonText}>Cancel</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={stylesEnhanced.applyButton}
+                                                onPress={applyDateRange}
+                                            >
+                                                <Text style={stylesEnhanced.applyButtonText}>Apply Range</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </View>
+                            </Modal>
+                            {/* DateTimePicker for Start Date */}
+                            {showFromDatePicker && (
+                                <DateTimePicker
+                                    value={fromDate || new Date()}
+                                    mode="date"
+                                    display="default"
+                                    onChange={(event, selectedDate) => {
+                                        setShowFromDatePicker(false);
+                                        if (selectedDate) {
+                                            setFromDate(selectedDate);
+                                            setShowDateRangePicker(true);
+                                        }
+                                    }}
+                                />
+                            )}
+
+                            {/* DateTimePicker for End Date */}
+                            {showToDatePicker && (
+                                <DateTimePicker
+                                    value={toDate || new Date()}
+                                    mode="date"
+                                    display="default"
+                                    onChange={(event, selectedDate) => {
+                                        setShowToDatePicker(false);
+                                        if (selectedDate) {
+                                            setToDate(selectedDate);
+                                            setShowDateRangePicker(true);
+                                        }
+                                    }}
+                                />
+                            )}
+
                         </ScrollView>
 
                         {/* <>
@@ -1638,6 +2116,239 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.3)',
         padding: 8,
         borderRadius: 12,
+    },
+    dateRangeButton: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 15,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 8,
+        marginBottom: 10,
+    },
+    dateRangeButtonText: {
+        color: '#fff',
+        fontSize: 16,
+    },
+    dateRangeModalContainer: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    dateRangeModalContent: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        padding: 10,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: '80%',
+    },
+    dateRangeOptionsContainer: {
+        width: '40%',
+        borderRightWidth: 1,
+        borderRightColor: '#eee',
+        paddingRight: 5,
+    },
+    dateRangeOptionsScroll: {
+        flex: 1,
+    },
+    dateRangeOptionButton: {
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 5,
+        marginBottom: 5,
+    },
+    selectedDateRangeOption: {
+        backgroundColor: theme.BRAND_GRADIENT_START,
+    },
+    dateRangeOptionText: {
+        color: '#333',
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    dateRangeCalendarContainer: {
+        flex: 1,
+        paddingLeft: 10,
+        justifyContent: 'center',
+    },
+    dateRangeCalendarTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        color: '#333',
+        textAlign: 'center',
+    },
+    datePickerButton: {
+        padding: 15,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        marginBottom: 10,
+        alignItems: 'center',
+    },
+    datePickerButtonText: {
+        color: '#333',
+        fontSize: 16,
+    },
+    confirmDateRangeButton: {
+        backgroundColor: theme.BRAND_GRADIENT_START,
+        padding: 15,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 10,
+        marginHorizontal: 10,
+    },
+    confirmDateRangeButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+
+
+
+});
+
+
+const stylesEnhanced = StyleSheet.create({
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: '90%',
+        padding: 20,
+        paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    clearButton: {
+        color: '#ff4444',
+        fontSize: 14,
+        fontWeight: '500',
+        padding: 5,
+    },
+    rangeDisplay: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#f8f9fa',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    rangeDisplayItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    rangeLabel: {
+        fontSize: 11,
+        color: '#6c757d',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    rangeValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#212529',
+    },
+    predefinedRangesContainer: {
+        marginBottom: 15,
+        maxHeight: 50,
+    },
+    predefinedRangesContent: {
+        paddingRight: 10,
+    },
+    predefinedButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 25,
+        backgroundColor: '#f8f9fa',
+        marginRight: 10,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    predefinedButtonActive: {
+        backgroundColor: theme.BRAND_GRADIENT_START,
+        borderColor: theme.BRAND_GRADIENT_START,
+    },
+    predefinedButtonText: {
+        fontSize: 13,
+        color: '#495057',
+        fontWeight: '500',
+    },
+    predefinedButtonTextActive: {
+        color: '#fff',
+    },
+    calendarContainer: {
+        flex: 1,
+        marginBottom: 15,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    calendar: {
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    actionButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginTop: 5,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#e9ecef',
+    },
+    cancelButton: {
+        flex: 1,
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: '#f8f9fa',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    cancelButtonText: {
+        fontSize: 16,
+        color: '#6c757d',
+        fontWeight: '600',
+    },
+    applyButton: {
+        flex: 1,
+        padding: 14,
+        borderRadius: 12,
+        backgroundColor: theme.BRAND_GRADIENT_START,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    applyButtonText: {
+        fontSize: 16,
+        color: '#fff',
+        fontWeight: 'bold',
     },
 });
 

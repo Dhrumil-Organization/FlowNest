@@ -139,8 +139,11 @@ const CustomDrawer = (props) => {
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
+            console.log("get_verify_manual_stock API payload :", payload)
+            console.log("get_verify_manual_stock API URL :", `${API}/api/get_verify_manual_stock`)
             try {
                 const response = await axios.post(`${API}/api/get_verify_manual_stock`, payload, { headers });
+                console.log("get_verify_manual_stock API response :", response)
                 if (response.data.success === true && response.data.response.data.length === 0) {
                     Alert.alert('No Data Found');
                 } else if (response.data.success === true && response.data.response.data.length > 0) {

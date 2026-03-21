@@ -32,6 +32,8 @@ export interface CustomDrawerReceiveableProps {
     onClose: () => void;
     fromDate: Date;
     toDate: Date;
+    setFromDate: (date: Date) => void;
+    setToDate: (date: Date) => void;
     selectedYear: string;
     selectedExe: string;
     selectedPrpgrp: string;

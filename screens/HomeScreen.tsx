@@ -204,6 +204,12 @@ const APP_SECTIONS = [
             { id: '24', name: 'Sales Order(Inactive)', screen: 'Sales Order(Inactive)', icon: 'bar-chart', iconColor: '#221080' },
         ],
     },
+    {
+        title: 'P',
+        data: [
+            { id: '25', name: 'Process complete auth.', screen: 'Process complete auth.', icon: 'autorenew', iconColor: '#dd5c98' },
+        ],
+    },
     // mob_sales_order_Inactive
 
 ];
@@ -411,6 +417,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     }, 
                 //                     {
                 //                         "title": "Sales Order(Inactive)",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Process complete auth.",
                 //                         "href": "/"
                 //                     },                                    
                 //                 ]

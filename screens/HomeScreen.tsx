@@ -215,10 +215,13 @@ const APP_SECTIONS = [
         data: [
             { id: '25', name: 'Process complete auth.', screen: 'Process complete auth.', icon: 'autorenew', iconColor: '#dd5c98' },
         ],
+    },
+    {
+        title: 'F',
+        data: [
+            { id: '26', name: 'Febric Stoke.', screen: 'Febric Stoke', icon: 'autorenew', iconColor: '#dd5c98' },
+        ],
     }
-
-    // mob_sales_order_Inactive
-
 ];
 
 interface Props {

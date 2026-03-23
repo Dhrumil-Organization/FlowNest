@@ -129,6 +129,23 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     }, [summaryDrawerVisible]);
 
 
+    // useEffect(() => {
+    //     const timeout = setTimeout(() => {
+    //         searchRef.current = searchQueryPOT;
+
+    //         // const filtered = getCardData[0]?.data?.outsummary?.filter(item =>
+    //         console.log('getOutSummary:', getOutSummary);
+    //         const filtered = getOutSummary.filter(item =>
+    //             Object.values(item).some(val =>
+    //                 String(val).toLowerCase().includes(searchQueryPOT.toLowerCase())
+    //             )
+    //         );
+
+    //         setFilteredData(filtered || []);
+    //     }, 250); // 👈 debounce
+
+    //     return () => clearTimeout(timeout);
+    // }, [searchQueryPOT, getOutSummary]);
     useEffect(() => {
         const timeout = setTimeout(() => {
             searchRef.current = searchQueryPOT;
@@ -145,7 +162,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         }, 250); // 👈 debounce
 
         return () => clearTimeout(timeout);
-    }, [searchQueryPOT, getOutSummary]);
+    }, [searchQueryPOT]);
 
 
 
@@ -373,7 +390,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             setdashPropertyLoading(false);
             console.error("Token check error:", error);
         }
-    }, [hideprpGroup]);
+    }, [hideprpGroup, token, API]);
 
     const dashParty = useCallback(async (selectedPrpgrp) => {
         setdashPartyLoading(true);
@@ -499,9 +516,9 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const fromdate = formatDate123(firstDayOfMonth);
         const todate = formatDate123(today);
-        const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
-        const subHeadArray = selectedDashSubHead.map(item => item.SHead);
-        const sexeArray = selectedDashSexe.map(item => item.Code);
+        const prpCodesArray = selectedDashPrp?.map(item => item.PrpCode);
+        const subHeadArray = selectedDashSubHead?.map(item => item.SHead);
+        const sexeArray = selectedDashSexe?.map(item => item.Code);
         console.log('🔵 🔵I am Callin2 dashAccount');
         try {
             console.log('🔵 🔵I am Calling3 dashAccount');
@@ -577,14 +594,16 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         // const unsubscribe = navigation.addListener('focus', () => {
         //     chacheData();
         // })
-        if (selectedPrpgrp) {
-            dashProperty(selectedPrpgrp);
-            dashParty(selectedPrpgrp);
+        const ddd = hideprpGroup === true ? 'R' : selectedPrpgrp;
+        if (ddd) {
+            dashProperty(ddd);
+            dashParty(ddd);
         }
-    }, [selectedPrpgrp]);
+    }, [selectedPrpgrp, hideprpGroup]);
     useEffect(() => {
-        if (selectedPrpgrp) {
-            dashSubHead(selectedPrpgrp, selectedDashPrp);
+        const ddd = hideprpGroup === true ? 'R' : selectedPrpgrp;
+        if (ddd) {
+            dashSubHead(ddd, selectedDashPrp);
         }
     }, [selectedPrpgrp, selectedDashPrp]);
 

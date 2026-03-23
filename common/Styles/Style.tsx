@@ -1164,6 +1164,95 @@ export const crlimtreq_styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'normal',
     },
+
+
+    /**yarn purchase order sub card css start */
+    expandRow: {
+        marginTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+        paddingTop: 8,
+    },
+
+    expandButton: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+
+    expandText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333'
+    },
+
+    subCard: {
+        backgroundColor: '#f0eeee',
+        marginTop: 12,
+        padding: 10,
+        borderRadius: 10,
+        //borderLeftWidth: 4,
+        //borderLeftColor: '#c2c1c1',
+        color: '#000',
+        elevation: 4
+    },
+
+    subTitle: {
+        fontWeight: 'bold',
+        fontSize: 14,
+        marginBottom: 5,
+        color: '#000'
+    },
+
+    subRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        gap: 15, // or marginRight
+        marginVertical: 2,
+        color: '#000'
+    },
+    subcardtext: {
+        color: '#000',
+        fontSize: 15,
+        fontWeight: 'normal',
+        width: '25%'
+    },
+    subcardtextval: {
+        color: '#000',
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    subcardtitle: {
+        color: '#000',
+        fontSize: 18,
+        verticalAlign: 'middle',
+        textAlign: 'center',
+        width: '100%',
+        backgroundColor: '#ccc',
+        padding: 5,
+        borderRadius: 8
+    },
+    subRow1: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+
+    subCol: {
+        flex: 1,
+    },
+
+    subcardtext1: {
+        fontSize: 12,
+        color: '#777',
+    },
+
+    subcardtextval1: {
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '600',
+    },
+    /**yarn purchase order sub card css end */
 });
 
 export const checkingScannerStyles = StyleSheet.create({

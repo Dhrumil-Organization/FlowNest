@@ -182,6 +182,10 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const cancelTokenRef = useRef(null);
     const didInitialFetch = useRef(false);
 
+    const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
+    const [subCardData, setSubCardData] = useState<{ [key: string]: D1datakeys[] }>({});
+    const [loadingSubCard, setLoadingSubCard] = useState<{ [key: string]: boolean }>({});
+
 
     const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
@@ -1075,6 +1079,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
 
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
+
         <View style={[
             crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
             item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
@@ -1122,6 +1127,100 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
                     </View>
                 </View>
+
+
+
+                <View style={crlimtreq_styles.expandRow}>
+                    <TouchableOpacity
+                        style={crlimtreq_styles.expandButton}
+                        onPress={() => toggleExpand(item.UId, item)}
+                    >
+                        <Text style={crlimtreq_styles.expandText}>
+                            Items: {item.d1?.length || 0}
+                        </Text>
+
+                        <Icon
+                            name={expandedCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                            size={24}
+                            color="#333"
+                        />
+                    </TouchableOpacity>
+                </View>
+                {
+                    expandedCards[item.UId] && item.d1.map((d1Item, index) => (
+                        <View key={index} style={crlimtreq_styles.subCard}>
+                            <View style={crlimtreq_styles.subRow1}>
+                                <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
+                            </View>
+                            <View style={crlimtreq_styles.subRow1}>
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
+                                </View>
+
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
+                                </View>
+                            </View>
+                            <View style={crlimtreq_styles.subRow1}>
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
+                                </View>
+
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
+                                </View>
+                            </View>
+                            <View style={crlimtreq_styles.subRow1}>
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
+                                </View>
+
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
+                                </View>
+                            </View>
+                            <View style={crlimtreq_styles.subRow1}>
+                                <View style={crlimtreq_styles.subCol}>
+                                    <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
+                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
+                                </View>
+                            </View>
+                            {
+                                activeTab1YPO === 'requests' &&
+                                (
+                                    <>
+                                        <View style={crlimtreq_styles.subRow1}>
+                                            <View style={crlimtreq_styles.subCol}>
+                                                <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
+                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
+                                            </View>
+                                            <View style={crlimtreq_styles.subCol}>
+                                                <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
+                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
+                                            </View>
+                                        </View>
+                                        <View style={crlimtreq_styles.subRow1}>
+                                            <View style={crlimtreq_styles.subCol}>
+                                                <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
+                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
+                                            </View>
+                                            <View style={crlimtreq_styles.subCol}>
+                                                <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
+                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
+                                            </View>
+                                        </View>
+                                    </>
+                                )
+                            }
+                        </View>
+                    ))
+                }
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
@@ -1130,12 +1229,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
+                {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
                         {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
                     </View>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 <TouchableOpacity
                     onPress={() => { if (isConnected && !item.isProcessed) handleCallURL(item); }}
                     disabled={!isConnected || item.isProcessed || getLocationLoading}>
@@ -1151,7 +1250,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     }
                 </TouchableOpacity>
             </View>
-        </View>
+        </View >
     );
 
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
@@ -1226,18 +1325,107 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             {item.AuthStatus || ''}
                         </Text>
                     </View>
-
                 </View>
-
             </View>
-            <View style={crlimtreq_styles.cardActions}>
+            <View style={crlimtreq_styles.expandRow}>
+                <TouchableOpacity
+                    style={crlimtreq_styles.expandButton}
+                    onPress={() => toggleExpand(item.UId, item)}
+                >
+                    <Text style={crlimtreq_styles.expandText}>
+                        Items: {item.d1?.length || 0}
+                    </Text>
+
+                    <Icon
+                        name={expandedCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        size={24}
+                        color="#333"
+                    />
+                </TouchableOpacity>
+            </View>
+            {
+                expandedCards[item.UId] && item.d1.map((d1Item, index) => (
+                    <View key={index} style={crlimtreq_styles.subCard}>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
+                            </View>
+
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
+                            </View>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
+                            </View>
+
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
+                            </View>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
+                            </View>
+
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
+                            </View>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
+                            </View>
+                        </View>
+                        {
+                            activeTab1YPO === 'requests' &&
+                            (
+                                <>
+                                    <View style={crlimtreq_styles.subRow1}>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
+                                        </View>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={crlimtreq_styles.subRow1}>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
+                                        </View>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
+                                        </View>
+                                    </View>
+                                </>
+                            )
+                        }
+                    </View>
+                ))
+            }
+            {/* <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
                         {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
                     </View>
                 </TouchableOpacity>
-            </View>
+            </View> */}
         </View>
     );
 
@@ -1330,8 +1518,98 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         </Text>
                     </View>
                 </View>
-
             </View>
+            <View style={crlimtreq_styles.expandRow}>
+                <TouchableOpacity
+                    style={crlimtreq_styles.expandButton}
+                    onPress={() => toggleExpand(item.UId, item)}
+                >
+                    <Text style={crlimtreq_styles.expandText}>
+                        Items: {item.d1?.length || 0}
+                    </Text>
+
+                    <Icon
+                        name={expandedCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        size={24}
+                        color="#333"
+                    />
+                </TouchableOpacity>
+            </View>
+            {
+                expandedCards[item.UId] && item.d1.map((d1Item, index) => (
+                    <View key={index} style={crlimtreq_styles.subCard}>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
+                            </View>
+
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
+                            </View>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
+                            </View>
+
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
+                            </View>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
+                            </View>
+
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
+                            </View>
+                        </View>
+                        <View style={crlimtreq_styles.subRow1}>
+                            <View style={crlimtreq_styles.subCol}>
+                                <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
+                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
+                            </View>
+                        </View>
+                        {
+                            activeTab1YPO === 'requests' &&
+                            (
+                                <>
+                                    <View style={crlimtreq_styles.subRow1}>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
+                                        </View>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={crlimtreq_styles.subRow1}>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
+                                        </View>
+                                        <View style={crlimtreq_styles.subCol}>
+                                            <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
+                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
+                                        </View>
+                                    </View>
+                                </>
+                            )
+                        }
+                    </View>
+                ))
+            }
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
@@ -1339,12 +1617,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
+                {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
                         {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
                     </View>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
             {/* <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
@@ -1381,6 +1659,16 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         </View>
     );
 
+
+    const toggleExpand = (uid: string, arr) => {
+        console.log("--------arrr-----------", arr)
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+        setExpandedCards(prev => ({
+            ...prev,
+            [uid]: !prev[uid]
+        }));
+    };
 
     return (
         <>

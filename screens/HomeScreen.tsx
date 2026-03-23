@@ -430,6 +430,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Item Authorization",
                 //                         "href": "/"
                 //                     },
+                //                     {
                 //                         "title": "Process complete auth.",
                 //                         "href": "/"
                 //                     },

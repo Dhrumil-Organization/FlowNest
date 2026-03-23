@@ -219,7 +219,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
 
 
-    
+
     // console.log("aaa Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
     // console.log("aaa Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
@@ -1501,8 +1501,10 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                 </>
                             )}
 
+                            {/*------------------------------------------------------------ DATE------------------------------------------------------- */}
+
                             {/* Date Range Picker Button (Below Sales Executive Dropdown) */}
-                            <TouchableOpacity
+                            {/* <TouchableOpacity
                                 style={styles.dateRangeButton}
                                 onPress={() => setShowDateRangePicker(true)}
                             >
@@ -1514,8 +1516,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                 <Icon name="calendar-today" size={20} color="#fff" />
                             </TouchableOpacity>
 
-                            {/* Date Range Picker Modal */}
-                            {/* Date Range Picker Modal */}
+
                             <Modal
                                 visible={showDateRangePicker}
                                 transparent={true}
@@ -1524,7 +1525,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             >
                                 <View style={stylesEnhanced.modalOverlay}>
                                     <View style={stylesEnhanced.modalContainer}>
-                                        {/* Header */}
+                                       
                                         <View style={stylesEnhanced.modalHeader}>
                                             <TouchableOpacity onPress={() => setShowDateRangePicker(false)}>
                                                 <Icon name="close" size={24} color="#666" />
@@ -1535,7 +1536,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                             </TouchableOpacity>
                                         </View>
 
-                                        {/* Selected Range Display */}
+
                                         <View style={stylesEnhanced.rangeDisplay}>
                                             <View style={stylesEnhanced.rangeDisplayItem}>
                                                 <Text style={stylesEnhanced.rangeLabel}>Start Date</Text>
@@ -1552,7 +1553,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                             </View>
                                         </View>
 
-                                        {/* Predefined Ranges */}
+
                                         <ScrollView
                                             horizontal
                                             showsHorizontalScrollIndicator={false}
@@ -1584,7 +1585,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                             ))}
                                         </ScrollView>
 
-                                        {/* Calendar */}
+
                                         <View style={stylesEnhanced.calendarContainer}>
                                             <Calendar
                                                 current={currentMonth}
@@ -1623,7 +1624,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                             />
                                         </View>
 
-                                        {/* Action Buttons */}
+
                                         <View style={stylesEnhanced.actionButtons}>
                                             <TouchableOpacity
                                                 style={stylesEnhanced.cancelButton}
@@ -1641,7 +1642,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                     </View>
                                 </View>
                             </Modal>
-                            {/* DateTimePicker for Start Date */}
+
                             {showFromDatePicker && (
                                 <DateTimePicker
                                     value={fromDate || new Date()}
@@ -1657,7 +1658,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                 />
                             )}
 
-                            {/* DateTimePicker for End Date */}
+
                             {showToDatePicker && (
                                 <DateTimePicker
                                     value={toDate || new Date()}
@@ -1671,7 +1672,9 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         }
                                     }}
                                 />
-                            )}
+                            )} */}
+
+                            {/*------------------------------------------------------------ DATE------------------------------------------------------- */}
 
                         </ScrollView>
 

@@ -59,6 +59,7 @@ import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOr
 import SalesOrderInActive from './components/SalesOrderInActive/SalesOrderInActive';
 import ItemAuthorization from './components/ItemAuthorization/ItemAuthorization';
 import ProcessCompleteAuth from './components/ProcessCompleteAuth/ProcessCompleteAuth';
+import ReceivablesSudamo from './components/ReceivablesSudamo/ReceivablesSudamo';
 
 
 const Stack = createNativeStackNavigator();
@@ -509,10 +510,18 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
-                    <Stack.Screen name="Receivables">{(props) =>
+                    {/* <Stack.Screen name="Receivables">{(props) =>
                       <>
-                        <Receivables {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                        {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
+                          <Receivables {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
+                       
+                      </>
+                    }</Stack.Screen> */}
+                     <Stack.Screen name="Receivables">{(props) =>
+                      <>
+                        {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
+                          <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
+                       
                       </>
                     }</Stack.Screen>
                     <Stack.Screen name="Payable">{(props) =>
@@ -593,18 +602,23 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
-                     <Stack.Screen name="Item Authorization">{(props) =>
+                    <Stack.Screen name="Item Authorization">{(props) =>
                       <>
                         <ItemAuthorization {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
-                    }</Stack.Screen> 
+                    }</Stack.Screen>
                     <Stack.Screen name="Process complete auth.">{(props) =>
                       <>
                         <ProcessCompleteAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
                       </>
                     }</Stack.Screen>
-                   
+                    <Stack.Screen name="Febric Stoke">{(props) =>
+                      <>
+                        <ProcessCompleteAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
+                      </>
+                    }</Stack.Screen>
+
                   </Stack.Navigator>
                 </NavigationContainer>
               ) : (

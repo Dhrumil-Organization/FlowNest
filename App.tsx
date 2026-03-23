@@ -613,7 +613,7 @@ export default function App() {
                         <ProcessCompleteAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
                       </>
                     }</Stack.Screen>
-                    <Stack.Screen name="Febric Stoke">{(props) =>
+                    <Stack.Screen name="Febric Stock">{(props) =>
                       <>
                         <ProcessCompleteAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
                       </>

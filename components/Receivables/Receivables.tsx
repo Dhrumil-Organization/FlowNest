@@ -104,25 +104,28 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     const ROW_HEIGHT = 52;
 
     useEffect(() => {
-        const initializeApp = async () => {
+        const initializeRole = async () => {
             try {
-
-                const role = await AsyncStorage.getItem('user_details_role');
-
-                setUserRole(JSON.parse(role as any));
-
-
-
+                const role = await AsyncStorage.getItem('user_login_role');
+                if (role) {
+                    const roleString = role.toString();
+                    const rolesArray = roleString.split(',');
+                    const hasReceivablesViewCombine = rolesArray.includes("Receivables View Combine");
+                    sethideprpGroup(hasReceivablesViewCombine);
+                    console.log('Role check result:', hasReceivablesViewCombine);
+                } else {
+                    sethideprpGroup(false);
+                    console.log('No role found in AsyncStorage.');
+                }
             } catch (error) {
-                console.error("Initialization error:", error);
-
-            } finally {
-                // setIsLoading(false);
+                console.error("Error reading role from AsyncStorage:", error);
+                sethideprpGroup(false);
             }
         };
 
-        initializeApp();
+        initializeRole();
     }, []);
+
 
     useEffect(() => {
         summaryVisibleRef.current = summaryDrawerVisible;
@@ -162,7 +165,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         }, 250); // 👈 debounce
 
         return () => clearTimeout(timeout);
-    }, [searchQueryPOT]);
+    }, [searchQueryPOT, getOutSummary]);
 
 
 
@@ -192,20 +195,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     console.log('getUserRole:', getUserRole);
 
 
-    useEffect(() => {
-        const getUserRoleString = getUserRole.toString();
-        console.log('getUserRole string:', getUserRoleString);
 
-        // 1. String ko array mein convert karein (comma se split karke)
-        const rolesArray = getUserRoleString.split(',');
-
-        // 2. "Receivables View Combine" check karein
-        const state = rolesArray.includes("Receivables View Combine");
-
-        // 3. Result print karein
-        console.log('getUserRole:', state); // Output: true
-        sethideprpGroup(state)
-    }, [getUserRole])
 
 
 
@@ -822,6 +812,12 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         return token;
     };
 
+
+    useEffect(() => {
+        console.log('getOutSummary in SummaryTable:', getOutSummary);
+    }, [getOutSummary]);
+
+
     const formatDate = (rawDate: any) => {
         let day = rawDate.getDate().toString().padStart(2, '0') || '';
         let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || ''; // Month is 0-indexed
@@ -910,6 +906,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             if (response.data.success == true) {
                 console.log('🔵 Table API Response:', response);
                 if (data && data.length > 0 && data1 && data1.length > 0 && data2 && data2.length > 0) {
+                    console.log('🔵 Table API Response: I am calles', response);
                     setIsDrawerVisible(false);
                     setIsLoading(false);
                     setOutCardData(data);
@@ -1022,6 +1019,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                     setOutCardData(data);
                     setOutDetails(data1);
                     setOutSummary(data2);
+                    // Use a callback to ensure state is updated before opening the modal
+                    setIsLoading(false);
                     if (isAcc == 1) {
                         setSummaryDrawerVisible(true);
                     }
@@ -1327,6 +1326,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 ))}
             </View>
         ));
+
+        console.log('filteredData 123:', filteredData);
 
         return (
             <View style={styles.tableWrapper}>

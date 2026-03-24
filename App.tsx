@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { ErrorBoundary } from 'react-error-boundary';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { navigationRef } from './android/app/src/navigation/NavigationService';
 import messaging from '@react-native-firebase/messaging';
@@ -368,6 +369,25 @@ export default function App() {
     </View>
   );
 
+  function ErrorFallback({ error, resetErrorBoundary }) {
+    return (
+      <View style={styles.errorContainer}>
+        <View style={styles.errorBox}>
+          <Icon name="error-outline" size={48} color="#FF5252" style={styles.errorIcon} />
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorMessage}>{error.message}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={resetErrorBoundary}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+
   return (
     <>
       <ThemeProvider>
@@ -510,20 +530,22 @@ export default function App() {
                         {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                       </>
                     }</Stack.Screen>
-                    {/* <Stack.Screen name="Receivables">{(props) =>
+                    <Stack.Screen name="Receivables">{(props) =>
                       <>
                         {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
-                          <Receivables {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
-                       
+                          <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <Receivables {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                          </ErrorBoundary>}
+
                       </>
-                    }</Stack.Screen> */}
-                     <Stack.Screen name="Receivables">{(props) =>
+                    }</Stack.Screen>
+                    {/* <Stack.Screen name="Receivables">{(props) =>
                       <>
                         {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
                           <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
                        
                       </>
-                    }</Stack.Screen>
+                    }</Stack.Screen> */}
                     <Stack.Screen name="Payable">{(props) =>
                       <>
                         <Payable {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -652,6 +674,59 @@ const styles = StyleSheet.create({
   offlineTitle: { fontSize: 20, fontWeight: '700', marginTop: 12, color: '#333' },
   offlineSub: { fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' },
   retryBtn: { marginTop: 18, backgroundColor: '#5B2EA6', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10 },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)', // Semi-transparent overlay
+    padding: 20,
+  },
+  errorBox: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#FFEBEE', // Light red border
+  },
+  errorIcon: {
+    marginBottom: 12,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#D32F2F', // Dark red
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: '#FF5252',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  error: { fontSize: 16, fontWeight: '700', marginBottom: 8, color: 'red' },
 });
 function preview(account: any, arg1: number): any {
   throw new Error('Function not implemented.');

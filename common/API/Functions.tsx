@@ -1221,7 +1221,6 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
              prptype: userPtype
             // prptype: 'R'
         };
-        console.log("params", params)
         const response = await axios.get(
             `${API}/api/getstore`,
             {

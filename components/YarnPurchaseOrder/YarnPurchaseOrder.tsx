@@ -183,6 +183,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const didInitialFetch = useRef(false);
 
     const [expandedCards, setExpandedCards] = useState<{ [key: string]: boolean }>({});
+    const [expandedRequestCards, setExpandedRequestCards] = useState({});
+    const [expandedHistoryCards, setExpandedHistoryCards] = useState({});
+    const [expandedVerifyCards, setExpandedVerifyCards] = useState({});
     const [subCardData, setSubCardData] = useState<{ [key: string]: D1datakeys[] }>({});
     const [loadingSubCard, setLoadingSubCard] = useState<{ [key: string]: boolean }>({});
 
@@ -1133,21 +1136,21 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <View style={crlimtreq_styles.expandRow}>
                     <TouchableOpacity
                         style={crlimtreq_styles.expandButton}
-                        onPress={() => toggleExpand(item.UId, item)}
+                        onPress={() => toggleExpandRequest(item.UId, item)}
                     >
                         <Text style={crlimtreq_styles.expandText}>
                             Items: {item.d1?.length || 0}
                         </Text>
 
                         <Icon
-                            name={expandedCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                            name={expandedRequestCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
                             size={24}
                             color="#333"
                         />
                     </TouchableOpacity>
                 </View>
                 {
-                    expandedCards[item.UId] && item.d1.map((d1Item, index) => (
+                    expandedRequestCards[item.UId] && item.d1.map((d1Item, index) => (
                         <View key={index} style={crlimtreq_styles.subCard}>
                             <View style={crlimtreq_styles.subRow1}>
                                 <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
@@ -1330,21 +1333,21 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             <View style={crlimtreq_styles.expandRow}>
                 <TouchableOpacity
                     style={crlimtreq_styles.expandButton}
-                    onPress={() => toggleExpand(item.UId, item)}
+                    onPress={() => toggleExpandHistory(item.UId, item)}
                 >
                     <Text style={crlimtreq_styles.expandText}>
                         Items: {item.d1?.length || 0}
                     </Text>
 
                     <Icon
-                        name={expandedCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
                         size={24}
                         color="#333"
                     />
                 </TouchableOpacity>
             </View>
             {
-                expandedCards[item.UId] && item.d1.map((d1Item, index) => (
+                expandedHistoryCards[item.UId] && item.d1.map((d1Item, index) => (
                     <View key={index} style={crlimtreq_styles.subCard}>
                         <View style={crlimtreq_styles.subRow1}>
                             <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
@@ -1522,21 +1525,21 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             <View style={crlimtreq_styles.expandRow}>
                 <TouchableOpacity
                     style={crlimtreq_styles.expandButton}
-                    onPress={() => toggleExpand(item.UId, item)}
+                    onPress={() => toggleExpandVerify(item.UId, item)}
                 >
                     <Text style={crlimtreq_styles.expandText}>
                         Items: {item.d1?.length || 0}
                     </Text>
 
                     <Icon
-                        name={expandedCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        name={expandedVerifyCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
                         size={24}
                         color="#333"
                     />
                 </TouchableOpacity>
             </View>
             {
-                expandedCards[item.UId] && item.d1.map((d1Item, index) => (
+                expandedVerifyCards[item.UId] && item.d1.map((d1Item, index) => (
                     <View key={index} style={crlimtreq_styles.subCard}>
                         <View style={crlimtreq_styles.subRow1}>
                             <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
@@ -1660,11 +1663,41 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     );
 
 
-    const toggleExpand = (uid: string, arr) => {
+    const toggleExpandRequest = (uid: string, arr) => {
         console.log("--------arrr-----------", arr)
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-        setExpandedCards(prev => ({
+        // setExpandedCards(prev => ({
+        //     ...prev,
+        //     [uid]: !prev[uid]
+        // }));
+        setExpandedRequestCards(prev => ({
+            ...prev,
+            [uid]: !prev[uid]
+        }));
+    };
+    const toggleExpandHistory = (uid: string, arr) => {
+        console.log("--------arrr-----------", arr)
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+        // setExpandedCards(prev => ({
+        //     ...prev,
+        //     [uid]: !prev[uid]
+        // }));
+        setExpandedHistoryCards(prev => ({
+            ...prev,
+            [uid]: !prev[uid]
+        }));
+    };
+    const toggleExpandVerify = (uid: string, arr) => {
+        console.log("--------arrr-----------", arr)
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+        // setExpandedCards(prev => ({
+        //     ...prev,
+        //     [uid]: !prev[uid]
+        // }));
+        setExpandedVerifyCards(prev => ({
             ...prev,
             [uid]: !prev[uid]
         }));

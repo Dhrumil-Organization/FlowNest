@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import theme from '../../android/app/src/theme';
 import SearchableDropdown from '../Shared/SearchableDropdown';
 import Snackbar from 'react-native-snackbar';
 import FullScreenLoader from '../Loader/Loader';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { height } = Dimensions.get('window');
 
@@ -15,16 +16,41 @@ const CriteriaForm = (props) => {
         isLoading,
         FormState,
         setFormState,
+        getAllPropertyData,
+        setAllPropertyData,
+        getAllYearData,
+        setAllYearData,
         getAllStoreData,
         fetchData,
         fetchAllHistoryData,
         fetchAllVerifyData,
-        activeTab1YPO
+        activeTab1YPO,
+        fromDate,
+        toDate,
+        onFromDateChange,
+        onToDateChange,
+        handleConfirmAction,
+        getAllData
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
-    
-    const selectedStore = getAllStoreData?.find((y) => y.StrCode == FormState.values.StrCode) || null;
+
+    const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+    const [showToDatePicker, setShowToDatePicker] = useState(false);
+
+
+
+    const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
+    const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
+
+
+    const formatDate = (rawDate: any) => {
+        let day = rawDate.getDate().toString().padStart(2, '0') || '';
+        let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || ''; // Month is 0-indexed
+        let year = rawDate.getFullYear() || '';
+        return `${day}-${month}-${year}`;
+    };
+
 
     return (
         <>
@@ -44,6 +70,87 @@ const CriteriaForm = (props) => {
                                 contentContainerStyle={stylesCF.scrollableFormContent}
                                 nestedScrollEnabled={true}>
                                 <View style={{ marginBottom: 10 }} >
+                                    <Text style={stylesCF.label}>Select Property <Text style={{ color: 'red' }}> * </Text></Text>
+                                    <SearchableDropdown
+                                        key={FormState.values.PrpCode}
+                                        data={getAllPropertyData}
+                                        labelKey="LngName"
+                                        valueKey="PrpCode"
+                                        placeholder="Choose property..."
+                                        pageSize={10}
+                                        initialValue={selectedProperty}
+                                        onSelect={(item) => {
+                                            setFormState(FormState => ({
+                                                ...FormState,
+                                                values: {
+                                                    ...FormState.values,
+                                                    PrpCode: item?.PrpCode || '',
+                                                }
+                                            }));
+                                        }}
+                                        multiple={false}
+                                        emptyMessage="No properties available" />
+                                </View>
+                                <View style={{ marginBottom: 10 }} >
+                                    <Text style={stylesCF.label}>Select Year <Text style={{ color: 'red' }}> * </Text></Text>
+                                    <SearchableDropdown
+                                        key={FormState.values.YearNo}
+                                        data={getAllYearData}
+                                        labelKey="YearName"
+                                        valueKey="YearNo"
+                                        placeholder="Choose year..."
+                                        pageSize={10}
+                                        initialValue={selectedYear}
+                                        onSelect={(item) => {
+                                            setFormState(FormState => ({
+                                                ...FormState,
+                                                values: {
+                                                    ...FormState.values,
+                                                    YearNo: item?.YearNo || '',
+                                                }
+                                            }));
+                                        }}
+                                        multiple={false}
+                                        emptyMessage="No years data available" />
+                                </View>
+                                {/* From Date */}
+                                <View style={stylesCF.inputGroup}>
+                                    <Text style={stylesCF.label}>From Date <Text style={{ color: 'red' }}> * </Text></Text>
+                                    <TouchableOpacity style={stylesCF.dateInput} onPress={() => setShowFromDatePicker(true)}>
+                                        <Text style={stylesCF.dateText}>{formatDate(fromDate)}</Text>
+                                    </TouchableOpacity>
+                                    {showFromDatePicker && (
+                                        <DateTimePicker
+                                            value={fromDate}
+                                            mode="date"
+                                            display="default"
+                                            onChange={(event, date) => {
+                                                setShowFromDatePicker(Platform.OS === 'ios');
+                                                if (date) onFromDateChange(date);
+                                            }}
+                                        />
+                                    )}
+                                </View>
+
+                                {/* To Date */}
+                                <View style={stylesCF.inputGroup}>
+                                    <Text style={stylesCF.label}>To Date <Text style={{ color: 'red' }}> * </Text></Text>
+                                    <TouchableOpacity style={stylesCF.dateInput} onPress={() => setShowToDatePicker(true)}>
+                                        <Text style={stylesCF.dateText}>{formatDate(toDate)}</Text>
+                                    </TouchableOpacity>
+                                    {showToDatePicker && (
+                                        <DateTimePicker
+                                            value={toDate}
+                                            mode="date"
+                                            display="default"
+                                            onChange={(event, date) => {
+                                                setShowToDatePicker(Platform.OS === 'ios');
+                                                if (date) onToDateChange(date);
+                                            }}
+                                        />
+                                    )}
+                                </View>
+                                {/* <View style={{ marginBottom: 10 }} >
                                     <Text style={stylesCF.label}>Select Store <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormState.values.StrCode}
@@ -64,11 +171,11 @@ const CriteriaForm = (props) => {
                                         }}
                                         multiple={false}
                                         emptyMessage="No stores data available" />
-                                </View>
+                                </View> */}
                             </ScrollView>
                             <TouchableOpacity
                                 style={stylesCF.centerFabButton}
-                                onPress={onClose}
+                                onPress={handleConfirmAction}
                                 activeOpacity={0.85}>
                                 {
                                     isLoading ?
@@ -144,6 +251,20 @@ const stylesCF = StyleSheet.create({
         fontWeight: "600",
         fontSize: 14,
         marginLeft: 6
+    },
+    inputGroup: {
+        marginBottom: 15,
+        zIndex: 10,
+    },
+    dateInput: {
+        borderWidth: 1,
+        //borderColor: '#000',
+        borderRadius: 5,
+        padding: 10,
+        backgroundColor: '#FFF',
+    },
+    dateText: {
+        color: '#000',
     },
 });
 

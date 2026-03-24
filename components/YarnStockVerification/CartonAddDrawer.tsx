@@ -79,6 +79,7 @@ const CartonAddDrawer = (props) => {
         console.log('get_verify_manual_stock API URL : ', `${API}/api/get_verify_manual_stock`)
         try {
             const response = await axios.post(`${API}/api/get_verify_manual_stock`, payload, { headers });
+            console.log('get_verify_manual_stock API response : ', response)
 
             if (response.data.success === true && response.data.response.data.length === 0) {
 
@@ -115,7 +116,7 @@ const CartonAddDrawer = (props) => {
                     }
                 }));
                 handleClearForm()
-                onClose()
+                
             } else if (response.data.success === false) {
 
                 Alert.alert(`${response.data.message}`);
@@ -127,6 +128,7 @@ const CartonAddDrawer = (props) => {
             Alert.alert('Server Error :' + error)
         } finally {
             setLoading(false)
+            onClose()
         }
 
     }
@@ -264,7 +266,8 @@ const CartonAddDrawer = (props) => {
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
-
+            console.log("insert_verify_manual_stock api payload :", payload)
+            console.log("insert_verify_manual_stock api url :", `${API}/api/insert_verify_manual_stock`)
             try {
                 const response = await axios.post(`${API}/api/insert_verify_manual_stock`, payload, { headers });
                 if (response.data.success === true && response.data.data.length === 0) {
@@ -281,6 +284,8 @@ const CartonAddDrawer = (props) => {
                 }
             } catch (error) {
                 Alert.alert('Server Error :' + error)
+            } finally {
+                //setLoading(false)
             }
         }
     }

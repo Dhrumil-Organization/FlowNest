@@ -338,7 +338,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                             nestedScrollEnabled={true}
                         >
                             {/* From Date */}
-                            <View style={styles.inputGroup}>
+                            {/* <View style={styles.inputGroup}>
                                 <Text style={styles.label}>From Date</Text>
                                 <TouchableOpacity style={styles.dateInput} onPress={() => setShowFromDatePicker(true)}>
                                     <Text style={styles.dateText}>{formatDate(fromDate)}</Text>
@@ -356,7 +356,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                 )}
                             </View>
 
-                            {/* To Date */}
+                            
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>To Date</Text>
                                 <TouchableOpacity style={styles.dateInput} onPress={() => setShowToDatePicker(true)}>
@@ -373,7 +373,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                         }}
                                     />
                                 )}
-                            </View>
+                            </View> */}
 
                             {/* Financial Year Dropdown */}
                             <View style={styles.inputGroup}>

@@ -219,7 +219,7 @@ const APP_SECTIONS = [
     {
         title: 'F',
         data: [
-            { id: '26', name: 'Febric Stock.', screen: 'Febric Stock', icon: 'autorenew', iconColor: '#dd5c98' },
+            { id: '26', name: 'Febric Stock', screen: 'Febric Stock', icon: 'autorenew', iconColor: '#dd5c98' },
         ],
     }
 ];
@@ -435,6 +435,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     },
                 //                     {
                 //                         "title": "Process complete auth.",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Purchase Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order Tracking",
                 //                         "href": "/"
                 //                     },
                 //                 ]

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBar from '../HeaderBar/HeaderBar';
 import theme from '../../android/app/src/theme';
@@ -64,6 +64,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [toDate, setToDate] = useState<Date>(new Date());
     const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
     const [selectedExe, setSelectedExe] = useState<ExeData | null>(null);
+    const [getDData, setDData] = useState(null);
     const [exeData, setExeData] = useState<ExeData[]>([]);
     const [designData, setDesignData] = useState<DesignData[]>([]);
     const [itemData, setItemData] = useState<ItemData[]>([]);
@@ -75,14 +76,59 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [getpayload, setPayload] = useState<CardPayload[]>([]);
     const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(null);
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
+    // 
+    const [isDesignModalVisible, setIsDesignModalVisible] = useState(false);
+    const [selectedDesignData, setSelectedDesignData] = useState<{
+        designdetails: any[];
+        design_summary: any[];
+        payload: any;
+    } | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filteredDesignDetails, setFilteredDesignDetails] = useState(selectedDesignData?.designdetails || []);
+    // 
+    const [designPage, setDesignPage] = useState(1);
+    const designItemsPerPage = 10;
     const [isListReady, setIsListReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+
+    const loadMoreDesignDetails = () => {
+        if (designPage * designItemsPerPage < filteredDesignDetails.length) {
+            setDesignPage(designPage + 1);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedDesignData) {
+            const lowercasedQuery = searchQuery.toLowerCase();
+            const filtered = selectedDesignData.designdetails.filter(
+                (item) =>
+                    item.Dsnname.toLowerCase().includes(lowercasedQuery) ||
+                    item.dsncode.toLowerCase().includes(lowercasedQuery) ||
+                    item.totmtr.toLowerCase().includes(lowercasedQuery) ||
+                    item.pending.toLowerCase().includes(lowercasedQuery)
+            );
+            setFilteredDesignDetails(filtered);
+        }
+    }, [searchQuery, selectedDesignData]);
 
     // Cache keys
     const CACHE_KEY_CONFIRM_ACTION = 'sales_order_tracking_confirm_action';
     const CACHE_KEY_CARD_PRESS = 'sales_order_tracking_card_press_';
     const CACHE_KEY_LAST_VIEWED = 'sales_order_tracking_last_viewed';
     const rowsPerPage = 20;
+
+
+
+    // Open modal with design data
+    const openDesignModal = (data: any, payload: any) => {
+        setSelectedDesignData({ designdetails: data.designdetails, design_summary: data.design_summary, payload });
+        setIsDesignModalVisible(true);
+    };
+
+    // Close modal
+    const closeDesignModal = () => {
+        setIsDesignModalVisible(false);
+    };
 
     const fetchData = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -480,8 +526,10 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
         const partyCodes = selectedParty.map((item: any) => item.acccode);
         const payload = {
-            fromdate: formatDate(fromDate),
-            todate: formatDate(toDate),
+            // fromdate: formatDate(fromDate),
+            fromdate: "",
+            // todate: formatDate(toDate),
+            todate: "",
             yearno: yearValue,
             sexes: selectedExe?.Code ? selectedExe?.Code : '0',
             type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
@@ -532,7 +580,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         }
     };
 
-    const handleCardPress = async (partyData: Party) => {
+    const handleCardPressforDesign = async (partyData: Party) => {
+        // setDData(partyData);
         const cacheKey = `${CACHE_KEY_CARD_PRESS}${partyData.parcode}`;
         const headers = {
             Authorization: `Bearer ${token}`,
@@ -544,8 +593,10 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             const yearValue = selectedYear.split('-')[1].substring(2);
             const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
             const payload = {
-                fromdate: formatDate(fromDate),
-                todate: formatDate(toDate),
+                // fromdate: formatDate(fromDate),
+                fromdate: "",
+                // todate: formatDate(toDate),
+                todate: "",
                 yearno: yearValue,
                 sexes: selectedExe?.Code ? selectedExe?.Code : '0',
                 type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
@@ -554,15 +605,98 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 prptype: 'S',
                 txntype: 'prodorderlist'
             };
+            const response = await axios.post(`${API}/api/salesorderdesigntracking`, payload, { headers });
+            console.log("🔵 responsedd design", payload, response);
+            if (response.data.success) {
+                setDData(partyData);
+                openDesignModal(response.data.data, payload);
+            }
+
+            // if (response.data.success === true) {
+            //     await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
+            //     await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
+            //     await AsyncStorage.setItem('parties_tracking_details_party_name', partyData.partyname);
+            //     await saveLastViewedToCache(partyData.parcode);
+            //     setLastViewedParcode(partyData.parcode);
+            //     navigation.navigate('SOPartyDetails', { party: partyData.partyname });
+            // }
+        } catch (error) {
+            console.error("Error in handleCardPress:", error);
+            Alert.alert("Error", "Failed to process party details");
+        } finally {
+            setTrackingLoader(false);
+        }
+    };
+
+    // const handleCardPress = async (partyData: Party) => {
+    //     const cacheKey = `${CACHE_KEY_CARD_PRESS}${partyData.parcode}`;
+    //     const headers = {
+    //         Authorization: `Bearer ${token}`,
+    //         'Content-Type': 'application/json',
+    //         'X-Requested-with': 'XMLHttpRequest',
+    //     };
+    //     setTrackingLoader(true);
+    //     try {
+    //         const yearValue = selectedYear.split('-')[1].substring(2);
+    //         const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
+    //         const payload = {
+    //             fromdate: formatDate(fromDate),
+    //             todate: formatDate(toDate),
+    //             yearno: yearValue,
+    //             sexes: selectedExe?.Code ? selectedExe?.Code : '0',
+    //             type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
+    //             dsncodes: dsnCodes,
+    //             parcode: partyData.parcode,
+    //             prptype: 'S',
+    //             txntype: 'prodorderlist'
+    //         };
+    //         const response = await axios.post(`${API}/api/salesorderpartytracking`, payload, { headers });
+    //         console.log("🔵 responsedd", payload, response);
+    //         if (response.data.success === true) {
+    //             await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
+    //             await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
+    //             await AsyncStorage.setItem('parties_tracking_details_party_name', partyData.partyname);
+    //             await saveLastViewedToCache(partyData.parcode);
+    //             setLastViewedParcode(partyData.parcode);
+    //             navigation.navigate('SOPartyDetails', { party: partyData.partyname });
+    //         }
+    //     } catch (error) {
+    //         console.error("Error in handleCardPress:", error);
+    //         Alert.alert("Error", "Failed to process party details");
+    //     } finally {
+    //         setTrackingLoader(false);
+    //     }
+    // };
+    const handleCardPress = async (getDData?: any, parname, customPayload?: any) => {
+        console.log('🔵 payload PARTY', getDData, parname, customPayload);
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Requested-with': 'XMLHttpRequest',
+        };
+        setTrackingLoader(true);
+        try {
+            const payload = customPayload || {
+                // fromdate: formatDate(fromDate),
+                fromdate: "",
+                // todate: formatDate(toDate),
+                todate: "",
+                yearno: selectedYear.split('-')[1].substring(2),
+                sexes: selectedExe?.Code ? selectedExe?.Code : '0',
+                type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
+                dsncodes: selectedDesigns.map((design) => design.DsnCode),
+                parcode: getDData.parcode,
+                prptype: 'S',
+                txntype: 'prodorderlist'
+            };
             const response = await axios.post(`${API}/api/salesorderpartytracking`, payload, { headers });
-            console.log("🔵 responsedd", payload, response);
-            if (response.data.success === true) {
+            if (response.data.success) {
                 await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
                 await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
-                await AsyncStorage.setItem('parties_tracking_details_party_name', partyData.partyname);
-                await saveLastViewedToCache(partyData.parcode);
-                setLastViewedParcode(partyData.parcode);
-                navigation.navigate('SOPartyDetails', { party: partyData.partyname });
+                await AsyncStorage.setItem('parties_tracking_details_party_name', parname.parname);
+                await saveLastViewedToCache(getDData.parcode);
+                setLastViewedParcode(getDData.parcode);
+                navigation.navigate('SOPartyDetails', { party: parname.parname });
             }
         } catch (error) {
             console.error("Error in handleCardPress:", error);
@@ -571,6 +705,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             setTrackingLoader(false);
         }
     };
+
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -581,7 +716,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 styles.partyCard,
                 lastViewedParcode === item.parcode && styles.recentlyViewedCard
             ]}
-            onPress={() => handleCardPress(item)}
+            // onPress={() => handleCardPress(item)}
+            onPress={() => handleCardPressforDesign(item)}
         >
             <View style={styles.partyHeader}>
                 <View style={[styles.partyAvatar, { backgroundColor: getColorForInitial(item.parcode) }]}>
@@ -716,6 +852,106 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
 
                 </View>
             )}
+            <Modal
+                visible={isDesignModalVisible}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={closeDesignModal}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Design Summary</Text>
+                        <TouchableOpacity onPress={closeDesignModal}>
+                            <Icon name="close" size={24} color="#333" />
+                        </TouchableOpacity>
+                    </View>
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search designs..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                    {selectedDesignData?.design_summary.map((summary, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.summaryCard}
+                            onPress={() => {
+                                handleCardPress(getDData, { parname: selectedDesignData?.designdetails[0].partyname }, selectedDesignData?.payload);
+                            }}
+                        >
+                            <Text style={styles.partyNameInSummary}>
+                                Party: {selectedDesignData?.designdetails[0].partyname}
+                            </Text>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Total Meter:</Text>
+                                <Text style={styles.summaryValue}>{formatNumber(summary.totmtr)}</Text>
+                            </View>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Total Amount:</Text>
+                                <Text style={styles.summaryValue}>{formatValue(summary.totamt)}</Text>
+                            </View>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Challan Qty:</Text>
+                                <Text style={styles.summaryValue}>{formatNumber(summary.chalqty)}</Text>
+                            </View>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Pending Meter:</Text>
+                                <Text style={[styles.summaryValue, { color: '#E65100' }]}>{formatNumber(summary.pending)}</Text>
+                            </View>
+                            <View style={styles.summaryRow}>
+                                <Text style={styles.summaryLabel}>Pending Amount:</Text>
+                                <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatValue(summary.pendingamt)}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                    <Text style={styles.sectionTitle}>Design Details</Text>
+                    <FlatList
+                        data={filteredDesignDetails.slice(0, designPage * designItemsPerPage)}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.designCard}
+                                onPress={() => {
+                                    const payload = { ...selectedDesignData!.payload, dsncodes: [item.dsncode] };
+                                    handleCardPress(getDData, { parname: item.partyname }, payload);
+                                }}
+                            >
+                                <View style={styles.designHeader}>
+                                    <Text style={styles.designName}>{item.Dsnname}</Text>
+                                    <Text style={styles.designCode}>{item.dsncode}</Text>
+                                </View>
+                                <View style={styles.designValues}>
+                                    <View style={styles.valueRow}>
+                                        <View style={styles.valueItem}>
+                                            <Text style={styles.valueLabel}>Total Meter:</Text>
+                                            <Text style={styles.valueText}>{formatNumber(item.totmtr)}</Text>
+                                        </View>
+                                        <View style={styles.valueItem}>
+                                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>Pending Meter:</Text>
+                                            <Text style={[styles.valueText, { color: '#E65100' }]}>{formatNumber(item.pending)}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.valueRow}>
+                                        <View style={styles.valueItem}>
+                                            <Text style={styles.valueLabel}>Total Amount:</Text>
+                                            <Text style={styles.valueText}>{formatValue(item.totamt)}</Text>
+                                        </View>
+                                        <View style={styles.valueItem}>
+                                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>Pending Amount:</Text>
+                                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>{formatValue(item.pendingamt)}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                        keyExtractor={(item, index) => `${item.dsncode}-${index}`}
+                        onEndReached={loadMoreDesignDetails}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={designPage * designItemsPerPage < filteredDesignDetails.length ? <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} /> : null}
+                    />
+                </View>
+            </Modal>
+
+
         </>
     );
 };
@@ -856,6 +1092,103 @@ const styles = StyleSheet.create({
     listContent: {
         paddingBottom: 20,
     },
+    // 
+    modalContainer: {
+        flex: 1,
+        padding: 20,
+        backgroundColor: '#f5f5f5',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    summaryCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    designCard: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    designHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    designName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    designCode: {
+        fontSize: 12,
+        color: '#666',
+    },
+    partyNameInSummary: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 10,
+    },
+
+    searchInput: {
+        height: 40,
+        borderColor: '#ccc',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        marginBottom: 10,
+        backgroundColor: '#fff',
+    },
+    designValues: {
+        marginTop: 8,
+    },
+    designValueRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    designValueItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    designValueLabel: {
+        fontSize: 12,
+        color: '#666',
+        marginRight: 4,
+    },
+    designValueText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#333',
+    }
+
 });
 
 export default React.memo(SalesOrderTracking);

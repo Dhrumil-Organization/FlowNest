@@ -202,6 +202,8 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             // const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
             const payload = {
                 ...getChallanPayload,
+                fromdate: "",
+                todate: "",
                 uid: order.srno,
                 srno: order.uid,
             };

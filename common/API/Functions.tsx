@@ -1216,8 +1216,11 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
 
-        let params = { prpcode: prp, yearno: yrno, txntype: txn, prptype: userPtype };
-        console.log("params", params)
+        let params = {
+            prpcode: prp, yearno: yrno, txntype: txn,
+             prptype: userPtype
+            // prptype: 'R'
+        };
         const response = await axios.get(
             `${API}/api/getstore`,
             {

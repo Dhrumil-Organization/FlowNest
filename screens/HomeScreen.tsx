@@ -215,10 +215,13 @@ const APP_SECTIONS = [
         data: [
             { id: '25', name: 'Process complete auth.', screen: 'Process complete auth.', icon: 'autorenew', iconColor: '#dd5c98' },
         ],
+    },
+    {
+        title: 'F',
+        data: [
+            { id: '26', name: 'Febric Stock', screen: 'Febric Stock', icon: 'autorenew', iconColor: '#dd5c98' },
+        ],
     }
-
-    // mob_sales_order_Inactive
-
 ];
 
 interface Props {
@@ -430,7 +433,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Item Authorization",
                 //                         "href": "/"
                 //                     },
+                //                     {
                 //                         "title": "Process complete auth.",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Purchase Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order Tracking",
                 //                         "href": "/"
                 //                     },
                 //                 ]

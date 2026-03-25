@@ -149,10 +149,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                 prpcode: prpcode,
                 prptype: prptype,
                 yearno: yearValue,
-                strcode: "0",
-                txntype: txntype,
+                strcode: "002",
+                // txntype: txntype,
+                txntype: "purchase_order_detail",
                 partytype: "p",
-                type: "s",
+                type: "P",
                 page: 1,
                 limit: 20,
                 search: "",
@@ -473,12 +474,13 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
 
     const tableColumns = [
-        { key: 'prpcode', label: 'Property', width: 160, align: 'center' },
+        { key: 'prpcode', label: 'Property', width: 100, align: 'center' },
         { key: 'pono', label: 'PO Number', width: 120, align: 'center' },
         { key: 'podate', label: 'PO Date', width: 120, align: 'center' },
         { key: 'itmname', label: 'Item Name', width: 160, align: 'left' },
-        { key: 'netamt', label: 'Total Qty', width: 120, align: 'right' },
+        { key: 'qty', label: 'Total Qty', width: 120, align: 'right' },
         { key: 'bqty', label: 'Balance Qty', width: 120, align: 'right' },
+        { key: 'pqty', label: 'Received Qty', width: 120, align: 'right' },
         { key: 'unitrate', label: 'Unit Rate', width: 120, align: 'right' },
         { key: 'amount', label: 'Amount', width: 120, align: 'right' },
     ];

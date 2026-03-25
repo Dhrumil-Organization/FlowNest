@@ -1,33 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-    View,
-    Text,
-    FlatList,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Modal,
-    ActivityIndicator,
-    Linking,
-    LayoutAnimation,
-    ScrollView,
-    ToastAndroid,
-    Share,
-    StyleSheet
+    View, Text, FlatList, TouchableOpacity, Alert, TextInput as RNTextInput, Modal, ActivityIndicator, LayoutAnimation, ScrollView, ToastAndroid, Share, StyleSheet
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import RNFS from 'react-native-fs';
-import { Buffer } from 'buffer';
 import Pdf from 'react-native-pdf';
 import FullScreenLoader from '../Loader/Loader';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 import HeaderBar from '../HeaderBar/HeaderBar';
-import { encode as btoa } from 'base-64';
-import { urlSafeEncode } from './urlSafeEncode';
-import { encodeData } from './encodingUtils';
 import LinearGradient from 'react-native-linear-gradient';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
@@ -48,15 +30,6 @@ interface Props {
     isConnected: boolean | null;
     username: string;
 }
-
-interface PartyData {
-    ParCode: string;
-    ParName: string;
-    Address: string;
-    Mhname: string;
-    Shname: string;
-}
-
 interface AllHistoryData {
     [key: string]: string;
     isProcessed: boolean;
@@ -109,7 +82,6 @@ interface D1datakeys {
 }
 
 const newStyles = StyleSheet.create({
-
     card: {
         backgroundColor: '#fff',
         margin: 10,
@@ -120,51 +92,41 @@ const newStyles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
     },
-
     acceptedCard: {
         borderLeftWidth: 5,
         borderLeftColor: '#4CAF50',
     },
-
     rejectedCard: {
         borderLeftWidth: 5,
         borderLeftColor: '#F44336',
     },
-
     stampContainer: {
         position: 'absolute',
         top: 10,
         right: 10,
     },
-
     stampText: {
         fontSize: 12,
         fontWeight: 'bold',
     },
-
     approvedText: {
         color: '#4CAF50',
     },
-
     rejectedText: {
         color: '#F44336',
     },
-
     content: {
         marginTop: 5,
         gap: 6,
     },
-
     row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
-
     label: {
         fontSize: 13,
         color: '#666',
     },
-
     value: {
         fontSize: 13,
         fontWeight: '600',
@@ -172,17 +134,14 @@ const newStyles = StyleSheet.create({
         maxWidth: '60%',
         textAlign: 'right',
     },
-
     statusValue: {
         fontSize: 13,
         fontWeight: 'bold',
         color: '#2196F3',
     },
-
     remarkBox: {
         marginTop: 8,
     },
-
     input: {
         borderWidth: 1,
         borderColor: '#ddd',
@@ -191,17 +150,14 @@ const newStyles = StyleSheet.create({
         marginTop: 4,
         fontSize: 13,
     },
-
     actions: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         marginTop: 15,
     },
-
     iconBtn: {
         padding: 6,
     },
-
     badge: {
         position: 'absolute',
         top: -5,
@@ -210,20 +166,100 @@ const newStyles = StyleSheet.create({
         borderRadius: 10,
         paddingHorizontal: 5,
     },
-
     badgeText: {
         color: '#fff',
         fontSize: 10,
         fontWeight: 'bold',
     },
     inlineInput: {
-        borderBottomWidth: 1,
-        borderColor: '#ddd',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
         fontSize: 13,
         color: '#333',
         minWidth: '55%',
-        textAlign: 'right',
+        textAlign: 'left',
+        paddingVertical: 6,
+        paddingHorizontal: 8,
+        backgroundColor: '#fff'
+    },
+    acceptBtn: {
+        backgroundColor: '#4CAF50',
+    },
+    rejectBtn: {
+        backgroundColor: '#F44336',
+    },
+    infoBtn: {
+        backgroundColor: '#2196F3',
+    },
+    disabledBtn: {
+        backgroundColor: '#ccc',
+        elevation: 0,
+    },
+    infoIconContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoCount: {
+        position: 'absolute',
+        top: -6,
+        right: -10,
+        backgroundColor: '#fff',
+        color: '#000',
+        borderRadius: 10,
+        paddingHorizontal: 5,
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    circleBtn: {
+        width: 35,
+        height: 35,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 1 },
+    },
+    actions1: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 30, // spacing between buttons
+        marginTop: 10,
+    },
+    editableValueBlack: {
+        borderWidth: 1,
+        borderColor: "#ccc",
+        borderRadius: 6,
+        height: 30,
+        paddingHorizontal: 8,
         paddingVertical: 2,
+        fontSize: 15,
+        minWidth: 135
+    },
+    rowBetween: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginVertical: 6
+    },
+    textBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 4,
+        minWidth: 60,
+    },
+    btnText: {
+        fontSize: 12,
+        fontWeight: 'bold'
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#eee',  // light grey line
+        marginTop: 10,
+        marginBottom: 8,
     },
 });
 
@@ -266,7 +302,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
     const [showPdfModal, setShowPdfModal] = useState(false);
     const [getLocationLoading, setLocationLoading] = useState(false);
     const [selectedItem, setSelectedItem] = useState<CardData | null>(null);
-
     const [criteriaFormOpen, setCriteriaFormOpen] = useState(false)
     const [getAllStoreData, setAllStoreData] = useState([]);
     const [FormState, setFormState] = useState({
@@ -279,15 +314,12 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
     const didFetchStore = useRef(false);
     const cancelTokenRef = useRef(null);
     const didInitialFetch = useRef(false);
-
-
     const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
 
     useEffect(() => {
         if (didFetchStore.current) return;
         didFetchStore.current = true;
-
         const loadProperty = async () => {
             let yno = await AsyncStorage.getItem('yno');
             const allstoredata = await fetchAllStoredata(token, '', yno, 'sales_order')
@@ -295,8 +327,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         };
         loadProperty();
     }, []);
-
-
 
     let cancelToken: any;
 
@@ -360,7 +390,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             } else {
                 setData([]);
             }
-
         } catch (error) {
             if (!axios.isCancel(error)) {
                 Alert.alert('Error', 'Server error');
@@ -413,10 +442,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
         }
-
         cancelTokenRef.current = axios.CancelToken.source();
         setIsLoadingYPO(true);
-
         const userPtype = await AsyncStorage.getItem('user_prptype');
         let yno = await AsyncStorage.getItem('yno');
         let strtypeFromApi = '';
@@ -425,29 +452,26 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 strtypeFromApi = el.StrType;
             }
         })
-
         try {
             const payload = {
-                txntype: 'purchase_order_detail',
+                txntype: 'mob_item_authorization',
                 referrer: 'dashboard',
-                prptype: userPtype,
+                // prptype: userPtype,
+                prptype: 'R',
                 yearno: yno,
                 strcode: FormState.values.StrCode || '',
                 atype: 'H',
                 //strtype: 'Y',
-                strtype: strtypeFromApi
+                // strtype: strtypeFromApi
             };
-
-            const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
+            const response = await axios.get(`${API}/api/itembrowse`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
-
             setAllHistoryDataYPO(response?.data?.response?.data || []);
             setData([]);
             setAllVerifyDataYPO([]);
-
         } catch (error) {
             if (!axios.isCancel(error)) {
                 Alert.alert('Error', 'Server error');
@@ -455,21 +479,16 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         } finally {
             setIsLoadingYPO(false);
         }
-
     }, [FormState.values.StrCode, token]);
 
 
     const fetchAllVerifyData = useCallback(async () => {
-
         if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
         }
-
         cancelTokenRef.current = axios.CancelToken.source();
         setIsLoadingYPO(true);
-
         const userPtype = await AsyncStorage.getItem('user_prptype');
         let yno = await AsyncStorage.getItem('yno');
         let strtypeFromApi = '';
@@ -478,29 +497,26 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 strtypeFromApi = el.StrType;
             }
         })
-
         try {
             const payload = {
-                txntype: 'purchase_order_detail',
+                txntype: 'mob_item_authorization',
                 referrer: 'dashboard',
-                prptype: userPtype,
+                // prptype: userPtype,
+                prptype: 'R',
                 yearno: yno,
                 strcode: FormState.values.StrCode || '',
                 atype: 'A',
                 //strtype: 'Y'
-                strtype: strtypeFromApi
+                // strtype: strtypeFromApi
             };
-
-            const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
+            const response = await axios.get(`${API}/api/itembrowse`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
-
             setAllVerifyDataYPO(response?.data?.response?.data || []);
             setData([]);
             setAllHistoryDataYPO([]);
-
         } catch (error) {
             if (!axios.isCancel(error)) {
                 Alert.alert('Error', 'Server error');
@@ -508,7 +524,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         } finally {
             setIsLoadingYPO(false);
         }
-
     }, [FormState.values.StrCode, token]);
 
     useEffect(() => {
@@ -516,7 +531,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             didInitialFetch.current = true;
             return;
         }
-
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();
         } else if (activeTab1YPO === 'requests') {
@@ -599,6 +613,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         const num = parseFloat(numericValue) || 0;
         return num.toLocaleString('en-IN');
     };
+
     const handleEdit = (UId: string, field: 'limit2' | 'crday2' | 'rate' | 'qty' | 'shkperc' | 'ARemark', formattedValue: string) => {
         const rawValue = formattedValue.replace(/[₹,]/g, '');
         const rawValuecrday = formattedValue.replace(/[₹,]/g, '');
@@ -644,12 +659,10 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
     };
 
     const handleInfoPress = (d1Data: D1datakeys[], item: CardData) => {
-        // LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setSelectedD1Data(Array.isArray(d1Data) ? d1Data : []);
         setD1Party(item.ParName);
         setShowCarouselModal(true);
     };
-
 
     const getToken = () => {
         return token;
@@ -658,40 +671,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
     const handleValidation = (updatedItem: any) => {
         if (selectedActionYPO === 'accept') {
 
-            // const numericNewLimit2: any = parseFloat(updatedItem.limit2.replace(/,/g, ''));
-            // const numericLimit1: any = parseFloat(updatedItem.limit1.replace(/,/g, ''));
-
-            // if (
-            //     parseFloat(numericNewLimit2).toFixed(2) ===
-            //     parseFloat(numericLimit1).toFixed(2)
-            // ) {
-            //     Alert.alert(
-            //         'Validation Error',
-            //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
-            //     )
-            //     return false;
-            // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
-            //         'Validation Error',
-            //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
-            //     )
-            //     return false;
-            // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
-            //         'Validation Error',
-            //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
-            //     )
-            //     return false;
-            // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
-            //         'Validation Error',
-            //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
-            //     )
-            //     return false;
-            // }
         }
         if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
-
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
             ) {
@@ -704,7 +685,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         }
         return true;
-
     };
 
     const scrollToTop = () => {
@@ -723,14 +703,17 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         if (!selectedItemYPO) return;
         const removed1 = { ...selectedItemYPO };
         delete removed1['d1'];
-
         const updatedItemAccept = {
             ...removed1,
             ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            IsAuth: 1,
+            remark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
+            prptype: "R",
+            isauth: 1,
             referrer: 'dashboard',
-            txntype: 'purchase_order_detail',
+            itmcode: removed1.ItmCode,
+            strcode: removed1.strCode,
+            yearno: "26",
+            // txntype: 'purchase_order_detail',
             action: 'edit'
         };
         const updatedItemVerifyPending = {
@@ -765,26 +748,26 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         if (handleValidation(payload)) {
             setSuccessYPO(true);
             setresponsemessageYPO('Loading...');
-
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
             try {
-                const getRequestConfig = (props: any) => {
-                    let params = props.params ? props.params : null;
-                    let requestconfig = {
+                const response = await axios.post(
+                    `${API}/api/authitem`,
+                    payload, // ✅ body data
+                    {
                         headers: {
                             Authorization: `Bearer ${getToken()}`,
-                            'Content-Type': 'application/javascript',
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
                             Accept: 'application/json'
-                        },
-                        params
-                    };
-                    return requestconfig;
-                };
-                const response = await axios.get(`${API}/api/authpo`, getRequestConfig({ params: payload }));
+                        }
+                    }
+                );
+                console.log("response", response, payload)
+                // const response = await axios.get(`${API}/api/authitem`, getRequestConfig({ params: payload }));
                 if (response.data.success) {
                     setresponsemessageYPO(response.data.message || 'Success');
                     setTimeout(() => {
@@ -822,56 +805,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 }, 2000);
             }
 
-        }
-    };
-
-    const handleCallURL = async (item: CardData) => {
-        setSelectedItem(item);
-        setLocationLoading(true);
-        setPdfLoading(true);
-        try {
-            const headers = {
-                Authorization: `Bearer ${getToken()}`,
-                'Content-Type': 'application/json',
-                'X-Requested-with': 'XMLHttpRequest',
-            };
-            const apiResp = await axios.post(
-                `${API}/api/saleschallanmultiprintnew`,
-                {
-                    prpcode: item.PrpCode,
-                    yearno: item.yearno,
-                    strcode: item.StrCode,
-                    printTypes: ['purchase_order_detail'],
-                    uid: item.UId,
-                    txntype: "purchase_order_detail",
-                    printFormat: 'A4',
-                },
-                { headers }
-            );
-            const pdfUrlFromApi = apiResp?.data?.results?.purchase_order_detail;
-            if (!pdfUrlFromApi) {
-                Alert.alert('Error', 'PDF URL not found in server response');
-                return;
-            }
-            const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
-            if (!pdfResp || !pdfResp.data) {
-                Alert.alert('Error', 'Failed to download PDF bytes');
-                return;
-            }
-            const buffer = Buffer.from(new Uint8Array(pdfResp.data));
-            const base64PDF = buffer.toString('base64');
-            const fileName = `yarn_purchase_order_${Date.now()}.pdf`;
-            const localPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-            await RNFS.writeFile(localPath, base64PDF, 'base64');
-            setPdfUrl(`file://${localPath}`);
-            setPdfPublicUrl(pdfUrlFromApi);
-            setShowPdfModal(true);
-        } catch (err: any) {
-            console.error('handleCallURL error:', err);
-            Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
-        } finally {
-            setLocationLoading(false);
-            setPdfLoading(false);
         }
     };
 
@@ -944,7 +877,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                             <Icon name="download" size={24} color={saving ? "#999" : "#000"} />
                             <Text style={crlimtreq_styles.pdfHeaderButtonText}>{saving ? 'Saving...' : 'Download'}</Text>
                         </TouchableOpacity>
-
                         <TouchableOpacity onPress={handleClose} style={crlimtreq_styles.pdfHeaderButton}>
                             <Icon name="close" size={24} color="#000" />
                             <Text style={crlimtreq_styles.pdfHeaderButtonText}>Close</Text>
@@ -992,54 +924,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     </View>
                 )
             }
-            {/* <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.MItmCode || ''}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}> {item.MItmName || ''}: </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.ItmCode || ''}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}> {item.ItmName || ''}: </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.IsgName || ''}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}> {item.IgName || ''}: </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesYPO[item.UId]?.ARemark || ''}
-                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                        />
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
-                    </View>
-                </View>
-            </View> */}
             <View style={newStyles.content}>
-
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Main Item Code</Text>
                     <Text style={newStyles.value}>{item.MItmCode || '-'}</Text>
@@ -1075,21 +960,17 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={newStyles.statusValue}>{item.AuthStatus || '-'}</Text>
                 </View>
 
-                {/* ✏️ Remark */}
-                <View style={newStyles.row}>
-                    <Text style={newStyles.label}>Remark</Text>
+                <View style={newStyles.rowBetween}>
+                    <Text style={newStyles.label}>Remark:</Text>
                     <RNTextInput
-                        style={newStyles.inlineInput}
+                        style={newStyles.editableValueBlack}
                         value={editableValuesYPO[item.UId]?.ARemark || ''}
                         onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
                         placeholder="Enter remark..."
                     />
                 </View>
-
-
-
             </View>
-            <View style={crlimtreq_styles.cardActions}>
+            {/* <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity
                     onPress={() => handleIconPress(item, 'accept')}
                     disabled={!isConnected || item.isProcessed}>
@@ -1111,6 +992,36 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                         {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
                     </View>
                 </TouchableOpacity>
+            </View> */}
+            <View style={newStyles.divider} />
+            <View style={newStyles.actions1}>
+
+                {/* ACCEPT */}
+                <TouchableOpacity
+                    style={[
+                        newStyles.textBtn,
+                        (!isConnected || item.isProcessed) && newStyles.disabledBtn,
+                        newStyles.acceptBtn
+                    ]}
+                    onPress={() => handleIconPress(item, 'accept')}
+                    disabled={!isConnected || item.isProcessed}
+                >
+                    <Text style={newStyles.btnText}>ACCEPT</Text>
+                </TouchableOpacity>
+
+                {/* REJECT */}
+                <TouchableOpacity
+                    style={[
+                        newStyles.textBtn,
+                        (!isConnected || item.isProcessed) && newStyles.disabledBtn,
+                        newStyles.rejectBtn
+                    ]}
+                    onPress={() => handleIconPress(item, 'reject')}
+                    disabled={!isConnected || item.isProcessed}
+                >
+                    <Text style={newStyles.btnText}>REJECT</Text>
+                </TouchableOpacity>
+
             </View>
         </View>
     );
@@ -1120,7 +1031,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             crlimtreq_styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
         ]}>
-            {
+            {/* {
                 item.IsAuth && (
                     <View style={crlimtreq_styles.stampContainerYOS}>
                         <View style={[
@@ -1132,73 +1043,48 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                             </Text>
                         </View>
                     </View>
-                )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                </View>
-            </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.ARemark || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Date:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.AuthorisedDate || 'N/A'}
-                        </Text>
-                    </View>
-
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth By:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthorisedBy || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthStatus || ''}
-                        </Text>
-                    </View>
-
+                )} */}
+            <View style={newStyles.content}>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Main Item Code</Text>
+                    <Text style={newStyles.value}>{item.MItmCode || '-'}</Text>
                 </View>
 
-            </View>
-            <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                    </View>
-                </TouchableOpacity>
-            </View>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Main Item Name</Text>
+                    <Text style={newStyles.value}>{item.MItmName || '-'}</Text>
+                </View>
+
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Code</Text>
+                    <Text style={newStyles.value}>{item.ItmCode || '-'}</Text>
+                </View>
+
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Name</Text>
+                    <Text style={newStyles.value}>{item.ItmName || '-'}</Text>
+                </View>
+
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Sub Group</Text>
+                    <Text style={newStyles.value}>{item.IsgName || '-'}</Text>
+                </View>
+
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Group</Text>
+                    <Text style={newStyles.value}>{item.IgName || '-'}</Text>
+                </View>
+
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Status</Text>
+                    <Text style={newStyles.statusValue}>{item.AuthStatus || '-'}</Text>
+                </View>
+
+                <View style={newStyles.rowBetween}>
+                    <Text style={newStyles.label}>Remark:</Text>
+                    <Text style={newStyles.statusValue}>{item.ARemark || '-'}</Text>
+                </View>
+            </View>           
         </View>
     );
 
@@ -1207,7 +1093,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             crlimtreq_styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
         ]}>
-            {item.isProcessed ? (
+            {/* {item.isProcessed ? (
                 <>
                     <View style={crlimtreq_styles.stampContainerYOS}>
                         <View style={[
@@ -1220,7 +1106,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                         </View>
                     </View>
                 </>
-
             ) : (
                 <>
                     <View style={crlimtreq_styles.stampContainerYOS}>
@@ -1234,87 +1119,70 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                         </View>
                     </View>
                 </>
-            )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
+            )} */}
+            <View style={newStyles.content}>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Main Item Code</Text>
+                    <Text style={newStyles.value}>{item.MItmCode || '-'}</Text>
                 </View>
-            </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
-                    </View>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Main Item Name</Text>
+                    <Text style={newStyles.value}>{item.MItmName || '-'}</Text>
                 </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesYPO[item.UId]?.ARemark || ''}
-                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                        />
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth By:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthorisedBy || 'N/A'}:
-                        </Text>
-                    </View>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Code</Text>
+                    <Text style={newStyles.value}>{item.ItmCode || '-'}</Text>
                 </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Date:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthorisedDate || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthStatus || ''}
-                        </Text>
-                    </View>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Name</Text>
+                    <Text style={newStyles.value}>{item.ItmName || '-'}</Text>
                 </View>
-
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Sub Group</Text>
+                    <Text style={newStyles.value}>{item.IsgName || '-'}</Text>
+                </View>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Item Group</Text>
+                    <Text style={newStyles.value}>{item.IgName || '-'}</Text>
+                </View>
+                <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Status</Text>
+                    <Text style={newStyles.statusValue}>{item.AuthStatus || '-'}</Text>
+                </View>
+                <View style={newStyles.rowBetween}>
+                    <Text style={newStyles.label}>Remark:</Text>
+                    <RNTextInput
+                        style={newStyles.editableValueBlack}
+                        value={editableValuesYPO[item.UId]?.ARemark || ''}
+                        onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                        placeholder="Enter remark..."
+                    />
+                </View>
             </View>
             <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                <TouchableOpacity
+                    style={[
+                        newStyles.textBtn,
+                        (!isConnected || item.isProcessed) && newStyles.disabledBtn,
+                        newStyles.acceptBtn
+                    ]}
+                    onPress={() => handleIconPress(item, 'pending')}
+                    disabled={!isConnected || item.isProcessed}>
+                    <Text style={newStyles.btnText}>PENDING</Text>
+                    {/* <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} /> */}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                    </View>
+                <TouchableOpacity
+                    style={[
+                        newStyles.textBtn,
+                        (!isConnected || item.isProcessed) && newStyles.disabledBtn,
+                        newStyles.rejectBtn
+                    ]}
+                    onPress={() => handleIconPress(item, 'verifyreject')}
+                    disabled={!isConnected || item.isProcessed}>
+                    {/* <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} /> */}
+                    <Text style={newStyles.btnText}>REJECT</Text>
                 </TouchableOpacity>
             </View>
-            {/* <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
-            </View> */}
         </View>
     );
 
@@ -1350,21 +1218,20 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     <HeaderBar
                         userName={username}
                         onSearch={setSearchQueryYPO}
-                        placeholder="Search purchase order..."
+                        placeholder="Search Item Authorization ..."
                     />
                 </>
-
             ) : activeTab1YPO === 'history' ? (
                 <HeaderBar
                     userName={username}
                     onSearch={setSearchhistoryQueryYPO}
-                    placeholder="Search purchase history..."
+                    placeholder="Search Item history..."
                 />
             ) : activeTab1YPO === 'verify' ? (
                 <HeaderBar
                     userName={username}
                     onSearch={setSearchverifyQueryYPO}
-                    placeholder="Search purchase verify..."
+                    placeholder="Search item verify..."
                 />
             ) : null}
             <View style={crlimtreq_styles.container}>
@@ -1485,8 +1352,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                             </TouchableOpacity>
                         )}</>
                 ) : null}
-
-
                 <PartyHistoryModal
                     visible={showPartyHistoryModalYPO}
                     onClose={() => {
@@ -1495,14 +1360,10 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     }}
                     partyListYPO={partyListYPO}
                     historyDataYPO={historyDataYPO}
-                    // allhistoryDataYPO={allhistoryDataYPO}
                     prodorderLoadingYPO={prodorderLoadingYPO}
                     historyLoadingYPO={historyLoadingYPO}
-                    // allhistoryLoadingYPO={allhistoryLoadingYPO}
-                    // showAllHistoryOnly={!!allhistoryDataYPO.length}
                     activeTabYPO={activeTabYPO}
                     setActiveTabYPO={setActiveTabYPO}
-                    // setParnameYPO={setParnameYPO}
                     getParnameYPO={getParnameYPO}
                 />
                 {getSuccessYPO === true ? (
@@ -1549,7 +1410,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                                     {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
                                 </Text>
                                 <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Party Name: {selectedItemYPO?.ParName}
+                                    Item Name: {selectedItemYPO?.ItmName}
                                 </Text>
                                 <View style={crlimtreq_styles.overlayButtons}>
                                     <TouchableOpacity
@@ -1580,19 +1441,15 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 >
                     <View style={crlimtreq_styles.carouselModalOverlay}>
                         <View style={crlimtreq_styles.carouselModalContainer}>
-                            {/* Close Button */}
                             <TouchableOpacity
                                 style={crlimtreq_styles.modalCloseButton}
                                 onPress={() => {
                                     setShowCarouselModal(false);
-                                    setSelectedD1Data([]); // Clear the data when closing
+                                    setSelectedD1Data([]); 
                                 }}
                             >
                                 <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
                             </TouchableOpacity>
-
-                            {/* Carousel Cards */}
-
                             <ScrollView
                                 horizontal
                                 pagingEnabled
@@ -1607,7 +1464,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                                         key={`${d1Item.SrNo || index}`}
                                         style={[
                                             crlimtreq_styles.carouselCard,
-                                            { marginHorizontal: 10 } // Add spacing between cards
+                                            { marginHorizontal: 10 } 
                                         ]}
                                     >
                                         <LinearGradient
@@ -1618,7 +1475,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
 
                                             <View style={crlimtreq_styles.carouselCardContent}>
                                                 <Text style={crlimtreq_styles.carouselCardTitle}>
-                                                    {/* {d1Item.ItmName} */}
                                                     {getD1Party}
                                                 </Text>
                                                 <View style={{ marginVertical: 10 }}>
@@ -1669,7 +1525,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                         </View>
                     </View>
                 </Modal>
-
             </View>
             <PdfViewerModal
                 visible={showPdfModal}
@@ -1681,23 +1536,16 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     setPdfPublicUrl(null);
                 }}
             />
-
-
             <CriteriaForm
                 isVisible={criteriaFormOpen}
                 onClose={handleCriteriaFormClose}
                 isLoading={isLoadingYPO}
-                //getAllPropertyData={getAllPropertyData}
-                //setAllPropertyData={setAllPropertyData}
                 FormState={FormState}
                 setFormState={setFormState}
-                //getAllYearData={getAllYearData}
-                //setAllYearData={setAllYearData}
                 getAllStoreData={getAllStoreData}
                 setAllStoreData={setAllStoreData}
                 token={token}
                 fetchData={fetchData}
-                //fetchHistoryData={fetchHistoryData}
                 fetchAllHistoryData={fetchAllHistoryData}
                 fetchAllVerifyData={fetchAllVerifyData}
                 activeTab1YPO={activeTab1YPO}

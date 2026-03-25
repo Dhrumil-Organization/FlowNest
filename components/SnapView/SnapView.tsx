@@ -41,6 +41,7 @@ const SnapView: React.FC<Props> = ({ token, navigation, getDeviceId, username, A
   const [getLoginPasswd, setLoginPasswd] = useState<string | null>(null);
 
   const REMOTE_URL = API == "https://apig.tms-webapp.com" ? "https://dash.tms-webapp.com/mob-snap-view" : API == "https://apiy.tms-webapp.com" ? "https://viz.tms-webapp.com/mob-snap-view" : "";
+  // const REMOTE_URL = API == "https://apig.tms-webapp.com" ? "http://192.168.13.130:3001/mob-snap-view" : API == "https://apiy.tms-webapp.com" ? "http://192.168.13.130:3001/mob-snap-view" : "";
 
   console.log('Snap View API:', API, REMOTE_URL);
 

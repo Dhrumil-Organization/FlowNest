@@ -281,7 +281,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
     const [allhistoryDataYPO, setAllHistoryDataYPO] = useState<CardData[]>([]);
     const [allverifyDataYPO, setAllVerifyDataYPO] = useState<AllHistoryData[]>([]);
     const [partyListYPO, setPartyListYPO] = useState<CardData[]>([]);
-    const [editableValuesYPO, setEditableValuesYPO] = useState<{ [UId: string]: { limit2?: string; crday2?: string; rate?: string; qty?: string; shkperc?: string; ARemark?: string } }>({});
+    const [editableValuesYPO, setEditableValuesYPO] = useState<{ [UId: string]: { limit2?: string; crday2?: string; rate?: string; qty?: string; shkperc?: string; aremark?: string } }>({});
     const [showOverlayYPO, setShowOverlayYPO] = useState(false);
     const [selectedActionYPO, setSelectedActionYPO] = useState<'accept' | 'reject' | 'list' | 'pending' | 'verifyreject' | null>(null);
     const [selectedItemYPO, setSelectedItemYPO] = useState<CardData | AllHistoryData | null>(null);
@@ -358,7 +358,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         try {
             const payload = {
                 // txntype: 'poy_yarn_item_master',
-                txntype: 'mob_item_authorization',
+                txntype: 'app_item_master_auth',
                 referrer: 'dashboard',
                 // prptype: userPtype,
                 prptype: 'R',
@@ -368,7 +368,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 //strtype: 'Y',
                 // strtype: strtypeFromApi
             };
-            console.log("payload", payload);
             const response = await axios.get(`${API}/api/itembrowse`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -398,6 +397,118 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsLoadingYPO(false);
         }
     }, [FormState.values.StrCode, token]);
+
+
+
+
+    const fetchAllHistoryData = useCallback(async () => {
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
+        cancelTokenRef.current = axios.CancelToken.source();
+        setIsLoadingYPO(true);
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+        try {
+            const payload = {
+                txntype: 'app_item_master_auth',
+                referrer: 'dashboard',
+                // prptype: userPtype,
+                prptype: 'R',
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
+                atype: 'h',
+                //strtype: 'Y',
+                // strtype: strtypeFromApi
+            };
+            const response = await axios.get(`${API}/api/itembrowse`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: payload,
+                cancelToken: cancelTokenRef.current.token
+            });
+             console.log("payload", payload)
+            console.log("response", response)
+            if (response.data.success && response.data.response.data.length > 0) {
+                console.log('✅All History Data:', response.data.response.data);
+                setAllHistoryDataYPO(response.data.response.data);
+                setData([]);
+                setAllVerifyDataYPO([]);
+
+            } else {
+                setAllHistoryDataYPO([]);
+                // setPartyListYPO([]);
+                // setHistoryDataYPO([]);
+            }
+        }
+        catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', 'Server error');
+            }
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    }, [FormState.values.StrCode, token]);
+
+
+    const fetchAllVerifyData = useCallback(async () => {
+        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        if (cancelTokenRef.current) {
+            cancelTokenRef.current.cancel();
+        }
+        cancelTokenRef.current = axios.CancelToken.source();
+        setIsLoadingYPO(true);
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        let yno = await AsyncStorage.getItem('yno');
+        let strtypeFromApi = '';
+        getAllStoreData && getAllStoreData.filter((el, ind) => {
+            if (el.StrCode == FormState.values.StrCode) {
+                strtypeFromApi = el.StrType;
+            }
+        })
+        try {
+            const payload = {
+                txntype: 'app_item_master_auth',
+                referrer: 'dashboard',
+                // prptype: userPtype,
+                prptype: 'R',
+                yearno: yno,
+                strcode: FormState.values.StrCode || '',
+                atype: 'A',
+            };
+            const response = await axios.get(`${API}/api/itembrowse`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: payload,
+                cancelToken: cancelTokenRef.current.token
+            });
+            console.log("verify data", payload)
+            if (response.data.success && response.data.response.data.length > 0) {
+                console.log('✅All History Data:', response.data.response.data);
+
+                setAllVerifyDataYPO(response.data.response.data);
+                setData([]);
+                setAllHistoryDataYPO([]);
+
+            } else {
+                setAllVerifyDataYPO([]);
+                // setPartyListYPO([]);
+                // setHistoryDataYPO([]);
+            }
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+                Alert.alert('Error', 'Server error');
+            }
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    }, [FormState.values.StrCode, token]);
+
 
     const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
         if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
@@ -435,97 +546,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             setIsHistoryLoadingYPO(false);
         }
     }, [FormState.values.StrCode]);
-
-
-    const fetchAllHistoryData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-        if (cancelTokenRef.current) {
-            cancelTokenRef.current.cancel();
-        }
-        cancelTokenRef.current = axios.CancelToken.source();
-        setIsLoadingYPO(true);
-        const userPtype = await AsyncStorage.getItem('user_prptype');
-        let yno = await AsyncStorage.getItem('yno');
-        let strtypeFromApi = '';
-        getAllStoreData && getAllStoreData.filter((el, ind) => {
-            if (el.StrCode == FormState.values.StrCode) {
-                strtypeFromApi = el.StrType;
-            }
-        })
-        try {
-            const payload = {
-                txntype: 'mob_item_authorization',
-                referrer: 'dashboard',
-                // prptype: userPtype,
-                prptype: 'R',
-                yearno: yno,
-                strcode: FormState.values.StrCode || '',
-                atype: 'H',
-                //strtype: 'Y',
-                // strtype: strtypeFromApi
-            };
-            const response = await axios.get(`${API}/api/itembrowse`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params: payload,
-                cancelToken: cancelTokenRef.current.token
-            });
-            setAllHistoryDataYPO(response?.data?.response?.data || []);
-            setData([]);
-            setAllVerifyDataYPO([]);
-        } catch (error) {
-            if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
-            }
-        } finally {
-            setIsLoadingYPO(false);
-        }
-    }, [FormState.values.StrCode, token]);
-
-
-    const fetchAllVerifyData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-        if (cancelTokenRef.current) {
-            cancelTokenRef.current.cancel();
-        }
-        cancelTokenRef.current = axios.CancelToken.source();
-        setIsLoadingYPO(true);
-        const userPtype = await AsyncStorage.getItem('user_prptype');
-        let yno = await AsyncStorage.getItem('yno');
-        let strtypeFromApi = '';
-        getAllStoreData && getAllStoreData.filter((el, ind) => {
-            if (el.StrCode == FormState.values.StrCode) {
-                strtypeFromApi = el.StrType;
-            }
-        })
-        try {
-            const payload = {
-                txntype: 'mob_item_authorization',
-                referrer: 'dashboard',
-                // prptype: userPtype,
-                prptype: 'R',
-                yearno: yno,
-                strcode: FormState.values.StrCode || '',
-                atype: 'A',
-                //strtype: 'Y'
-                // strtype: strtypeFromApi
-            };
-            const response = await axios.get(`${API}/api/itembrowse`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params: payload,
-                cancelToken: cancelTokenRef.current.token
-            });
-            setAllVerifyDataYPO(response?.data?.response?.data || []);
-            setData([]);
-            setAllHistoryDataYPO([]);
-        } catch (error) {
-            if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
-            }
-        } finally {
-            setIsLoadingYPO(false);
-        }
-    }, [FormState.values.StrCode, token]);
-
     useEffect(() => {
         if (!didInitialFetch.current) {
             didInitialFetch.current = true;
@@ -614,7 +634,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         return num.toLocaleString('en-IN');
     };
 
-    const handleEdit = (UId: string, field: 'limit2' | 'crday2' | 'rate' | 'qty' | 'shkperc' | 'ARemark', formattedValue: string) => {
+    const handleEdit = (UId: string, field: 'limit2' | 'crday2' | 'rate' | 'qty' | 'shkperc' | 'aremark', formattedValue: string) => {
         const rawValue = formattedValue.replace(/[₹,]/g, '');
         const rawValuecrday = formattedValue.replace(/[₹,]/g, '');
         const displayValue = formatToIndianCurrency(rawValue || '0');
@@ -625,7 +645,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             [UId]: {
                 ...prev[UId],
                 [field]: field === 'limit2' ? displayValue : displayValuecrday,
-                [field]: field === 'ARemark' ? displayValuearemark : displayValuearemark,
+                [field]: field === 'aremark' ? displayValuearemark : displayValuearemark,
                 [`${field}Raw`]: field === 'limit2' ? rawValue : rawValuecrday,
             },
         }));
@@ -669,16 +689,15 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
     };
 
     const handleValidation = (updatedItem: any) => {
+        const remark = updatedItem?.aremark?.toString().trim();
         if (selectedActionYPO === 'accept') {
 
         }
         if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
-            if (
-                updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
-            ) {
+            if (!remark) {
                 Alert.alert(
                     'Validation Error',
-                    'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
+                    'Auth Remark cannot be empty for Item.: ' + updatedItem.ItmCode
                 )
                 setShowOverlayYPO(false);
                 return false;
@@ -705,43 +724,56 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         delete removed1['d1'];
         const updatedItemAccept = {
             ...removed1,
-            ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            remark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
+            remark: editableValuesYPO[removed1.ItmCode]?.aremark || (removed1.aremark || ''),
             prptype: "R",
             isauth: 1,
             referrer: 'dashboard',
             itmcode: removed1.ItmCode,
             strcode: removed1.strCode,
             yearno: "26",
-            // txntype: 'purchase_order_detail',
-            action: 'edit'
+            action: 'edit',
+            txntype: 'app_item_master_auth',
+            atype: "B"
         };
         const updatedItemVerifyPending = {
-            ...removed1,
-            ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            IsAuth: 0,
+             ...removed1,
+            remark: editableValuesYPO[removed1.ItmCode]?.aremark || (removed1.aremark || ''),
+            prptype: "R",
+            isauth: 0,
             referrer: 'dashboard',
-            txntype: 'purchase_order_detail',
-            action: 'edit'
+            itmcode: removed1.ItmCode,
+            strcode: removed1.strCode,
+            yearno: "26",
+            action: 'edit',
+            txntype: 'app_item_master_auth',
+            atype: 'A',
         };
         const updatedItemReject = {
             ...removed1,
-            ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            IsAuth: 2,
+            remark: editableValuesYPO[removed1.ItmCode]?.aremark || (removed1.aremark || ''),
+            prptype: "R",
+            isauth: 2,
             referrer: 'dashboard',
-            txntype: 'purchase_order_detail',
-            action: 'edit'
+            itmcode: removed1.ItmCode,
+            strcode: removed1.strCode,
+            yearno: "26",
+            action: 'edit',
+            txntype: 'app_item_master_auth',
+            atype: "B"
+
         };
         const updatedItemVerifyReject = {
             ...removed1,
-            ARemark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            aremark: editableValuesYPO[removed1.UId]?.ARemark || (removed1.ARemark || ''),
-            IsAuth: 2,
+            remark: editableValuesYPO[removed1.ItmCode]?.aremark || (removed1.aremark || ''),
+            prptype: "R",
+            isauth: 2,
             referrer: 'dashboard',
-            txntype: 'purchase_order_detail',
-            action: 'edit'
+            itmcode: removed1.ItmCode,
+            strcode: removed1.strCode,
+            yearno: "26",
+            action: 'edit',
+            txntype: 'app_item_master_auth',
+            atype: 'A',
         };
         const payload = selectedActionYPO === 'accept' ? updatedItemAccept : selectedActionYPO === 'pending' ? updatedItemVerifyPending : selectedActionYPO === 'reject' ? updatedItemReject : selectedActionYPO === 'verifyreject' ? updatedItemVerifyReject : 'null';
 
@@ -753,6 +785,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
+            console.log("Payload", payload);
             try {
                 const response = await axios.post(
                     `${API}/api/authitem`,
@@ -766,38 +799,27 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                         }
                     }
                 );
-                console.log("response", response, payload)
-                // const response = await axios.get(`${API}/api/authitem`, getRequestConfig({ params: payload }));
-                if (response.data.success) {
+                console.log("auth item response", response)
+                if (response?.data?.success) {
+
                     setresponsemessageYPO(response.data.message || 'Success');
+                    const apiData = response?.data?.response?.data || [];
+
+                    setData(apiData);
+                    setAllVerifyDataYPO(apiData);
                     setTimeout(() => {
                         setSuccessYPO(false);
                         setShowOverlayYPO(false);
                     }, 2000);
 
-                    setData(prevData => {
-                        const newData = prevData.filter(item => item.UId !== selectedItemYPO.UId);
-                        newData.push({ ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO });
-                        return newData;
-                    });
-
-                    setAllVerifyDataYPO(prevData => {
-                        const newData = prevData.filter(item => item.UId !== selectedItemYPO.UId);
-                        newData.push({ ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO });
-                        return newData;
-                    });
-
-                    setTimeout(() => {
-                        flatListRefYPO.current?.scrollToEnd({ animated: true });
-                        flatVerifyListRefYPO.current?.scrollToEnd({ animated: true });
-                    }, 300);
-
                 } else {
-                    setresponsemessageYPO(response.data.message || 'Success');
+                    setresponsemessageYPO(response.data.message || 'Failed');
+
                     setTimeout(() => {
                         setSuccessYPO(false);
                     }, 2000);
                 }
+
             } catch (error) {
                 setresponsemessageYPO('Server Error');
                 setTimeout(() => {
@@ -912,7 +934,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         <View style={[
             crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
             item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
-            {
+            {/* {
                 item.isProcessed &&
                 (
                     <View style={[crlimtreq_styles.stampContainerYOS,]}>
@@ -923,7 +945,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                         </View>
                     </View>
                 )
-            }
+            } */}
             <View style={newStyles.content}>
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Main Item Code</Text>
@@ -964,8 +986,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={newStyles.label}>Remark:</Text>
                     <RNTextInput
                         style={newStyles.editableValueBlack}
-                        value={editableValuesYPO[item.UId]?.ARemark || ''}
-                        onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                        value={editableValuesYPO[item.ItmCode]?.aremark || ''}
+                        onChangeText={(text) => handleEdit(item.ItmCode, 'aremark', text)}
                         placeholder="Enter remark..."
                     />
                 </View>
@@ -1082,9 +1104,9 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
 
                 <View style={newStyles.rowBetween}>
                     <Text style={newStyles.label}>Remark:</Text>
-                    <Text style={newStyles.statusValue}>{item.ARemark || '-'}</Text>
+                    <Text style={newStyles.statusValue}>{item.aremark || '-'}</Text>
                 </View>
-            </View>           
+            </View>
         </View>
     );
 
@@ -1093,33 +1115,6 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             crlimtreq_styles.card,
             item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
         ]}>
-            {/* {item.isProcessed ? (
-                <>
-                    <View style={crlimtreq_styles.stampContainerYOS}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : item.actionType === 'pending' ? crlimtreq_styles.stampPendingall : item.actionType === 'reject' ? crlimtreq_styles.stampRejected : item.actionType === 'verifyreject' ? crlimtreq_styles.stampRejected : '',
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : item.actionType === 'reject' ? 'REJECTED' : item.actionType === 'pending' ? 'PENDING' : item.actionType === 'verifyreject' ? 'REJECTED' : ''}
-                            </Text>
-                        </View>
-                    </View>
-                </>
-            ) : (
-                <>
-                    <View style={crlimtreq_styles.stampContainerYOS}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : item.IsAuth === '0' || item.IsAuth === 0 ? crlimtreq_styles.stampPendingall : '',
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' || item.IsAuth === 2 ? 'REJECTED' : item.IsAuth === '0' || item.IsAuth === 0 ? 'PENDING' : ''}
-                            </Text>
-                        </View>
-                    </View>
-                </>
-            )} */}
             <View style={newStyles.content}>
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Main Item Code</Text>
@@ -1153,8 +1148,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={newStyles.label}>Remark:</Text>
                     <RNTextInput
                         style={newStyles.editableValueBlack}
-                        value={editableValuesYPO[item.UId]?.ARemark || ''}
-                        onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                        value={editableValuesYPO[item.ItmCode]?.aremark || ''}
+                        onChangeText={(text) => handleEdit(item.ItmCode, 'aremark', text)}
                         placeholder="Enter remark..."
                     />
                 </View>
@@ -1168,7 +1163,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     ]}
                     onPress={() => handleIconPress(item, 'pending')}
                     disabled={!isConnected || item.isProcessed}>
-                    <Text style={newStyles.btnText}>PENDING</Text>
+                    <Text style={newStyles.btnText}>PENDING....</Text>
                     {/* <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} /> */}
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1180,7 +1175,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                     onPress={() => handleIconPress(item, 'verifyreject')}
                     disabled={!isConnected || item.isProcessed}>
                     {/* <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} /> */}
-                    <Text style={newStyles.btnText}>REJECT</Text>
+                    <Text style={newStyles.btnText}>REJECT---</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -1379,7 +1374,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                                     {selectedActionYPO === 'accept' ? 'Confirm Accept' : selectedActionYPO === 'pending' ? 'Confirm Pending' : selectedActionYPO === 'reject' ? 'Confirm Reject' : selectedActionYPO === 'verifyreject' ? 'Confirm Reject' : ''}
                                 </Text>
                                 <Text style={crlimtreq_styles.overlayPartyName}>
-                                    Vouchar No.: {selectedItemYPO?.vouno}
+                                    Item Name.: {selectedItemYPO?.ItmName}
                                 </Text>
                                 {responsemessageYPO === 'Loading...' ? (
                                     <>
@@ -1445,7 +1440,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                                 style={crlimtreq_styles.modalCloseButton}
                                 onPress={() => {
                                     setShowCarouselModal(false);
-                                    setSelectedD1Data([]); 
+                                    setSelectedD1Data([]);
                                 }}
                             >
                                 <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
@@ -1464,7 +1459,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                                         key={`${d1Item.SrNo || index}`}
                                         style={[
                                             crlimtreq_styles.carouselCard,
-                                            { marginHorizontal: 10 } 
+                                            { marginHorizontal: 10 }
                                         ]}
                                     >
                                         <LinearGradient

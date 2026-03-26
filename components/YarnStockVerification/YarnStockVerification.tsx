@@ -441,8 +441,9 @@ const YarnStockVerification = (props) => {
                                     <Text style={styles.label}>Stk. type :</Text>
                                     <Text style={styles.value}>{getSelectedStockRow?.StkType}</Text>
                                 </View>
-                                {/* 
                                 <Text style={styles.confirmText}> Are you sure you want to update ? </Text>
+                                {/* 
+                                
                                 <Text style={styles.confirmText}> UID : {getSelectedStockRow?.UId} </Text>
                                 <Text style={styles.confirmText}> Carton  : {getSelectedStockRow?.CartNo} </Text>
                                 <Text style={styles.confirmText}> Item  : {getSelectedStockRow?.ItmName} </Text>

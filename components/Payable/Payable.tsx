@@ -1091,7 +1091,7 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
                                 isDisabled && styles.disabledText,
                             ]}
                         >
-                             ₹ {formatIndianNumber(item.summary)}
+                            ₹ {formatIndianNumber(item.summary)}
                         </Text>
                     </LinearGradient>
                 </TouchableOpacity>
@@ -1637,46 +1637,217 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
     };
 
 
+    // const DetailTable = () => {
+    //     const detailColumns = [
+    //         // { key: 'TYPE', label: 'Type', width: 120, align: 'center' },
+    //         { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
+    //         { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
+    //         { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
+    //         { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
+    //     ];
+
+
+    //     const columnsToFormat = ['CUMBAL'];
+
+    //     // Specify which columns to sum in the footer
+    //     const columnsToSum = ['CUMBAL'];
+
+
+    //     const calculateTotals = () => {
+    //         const totals = {};
+    //         columnsToSum.forEach(key => {
+    //             totals[key] = filteredDetails.reduce((sum, item) => {
+    //                 const value = parseFloat(item[key]) || 0;
+    //                 return sum + value;
+    //             }, 0);
+    //         });
+    //         return totals;
+    //     };
+
+    //     // Format number as Indian comma-separated value
+    //     const formatIndianNumber = (value) => {
+    //         return value?.toLocaleString('en-IN', {
+    //             minimumFractionDigits: 2,
+    //             maximumFractionDigits: 2,
+    //         });
+    //     };
+
+    //     const totals = calculateTotals();
+
+    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 120;
+
+
+    //     const Header = () => (
+    //         <View style={styles.tableHeader}>
+    //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
+    //                 Type
+    //             </Text>
+    //             {detailColumns.map(col => (
+    //                 <Text
+    //                     key={col.key}
+    //                     style={[
+    //                         styles.headerText,
+    //                         { width: col.width, textAlign: col.align }
+    //                     ]}
+    //                 >
+    //                     {col.label}
+    //                 </Text>
+    //             ))}
+    //         </View>
+    //     );
+
+    //     const Footer = () => (
+    //         <View style={[styles.tableHeader]}>
+    //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
+    //                 Totals
+    //             </Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
+    //                 {/* Empty cell for Actions column */}
+    //             </Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
+    //                 {/* Empty cell for Actions column */}
+    //             </Text>
+    //             {detailColumns.slice(2).map(col => (
+    //                 <Text
+    //                     key={col.key}
+    //                     style={[
+    //                         styles.headerText,
+    //                         { width: col.width, textAlign: col.align }
+    //                     ]}
+    //                 >
+    //                     {columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
+    //                 </Text>
+    //             ))}
+    //         </View>
+    //     );
+
+
+    //     const Row = React.memo(({ item }) => (
+    //         <View style={styles.tableRow}>
+    //             <Text
+    //                 style={[styles.rowText, { width: 160, textAlign: 'center' }]}
+    //                 numberOfLines={2}
+    //             >
+    //                 {item.TYPE}
+    //             </Text>
+    //             {detailColumns.map(col => (
+    //                 <Text
+    //                     key={col.key}
+    //                     style={[
+    //                         styles.rowText,
+    //                         { width: col.width, textAlign: col.align }
+    //                     ]}
+    //                     numberOfLines={2}
+    //                 >
+    //                     {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
+    //                 </Text>
+    //             ))}
+    //         </View>
+    //     ));
+
+    //     return (
+    //         <View style={styles.tableWrapper}>
+    //             <ScrollView horizontal showsHorizontalScrollIndicator>
+    //                 <View style={{ minWidth: totalWidth }}>
+    //                     <Header />
+    //                     <FlatList
+    //                         data={filteredDetails}
+    //                         renderItem={({ item }) => <Row item={item} />}
+    //                         keyExtractor={(item, index) =>
+    //                             `${item.ACCCODE}-${index}`
+    //                         }
+    //                         getItemLayout={(_, index) => ({
+    //                             length: ROW_HEIGHT,
+    //                             offset: ROW_HEIGHT * index,
+    //                             index,
+    //                         })}
+    //                         initialNumToRender={20}
+    //                         maxToRenderPerBatch={20}
+    //                         windowSize={10}
+    //                         removeClippedSubviews
+    //                         showsVerticalScrollIndicator={false}
+    //                     />
+    //                     <Footer />
+    //                 </View>
+    //             </ScrollView>
+    //         </View>
+    //     );
+    // };
+
     const DetailTable = () => {
+        console.log("Filtered Details:", filteredDetails);
+
+        // Data ko TRANID ke hisaab se ascending order mein sort karo
+        const sortedData = [...filteredDetails].sort((a, b) =>
+            parseFloat(a.TRANID) - parseFloat(b.TRANID)
+        );
+
+        console.log("Sorted Data (Ascending by TRANID):", sortedData);
+
+        // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
+        let cumulativeData = [];
+        sortedData.forEach((item, index) => {
+            const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
+
+            if (index === 0) {
+                cumulativeData.push({
+                    ...item,
+                    Cumulative: currentCUMBAL.toString(), // String format mein rakha
+                });
+            } else {
+                const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
+                const newCumulative = prevCumulative + currentCUMBAL;
+                cumulativeData.push({
+                    ...item,
+                    Cumulative: newCumulative.toString(), // String format mein rakha
+                });
+            }
+        });
+
+        console.log("Cumulative Data (Ascending by TRANID):", cumulativeData);
+
+        // Descending order mein sort karo (TRANID ko number mein convert karke)
+        const finalData = cumulativeData.sort((a, b) =>
+            parseFloat(b.TRANID) - parseFloat(a.TRANID)
+        );
+
+        console.log("Final Data (Descending by TRANID):", finalData);
+
+        // Columns definition
         const detailColumns = [
-            // { key: 'TYPE', label: 'Type', width: 120, align: 'center' },
             { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
             { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
             { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
             { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
+            { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' }, // Naya column
         ];
 
+        const columnsToFormat = ['CUMBAL', 'Cumulative'];
 
-        const columnsToFormat = ['CUMBAL'];
-
-        // Specify which columns to sum in the footer
-        const columnsToSum = ['CUMBAL'];
-
-
+        // Calculate totals for CUMBAL and Cumulative
         const calculateTotals = () => {
-            const totals = {};
-            columnsToSum.forEach(key => {
-                totals[key] = filteredDetails.reduce((sum, item) => {
-                    const value = parseFloat(item[key]) || 0;
-                    return sum + value;
-                }, 0);
+            const totals = { CUMBAL: 0, Cumulative: 0 };
+            finalData.forEach(item => {
+                totals.CUMBAL += parseFloat(item.CUMBAL) || 0;
+                totals.Cumulative += parseFloat(item.Cumulative) || 0;
             });
             return totals;
         };
 
         // Format number as Indian comma-separated value
         const formatIndianNumber = (value) => {
-            return value?.toLocaleString('en-IN', {
+            if (!value && value !== 0) return "0";
+            const num = parseFloat(value);
+            return num.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             });
         };
 
         const totals = calculateTotals();
+        const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 160;
 
-        const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 120;
-
-
+        // Header component
         const Header = () => (
             <View style={styles.tableHeader}>
                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
@@ -1696,32 +1867,25 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
             </View>
         );
 
+        // Footer component
         const Footer = () => (
             <View style={[styles.tableHeader]}>
                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
                     Totals
                 </Text>
-                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
-                    {/* Empty cell for Actions column */}
+                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+                <Text style={[styles.headerText, { width: 120, textAlign: 'right' }]}>
+                    {formatIndianNumber(totals.CUMBAL)}
                 </Text>
+                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
                 <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
-                    {/* Empty cell for Actions column */}
+                    {formatIndianNumber(totals.Cumulative)}
                 </Text>
-                {detailColumns.slice(2).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
-                    </Text>
-                ))}
             </View>
         );
 
-
+        // Row component
         const Row = React.memo(({ item }) => (
             <View style={styles.tableRow}>
                 <Text
@@ -1739,7 +1903,9 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
                         ]}
                         numberOfLines={2}
                     >
-                        {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
+                        {columnsToFormat.includes(col.key)
+                            ? formatIndianNumber(item[col.key])
+                            : item[col.key]}
                     </Text>
                 ))}
             </View>
@@ -1751,11 +1917,9 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
                     <View style={{ minWidth: totalWidth }}>
                         <Header />
                         <FlatList
-                            data={filteredDetails}
+                            data={finalData} // Use finalData instead of filteredDetails
                             renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item, index) =>
-                                `${item.ACCCODE}-${index}`
-                            }
+                            keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
                             getItemLayout={(_, index) => ({
                                 length: ROW_HEIGHT,
                                 offset: ROW_HEIGHT * index,
@@ -1992,7 +2156,7 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
                         autoCorrect={false}
                         autoCapitalize="none"
                         blurOnSubmit={false}
-                        placeholderTextColor={theme.BRAND_GRADIENT_END}  
+                        placeholderTextColor={theme.BRAND_GRADIENT_END}
                     />
 
                     {/* CONTENT */}

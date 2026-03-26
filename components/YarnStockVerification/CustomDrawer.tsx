@@ -203,7 +203,7 @@ const CustomDrawer = (props) => {
                                     <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormState.values.PrpCode}
-                                        data={getAllPropertyData}
+                                        data={getAllPropertyData || []}
                                         labelKey="LngName"
                                         valueKey="PrpCode"
                                         placeholder="Choose property..."
@@ -225,7 +225,7 @@ const CustomDrawer = (props) => {
                                     <Text style={styles.label}>Select Year <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormState.values.YearNo}
-                                        data={getAllYearData}
+                                        data={getAllYearData || []}
                                         labelKey="YearName"
                                         valueKey="YearNo"
                                         placeholder="Choose year..."
@@ -247,7 +247,7 @@ const CustomDrawer = (props) => {
                                     <Text style={styles.label}>Select Store <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormState.values.StrCode}
-                                        data={getAllStoreData}
+                                        data={getAllStoreData || []}
                                         labelKey="StrName"
                                         valueKey="StrCode"
                                         placeholder="Choose sore..."
@@ -269,7 +269,7 @@ const CustomDrawer = (props) => {
                                     <Text style={styles.label}>Select stock type <Text style={{ color: 'red' }}> * </Text></Text>
                                     <SearchableDropdown
                                         key={FormState.values.StkType}
-                                        data={getStockTypesFilterForm}
+                                        data={getStockTypesFilterForm || []}
                                         labelKey="label"
                                         valueKey="value"
                                         placeholder="Choose property..."

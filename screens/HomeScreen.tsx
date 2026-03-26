@@ -221,7 +221,13 @@ const APP_SECTIONS = [
         data: [
             { id: '26', name: 'Febric Stock', screen: 'Febric Stock', icon: 'autorenew', iconColor: '#dd5c98' },
         ],
-    }
+    },
+    {
+        title: 'D',
+        data: [
+            { id: '27', name: 'Daily Payment Report', screen: 'Daily Payment Report', icon: 'payments', iconColor: '#ff2ced' },
+        ],
+    },
 ];
 
 interface Props {
@@ -438,6 +444,18 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
+                //                         "title": "Febric Stock",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Daily Collection Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Daily Payment Report",
+                //                         "href": "/"
+                //                     },
+                                    
                 //                         "title": "Purchase Order Tracking",
                 //                         "href": "/"
                 //                     },

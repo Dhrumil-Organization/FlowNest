@@ -63,6 +63,8 @@ import ProcessCompleteAuth from './components/ProcessCompleteAuth/ProcessComplet
 import ReceivablesSudamo from './components/ReceivablesSudamo/ReceivablesSudamo';
 import FebricStock from './components/FebricStock/FebricStock';
 import DailyPaymentReport from './components/DailyPaymentReport/DailyPaymentReport';
+import DesignAuthorization from './components/DesignAuthorization/DesignAuthorization';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -539,13 +541,8 @@ export default function App() {
                           </ErrorBoundary>}
 
                       </>
-<<<<<<< HEAD
-                    }</Stack.Screen> */}
-                    <Stack.Screen name="Receivables">{(props) =>
-=======
                     }</Stack.Screen>
                     {/* <Stack.Screen name="Receivables">{(props) =>
->>>>>>> bbe0805bc18a5a579e19899e3805accd57481495
                       <>
                         {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
                           <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
@@ -653,6 +650,13 @@ export default function App() {
                         </GestureHandlerRootView>
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="Design Authorization">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <DesignAuthorization {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>                   
                   </Stack.Navigator>
                 </NavigationContainer>
               ) : (

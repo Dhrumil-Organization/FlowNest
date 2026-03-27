@@ -5,7 +5,7 @@ import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { POTDataProps, LabelMap, CardPayload, StageData } from './Modal';
 import Svg, { Circle, G, Path } from 'react-native-svg';
-import { API } from '../../common/API/dynamicAPI';
+import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
 
 const YarnStockCard: React.FC<POTDataProps> = ({
     gePOTData,
@@ -14,7 +14,10 @@ const YarnStockCard: React.FC<POTDataProps> = ({
     parentDesignData,
     setSelectedStockRow,
     setModalOpen,
-    getSavedCartons
+    getSavedCartons,
+    printSticker,
+    getPrintRow,
+    setPrintRow
 }) => {
     const [filteredData, setFilteredData] = useState(gePOTData || []);
     const [getStageData, setStageData] = useState<StageData[]>([]);
@@ -58,6 +61,10 @@ const YarnStockCard: React.FC<POTDataProps> = ({
         setSelectedStockRow(item)
         setModalOpen(true);
     };
+    const handlePrintData = (item: any) => {       
+        setPrintRow(item)
+        printSticker(item)
+    }
 
     const getToken = () => {
         return token;
@@ -179,6 +186,17 @@ const YarnStockCard: React.FC<POTDataProps> = ({
                             activeOpacity={0.7}
                         >
                             <Icon name="send" size={18} color="#fff" />
+                        </TouchableOpacity>
+                    )
+                }
+                {
+                    (item.Status === '2' || getSavedCartons.includes(item.UId)) && (
+                        <TouchableOpacity
+                            style={styles.goButton}
+                            onPress={() => handlePrintData(item)}
+                            activeOpacity={0.7}
+                        >
+                            <Icon name="local-print-shop" size={28} color="#fff" />
                         </TouchableOpacity>
                     )
                 }

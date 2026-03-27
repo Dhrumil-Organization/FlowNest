@@ -595,15 +595,15 @@ const CartonAddDrawer = (props) => {
                                         pageSize={10}
                                         initialValue={selectedProperty}
                                         value={FormCartonDataState.values.PrpCode || FormState.values.PrpCode}
-                                        // onSelect={(item) => {
-                                        //     setFormCartonDataState(FormCartonDataState => ({
-                                        //         ...FormCartonDataState,
-                                        //         values: {
-                                        //             ...FormCartonDataState.values,
-                                        //             PrpCode: item?.PrpCode || '',
-                                        //         }
-                                        //     }));
-                                        // }}
+                                        onSelect={(item) => {
+                                            setFormCartonDataState(FormCartonDataState => ({
+                                                ...FormCartonDataState,
+                                                values: {
+                                                    ...FormCartonDataState.values,
+                                                    PrpCode: item?.PrpCode || '',
+                                                }
+                                            }));
+                                        }}
                                         multiple={false}
                                         emptyMessage="No properties available" />
                                 </View>
@@ -641,15 +641,15 @@ const CartonAddDrawer = (props) => {
                                         pageSize={10}
                                         value={FormCartonDataState.values.StrCode || FormState.values.StrCode}
                                         initialValue={selectedStore}
-                                        // onSelect={(str) => {
-                                        //     setFormCartonDataState(FormCartonDataState => ({
-                                        //         ...FormCartonDataState,
-                                        //         values: {
-                                        //             ...FormCartonDataState.values,
-                                        //             StrCode: str?.StrCode || '',
-                                        //         }
-                                        //     }));
-                                        // }}
+                                        onSelect={(str) => {
+                                            setFormCartonDataState(FormCartonDataState => ({
+                                                ...FormCartonDataState,
+                                                values: {
+                                                    ...FormCartonDataState.values,
+                                                    StrCode: str?.StrCode || '',
+                                                }
+                                            }));
+                                        }}
                                         multiple={false}
                                         emptyMessage="No stores data available" />
                                 </View>

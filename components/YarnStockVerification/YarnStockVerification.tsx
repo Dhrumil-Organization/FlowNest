@@ -9,7 +9,7 @@ import CartonAddDrawer from './CartonAddDrawer';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import YarnStockCard from './YarnStockCard';
 import theme from '../../android/app/src/theme';
-import { API } from '../../common/API/dynamicAPI';
+import { API, PRINTERSLISTAPI, PRINTSTICKER } from '../../common/API/dynamicAPI';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
 import Snackbar from 'react-native-snackbar';
 import FullScreenLoader from '../Loader/Loader';
@@ -62,6 +62,9 @@ const YarnStockVerification = (props) => {
     const [getSelectedStockRow, setSelectedStockRow] = useState({});
     const [getModalOpen, setModalOpen] = useState(false)
     const [getSavedCartons, setSavedCartons] = useState([])
+    const [getPrintRow, setPrintRow] = useState({})
+    const [getPrinters, setPrinters] = useState([])
+    const [printer, setPrinter] = useState('')
 
     const rowsPerPage = 20;
 
@@ -276,6 +279,73 @@ const YarnStockVerification = (props) => {
         setModalOpen(false);
     }
 
+
+    const printSticker = (data) => {
+
+        setIsLoading(true);
+        console.log('printsticker function :', data);
+
+        if (Object.keys(data).length > 0) {
+
+            data.yearno = typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '' ? FormState.values.YearNo : '99'
+            const params = {
+                data: [data],
+                IskgQty: 0,
+                printype: "Print",
+                PrintFormat: 3,
+                printerName: printer ? printer : '',
+                txntype: 'yarnStockVerification'
+            };
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            console.log("params :", params)
+            console.log("url :", `${PRINTSTICKER}`)
+            
+            axios.post(`${PRINTSTICKER}`, params, { headers })
+                .then(response => {
+                    console.log("response :", response)
+                    setIsLoading(false);
+                    const res = response.data;
+
+                    if (res.success) {
+                        Snackbar.show({
+                            text: '✅ ${res.printed} label(s) sent to printer.',
+                            duration: Snackbar.LENGTH_INDEFINITE,
+                            backgroundColor: 'green',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
+                    } else {
+                        Snackbar.show({
+                            text: res.message || 'Operation failed',
+                            duration: Snackbar.LENGTH_INDEFINITE,
+                            backgroundColor: 'red',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
+                    }
+                }).catch(error => {
+                    setIsLoading(false);
+                    Snackbar.show({
+                        text: error?.response?.data?.error || error.message || 'Print failed',
+                        duration: Snackbar.LENGTH_LONG,
+                        backgroundColor: 'red',
+                        action: { text: 'OK', textColor: 'white' },
+                    });
+                });
+        } else {
+            setIsLoading(false);
+            Snackbar.show({
+                text: 'printing sticker data is empty',
+                duration: Snackbar.LENGTH_LONG,
+                backgroundColor: 'red',
+                textColor: '#fff',
+                action: { text: 'OK', textColor: '#fff' },
+            });
+        }
+    }
+
     return (
         <>
             {
@@ -334,7 +404,7 @@ const YarnStockVerification = (props) => {
                         </View>
                     </ScrollView>
                 </View>
-                <YarnStockCard gePOTData={getAllStockData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} parentDesignData={parentDesignData} setSelectedStockRow={setSelectedStockRow} getSelectedStockRow={getSelectedStockRow} setModalOpen={setModalOpen} setSavedCartons={setSavedCartons} getSavedCartons={getSavedCartons} />
+                <YarnStockCard gePOTData={getAllStockData} searchQueryPOT={searchQueryPOT} getpayload={getpayload} token={token} parentDesignData={parentDesignData} setSelectedStockRow={setSelectedStockRow} getSelectedStockRow={getSelectedStockRow} setModalOpen={setModalOpen} setSavedCartons={setSavedCartons} getSavedCartons={getSavedCartons} printSticker={printSticker} getPrintRow={getPrintRow} setPrintRow={setPrintRow} />
             </View>
             <CartonAddDrawer
                 isVisible={isCartonAddDrawerVisible}
@@ -591,8 +661,8 @@ const styles = StyleSheet.create({
         height: 20,
         borderRadius: 2,
         marginRight: 4,
-        
-        
+
+
     },
 
     labelcolors: {
@@ -642,18 +712,18 @@ const styles = StyleSheet.create({
         //alignItems: 'center',
         //justifyContent: 'center',
         //width: 140,        // 👈 SAME WIDTH FOR ALL
-        marginRight: 8,       
+        marginRight: 8,
     },
-    v:{
+    v: {
         height: 25,
-        backgroundColor : '#f1e8e8',
+        backgroundColor: '#f1e8e8',
         padding: 5,
         borderRadius: 8,
         marginLeft: 7,
-        marginRight:7,
-        
-        
-        
+        marginRight: 7,
+
+
+
     }
 });
 

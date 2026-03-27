@@ -61,7 +61,8 @@ import SalesOrderInActive from './components/SalesOrderInActive/SalesOrderInActi
 import ItemAuthorization from './components/ItemAuthorization/ItemAuthorization';
 import ProcessCompleteAuth from './components/ProcessCompleteAuth/ProcessCompleteAuth';
 import ReceivablesSudamo from './components/ReceivablesSudamo/ReceivablesSudamo';
-
+import FebricStock from './components/FebricStock/FebricStock';
+import DailyPaymentReport from './components/DailyPaymentReport/DailyPaymentReport';
 
 const Stack = createNativeStackNavigator();
 
@@ -538,12 +539,17 @@ export default function App() {
                           </ErrorBoundary>}
 
                       </>
+<<<<<<< HEAD
+                    }</Stack.Screen> */}
+                    <Stack.Screen name="Receivables">{(props) =>
+=======
                     }</Stack.Screen>
                     {/* <Stack.Screen name="Receivables">{(props) =>
+>>>>>>> bbe0805bc18a5a579e19899e3805accd57481495
                       <>
                         {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
                           <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
-                       
+
                       </>
                     }</Stack.Screen> */}
                     <Stack.Screen name="Payable">{(props) =>
@@ -637,10 +643,16 @@ export default function App() {
                     }</Stack.Screen>
                     <Stack.Screen name="Febric Stock">{(props) =>
                       <>
-                        <ProcessCompleteAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
+                        <FebricStock {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} getUserPrptype={getUserPrptype} />
                       </>
                     }</Stack.Screen>
-
+                    <Stack.Screen name="Daily Payment Report">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <DailyPaymentReport {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
                   </Stack.Navigator>
                 </NavigationContainer>
               ) : (

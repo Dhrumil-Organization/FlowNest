@@ -24,7 +24,8 @@ const IS_LOCAL = false; // true = it will use local apis url , false = it will u
 
 export let API: string = IS_LOCAL ? "http://192.168.13.100:4004" : "https://apig.tms-webapp.com";
 
-export let PRINTSTICKER = IS_LOCAL ? "http://192.168.13.130:4000/print-grey-in-stock" : "http://192.168.0.6:4000/print-grey-in-stock"
+//export let PRINTSTICKER = IS_LOCAL ? "http://192.168.13.130:4000/print-grey-in-stock" : "http://192.168.0.6:4000/print-grey-in-stock"
+export let PRINTSTICKER = IS_LOCAL ? "http://192.168.13.100:4004/api/print-grey-in-stock" : "https://apig.tms-webapp.com/api/print-grey-in-stock"
 export let PRINTERSLISTAPI = IS_LOCAL ? "http://192.168.13.130:4000/printers" : "http://192.168.0.6:4000/printers"
 
 
@@ -59,10 +60,10 @@ export const initAPIForSticker = async (): Promise<string> => {
 
     if (IS_LOCAL) {
         // Local server
-        PRINTSTICKER = "http://192.168.13.130:4000/print-grey-in-stock";
+        PRINTSTICKER = "http://192.168.13.100:4004/api/print-grey-in-stock";
     } else {
         // Live server only for sudamo
-        PRINTSTICKER = "http://192.168.0.6:4000/print-grey-in-stock";
+        PRINTSTICKER = "https://apig.tms-webapp.com/api/print-grey-in-stock";
     }
 
     return PRINTSTICKER;

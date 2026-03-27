@@ -539,13 +539,8 @@ export default function App() {
                           </ErrorBoundary>}
 
                       </>
-<<<<<<< HEAD
-                    }</Stack.Screen> */}
-                    <Stack.Screen name="Receivables">{(props) =>
-=======
                     }</Stack.Screen>
                     {/* <Stack.Screen name="Receivables">{(props) =>
->>>>>>> bbe0805bc18a5a579e19899e3805accd57481495
                       <>
                         {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
                           <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}

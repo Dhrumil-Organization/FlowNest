@@ -1,24 +1,115 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
+import axios from 'axios';
+import { useRouter } from 'expo-router';
+import FullScreenLoader from '../components/FullScreenLoader';
+import AccessDeniedScreen from '../common/access-denied';
+import { AuthProvider } from '../hooks/AuthContext';
+import { getFCMToken, setupNotificationHandlers, getStoredToken } from '../hooks/NotificationService';
+import { handleNotification } from '../hooks/notificationHandler';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const router = useRouter();
+  const [isReady, setIsReady] = useState(false);
+  const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
+  useEffect(() => {
+    // 🔥 Get FCM token
+    getFCMToken();
+
+    // 🔥 Setup notification handlers
+    // setupNotificationHandlers(handleNotification);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+
+    // ❌ NOT LOGGED IN → FORCE LOGIN
+    if (isAllowed && isLoggedIn === false) {
+      router.replace('/(auth)/login');
+    }
+
+    // ✅ LOGGED IN → FORCE HOME
+    if (isAllowed && isLoggedIn === true) {
+      router.replace('/');
+    }
+
+  }, [isReady, isAllowed, isLoggedIn]);
+
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        console.log("🚀 App Start");
+
+        const deviceId = Device.osInternalBuildId || "test-device";
+
+        // 🔥 1. DEVICE CHECK
+        const res = await axios.post(
+          "https://apig.tms-webapp.com/api/checkdevice",
+          { deviceid: deviceId }
+        );
+
+        console.log("✅ checkdevice:", res.data);
+
+        // ❌ ACCESS DENIED
+        if (Number(res.data) !== 1) {
+          setIsAllowed(false);
+          return;
+        }
+
+        // ✅ ALLOWED
+        setIsAllowed(true);
+
+        // 🔥 2. TOKEN CHECK
+        const token = await AsyncStorage.getItem('access_token');
+
+        console.log("🔑 Token:", token);
+
+        setIsLoggedIn(!!token);
+
+      } catch (err) {
+        console.log("❌ INIT ERROR:", err);
+      } finally {
+        setIsReady(true);
+      }
+    };
+
+    initApp();
+  }, []);
+
+  // 🔥 LOADER
+  if (!isReady) {
+    return <FullScreenLoader message="Verifying..." />;
+  }
+
+  // 🔥 ACCESS DENIED
+  if (isAllowed === false) {
+    return <AccessDeniedScreen fromInit={true} />;
+  }
+
+  // 🔥 WAIT FOR TOKEN CHECK
+  if (isLoggedIn === null) {
+    return <FullScreenLoader message="Loading..." />;
+  }
+
+  console.log("isLoggedIn", isLoggedIn);
+
+  // 🔥 FINAL ROUTING
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        {isAllowed && isLoggedIn === true ? (
+
+          <Stack.Screen name="(tabs)" />
+
+        ) : (
+          <Stack.Screen name="(auth)/login" />
+        )}
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </AuthProvider>
   );
 }

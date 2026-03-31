@@ -1,98 +1,187 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  View, Text, FlatList, TouchableOpacity, StyleSheet
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Header from '../../components/Header';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
+import { Dimensions } from 'react-native';
+import { useAuth } from '../../hooks/AuthContext';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const { width } = Dimensions.get('window');
 
-export default function HomeScreen() {
+const NUM_COLUMNS = Math.max(3, Math.floor(width / 120));
+const ITEM_SIZE = (width - 40) / NUM_COLUMNS;
+
+const ALL_APPS = [
+  { name: 'Credit Limit Request', route: 'credit-limit', icon: 'credit-score', color: '#4285F4' },
+  { name: 'Receivables', icon: 'receipt-long', route: 'receivables', color: '#773F3F' },
+];
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+export default function Home() {
+  const { username } = useAuth();
+  const [search, setSearch] = useState('');
+  const [apps, setApps] = useState<any[]>([]);
+  const [selectedLetter, setSelectedLetter] = useState('');
+  const flatListRef = useRef<FlatList>(null);
+  const router = useRouter();
+
+  // 🔥 LOAD MENU APPS FROM CACHE
+  useEffect(() => {
+    const loadApps = async () => {
+      try {
+        const data = await AsyncStorage.getItem('user_menu_apps');
+
+        if (!data) return;
+
+        const decoded = atob(data);
+        // const parsed = JSON.parse(decoded);
+        const parsed = [
+                    {
+                        "title": "",
+                        "pages": [
+                            {
+                                "title": "Mobile App",
+                                "href": "#",
+                                "icon": "",
+                                "children": [
+                                    {
+                                        "title": "Credit Limit Request",
+                                        "href": "/"
+                                    },
+                                    {
+                                        "title": "Receivables",
+                                        "href": "/"
+                                    },
+                                ]
+                            }
+                        ]
+                    }
+                ];
+
+        const mobileApp = parsed.find((item: any) =>
+          item.pages?.some((p: any) => p.title === 'Mobile App')
+        );
+
+        const children = mobileApp?.pages?.find(
+          (p: any) => p.title === 'Mobile App'
+        )?.children || [];
+
+        const allowedNames = children.map((c: any) => c.title);
+
+        const filteredApps = ALL_APPS.filter(app =>
+          allowedNames.includes(app.name)
+        );
+
+        // 🔥 SORT A-Z
+        filteredApps.sort((a, b) => a.name.localeCompare(b.name));
+
+        setApps(filteredApps);
+
+      } catch (e) {
+        console.log("❌ MENU ERROR", e);
+      }
+    };
+
+    loadApps();
+  }, []);
+
+  // 🔥 SEARCH FILTER
+  const filteredApps = useMemo(() => {
+    return apps.filter(a =>
+      a.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [apps, search]);
+
+  // 🔥 ALPHABET SCROLL
+  const scrollToLetter = (letter: string) => {
+    const index = filteredApps.findIndex(a =>
+      a.name.startsWith(letter)
+    );
+
+    if (index !== -1) {
+      flatListRef.current?.scrollToIndex({ index, animated: true });
+      setSelectedLetter(letter);
+      setTimeout(() => setSelectedLetter(''), 800);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={{ flex: 1 }}>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <Header userName={username} onSearch={setSearch} />
+
+      <FlatList
+        ref={flatListRef}
+        data={filteredApps}
+        numColumns={NUM_COLUMNS}
+        key={NUM_COLUMNS} // 🔥 important for rerender
+        keyExtractor={(item) => item.name}
+        contentContainerStyle={{
+          padding: 10,
+          paddingBottom: 120,
+          alignItems: 'flex-start' // 🔥 no stretch
+        }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[styles.card, { width: ITEM_SIZE }]}
+            onPress={() => router.push(`/app/${item.route}`)}
+          >
+            <View style={[styles.icon, { backgroundColor: item.color }]}>
+              <Icon name={item.icon} size={22} color="#fff" />
+            </View>
+            <Text style={styles.text}>{item.name}</Text>
+          </TouchableOpacity>
+        )}
+      />
+
+      {/* 🔥 RIGHT SIDE ALPHABET */}
+      <View style={styles.alphabet}>
+        {ALPHABET.map(letter => (
+          <TouchableOpacity key={letter} onPress={() => scrollToLetter(letter)}>
+            <Text style={[
+              styles.alphaText,
+              selectedLetter === letter && { color: 'blue' }
+            ]}>
+              {letter}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  card: {
+    margin: 6,
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  icon: {
+    width: 55,
+    height: 55,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  text: {
+    marginTop: 6,
+    fontSize: 12,
+    textAlign: 'center'
+  },
+  alphabet: {
     position: 'absolute',
+    right: 5,
+    top: 100,
+    bottom: 100,
+    justifyContent: 'center'
   },
+  alphaText: {
+    fontSize: 10,
+    padding: 2
+  }
 });

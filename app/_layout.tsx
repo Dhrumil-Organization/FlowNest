@@ -1,14 +1,11 @@
-import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Device from 'expo-device';
 import axios from 'axios';
-import { useRouter } from 'expo-router';
-import FullScreenLoader from '../components/FullScreenLoader';
+import * as Device from 'expo-device';
+import { Stack, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import AccessDeniedScreen from '../common/access-denied';
+import FullScreenLoader from '../components/FullScreenLoader';
 import { AuthProvider } from '../hooks/AuthContext';
-import { getFCMToken, setupNotificationHandlers, getStoredToken } from '../hooks/NotificationService';
-import { handleNotification } from '../hooks/notificationHandler';
 
 
 export default function RootLayout() {
@@ -17,13 +14,13 @@ export default function RootLayout() {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    // 🔥 Get FCM token
-    getFCMToken();
+  // useEffect(() => {
+  //   // 🔥 Get FCM token
+  //   getFCMToken();
 
-    // 🔥 Setup notification handlers
-    // setupNotificationHandlers(handleNotification);
-  }, []);
+  //   // 🔥 Setup notification handlers
+  //   // setupNotificationHandlers(handleNotification);
+  // }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -56,7 +53,7 @@ export default function RootLayout() {
         console.log("✅ checkdevice:", res.data);
 
         // ❌ ACCESS DENIED
-        if (Number(res.data) !== 1) {
+        if (Number(res.data) !== 0) {
           setIsAllowed(false);
           return;
         }

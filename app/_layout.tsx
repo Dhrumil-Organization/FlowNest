@@ -53,7 +53,7 @@ export default function RootLayout() {
         console.log("✅ checkdevice:", res.data);
 
         // ❌ ACCESS DENIED
-        if (Number(res.data) !== 0) {
+        if (Number(res.data) !== 1) {
           setIsAllowed(false);
           return;
         }

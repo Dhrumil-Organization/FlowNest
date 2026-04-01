@@ -1,21 +1,21 @@
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    View,
+    Image,
+    LayoutAnimation,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    StyleSheet,
-    LayoutAnimation,
-    Platform,
     UIManager,
-    SafeAreaView,
+    View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { useRouter } from 'expo-router';
-import theme from './theme';
-import { Image } from 'react-native';
 import logo from '../assets/images/logo.png';
+import theme from './theme';
 
 // ✅ enable animation Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -37,7 +37,7 @@ export default function Header({ userName, onSearch, placeholder = 'Search...' }
     return (
         <LinearGradient
             colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-            style={styles.container}
+            style={Platform.OS === 'android' ? styles.container_android : styles.container}
         >
             <SafeAreaView>
 
@@ -132,6 +132,14 @@ export default function Header({ userName, onSearch, placeholder = 'Search...' }
 }
 
 const styles = StyleSheet.create({
+    container_android: {
+        paddingHorizontal: 15,
+        paddingBottom: 10,
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
+        elevation: 6,
+        paddingTop: 25
+    },
     container: {
         paddingHorizontal: 15,
         paddingBottom: 10,

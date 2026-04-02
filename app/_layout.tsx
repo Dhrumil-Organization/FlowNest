@@ -1,3 +1,4 @@
+import { getFCMToken } from '@/hooks/NotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as Device from 'expo-device';
@@ -14,13 +15,13 @@ export default function RootLayout() {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-  // useEffect(() => {
-  //   // 🔥 Get FCM token
-  //   getFCMToken();
+  useEffect(() => {
+    // 🔥 Get FCM token
+    getFCMToken();
 
-  //   // 🔥 Setup notification handlers
-  //   // setupNotificationHandlers(handleNotification);
-  // }, []);
+    // 🔥 Setup notification handlers
+    // setupNotificationHandlers(handleNotification);
+  }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -109,4 +110,8 @@ export default function RootLayout() {
       </Stack>
     </AuthProvider>
   );
+}
+
+function setupNotificationHandlers(handleNotification: (data: any) => void) {
+  throw new Error('Function not implemented.');
 }

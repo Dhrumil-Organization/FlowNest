@@ -16,6 +16,9 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "experimental": {
+      "newArchEnabled": false
+    },
     "android": {
       "jsEngine": "jsc",
       "adaptiveIcon": {

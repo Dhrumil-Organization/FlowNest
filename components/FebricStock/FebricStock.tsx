@@ -174,6 +174,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
             const responseData = response?.data?.response?.data || [];
 
+            console.log("response.data.response.data", response.data.response.data)
+
             if (response.data.success === true) {
 
                 if (responseData.length > 0) {
@@ -395,6 +397,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     }, [selectedItem, salesdata]);
 
     const getAllDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+        console.log("mainItm :", mainItm);
+        console.log("data :", data);
+        console.log("flag :", flag);
 
         if (!data || data.length === 0) return [];
 
@@ -554,7 +559,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         //({ item }: any) => (
                         ({ item, index }: any) => (
                             <TouchableOpacity
-                                onPress={() => { setSelectedItem(item); setIsDetailVisible(true) }}
+                                onPress={() => { console.log("here"); setSelectedItem(item); setIsDetailVisible(true) }}
                                 style={{
                                     backgroundColor: index === 0 ? '#CCE9EF' : '#FFF', marginBottom: 10, borderRadius: 12, padding: 15,
                                     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
@@ -572,7 +577,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                             </TouchableOpacity>
                         )
                     }
-                />
+                />  
                 <View style={{
                     position: 'absolute', bottom: 0, left: 0, right: 0, height: 55, backgroundColor: theme.BRAND_GRADIENT_END,
                     justifyContent: 'center', paddingHorizontal: 15, borderTopLeftRadius: 10, borderTopRightRadius: 10, elevation: 10

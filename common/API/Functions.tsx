@@ -1183,6 +1183,7 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
         cancelToken = axios.CancelToken.source();
 
         let params = { prpcode: prpcd };
+        console.log("`${API}/api/getyear` :", `${API}/api/getyear`);
         const response = await axios.get(
             `${API}/api/getyear`,
             {
@@ -1194,6 +1195,7 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
                 params
             }
         );
+        console.log("response :", response);
 
         if (response.data.response.data && response.data.response.data.length > 0) {
             const appYdata = response.data.response.data;

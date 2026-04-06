@@ -228,6 +228,12 @@ const APP_SECTIONS = [
             { id: '27', name: 'Daily Payment Report', screen: 'Daily Payment Report', icon: 'payments', iconColor: '#ff2ced' },
         ],
     },
+    {
+        title: 'D',
+        data: [
+            { id: '27', name: 'Beam Close', screen: 'Beam Close', icon: 'all-out', iconColor: '#05010d' },
+        ],
+    },
 ];
 
 interface Props {
@@ -464,12 +470,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Sales Order Tracking",
                 //                         "href": "/"
                 //                     },
+                //                     {
+                //                         "title": "Beam Close",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]
                 //     }
                 // ];
-                console.log('Decoded getMenuApps:', parsedValue);
+                //console.log('Decoded getMenuApps:', parsedValue);
                 setDecodedMenuApps(parsedValue);
 
                 const mobileApp = parsedValue.find((item: any) => item.pages && item.pages.some((page: any) => page.title === "Mobile App"));
@@ -821,7 +831,7 @@ const styles = StyleSheet.create({
     },
     iconWrap: { marginBottom: 6, width: 64, height: 64, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
     iconCircle: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    appTitle: { color: theme.TEXT_SECONDARY, fontSize: 10, textAlign: 'center', paddingHorizontal: 6, lineHeight: 16 },
+    appTitle: { color: theme.TEXT_SECONDARY, fontSize: 10, textAlign: 'center', paddingHorizontal: 6, lineHeight: 16, width: '100%', },
 
     disabledOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 12 },
 

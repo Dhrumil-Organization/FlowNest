@@ -40,8 +40,11 @@ const HeaderBarwithBack: React.FC<HeaderProps> = ({
     setIsAvatarBarVisible(v => !v);
   };
 
+  // const handleBackPress = () => {
+  //   navigation.navigate(backNavigateScreen as never);
+  // };
   const handleBackPress = () => {
-    navigation.navigate(backNavigateScreen as never);
+    navigation.goBack();
   };
 
   const initial = (userName || 'U').charAt(0).toUpperCase();

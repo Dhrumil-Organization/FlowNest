@@ -38,8 +38,11 @@ const HeaderBarwithBackWebUI: React.FC<HeaderProps> = ({
     setIsAvatarBarVisible(v => !v);
   };
 
+  // const handleBackPress = () => {
+  //   navigation.navigate('Home' as never);
+  // };
   const handleBackPress = () => {
-    navigation.navigate('Home' as never);
+    navigation.goBack();
   };
 
   const initial = (userName || 'U').charAt(0).toUpperCase();

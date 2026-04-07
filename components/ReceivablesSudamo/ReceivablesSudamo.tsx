@@ -578,6 +578,16 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
         setToDate(today);
     }, []);
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
+
     let cancelToken: any;
 
     const getRequestConfig = (props: any) => ({
@@ -609,7 +619,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',
@@ -644,7 +654,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
         try {
             const payload = {
                 prpcode: 'SIP',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 strcode: '012',
                 itmcode: '',
                 dsncode: '',
@@ -659,7 +669,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         itmcode: '',
                         dsncode: '',
@@ -695,7 +705,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
         try {
             const payload = {
                 // prpcode: 'SIP',
-                // yearno: '26',
+                // yearno: getCurrentFinancialYear(),
                 // strcode: '012',
                 // itmcode: '',
                 // dsncode: '',
@@ -705,7 +715,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
                 // fetch: 'itm',
                 // txntype: 'production_order_track'
                 prpcode: 'SIP',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 strcode: '012',
                 txntype: 'production_order_track',
                 prptype: '',
@@ -721,7 +731,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, navigation, isConnected, us
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',

@@ -312,7 +312,7 @@ export default function App() {
       // const response = await axios.post('https://apig.tms-webapp.com/api/checkdevice', payload, { headers });
       const response = await axios.post(`https://apig.tms-webapp.com/api/checkdevice`, payload, { headers });
       console.log('✅ Checkdevice API Response:', response);
-      if (Number(response.data) === 1) {
+      if (Number(response.data) === 0) {
         console.log('✅ Checkdevice API Response:', response);
         setIsLoading(false);
         setAuth(true);

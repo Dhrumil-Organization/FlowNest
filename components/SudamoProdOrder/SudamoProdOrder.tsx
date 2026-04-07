@@ -159,12 +159,22 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
         cancelToken: cancelToken?.token,
     });
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
+
     const fetchData = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoadingSPO(true);
         try {
-            const payload = { txntype: 'production_order_sudo', referrer: 'dashboard', prptype: 'S', yearno: '26', atype: 'B' };
+            const payload = { txntype: 'production_order_sudo', referrer: 'dashboard', prptype: 'S',  yearno: getCurrentFinancialYear(), atype: 'B' };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/prodorderbrowsesudo`,
                 `${API}/api/prodorderbrowsesudo`,
@@ -237,7 +247,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                 txntype: 'production_order_sudo',
                 referrer: 'dashboard',
                 prptype: 'S',
-                yearno: '26',
+                 yearno: getCurrentFinancialYear(),
                 atype: 'H',
             };
             const response = await axios.get(
@@ -280,7 +290,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                 txntype: 'production_order_sudo',
                 referrer: 'dashboard',
                 prptype: 'S',
-                yearno: '26',
+                 yearno: getCurrentFinancialYear(),
                 atype: 'A',
             };
             const response = await axios.get(

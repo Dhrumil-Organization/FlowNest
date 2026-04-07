@@ -356,6 +356,16 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
     }
     const { width } = useWindowDimensions();
     const numColumns = width > 600 ? 3 : 2;
+
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -373,7 +383,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
         setIsLoadingYPO(true);
         try {
             const payload = {
-                txntype: 'sales_order', referrer: 'dashboard', prptype: 'R', yearno: '26', atype: 'B', strtype: ['Y', 'G'], strcodes: ['001', '002', '005'], status: 'I'
+                txntype: 'sales_order', referrer: 'dashboard', prptype: 'R', yearno: getCurrentFinancialYear(), atype: 'B', strtype: ['Y', 'G'], strcodes: ['001', '002', '005'], status: 'I'
             };
             const response = await axios.get(
                 `${API}/api/sosortbrowse`,
@@ -453,7 +463,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                 txntype: 'sales_order',
                 referrer: 'dashboard',
                 prptype: 'R',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 atype: 'H',
                 strtype: ['Y', 'G'],
                 strcodes: ['001', '002', '005'],
@@ -497,7 +507,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, navigation, isConnected, u
                 txntype: 'sales_order',
                 referrer: 'dashboard',
                 prptype: 'R',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 atype: 'H',
                 strtype: ['Y', 'G'],
                 strcodes: ['001', '002', '005'],

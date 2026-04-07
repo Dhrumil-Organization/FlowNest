@@ -208,8 +208,8 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 ...getChallanPayload,
                 fromdate: "",
                 todate: "",
-                uid: order.srno,
-                srno: order.uid,
+                uid: order.uid,
+                srno: order.srno,
             };
             const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
             // const response = {

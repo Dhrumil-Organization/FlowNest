@@ -24,7 +24,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     isVisible,
     onClose,
     fromDate,
-    toDate,
+    delDate,
     selectedYear,
     selectedExe,
     onFromDateChange,
@@ -84,19 +84,19 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
     const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'];
 
-    
+
     useEffect(() => {
         if (exeData.length > 0 && !selectedExe) {
             onExeChange(exeData[0]);
         }
     }, [exeData, selectedExe, onExeChange]);
-    
+
     useEffect(() => {
         if (designData) {
             setdesignData11(designData as any);
         }
     }, [designData]);
-    
+
     console.log("designData1:", designData1, "itemData:", itemData);
 
 
@@ -360,11 +360,11 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>To Date</Text>
                                 <TouchableOpacity style={styles.dateInput} onPress={() => setShowToDatePicker(true)}>
-                                    <Text style={styles.dateText}>{formatDate(toDate)}</Text>
+                                    <Text style={styles.dateText}>{formatDate(delDate)}</Text>
                                 </TouchableOpacity>
                                 {showToDatePicker && (
                                     <DateTimePicker
-                                        value={toDate}
+                                        value={delDate}
                                         mode="date"
                                         display="default"
                                         onChange={(event, date) => {
@@ -374,6 +374,24 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                     />
                                 )}
                             </View> */}
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Delivery Date</Text>
+                                <TouchableOpacity style={styles.dateInput} onPress={() => setShowToDatePicker(true)}>
+                                    <Text style={styles.dateText}>{formatDate(delDate)}</Text>
+                                </TouchableOpacity>
+                                {showToDatePicker && (
+                                    <DateTimePicker
+                                        value={delDate}
+                                        mode="date"
+                                        display="default"
+                                        onChange={(event, date) => {
+                                            setShowToDatePicker(Platform.OS === 'ios');
+                                            if (date) onToDateChange(date);
+                                        }}
+                                    />
+                                )}
+                            </View>
 
                             {/* Financial Year Dropdown */}
                             <View style={styles.inputGroup}>

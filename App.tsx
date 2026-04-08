@@ -101,6 +101,7 @@ export default function App() {
       console.log('🔥 REAL FCM TOKEN:', n_token);
       if (n_token) {
         const notification_token = await AsyncStorage.setItem('notification_token', n_token);
+        return notification_token;
       }
     }
     getToken();
@@ -682,7 +683,7 @@ export default function App() {
                           <BeamGaiting {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
                         </GestureHandlerRootView>
                       </>
-                    }</Stack.Screen> 
+                    }</Stack.Screen>
 
                     <Stack.Screen name="Yarn Stock">{(props) =>
                       <>

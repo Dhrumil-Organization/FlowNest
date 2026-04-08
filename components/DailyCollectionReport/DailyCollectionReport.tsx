@@ -285,7 +285,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const fetchBrowseData = async (payload: any) => {
-        // console.log("Browse API running");
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoading(true);
@@ -300,6 +299,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             setPayload(params as any);
             const response = await axios.post(`${API}/api/collection_crud`, params, { headers });
             console.log("response", response)
+            console.log("payload", payload)
+
             if (response?.data?.success && response?.data?.data?.data) {
                 // console.log("Browse API running");
                 let apiData = response.data.data.data;

@@ -116,7 +116,7 @@ const CartonAddDrawer = (props) => {
                     }
                 }));
                 handleClearForm()
-                
+
             } else if (response.data.success === false) {
 
                 Alert.alert(`${response.data.message}`);
@@ -216,7 +216,7 @@ const CartonAddDrawer = (props) => {
                 textColor: '#fff',
                 action: { text: 'OK', textColor: 'white' },
             });
-        } 
+        }
         // else if (typeof FormCartonDataState.values.grsWt == 'undefined' || FormCartonDataState.values.grsWt == null || FormCartonDataState.values.grsWt == '' || parseFloat(FormCartonDataState.values.grsWt) <= 0) {
         //     Snackbar.show({
         //         text: 'Gross wt. can not be balnk or empty or 0',
@@ -328,6 +328,7 @@ const CartonAddDrawer = (props) => {
                     }
                 )
             );
+            console.log("response item", response)
             if (response.data.response.data.length > 0) {
                 //setItemData(response.data.response.data);
                 const itmdt = response.data.response.data
@@ -514,18 +515,18 @@ const CartonAddDrawer = (props) => {
         setFormCartonDataState(prev => ({
             ...prev,
             values: {
-                PrpCode: typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != '' 
-                ?  FormCartonDataState.values.PrpCode 
-                : typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '' 
-                ? FormState.values.PrpCode : '', 
-                YearNo: typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != '' 
-                ?  FormCartonDataState.values.YearNo 
-                : typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != '' 
-                ? FormState.values.YearNo : '', 
-                StrCode: typeof FormCartonDataState.values.StrCode != 'undefined' && FormCartonDataState.values.StrCode != null && FormCartonDataState.values.StrCode != '' 
-                ?  FormCartonDataState.values.StrCode 
-                : typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != '' 
-                ? FormState.values.StrCode : '',
+                PrpCode: typeof FormCartonDataState.values.PrpCode != 'undefined' && FormCartonDataState.values.PrpCode != null && FormCartonDataState.values.PrpCode != ''
+                    ? FormCartonDataState.values.PrpCode
+                    : typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != ''
+                        ? FormState.values.PrpCode : '',
+                YearNo: typeof FormCartonDataState.values.YearNo != 'undefined' && FormCartonDataState.values.YearNo != null && FormCartonDataState.values.YearNo != ''
+                    ? FormCartonDataState.values.YearNo
+                    : typeof FormState.values.YearNo != 'undefined' && FormState.values.YearNo != null && FormState.values.YearNo != ''
+                        ? FormState.values.YearNo : '',
+                StrCode: typeof FormCartonDataState.values.StrCode != 'undefined' && FormCartonDataState.values.StrCode != null && FormCartonDataState.values.StrCode != ''
+                    ? FormCartonDataState.values.StrCode
+                    : typeof FormState.values.StrCode != 'undefined' && FormState.values.StrCode != null && FormState.values.StrCode != ''
+                        ? FormState.values.StrCode : '',
                 CartNo: '',
                 Chees: '',
                 ItmCode: '',
@@ -535,8 +536,8 @@ const CartonAddDrawer = (props) => {
                 Denier: '',
                 grsWt: 0,
                 netWt: '',
-                StkType: typeof FormCartonDataState.values.StkType != 'undefined' && FormCartonDataState.values.StkType != null && FormCartonDataState.values.StkType != '' 
-                ?  FormCartonDataState.values.StkType : ''
+                StkType: typeof FormCartonDataState.values.StkType != 'undefined' && FormCartonDataState.values.StkType != null && FormCartonDataState.values.StkType != ''
+                    ? FormCartonDataState.values.StkType : ''
             }
         }));
     };

@@ -52,6 +52,15 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         }).start();
     }, [isVisible]);
 
+    const updatedPrpCodeList = React.useMemo(() => {
+        if (!PrpCodeList || PrpCodeList.length === 0) return [];
+
+        return [
+            { PrpCode: "ALL", LngName: "All" },
+            ...PrpCodeList
+        ];
+    }, [PrpCodeList]);
+
     const handleLoadPress = () => {
         onLoadPress();
     };
@@ -65,10 +74,10 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                         style={styles.gradientBackground}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
-                    >                    
+                    >
                         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                             <Icon name="close" size={28} color="#fff" />
-                        </TouchableOpacity>                        
+                        </TouchableOpacity>
                         <ScrollView
                             style={styles.scrollableFormContainer}
                             contentContainerStyle={styles.scrollableFormContent}
@@ -76,7 +85,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                         >
                             <View style={{ marginBottom: 10 }} >
                                 <Text style={styles.label}>Select Property..<Text style={{ color: 'red' }}>*</Text></Text>
-                                <SearchableDropdown
+                                {/* <SearchableDropdown
                                     data={PrpCodeList}
                                     labelKey="LngName"
                                     valueKey="PrpCode"
@@ -87,10 +96,29 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                         console.log("Selected Property:", item);
                                         onPropertyCodeSelect(item);
                                     }}
-                                    multiple={false}
+                                    multiple={true}
+                                    emptyMessage="No properties available"
+                                /> */}
+                                <SearchableDropdown
+                                    data={updatedPrpCodeList}
+                                    labelKey="LngName"
+                                    valueKey="PrpCode"
+                                    placeholder="Choose property..."
+                                    pageSize={10}
+                                    initialValue={selectedPrpCode}
+                                    onSelect={(item) => {
+                                        const isAllSelected = item.some(i => i.PrpCode === "ALL");
+
+                                        if (isAllSelected) {
+                                            onPropertyCodeSelect(PrpCodeList); // 👈 full list
+                                        } else {
+                                            onPropertyCodeSelect(item);
+                                        }
+                                    }}
+                                    multiple={true}
                                     emptyMessage="No properties available"
                                 />
-                            </View>                                                  
+                            </View>
                         </ScrollView>
                         <View style={styles.loadButtonContainer}>
                             <TouchableOpacity style={styles.loadButton} onPress={handleLoadPress}>
@@ -303,7 +331,7 @@ const styles = StyleSheet.create({
         padding: 10,
     },
     scrollableFormContent: {
-        paddingBottom: 80, 
+        paddingBottom: 80,
     },
     loadButtonContainer: {
         position: 'absolute',

@@ -185,13 +185,12 @@ const APP_SECTIONS = [
             { id: '21', name: 'Purchase Order Tracking', screen: 'Purchase Order Tracking', icon: 'shopping-cart', iconColor: '#228B22' },
         ],
     },
-    // {
-    //     title: 'D',
-    //     data: [
-    //         { id: '22', name: 'Design Authorization', screen: 'Design Authorization', icon: 'edit', iconColor: '#4B0082' },
-    //     ],
-    // },
-    // 
+    {
+        title: 'D',
+        data: [
+            { id: '22', name: 'Design Authorization', screen: 'Design Authorization', icon: 'edit', iconColor: '#4B0082' },
+        ],
+    },
     {
         title: 'S',
         data: [
@@ -226,6 +225,30 @@ const APP_SECTIONS = [
         title: 'D',
         data: [
             { id: '27', name: 'Daily Payment Report', screen: 'Daily Payment Report', icon: 'payments', iconColor: '#ff2ced' },
+        ],
+    },
+    {
+        title: 'D',
+        data: [
+            { id: '27', name: 'Beam Close', screen: 'Beam Close', icon: 'all-out', iconColor: '#05010d' },
+        ],
+    },
+    {
+        title: 'C',
+        data: [
+            { id: '27', name: 'Creel Management System', screen: 'Creel Management System', icon: 'settings-system-daydream', iconColor: '#008080' },
+        ],
+    },
+    {
+        title: 'B',
+        data: [
+            { id: '28', name: 'Beam Gaiting', screen: 'Beam Gaiting', icon: 'edit', iconColor: '#142af5' },
+        ],
+    },
+    {
+        title: 'B',
+        data: [
+            { id: '29', name: 'Yarn Stock', screen: 'Yarn Stock', icon: 'autorenew', iconColor: '#008080' },
         ],
     },
     {

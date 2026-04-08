@@ -605,6 +605,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             prptype: 'S',
             txntype: 'prodorderlist'
         };
+        console.log("payload", payload);
 
         // Check cache first
         // const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);

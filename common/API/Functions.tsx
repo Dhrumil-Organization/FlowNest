@@ -1162,6 +1162,7 @@ export const fetchAllPropertyData = async (token: string) => {
                 params
             }
         );
+        console.log("response",response)
 
         if (response.data.success && response.data.response.data.length > 0) {
             const propertyGroupData = response.data.response.data;

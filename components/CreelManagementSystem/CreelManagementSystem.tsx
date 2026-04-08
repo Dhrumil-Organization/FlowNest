@@ -707,8 +707,16 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         setScannedObj({});
     };
 
-    if (!device || !hasPermission) {
-        return (<View><Text>No camera permission or device not available</Text></View>);
+    // if (!device || !hasPermission) {
+    //     return (<View><Text>No camera permission or device not available</Text></View>);
+    // }
+
+    {
+        (!device || !hasPermission) && (
+            <View style={{ alignItems: 'center', marginTop: 20 }}>
+                <Text>No camera permission or device not available</Text>
+            </View>
+        )
     }
 
     const getToken = () => {

@@ -672,9 +672,9 @@ export default function App() {
                     }</Stack.Screen>
                     <Stack.Screen name="Creel Management System">{(props) =>
                       <>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
                           <CreelManagementSystem {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
-                        </GestureHandlerRootView>
+                        </ErrorBoundary>
                       </>
                     }</Stack.Screen>
                     <Stack.Screen name="Beam Gaiting">{(props) =>

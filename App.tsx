@@ -64,6 +64,12 @@ import ReceivablesSudamo from './components/ReceivablesSudamo/ReceivablesSudamo'
 import FebricStock from './components/FebricStock/FebricStock';
 import DailyPaymentReport from './components/DailyPaymentReport/DailyPaymentReport';
 import DesignAuthorization from './components/DesignAuthorization/DesignAuthorization';
+import CreelManagementSystem from './components/CreelManagementSystem/CreelManagementSystem';
+import BeamGaiting from './components/BeamGaiting/BeamGaiting';
+import YarnStock from './components/YarnStock/YarnStock';
+
+
+
 
 
 const Stack = createNativeStackNavigator();
@@ -656,8 +662,32 @@ export default function App() {
                           <DesignAuthorization {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
                         </GestureHandlerRootView>
                       </>
-                    }</Stack.Screen>                   
+                    }</Stack.Screen>
+                    <Stack.Screen name="Creel Management System">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <CreelManagementSystem {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Beam Gaiting">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <BeamGaiting {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen> 
+
+                    <Stack.Screen name="Yarn Stock">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <YarnStock {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
+                    
                   </Stack.Navigator>
+
                 </NavigationContainer>
               ) : (
                 isConnected === false ? <OfflineFallback /> : (

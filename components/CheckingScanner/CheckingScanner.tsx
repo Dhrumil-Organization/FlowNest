@@ -101,13 +101,14 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             setPrinters([])
 
             const value = codes[0]?.value || '';
+            console.log("📦 Raw QR Value 👉", value);
 
             try {
 
                 const parsed = JSON.parse(value);
 
                 setScannedObj(parsed)
-                
+
                 setBeamNo(parsed.beamno || '');
                 setTakaNo(parsed.takano || '');
                 setBeamUid(parsed.beamuid || '');
@@ -299,7 +300,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 'X-Requested-with': 'XMLHttpRequest',
             };
             const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
-
+            console.log("response", response)
             if (response.data.success && response.data.response.data) {
                 setData(response.data.response.data);
                 setIsLoading(false);

@@ -301,6 +301,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 //strtype: 'Y',
                 strtype: strtypeFromApi
             };
+            console.log("payload", payload);
+
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -498,6 +500,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 strtype: strtypeFromApi
             };
 
+            console.log("payload", payload);
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: payload,
@@ -594,6 +597,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 strtype: strtypeFromApi
             };
 
+            console.log("payload", payload);
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: payload,

@@ -227,6 +227,24 @@ const APP_SECTIONS = [
             { id: '27', name: 'Daily Payment Report', screen: 'Daily Payment Report', icon: 'payments', iconColor: '#ff2ced' },
         ],
     },
+    {
+        title: 'C',
+        data: [
+            { id: '27', name: 'Creel Management System', screen: 'Creel Management System', icon: 'settings-system-daydream', iconColor: '#008080' },
+        ],
+    },
+    {
+        title: 'B',
+        data: [
+            { id: '28', name: 'Beam Gaiting', screen: 'Beam Gaiting', icon: 'edit', iconColor: '#142af5' },
+        ],
+    },
+    {
+        title: 'B',
+        data: [
+            { id: '29', name: 'Yarn Stock', screen: 'Yarn Stock', icon: 'autorenew', iconColor: '#008080' },
+        ],
+    },
 ];
 
 interface Props {
@@ -455,7 +473,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                                    
+
                 //                         "title": "Purchase Order Tracking",
                 //                         "href": "/"
                 //                     },
@@ -466,7 +484,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Design Authorization",
                 //                         "href": "/"
-                //                     },                                    
+                //                     },
+                //                     {
+                //                         "title": "Creel Management System",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Beam Gaiting",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Yarn Stock",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

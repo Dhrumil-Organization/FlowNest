@@ -39,7 +39,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
     const [isListReady, setIsListReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
-    const [selectedPrpCode, setSelectedPrpCode] = useState<any>(null);
+    const [selectedPrpCode, setSelectedPrpCode] = useState([]);
     const { width: screenWidth } = useWindowDimensions();
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [activeTab, setActiveTab] = useState('grey');
@@ -50,6 +50,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [isShadeVisible, setIsShadeVisible] = useState(false);
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
+
+    console.log("selectedPrpCode", selectedPrpCode)
 
     const fetchPrpCode = async () => {
         await axios
@@ -149,35 +151,28 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     });
 
     const handleConfirmAction = async () => {
-
         setIsLoading(true);
-
         const payload = {
-            prpcode: selectedPrpCode.PrpCode,
+            prpcodes: selectedPrpCode.map(item => item.PrpCode),
             prptype: "S",
             txntype: "mob_fabric_stock"
         };
-
         setPayload(payload as any);
-
+        console.log("payload", payload)
         const headers = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             'X-Requested-with': 'XMLHttpRequest',
         };
-
         try {
             const response = await axios.get(`${API}/api/appgreyinstockdata`, {
                 params: payload,
                 headers: headers
             });
-
+            console.log("response", response)
             const responseData = response?.data?.response?.data || [];
-
             if (response.data.success === true) {
-
                 if (responseData.length > 0) {
-
                     const prData = responseData.filter(item => item.dptcode == 'PR')
                     const nonPrData = responseData.filter(item => item.dptcode !== 'PR')
 
@@ -190,28 +185,44 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     setsalessumdata(responseData);
                     setsalesdataTotal(responseData.length);
                 }
-
             } else {
-
                 Alert.alert(`${response.data.message}`);
                 setGreyStockData([]);
                 setFinishStockData([]);
                 setsalesdata([]);
                 setsalessumdata([]);
             }
-
         } catch (error) {
-
             Alert.alert('Server Error');
             setsalesdata([]);
             setsalessumdata([]);
-
         } finally {
-
             setIsLoading(false);
             closeDrawer();
         }
     };
+
+    // const getItemWiseSummary = (data) => {
+
+    //     const summary = data.reduce((acc, item) => {
+
+    //         const key = item.ITMCODE;
+
+    //         if (!acc[key]) {
+
+    //             acc[key] = { ITMCODE: item.ITMCODE, ITMNAME: item.ITMNAME, TOTQTY: 0 };
+    //         }
+
+    //         const qty = parseFloat(item.TOTQTY) || 0;
+    //         acc[key].TOTQTY += qty;
+
+    //         return acc;
+
+    //     }, {});
+
+    //     return Object.values(summary);
+    // };
+
 
     const getItemWiseSummary = (data) => {
 
@@ -220,7 +231,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             const key = item.ITMCODE;
 
             if (!acc[key]) {
-
                 acc[key] = { ITMCODE: item.ITMCODE, ITMNAME: item.ITMNAME, TOTQTY: 0 };
             }
 
@@ -231,8 +241,29 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         }, {});
 
-        return Object.values(summary);
+        return Object.values(summary)
+            .sort((a, b) => a.ITMNAME.localeCompare(b.ITMNAME));
     };
+
+    // const getDesignWiseSummary = (data) => {
+
+    //     const summary = data.reduce((acc, item) => {
+
+    //         const key = item.MDSNCODE;
+
+    //         if (!acc[key]) {
+
+    //             acc[key] = { MDSNCODE: item.MDSNCODE, MDSNNAME: item.MDSNNAME, TOTQTY: 0 };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+
+    //     }, {});
+
+    //     return Object.values(summary);
+    // };
 
     const getDesignWiseSummary = (data) => {
 
@@ -241,7 +272,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             const key = item.MDSNCODE;
 
             if (!acc[key]) {
-
                 acc[key] = { MDSNCODE: item.MDSNCODE, MDSNNAME: item.MDSNNAME, TOTQTY: 0 };
             }
 
@@ -251,18 +281,54 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         }, {});
 
-        return Object.values(summary);
+        return Object.values(summary)
+            .sort((a, b) => a.MDSNNAME.localeCompare(b.MDSNNAME));
     };
 
+    // const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes') => {
+
+    //     if (!data || data.length === 0) return [];
+
+    //     const filtered = data.filter(item =>
+    //         item.SDSNCODE == mainItm?.SDSNCODE &&
+    //         (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //     );
+
+    //     const grouped = filtered.reduce((acc, item) => {
+    //         const key = item.SHDNAME || 'UNKNOWN';
+
+    //         if (!acc[key]) {
+    //             acc[key] = {
+    //                 SHDCODE: item.SHDCODE,
+    //                 SHDNAME: key,
+    //                 TOTQTY: 0
+    //             };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+    //     }, {});
+
+    //     const result = Object.values(grouped);
+
+    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
+
+    //     const allItem = {
+    //         SHDCODE: 'ALL',
+    //         SHDNAME: 'ALL [ SHADES ]',
+    //         TOTQTY: total
+    //     };
+
+    //     return [allItem, ...result];
+    // };
+
     const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes') => {
-
         if (!data || data.length === 0) return [];
-
         const filtered = data.filter(item =>
             item.SDSNCODE == mainItm?.SDSNCODE &&
             (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
         );
-
         const grouped = filtered.reduce((acc, item) => {
             const key = item.SHDNAME || 'UNKNOWN';
 
@@ -273,13 +339,12 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     TOTQTY: 0
                 };
             }
-
             acc[key].TOTQTY += Number(item.TOTQTY || 0);
-
             return acc;
         }, {});
 
-        const result = Object.values(grouped);
+        const result = Object.values(grouped)
+            .sort((a, b) => (a.SHDNAME || '').localeCompare(b.SHDNAME || ''));
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -288,7 +353,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             SHDNAME: 'ALL [ SHADES ]',
             TOTQTY: total
         };
-
         return [allItem, ...result];
     };
 
@@ -394,6 +458,45 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
     }, [selectedItem, salesdata]);
 
+    // const getAllDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+
+    //     if (!data || data.length === 0) return [];
+
+    //     const filtered = data.filter(item =>
+    //         item.ITMCODE == mainItm?.ITMCODE &&
+    //         (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //     );
+
+    //     const grouped = filtered.reduce((acc, item) => {
+    //         const key = item.MDSNNAME || 'UNKNOWN';
+
+    //         if (!acc[key]) {
+    //             acc[key] = {
+    //                 MDSNCODE: item.MDSNCODE,
+    //                 MDSNNAME: key,
+    //                 TOTQTY: 0
+    //             };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+    //     }, {});
+
+    //     const result = Object.values(grouped);
+
+    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
+
+    //     const allItem = {
+    //         MDSNCODE: 'ALL',
+    //         MDSNNAME: 'ALL [ DESIGNS ]',
+    //         TOTQTY: total
+    //     };
+
+    //     return [allItem, ...result];
+    // };
+
+
     const getAllDesignData = (mainItm = {}, data = [], flag = 'yes') => {
 
         if (!data || data.length === 0) return [];
@@ -419,7 +522,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        const result = Object.values(grouped);
+        // 👉 Alphabetical sort
+        const result = Object.values(grouped)
+            .sort((a, b) => (a.MDSNNAME || '').localeCompare(b.MDSNNAME || ''));
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -429,6 +534,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             TOTQTY: total
         };
 
+        // 👉 ALL always first
         return [allItem, ...result];
     };
 
@@ -448,8 +554,45 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }, [selectedItem, salesdata, finishStockData]
     )
 
-    const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+    // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
 
+    //     if (!data || data.length === 0) return [];
+
+    //     const filtered = data.filter(item =>
+    //         item.MDSNCODE == mainItm?.MDSNCODE &&
+    //         (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //     );
+
+    //     const grouped = filtered.reduce((acc, item) => {
+    //         const key = item.SDSNNAME || 'UNKNOWN';
+
+    //         if (!acc[key]) {
+    //             acc[key] = {
+    //                 SDSNCODE: item.SDSNCODE,
+    //                 SDSNNAME: key,
+    //                 TOTQTY: 0
+    //             };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+    //     }, {});
+
+    //     const result = Object.values(grouped);
+
+    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
+
+    //     const allItem = {
+    //         SDSNCODE: 'ALL',
+    //         SDSNNAME: 'ALL [ SUB DESIGNS ]',
+    //         TOTQTY: total
+    //     };
+
+    //     return [allItem, ...result];
+    // };
+
+    const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
         if (!data || data.length === 0) return [];
 
         const filtered = data.filter(item =>
@@ -473,7 +616,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        const result = Object.values(grouped);
+        const result = Object.values(grouped)
+            .sort((a, b) => (a.SDSNNAME || '').localeCompare(b.SDSNNAME || ''));
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -482,9 +626,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             SDSNNAME: 'ALL [ SUB DESIGNS ]',
             TOTQTY: total
         };
-
         return [allItem, ...result];
     };
+
 
     const subDesignDataLevel2 = useMemo(
 
@@ -563,12 +707,16 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                 <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
                                     {item.ITMNAME}
                                 </Text>
-                                <View style={{
-                                    backgroundColor: theme.BRAND_GRADIENT_END,  height: 28, justifyContent: 'center',
+                                {/* <View style={{
+                                    backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center',
                                     alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10
                                 }}>
                                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
-                                </View>
+                                </View> */}
+                                <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                    {Number(item.TOTQTY || 0).toFixed(3)}
+                                </Text>
+
                             </TouchableOpacity>
                         )
                     }
@@ -619,13 +767,16 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         shadowRadius: 4, elevation: 3
                                     }}>
                                     <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MDSNNAME} </Text>
-                                    <View
+                                    {/* <View
                                         style={{
-                                            backgroundColor: theme.BRAND_GRADIENT_END,  height: 28, justifyContent: 'center',
+                                            backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center',
                                             alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10
                                         }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
-                                    </View>
+                                    </View> */}
+                                    <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                    </Text>
                                 </TouchableOpacity>
                             )}
                     />
@@ -680,10 +831,13 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                     }}>
                                     <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SDSNNAME} </Text>
-                                    <View
+                                    {/* <View
                                         style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
-                                    </View>
+                                    </View> */}
+                                    <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                    </Text>
                                 </TouchableOpacity>
                             )
                         }
@@ -730,10 +884,13 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                     }} >
                                     <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
-                                    <View
-                                        style={{ backgroundColor: theme.BRAND_GRADIENT_END,  height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
+                                    {/* <View
+                                        style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
-                                    </View>
+                                    </View> */}
+                                    <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                    </Text>
                                 </View>
                             )
                         }

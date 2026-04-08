@@ -250,13 +250,7 @@ const APP_SECTIONS = [
         data: [
             { id: '29', name: 'Yarn Stock', screen: 'Yarn Stock', icon: 'autorenew', iconColor: '#008080' },
         ],
-    },
-    {
-        title: 'D',
-        data: [
-            { id: '27', name: 'Beam Close', screen: 'Beam Close', icon: 'all-out', iconColor: '#05010d' },
-        ],
-    },
+    },    
 ];
 
 interface Props {
@@ -496,7 +490,20 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Beam Close",
                 //                         "href": "/"
-                //                     }
+                //                     },
+                //                     {
+                //                         "title": "Creel Management System",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Yarn Stock",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Beam Gaiting",
+                //                         "href": "/"
+                //                     },
+
                 //                 ]
                 //             }
                 //         ]

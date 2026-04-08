@@ -1787,12 +1787,12 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
     const DetailTable = () => {
         console.log("Filtered Details:", filteredDetails);
 
-        // Data ko TRANID ke hisaab se ascending order mein sort karo
+        // Data ko NTRANDATE ke hisaab se ascending order mein sort karo
         const sortedData = [...filteredDetails].sort((a, b) =>
-            parseFloat(a.TRANID) - parseFloat(b.TRANID)
+            parseFloat(a.NTRANDATE) - parseFloat(b.NTRANDATE)
         );
 
-        console.log("Sorted Data (Ascending by TRANID):", sortedData);
+        console.log("Sorted Data (Ascending by NTRANDATE):", sortedData);
 
         // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
         let cumulativeData = [];
@@ -1814,14 +1814,14 @@ const Payable: React.FC<Props> = ({ token, navigation, isConnected, username }) 
             }
         });
 
-        console.log("Cumulative Data (Ascending by TRANID):", cumulativeData);
+        console.log("Cumulative Data (Ascending by NTRANDATE):", cumulativeData);
 
-        // Descending order mein sort karo (TRANID ko number mein convert karke)
+        // Descending order mein sort karo (NTRANDATE ko number mein convert karke)
         const finalData = cumulativeData.sort((a, b) =>
-            parseFloat(b.TRANID) - parseFloat(a.TRANID)
+            parseFloat(b.NTRANDATE) - parseFloat(a.NTRANDATE)
         );
 
-        console.log("Final Data (Descending by TRANID):", finalData);
+        console.log("Final Data (Descending by NTRANDATE):", finalData);
 
         // Columns definition
         const detailColumns = [

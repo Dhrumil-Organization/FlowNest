@@ -63,14 +63,11 @@ import ProcessCompleteAuth from './components/ProcessCompleteAuth/ProcessComplet
 import ReceivablesSudamo from './components/ReceivablesSudamo/ReceivablesSudamo';
 import FebricStock from './components/FebricStock/FebricStock';
 import DailyPaymentReport from './components/DailyPaymentReport/DailyPaymentReport';
+import BeamClose from './components/BeamClose/BeamClose';
 import DesignAuthorization from './components/DesignAuthorization/DesignAuthorization';
 import CreelManagementSystem from './components/CreelManagementSystem/CreelManagementSystem';
 import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
-
-
-
-
 
 const Stack = createNativeStackNavigator();
 
@@ -656,6 +653,15 @@ export default function App() {
                         </GestureHandlerRootView>
                       </>
                     }</Stack.Screen>
+
+                    <Stack.Screen name="Beam Close">
+                      {
+                        (props) =>
+                          <>
+                            <BeamClose {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                          </>
+                      }
+                    </Stack.Screen>
                     <Stack.Screen name="Design Authorization">{(props) =>
                       <>
                         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -685,7 +691,6 @@ export default function App() {
                         </GestureHandlerRootView>
                       </>
                     }</Stack.Screen>
-                    
                   </Stack.Navigator>
 
                 </NavigationContainer>

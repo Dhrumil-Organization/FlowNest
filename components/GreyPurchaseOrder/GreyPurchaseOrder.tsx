@@ -219,6 +219,16 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
     let cancelToken: any;
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
+
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -234,7 +244,7 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         cancelToken = axios.CancelToken.source();
         setIsLoadingYPO(true);
         try {
-            const payload = { txntype: 'purchase_order_detail', referrer: 'dashboard', prptype: 'S', yearno: '26', atype: 'B', strtype: 'G' };
+            const payload = { txntype: 'purchase_order_detail', referrer: 'dashboard', prptype: 'S', yearno: getCurrentFinancialYear(), atype: 'B', strtype: 'G' };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/purchaseorderbrowse`,
                 `${API}/api/purchaseorderbrowse`,
@@ -323,7 +333,7 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 txntype: 'purchase_order_detail',
                 referrer: 'dashboard',
                 prptype: 'S',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 atype: 'H',
                 strtype: 'G'
             };
@@ -367,7 +377,7 @@ const GreyPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 txntype: 'purchase_order_detail',
                 referrer: 'dashboard',
                 prptype: 'S',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 atype: 'A',
                 strtype: 'G'
             };

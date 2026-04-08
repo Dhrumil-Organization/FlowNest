@@ -39,7 +39,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
     const [isListReady, setIsListReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
-    const [selectedPrpCode, setSelectedPrpCode] = useState([]);
+    const [selectedPrpCode, setSelectedPrpCode] = useState<any>(null);
     const { width: screenWidth } = useWindowDimensions();
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [activeTab, setActiveTab] = useState('grey');
@@ -50,8 +50,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [isShadeVisible, setIsShadeVisible] = useState(false);
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
-
-    console.log("selectedPrpCode", selectedPrpCode)
 
     const fetchPrpCode = async () => {
         await axios
@@ -151,28 +149,35 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     });
 
     const handleConfirmAction = async () => {
+
         setIsLoading(true);
+
         const payload = {
-            prpcodes: selectedPrpCode.map(item => item.PrpCode),
+            prpcode: selectedPrpCode.PrpCode,
             prptype: "S",
             txntype: "mob_fabric_stock"
         };
+
         setPayload(payload as any);
-        console.log("payload", payload)
+
         const headers = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             'X-Requested-with': 'XMLHttpRequest',
         };
+
         try {
             const response = await axios.get(`${API}/api/appgreyinstockdata`, {
                 params: payload,
                 headers: headers
             });
-            console.log("response", response)
+
             const responseData = response?.data?.response?.data || [];
+
             if (response.data.success === true) {
+
                 if (responseData.length > 0) {
+
                     const prData = responseData.filter(item => item.dptcode == 'PR')
                     const nonPrData = responseData.filter(item => item.dptcode !== 'PR')
 
@@ -185,18 +190,24 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     setsalessumdata(responseData);
                     setsalesdataTotal(responseData.length);
                 }
+
             } else {
+
                 Alert.alert(`${response.data.message}`);
                 setGreyStockData([]);
                 setFinishStockData([]);
                 setsalesdata([]);
                 setsalessumdata([]);
             }
+
         } catch (error) {
+
             Alert.alert('Server Error');
             setsalesdata([]);
             setsalessumdata([]);
+
         } finally {
+
             setIsLoading(false);
             closeDrawer();
         }
@@ -223,47 +234,45 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     //     return Object.values(summary);
     // };
 
+    const getItemWiseSummary = (data = [], filter1 = true, filter2 = true, order = 'asc') => {
 
-    const getItemWiseSummary = (data) => {
+        if (!data || data.length === 0) return [];
 
-        const summary = data.reduce((acc, item) => {
+        // 🔽 FILTER (2 conditions)
+        const filtered = data.filter(item =>
+            (filter1 ? item.dptcode === 'PR' : true) &&   // 👉 filter 1
+            (filter2 ? item.TOTQTY > 0 : true)            // 👉 filter 2
+        );
 
+        // 🔽 GROUP + SUM
+        const summary = filtered.reduce((acc, item) => {
             const key = item.ITMCODE;
 
             if (!acc[key]) {
-                acc[key] = { ITMCODE: item.ITMCODE, ITMNAME: item.ITMNAME, TOTQTY: 0 };
+                acc[key] = {
+                    ITMCODE: item.ITMCODE,
+                    ITMNAME: item.ITMNAME,
+                    TOTQTY: 0
+                };
             }
 
             const qty = parseFloat(item.TOTQTY) || 0;
             acc[key].TOTQTY += qty;
 
             return acc;
-
         }, {});
 
-        return Object.values(summary)
-            .sort((a, b) => a.ITMNAME.localeCompare(b.ITMNAME));
+        let result = Object.values(summary);
+
+        // 🔽 NAME se sorting
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.ITMNAME || '').localeCompare(b.ITMNAME || '')
+                : (b.ITMNAME || '').localeCompare(a.ITMNAME || '')
+        );
+
+        return result;
     };
-
-    // const getDesignWiseSummary = (data) => {
-
-    //     const summary = data.reduce((acc, item) => {
-
-    //         const key = item.MDSNCODE;
-
-    //         if (!acc[key]) {
-
-    //             acc[key] = { MDSNCODE: item.MDSNCODE, MDSNNAME: item.MDSNNAME, TOTQTY: 0 };
-    //         }
-
-    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
-
-    //         return acc;
-
-    //     }, {});
-
-    //     return Object.values(summary);
-    // };
 
     const getDesignWiseSummary = (data) => {
 
@@ -272,6 +281,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             const key = item.MDSNCODE;
 
             if (!acc[key]) {
+
                 acc[key] = { MDSNCODE: item.MDSNCODE, MDSNNAME: item.MDSNNAME, TOTQTY: 0 };
             }
 
@@ -281,54 +291,26 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         }, {});
 
-        return Object.values(summary)
-            .sort((a, b) => a.MDSNNAME.localeCompare(b.MDSNNAME));
+        return Object.values(summary);
     };
 
-    // const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes') => {
-
-    //     if (!data || data.length === 0) return [];
-
-    //     const filtered = data.filter(item =>
-    //         item.SDSNCODE == mainItm?.SDSNCODE &&
-    //         (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
-    //     );
-
-    //     const grouped = filtered.reduce((acc, item) => {
-    //         const key = item.SHDNAME || 'UNKNOWN';
-
-    //         if (!acc[key]) {
-    //             acc[key] = {
-    //                 SHDCODE: item.SHDCODE,
-    //                 SHDNAME: key,
-    //                 TOTQTY: 0
-    //             };
-    //         }
-
-    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
-
-    //         return acc;
-    //     }, {});
-
-    //     const result = Object.values(grouped);
-
-    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
-
-    //     const allItem = {
-    //         SHDCODE: 'ALL',
-    //         SHDNAME: 'ALL [ SHADES ]',
-    //         TOTQTY: total
-    //     };
-
-    //     return [allItem, ...result];
-    // };
-
     const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes') => {
+
+        let filtered = [];
+
         if (!data || data.length === 0) return [];
-        const filtered = data.filter(item =>
-            item.SDSNCODE == mainItm?.SDSNCODE &&
-            (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
-        );
+
+        if (mainItm && mainItm.SDSNCODE == 'ALL' && mainItm.SDSNNAME == 'ALL [ SUB DESIGNS ]') {
+
+            filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+
+        } else {
+            filtered = data.filter(item =>
+                item.SDSNCODE == mainItm?.SDSNCODE &&
+                (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+            );
+        }
+
         const grouped = filtered.reduce((acc, item) => {
             const key = item.SHDNAME || 'UNKNOWN';
 
@@ -339,12 +321,19 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     TOTQTY: 0
                 };
             }
+
             acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
             return acc;
         }, {});
 
-        const result = Object.values(grouped)
-            .sort((a, b) => (a.SHDNAME || '').localeCompare(b.SHDNAME || ''));
+        const result = Object.values(grouped);
+
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.SHDNAME || '').localeCompare(b.SHDNAME || '')
+                : (b.SHDNAME || '').localeCompare(a.SHDNAME || '')
+        );
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -353,6 +342,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             SHDNAME: 'ALL [ SHADES ]',
             TOTQTY: total
         };
+
         return [allItem, ...result];
     };
 
@@ -462,10 +452,18 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
     //     if (!data || data.length === 0) return [];
 
-    //     const filtered = data.filter(item =>
-    //         item.ITMCODE == mainItm?.ITMCODE &&
-    //         (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
-    //     );
+    //     let filtered = [];
+
+    //     if (mainItm && mainItm.ITMCODE == 'ALL' && mainItm.ITMNAME == 'ALL [ ITEMS ]') {
+
+    //         filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+
+    //     } else {
+    //         filtered = data.filter(item =>
+    //             item.ITMCODE == mainItm?.ITMCODE &&
+    //             (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //         );
+    //     }
 
     //     const grouped = filtered.reduce((acc, item) => {
     //         const key = item.MDSNNAME || 'UNKNOWN';
@@ -485,6 +483,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
     //     const result = Object.values(grouped);
 
+
+
     //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
     //     const allItem = {
@@ -496,16 +496,27 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     //     return [allItem, ...result];
     // };
 
-
-    const getAllDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+    const getAllDesignData = (mainItm = {}, data = [], flag = 'yes', order = 'asc') => {
 
         if (!data || data.length === 0) return [];
 
-        const filtered = data.filter(item =>
-            item.ITMCODE == mainItm?.ITMCODE &&
-            (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
-        );
+        let filtered = [];
 
+        // 🔽 FILTER
+        if (mainItm && mainItm.ITMCODE == 'ALL' && mainItm.ITMNAME == 'ALL [ ITEMS ]') {
+
+            filtered = data.filter(item =>
+                flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'
+            );
+
+        } else {
+            filtered = data.filter(item =>
+                item.ITMCODE == mainItm?.ITMCODE &&
+                (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+            );
+        }
+
+        // 🔽 GROUP + SUM
         const grouped = filtered.reduce((acc, item) => {
             const key = item.MDSNNAME || 'UNKNOWN';
 
@@ -522,10 +533,16 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        // 👉 Alphabetical sort
-        const result = Object.values(grouped)
-            .sort((a, b) => (a.MDSNNAME || '').localeCompare(b.MDSNNAME || ''));
+        let result = Object.values(grouped);
 
+        // 🔽 NAME se sorting
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.MDSNNAME || '').localeCompare(b.MDSNNAME || '')
+                : (b.MDSNNAME || '').localeCompare(a.MDSNNAME || '')
+        );
+
+        // 🔽 TOTAL
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
         const allItem = {
@@ -534,7 +551,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             TOTQTY: total
         };
 
-        // 👉 ALL always first
         return [allItem, ...result];
     };
 
@@ -554,51 +570,21 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }, [selectedItem, salesdata, finishStockData]
     )
 
-    // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
-
-    //     if (!data || data.length === 0) return [];
-
-    //     const filtered = data.filter(item =>
-    //         item.MDSNCODE == mainItm?.MDSNCODE &&
-    //         (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
-    //     );
-
-    //     const grouped = filtered.reduce((acc, item) => {
-    //         const key = item.SDSNNAME || 'UNKNOWN';
-
-    //         if (!acc[key]) {
-    //             acc[key] = {
-    //                 SDSNCODE: item.SDSNCODE,
-    //                 SDSNNAME: key,
-    //                 TOTQTY: 0
-    //             };
-    //         }
-
-    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
-
-    //         return acc;
-    //     }, {});
-
-    //     const result = Object.values(grouped);
-
-    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
-
-    //     const allItem = {
-    //         SDSNCODE: 'ALL',
-    //         SDSNNAME: 'ALL [ SUB DESIGNS ]',
-    //         TOTQTY: total
-    //     };
-
-    //     return [allItem, ...result];
-    // };
-
     const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+
+        let filtered = [];
         if (!data || data.length === 0) return [];
 
-        const filtered = data.filter(item =>
-            item.MDSNCODE == mainItm?.MDSNCODE &&
-            (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
-        );
+        if (mainItm && mainItm.MDSNCODE == 'ALL' && mainItm.MDSNNAME == 'ALL [ DESIGNS ]') {
+
+            filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+
+        } else {
+            filtered = data.filter(item =>
+                item.MDSNCODE == mainItm?.MDSNCODE &&
+                (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+            );
+        }
 
         const grouped = filtered.reduce((acc, item) => {
             const key = item.SDSNNAME || 'UNKNOWN';
@@ -616,8 +602,13 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        const result = Object.values(grouped)
-            .sort((a, b) => (a.SDSNNAME || '').localeCompare(b.SDSNNAME || ''));
+        const result = Object.values(grouped);
+
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.SDSNNAME || '').localeCompare(b.SDSNNAME || '')
+                : (b.SDSNNAME || '').localeCompare(a.SDSNNAME || '')
+        );
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -626,9 +617,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             SDSNNAME: 'ALL [ SUB DESIGNS ]',
             TOTQTY: total
         };
+
         return [allItem, ...result];
     };
-
 
     const subDesignDataLevel2 = useMemo(
 
@@ -716,7 +707,6 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                 <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
                                     {Number(item.TOTQTY || 0).toFixed(3)}
                                 </Text>
-
                             </TouchableOpacity>
                         )
                     }

@@ -1184,6 +1184,7 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
         cancelToken = axios.CancelToken.source();
 
         let params = { prpcode: prpcd };
+        console.log("`${API}/api/getyear` :", `${API}/api/getyear`);
         const response = await axios.get(
             `${API}/api/getyear`,
             {
@@ -1195,6 +1196,7 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
                 params
             }
         );
+        console.log("response :", response);
 
         if (response.data.response.data && response.data.response.data.length > 0) {
             const appYdata = response.data.response.data;
@@ -1219,7 +1221,7 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
 
         let params = {
             prpcode: prp, yearno: yrno, txntype: txn,
-             prptype: userPtype
+            prptype: userPtype
             // prptype: 'R'
         };
         const response = await axios.get(
@@ -1248,3 +1250,46 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
         return [];
     }
 }
+
+export const getCurrentFinancialYearMain = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+    // Financial year starts in April
+    const financialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+    const financialYearEnd = financialYearStart + 1;
+
+    return `${financialYearStart}-${financialYearEnd}`;
+};
+
+// Fot future year
+// const generateFinancialYearOptions = (currentYear: number, range: number = 4) => {
+//     const years = [];
+//     const currentFinancialYearStart = currentYear - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
+
+//     for (let i = -range; i <= range; i++) {
+//         const startYear = currentFinancialYearStart + i;
+//         const endYear = startYear + 1;
+//         years.push(`${startYear}-${endYear}`);
+//     }
+
+//     return years;
+// };
+
+// without Not future
+export const generateFinancialYearOptions = (currentYear: number, range: number = 4) => {
+    const years = [];
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+    const currentFinancialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+
+    // Generate the last 'range' financial years including the current financial year
+    for (let i = 0; i <= range; i++) {
+        const startYear = currentFinancialYearStart - i;
+        const endYear = startYear + 1;
+        years.push(`${startYear}-${endYear}`);
+    }
+
+    return years;
+};

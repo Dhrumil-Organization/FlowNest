@@ -636,6 +636,16 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         setToDate(today);
     }, []);
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
+
     let cancelToken: any;
 
     const getRequestConfig = (props: any) => ({
@@ -667,7 +677,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',
@@ -702,7 +712,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         try {
             const payload = {
                 prpcode: 'SIP',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 strcode: '012',
                 itmcode: '',
                 dsncode: '',
@@ -717,7 +727,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         itmcode: '',
                         dsncode: '',
@@ -753,7 +763,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         try {
             const payload = {
                 // prpcode: 'SIP',
-                // yearno: '26',
+                // yearno: getCurrentFinancialYear(),
                 // strcode: '012',
                 // itmcode: '',
                 // dsncode: '',
@@ -763,7 +773,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 // fetch: 'itm',
                 // txntype: 'production_order_track'
                 prpcode: 'SIP',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 strcode: '012',
                 txntype: 'production_order_track',
                 prptype: '',
@@ -779,7 +789,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',

@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API } from '../../../common/API/dynamicAPI';
 import { debounce } from 'lodash';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBarwithBack from '../../HeaderBarwithBack/HeaderBarwithBack';
+import theme from '../../../android/app/src/theme';
+import FullScreenLoader from '../../FullScreenLoader/FullScreenLoader';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
@@ -60,6 +62,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
     const [renderedOrders, setRenderedOrders] = useState<PartyDetail[]>([]);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [apiloading, setAPILoading] = useState(false);
     const [isAccordionOpen, setIsAccordionOpen] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [getChallanPayload, setChallanPayload] = useState({});
@@ -190,6 +193,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
     const handleCardPress = async (order: PartyDetail) => {
         console.log("Selected Order Data:", JSON.stringify(order, null, 2));
         console.log("Selected Order Data123:", order, getChallanPayload);
+        setAPILoading(true);
         // navigation.navigate('Taka Checking Entry View Data', { party: partyData.partyname });
         // navigation.navigate('Taka Checking Entry View Data');
         const headers = {
@@ -204,8 +208,8 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 ...getChallanPayload,
                 fromdate: "",
                 todate: "",
-                uid: order.srno,
-                srno: order.uid,
+                uid: order.uid,
+                srno: order.srno,
             };
             const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
             // const response = {
@@ -462,7 +466,9 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             //         "responseURL": "https://apig.tms-webapp.com/api/salesorderpartychallantracking"
             //     }
             // }
+            console.log("I am here:", response, payload);
             if (response.data.success === true) {
+                setAPILoading(false);
                 console.log("I am here:", response.data);
                 // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
                 await AsyncStorage.setItem('parties_tracking_details_challan_response', JSON.stringify(response.data));
@@ -473,9 +479,11 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 console.log("Response Data:", response);
             }
         } catch (error) {
+            setAPILoading(false);
             console.error("Error in handleCardPress:", error);
             Alert.alert("Error", "Failed to process party details");
         } finally {
+            setAPILoading(false);
             // setTrackingLoader(false);
         }
     };
@@ -562,6 +570,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
 
     return (
         <>
+            {apiloading && <FullScreenLoader />}
             <HeaderBarwithBack
                 userName={''}
                 header={party && party?.partyname || party || ""}
@@ -570,13 +579,22 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             />
 
             <View style={styles.searchContainer}>
+                {apiloading ? <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} /> : <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search Sales Orders..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />}
+            </View>
+
+            {/* <View style={styles.searchContainer}>
                 <TextInput
                     style={styles.searchInput}
                     placeholder="Search Sales Orders..."
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                 />
-            </View>
+            </View> */}
 
             <ScrollView style={styles.container}>
                 <TouchableOpacity

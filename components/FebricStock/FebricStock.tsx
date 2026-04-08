@@ -570,14 +570,68 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }, [selectedItem, salesdata, finishStockData]
     )
 
-    const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+    // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+
+    //     let filtered = [];
+    //     if (!data || data.length === 0) return [];
+
+    //     if (mainItm && mainItm.MDSNCODE == 'ALL' && mainItm.MDSNNAME == 'ALL [ DESIGNS ]') {
+
+    //         filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+
+    //     } else {
+    //         filtered = data.filter(item =>
+    //             item.MDSNCODE == mainItm?.MDSNCODE &&
+    //             (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //         );
+    //     }
+
+    //     const grouped = filtered.reduce((acc, item) => {
+    //         const key = item.SDSNNAME || 'UNKNOWN';
+
+    //         if (!acc[key]) {
+    //             acc[key] = {
+    //                 SDSNCODE: item.SDSNCODE,
+    //                 SDSNNAME: key,
+    //                 TOTQTY: 0
+    //             };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+    //     }, {});
+
+    //     const result = Object.values(grouped);
+
+    //     result.sort((a, b) =>
+    //         order === 'asc'
+    //             ? (a.SDSNNAME || '').localeCompare(b.SDSNNAME || '')
+    //             : (b.SDSNNAME || '').localeCompare(a.SDSNNAME || '')
+    //     );
+
+    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
+
+    //     const allItem = {
+    //         SDSNCODE: 'ALL',
+    //         SDSNNAME: 'ALL [ SUB DESIGNS ]',
+    //         TOTQTY: total
+    //     };
+
+    //     return [allItem, ...result];
+    // };
+
+    const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes', order = 'asc') => {
 
         let filtered = [];
         if (!data || data.length === 0) return [];
 
+        // 🔽 FILTER
         if (mainItm && mainItm.MDSNCODE == 'ALL' && mainItm.MDSNNAME == 'ALL [ DESIGNS ]') {
 
-            filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+            filtered = data.filter(item =>
+                flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'
+            );
 
         } else {
             filtered = data.filter(item =>
@@ -586,6 +640,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             );
         }
 
+        // 🔽 GROUP
         const grouped = filtered.reduce((acc, item) => {
             const key = item.SDSNNAME || 'UNKNOWN';
 
@@ -602,8 +657,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        const result = Object.values(grouped);
+        let result = Object.values(grouped);
 
+        // 🔽 SORT (ab error nahi aayega)
         result.sort((a, b) =>
             order === 'asc'
                 ? (a.SDSNNAME || '').localeCompare(b.SDSNNAME || '')

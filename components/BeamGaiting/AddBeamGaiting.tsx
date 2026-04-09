@@ -773,26 +773,20 @@ const CartonAddDrawer = (props) => {
     const formatDate = (date) => {
         if (!date) return "";
         const d = new Date(date);
-
         const day = String(d.getDate()).padStart(2, '0');
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const year = d.getFullYear();
-
         return `${day}-${month}-${year}`;
     };
 
     const onChangeDate = (event, selectedDate) => {
         setDateType(null);
-
         if (event.type === "dismissed") return;
-
         if (selectedDate) {
             let field = "";
-
             if (dateType === "vou") field = "VouDate";
             if (dateType === "start") field = "BStDate";
             if (dateType === "end") field = "BEndDate";
-
             setFormState(prev => ({
                 ...prev,
                 values: {
@@ -803,12 +797,9 @@ const CartonAddDrawer = (props) => {
         }
     };
 
-
     const formatTime = (date) => {
         if (!date) return "";
-
         const d = new Date(date);
-
         const hours = String(d.getHours()).padStart(2, '0');
         const minutes = String(d.getMinutes()).padStart(2, '0');
 
@@ -911,10 +902,10 @@ const CartonAddDrawer = (props) => {
                                                 borderTopLeftRadius: 10,
                                                 borderTopRightRadius: 10
                                             }}>
-                                                <Text style={{ flex: 1, fontWeight: 'bold' }}>Code</Text>
-                                                <Text style={{ flex: 2, fontWeight: 'bold' }}>Name</Text>
-                                                <Text style={{ flex: 1, fontWeight: 'bold' }}>Prp</Text>
-                                                <Text style={{ flex: 1, fontWeight: 'bold' }}>Loc</Text>
+                                                <Text style={{ flex: 1, fontWeight: 'bold', color: '#000' }}>Code</Text>
+                                                <Text style={{ flex: 2, fontWeight: 'bold', color: '#000' }}>Name</Text>
+                                                <Text style={{ flex: 1, fontWeight: 'bold', color: '#000' }}>Prp</Text>
+                                                <Text style={{ flex: 1, fontWeight: 'bold', color: '#000' }}>Loc</Text>
                                             </View>
 
                                             {/* ✅ FIX: FlatList removed */}
@@ -948,10 +939,10 @@ const CartonAddDrawer = (props) => {
                                                             setVisible(false);
                                                         }}
                                                     >
-                                                        <Text style={{ flex: 1 }}>{item.MacCode}</Text>
-                                                        <Text style={{ flex: 2 }}>{item.MacName}</Text>
-                                                        <Text style={{ flex: 1 }}>{item.PrpCode}</Text>
-                                                        <Text style={{ flex: 1 }}>{item.Location}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.MacCode}</Text>
+                                                        <Text style={{ flex: 2, color: '#000' }}>{item.MacName}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.PrpCode}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.Location}</Text>
                                                     </TouchableOpacity>
                                                 ))}
                                             </ScrollView>
@@ -1171,10 +1162,10 @@ const CartonAddDrawer = (props) => {
                                                             checkvoucher(updatedValues);
                                                         }}
                                                     >
-                                                        <Text style={{ flex: 1 }}>{item.BeamNo}</Text>
-                                                        <Text style={{ flex: 1 }}>{item.UBeamNo}</Text>
-                                                        <Text style={{ flex: 1 }}>{item.WarpLen}</Text>
-                                                        <Text style={{ flex: 1 }}>{item.PrpCode}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.BeamNo}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.UBeamNo}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.WarpLen}</Text>
+                                                        <Text style={{ flex: 1, color: '#000' }}>{item.PrpCode}</Text>
                                                     </TouchableOpacity>
                                                 ))}
                                             </ScrollView>

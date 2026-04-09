@@ -250,7 +250,7 @@ const APP_SECTIONS = [
         data: [
             { id: '29', name: 'Yarn Stock', screen: 'Yarn Stock', icon: 'autorenew', iconColor: '#008080' },
         ],
-    },    
+    },
 ];
 
 interface Props {
@@ -503,7 +503,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Beam Gaiting",
                 //                         "href": "/"
                 //                     },
-
+                //                     {
+                //                         "title": "Taka Checking Entry",
+                //                         "href": "/"
+                //                     },                                
                 //                 ]
                 //             }
                 //         ]

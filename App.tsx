@@ -608,7 +608,7 @@ export default function App() {
                         (props) =>
                           <>
                             <CheckingScanner {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-                            <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                           </>
                       }
                     </Stack.Screen>

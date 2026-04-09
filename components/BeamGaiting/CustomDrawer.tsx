@@ -52,7 +52,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         },
         title: {
             fontSize: 16,
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            color: '#000'
         },
         yearItem: {
             padding: 12,
@@ -66,7 +67,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             borderColor: '#007EA7'
         },
         yearText: {
-            fontSize: 14
+            fontSize: 14,
+            color: '#000'
         },
         loadBtn: {
             marginTop: 10,
@@ -90,11 +92,9 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     <View style={styles.header}>
                         <Text style={styles.title}>Select Year</Text>
                         <TouchableOpacity onPress={onClose}>
-                            <Icon name="close" size={22} color="#333" />
+                            <Icon name="close" size={22} color="#000" />
                         </TouchableOpacity>
                     </View>
-
-                    {/* YEAR LIST */}
                     {getAllYearData?.length > 0 ? (
                         getAllYearData.map((item: any, index: number) => (
                             <TouchableOpacity
@@ -104,7 +104,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                     FormState?.values?.YearNo === item.YearNo && styles.selectedYear
                                 ]}
                                 onPress={() => {
-                                    // ✅ EXACT dropdown jaisa behavior
                                     setFormState((prev: any) => ({
                                         ...prev,
                                         values: {

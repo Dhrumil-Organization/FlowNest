@@ -1,13 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Button
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import FullScreenLoader from '../Loader/Loader';
@@ -20,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView } from 'react-native';
 import Snackbar from 'react-native-snackbar';
 import { Switch } from 'react-native';
+import PartyDropdown from '../Shared/PartyDropdown';
 interface Props {
     token: string;
     navigation: any;
@@ -58,7 +51,14 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [getSavedData, setSavedData] = useState([]);
     const [isMending, setIsMending] = useState(false);
     const [getPrinters, setPrinters] = useState([])
-    const [printer, setPrinter] = useState('')
+    const [printer, setPrinter] = useState('');
+    const [selectedMachine, setSelectedMachine] = useState(null);
+    //
+    const [showManualPopup, setShowManualPopup] = useState(false);
+    const [machinedata, setMachineData] = useState([]);
+    const [FormState, setFormState] = useState({
+        values: {}
+    });
 
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
@@ -71,11 +71,17 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         cancelToken: cancelToken?.token,
     });
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2);
+    };
+
     useEffect(() => {
         requestPermission();
     }, []);
-
-    // if (!device || !hasPermission) return null;
 
     const codeScanner = useCodeScanner({
         codeTypes: ['qr'],
@@ -106,9 +112,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             try {
 
                 const parsed = JSON.parse(value);
-
                 setScannedObj(parsed)
-
                 setBeamNo(parsed.beamno || '');
                 setTakaNo(parsed.takano || '');
                 setBeamUid(parsed.beamuid || '');
@@ -121,9 +125,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 getCheckers(parsed)
                 getShifts(parsed)
                 sendScannedValue(value);
-
             } catch (err) {
-
                 setBeamNo('');
                 setTakaNo('');
                 setBeamUid('');
@@ -143,7 +145,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 setShift('')
                 setPrinter('')
                 setPrinters([])
-
                 Alert.alert("Invalid QR", "QR format not valid");
             }
             setIsScanning(false);
@@ -292,8 +293,10 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 referrer: 'dashboard',
                 scannedString: temp,
                 prpcode: temp.prpcode,
-                yearno: yno
+                // yearno: yno
+                yearno: '26'
             };
+            console.log("infoPyload", infoPyload)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
@@ -609,6 +612,247 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         }
     }
 
+    const handleChange = (key, value) => {
+        setFormState(prev => ({
+            ...prev,
+            values: {
+                ...prev.values,
+                [key]: value
+            }
+        }));
+    };
+
+    const fetchmachine = async () => {
+        try {
+            setIsLoading(true);
+            if (cancelToken?.cancel) cancelToken.cancel();
+            cancelToken = axios.CancelToken.source();
+            const historyPayload = {
+                prptype: 'S',
+                yearno: getCurrentFinancialYear(),
+                txntype: 'manual_checking',
+                fetch: 'manual_checking_machine_help',
+            };
+            console.log("Payload:", historyPayload);
+            const response = await axios.get(
+                `${API}/api/prodbeamdetailbrowsesudo`,
+                getRequestConfig({
+                    params: { ...historyPayload },
+                    cancelToken: cancelToken.token
+                })
+            );
+            console.log("Machine API Response:", response);
+            const data = response?.data?.data || [];
+            if (response?.data?.success && data.length > 0) {
+                setMachineData(data);
+            } else {
+                setMachineData([]);
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                console.log("Request cancelled:", error.message);
+            } else {
+                console.log("API getshifts error:", error);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const soshow = async () => {
+        setIsLoading(true);
+        try {
+            const historyPayload = {
+                prptype: 'S',
+                yearno: getCurrentFinancialYear(),
+                txntype: 'manual_checking',
+                MacCode: '',
+                TakaNo: ''
+            };
+            const response = await axios.get(
+                `${API}/api/get_manual_checking_detail`,
+                getRequestConfig({
+                    params: { ...historyPayload }
+                })
+            );
+
+            console.log("soshow response", response);
+
+            const mainData = response?.data?.data?.main || [];
+            const newMain = response?.data?.data?.new_main || [];
+
+            // ✅ SAFE CHECK
+            if (response?.data?.success && mainData.length > 0) {
+
+                console.log("Main Data 👉", mainData);
+                if (newMain.length > 0 && typeof newMain[0] === 'object') {
+                    const first = newMain[0];
+                    setFormState(prev => ({
+                        ...prev,
+                        values: {
+                            ...first
+                        }
+                    }));
+                }
+                setShowManualPopup(true);
+                fetchmachine();
+
+            } else {
+                Alert.alert("No Data Found");
+            }
+        } catch (error) {
+            console.log("API error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const showAlert = (message) => {
+        return new Promise((resolve) => {
+            Alert.alert(
+                'Validation Error',
+                message,
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => resolve(true),
+                    },
+                ],
+                { cancelable: false }
+            );
+        });
+    };
+
+    const validateForm = async () => {
+        const qty = parseFloat(FormState.values.Qty);
+        if (!FormState.values.MacCode) {
+            await showAlert('Please select a valid machine');
+            return false;
+        }
+
+        if (!FormState.values.TakaNo) {
+            await showAlert('Please Enter TakaNo');
+            return false;
+        }
+
+        if (!FormState.values.DsnName) {
+            await showAlert('Please Enter Design');
+            return false;
+        }
+        if (
+            FormState.values.Qty === '' ||
+            isNaN(qty) ||
+            qty <= 0
+        ) {
+            await showAlert('Please Enter valid Qty');
+            return false;
+        }
+        return true;
+    };
+
+    const handleClearForm = () => {
+        setFormState(prev => ({
+            ...prev,
+            values: {
+                ...prev.values,
+
+                MacCode: "",
+                TakaNo: "",
+                DsnName: "",
+                Qty: "",
+                BalQty: "",
+                UsrCode: "",
+                LastDate: "",
+                LastTime: "",
+                UUsrCode: "",
+                ULastDate: "",
+                ULastTime: "",
+                MacName: "",
+                isedit: "",
+            }
+        }));
+        setSelectedMachine(null);
+
+    };
+
+    const handlesave = async () => {
+        const isValid = await validateForm();
+        if (!isValid) return;
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            const payloadObj = {
+                ...FormState.values,
+                prptype: "S",
+                txntype: "manual_checking",
+                yearno: getCurrentFinancialYear(),
+            };
+
+            console.log("payload...........333", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/add_edit_manual_checking_detail`, payloadObj, { headers });
+            console.log("response", response);
+
+            if (response.data.success === true) {
+
+                Alert.alert(
+                    "Success",
+                    "Data Saved Successfully ✅",
+                    [
+                        {
+                            text: "OK",
+                            onPress: async () => {
+                                handleClearForm();
+                                setShowManualPopup(false);
+                            }
+                        }
+                    ]
+                );
+
+            }
+            else if (response.data.success === false) {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: `⚠️ ${response.data.message}`,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#D32F2F',   // 🔥 RED (error)
+                    textColor: '#fff',
+                    numberOfLines: 2,
+                    action: {
+                        text: 'OK',
+                        textColor: '#fff',
+                        onPress: () => { }
+                    },
+                });
+            } else {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
     return (
         <>
             {isLoading && <FullScreenLoader />}
@@ -617,6 +861,21 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 header={'Checking scanner'}
                 subHeader={'scan with QR code'}
             />
+            {/* <View style={{ flexDirection: 'row', justifyContent: 'flex-start', margin: 10 }}>
+                <TouchableOpacity
+                    style={{
+                        backgroundColor: '#007EA7',
+                        paddingVertical: 5,
+                        paddingHorizontal: 10,
+                        borderRadius: 20
+                    }}
+                    onPress={soshow}
+                >
+                    <Text style={{ color: '#fff', fontSize: 14 }}>
+                        Manual Entry
+                    </Text>
+                </TouchableOpacity>
+            </View> */}
             <View style={checkingScannerStyles.flexContainer}>
                 <Icon name="camera" style={checkingScannerStyles.cameraIcon} />
                 <Text style={checkingScannerStyles.titleTextWithIcon}> QR scanner </Text>
@@ -626,10 +885,12 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     onPress={() => setIsScanning(!isScanning)}
                 />
             </View>
+
             <ScrollView
                 style={checkingScannerStyles.container}
                 contentContainerStyle={{ paddingBottom: 40 }}
-                keyboardShouldPersistTaps="handled">
+                keyboardShouldPersistTaps="handled"
+                >
                 {
                     isScanning &&
                     (
@@ -643,7 +904,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                         codeScanner={codeScanner}
                                     />
                                 )}
-                                {/* Overlay */}
                                 <View style={checkingScannerStyles.overlay}>
                                     <View style={checkingScannerStyles.scanBox} />
                                 </View>
@@ -677,7 +937,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             />
                         </View>
                     </View>
-                    {/* Design */}
                     <Text style={checkingScannerStyles.label}>Design <Text style={{ color: 'red' }}> *</Text> </Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
@@ -715,7 +974,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
                         </TouchableOpacity>
                     </View>
-                    {/* Meter */}
                     <View style={checkingScannerStyles.row}>
                         <View style={checkingScannerStyles.halfInput}>
                             <Text style={checkingScannerStyles.label}> Meter (in meters) <Text style={{ color: 'red' }}> *</Text>
@@ -754,7 +1012,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             />
                         </View>
                     </View>
-                    {/* Design */}
                     <Text style={checkingScannerStyles.label}>Grade <Text style={{ color: 'red' }}> *</Text></Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
@@ -784,7 +1041,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             <Icon name="delete" size={30} color="red" style={checkingScannerStyles.dropdownIconDelete} />
                         </TouchableOpacity>
                     </View>
-                    {/* Design */}
                     <Text style={checkingScannerStyles.label}> Checker <Text style={{ color: 'red' }}> *</Text> </Text>
                     <View style={checkingScannerStyles.dropdown}>
                         <Picker
@@ -908,8 +1164,6 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     >
                         <Text style={checkingScannerStyles.submitText}>Submit Scan</Text>
                     </TouchableOpacity>
-
-                    {/* Print + Clear Buttons */}
                     {
                         getDataSaved == true &&
                         (
@@ -933,13 +1187,10 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                         setDesign('')
                                         setGradeData([])
                                         setGrade('')
-                                        //setCheckerData([]);
-                                        //setChecker('')
                                         setScannedObj({});
                                         setShift('');
                                         clearDesign();
                                         clearGrade();
-                                        //clearChecker();
                                         clearShift();
                                         setShiftData([]);
                                         setMeter('');
@@ -956,12 +1207,150 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             </View>
                         )
                     }
-                    {/* Info */}
                     <View style={checkingScannerStyles.infoBox}>
                         <Text style={checkingScannerStyles.infoText}> Fill all fields to enable submission </Text>
                     </View>
                 </View>
             </ScrollView>
+
+            <Modal
+                visible={showManualPopup}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowManualPopup(false)}
+            >
+                <View style={checkingScannerStyles.modalOverlay}>
+                    <View style={checkingScannerStyles.modalBox}>
+                        <Text style={checkingScannerStyles.modalTitle}>Manual Entry</Text>
+                        {/* 🔹 FORM */}
+                        <View style={checkingScannerStyles.formGroup}>
+                            {/* Machine */}
+                            <View style={checkingScannerStyles.rowHorizontal}>
+                                <Text style={checkingScannerStyles.labelHorizontal}>
+                                    Machine <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+
+                                <View style={{ flex: 1 }}>
+                                    <PartyDropdown
+                                        key={selectedMachine ? selectedMachine.MacCode : 'empty'}
+                                        data={machinedata}
+                                        placeholder="Choose machine..."
+                                        labelKey={["MacName", "MacCode"]}
+                                        valueKey="MacCode"
+                                        pageSize={12}
+                                        selected={selectedMachine}
+                                        loading={false}
+                                        type="machine"
+                                        onSelect={(item) => {
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: {
+                                                    ...prev.values,
+                                                    MacCode: item.MacCode,
+                                                    MacName: item.MacName
+                                                }
+                                            }));
+                                            setSelectedMachine(item);
+                                        }}
+
+                                    // setSelected={(val) => {
+                                    //     if (!val) {
+                                    //         setFormState(prev => ({
+                                    //             ...prev,
+                                    //             values: {
+                                    //                 ...prev.values,
+                                    //                 MacCode: '',
+                                    //                 MacName: ''
+                                    //             }
+                                    //         }));
+                                    //         setSelectedMachine(null);
+                                    //     } else {
+                                    //         setFormState(prev => ({
+                                    //             ...prev,
+                                    //             values: {
+                                    //                 ...prev.values,
+                                    //                 MacCode: val.MacCode,
+                                    //                 MacName: val.MacName
+                                    //             }
+                                    //         }));
+                                    //         setSelectedMachine(val);
+                                    //     }
+                                    // }}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Taka */}
+                            <View style={checkingScannerStyles.rowHorizontal}>
+                                <Text style={checkingScannerStyles.labelHorizontal}>Taka No</Text>
+                                <TextInput
+                                    style={checkingScannerStyles.inputDisabledHorizontal}
+                                    value={FormState.values.TakaNo}
+                                    onChangeText={(text) => handleChange('TakaNo', text)}
+                                    maxLength={20}
+                                />
+                            </View>
+
+                            <View style={checkingScannerStyles.rowHorizontal}>
+                                <Text style={checkingScannerStyles.labelHorizontal}>Design</Text>
+                                <TextInput
+                                    style={checkingScannerStyles.inputDisabledHorizontal}
+                                    value={FormState.values.DsnName}
+                                    onChangeText={(text) => handleChange('DsnName', text)}
+                                    maxLength={40}
+                                />
+                            </View>
+
+                            {/* Qty */}
+                            <View style={checkingScannerStyles.rowHorizontal}>
+                                <Text style={checkingScannerStyles.labelHorizontal}>Qty</Text>
+                                <TextInput
+                                    style={checkingScannerStyles.inputDisabledHorizontal}
+                                    keyboardType="decimal-pad"
+                                    onFocus={() => {
+                                        if (FormState.values.Qty === '0.00') {
+                                            handleChange('Qty', '');
+                                        }
+                                    }}
+                                    onChangeText={(text) => {
+                                        const re = /^\d*(?:[.,]\d{0,3})?$/;
+
+                                        if (text === '' || re.test(text)) {
+                                            handleChange('Qty', text);
+                                        }
+                                    }}
+                                    value={FormState?.values?.Qty}
+
+                                />
+                            </View>
+
+                        </View>
+
+                        {/* 🔘 BUTTONS */}
+                        <View style={{ flexDirection: 'row', marginTop: 15 }}>
+                            <TouchableOpacity
+                                style={[checkingScannerStyles.submitBtn, { flex: 1, marginRight: 5 }]}
+                                onPress={handlesave}
+                            >
+                                <Text style={checkingScannerStyles.submitText}>Save</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[checkingScannerStyles.submitBtn, { flex: 1, marginLeft: 5, backgroundColor: '#999' }]}
+                                // onPress={() => setShowManualPopup(false)
+                                //      handleClearForm();
+                                // }
+                                onPress={() => {
+                                    setShowManualPopup(false);
+                                    handleClearForm();
+                                }}
+                            >
+                                <Text style={checkingScannerStyles.submitText}>Close</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </>
     );
 };

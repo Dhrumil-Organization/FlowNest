@@ -155,7 +155,7 @@ const CustomDrawer = (props) => {
                                         style={styles.dateTrigger}
                                         onPress={() => setCheckingDatePickerVisible(true)}
                                     >
-                                        <Text>
+                                        <Text style={{ color: '#000' }}>
                                             {FormState.values.fromdate
                                                 ? formatDisplayDate(FormState.values.fromdate)
                                                 : "Select From Date"}
@@ -189,7 +189,7 @@ const CustomDrawer = (props) => {
                                         style={styles.dateTrigger}
                                         onPress={() => setCheckingDatePickerVisible1(true)}
                                     >
-                                        <Text>
+                                        <Text style={{ color: '#000' }}> 
                                             {FormState.values.todate
                                                 ? formatDisplayDate(FormState.values.todate)
                                                 : "Select To Date"}

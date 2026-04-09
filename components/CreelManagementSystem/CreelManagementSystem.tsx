@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -138,7 +138,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             padding: 10,
             backgroundColor: '#f2f2f2',
             height: 45,      // 👈 add this
-            justifyContent: 'center'
+            justifyContent: 'center',
+            color: '#000'
         },
         dropdown: {
             borderWidth: 1,
@@ -305,7 +306,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         infoLabel: {
             fontSize: 13,
             color: '#555',
-            fontWeight: '600'
+            fontWeight: '600',
+            color: '#000'
         },
 
         infoValue: {
@@ -1011,6 +1013,26 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         setIsDrawerVisible(true);
     }, []);
 
+    const shiftOptions = useMemo(() => {
+        return getShiftData.map((item, index) => (
+            <Picker.Item
+                key={index}
+                label={item.ShfName}
+                value={item.ShfCode}
+            />
+        ));
+    }, [getShiftData]);
+
+    const stockOptions = useMemo(() => {
+        return getStockTypes.map((item, index) => (
+            <Picker.Item
+                key={index}
+                label={item.label}
+                value={item.value}
+            />
+        ));
+    }, [getStockTypes]);
+
     return (
         <>
             {isLoading && <FullScreenLoader />}
@@ -1179,7 +1201,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     Creel ID <Text style={{ color: 'red' }}>*</Text>
                                                 </Text>
                                                 <TextInput
-                                                    style={[checkingScannerStyles.input, { height: 40 }]}
+                                                    style={[checkingScannerStyles.input, { height: 40, color: '#000' }]}
                                                     value={creelId}
                                                     onChangeText={(text) => setCreelId(text)}
                                                     editable={true}
@@ -1187,7 +1209,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 />
                                             </View>
                                         </View>
-                                        <View style={checkingScannerStyles.row}>
+                                        {/* <View style={checkingScannerStyles.row}>
                                             <View style={checkingScannerStyles.halfInput}>
                                                 <Text style={checkingScannerStyles.label}>
                                                     SetUp Date <Text style={{ color: 'red' }}>*</Text>
@@ -1269,6 +1291,103 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     />
                                                 </View>
                                             </View>
+                                        </View> */}
+
+                                        <View style={{ marginTop: 10 }}>
+
+                                            {/* SetUp Date */}
+                                            <View style={checkingScannerStyles.halfInput}>
+                                                <Text style={checkingScannerStyles.label}>
+                                                    SetUp Date <Text style={{ color: 'red' }}>*</Text>
+                                                </Text>
+
+                                                <TouchableOpacity
+                                                    // style={checkingScannerStyles.dropdown}
+                                                    style={[checkingScannerStyles.dropdown, { height: 40 }]}
+                                                    onPress={() => setShowDatePicker(true)}
+                                                >
+                                                    <Text style={{ color: '#000' }}>
+                                                        {setupDate ? setupDate.toLocaleDateString() : 'Select Date'}
+                                                    </Text>
+                                                </TouchableOpacity>
+
+                                                {showDatePicker && (
+                                                    <DateTimePicker
+                                                        value={setupDate}
+                                                        mode="date"
+                                                        display="default"
+                                                        onChange={(event, selectedDate) => {
+                                                            setShowDatePicker(false);
+                                                            if (selectedDate) setSetupDate(selectedDate);
+                                                        }}
+                                                    />
+                                                )}
+                                            </View>
+
+                                            {/* Shift */}
+                                            <View style={checkingScannerStyles.halfInput}>
+                                                <Text style={checkingScannerStyles.label}>
+                                                    Shift <Text style={{ color: 'red' }}>*</Text>
+                                                </Text>
+
+                                                <View style={checkingScannerStyles.dropdown}>
+                                                    <Picker
+                                                        selectedValue={shift}
+                                                        onValueChange={(itemValue) => setShift(itemValue)}
+                                                        style={[checkingScannerStyles.picker, { color: '#000' }]}
+                                                    >
+                                                        <Picker.Item label="Select shift" value="" enabled={false} style={{ color: '#000' }} />
+                                                        {getShiftData.map((item, index) => (
+                                                            <Picker.Item
+                                                                key={index}
+                                                                label={item.ShfName}
+                                                                value={item.ShfCode}
+                                                            />
+                                                        ))}
+                                                    </Picker>
+                                                    {/* <Picker
+                                                        selectedValue={shift}
+                                                        onValueChange={(itemValue) => setShift(itemValue)}
+                                                        style={checkingScannerStyles.picker}
+                                                    >
+                                                        <Picker.Item label="Select shift" value="" enabled={false} />
+                                                        {shiftOptions}
+                                                    </Picker> */}
+                                                </View>
+                                            </View>
+
+                                            {/* Stock Type */}
+                                            <View style={checkingScannerStyles.halfInput}>
+                                                <Text style={checkingScannerStyles.label}>
+                                                    Stock Type <Text style={{ color: 'red' }}>*</Text>
+                                                </Text>
+
+                                                <View style={checkingScannerStyles.dropdown}>
+                                                    <Picker
+                                                        selectedValue={stocktype}
+                                                        onValueChange={(itemValue) => setstocktype(itemValue)}
+                                                        style={[checkingScannerStyles.picker, { color: '#000' }]}
+                                                    >
+                                                        <Picker.Item label="Select Stock Type" value="" enabled={false} style={{ color: '#000' }} />
+                                                        {getStockTypes.map((item, index) => (
+                                                            <Picker.Item
+                                                                key={index}
+                                                                label={item.label}
+                                                                value={item.value}
+                                                            />
+                                                        ))}
+                                                    </Picker>
+                                                    {/* <Picker
+                                                        selectedValue={stocktype}
+                                                        onValueChange={(itemValue) => setstocktype(itemValue)}
+                                                        style={checkingScannerStyles.picker}
+                                                    >
+                                                        <Picker.Item label="Select Stock Type" value="" enabled={false} />
+                                                        {stockOptions}
+                                                    </Picker> */}
+                                                </View>
+                                            </View>
+
                                         </View>
 
                                         <View style={checkingScannerStyles.row}>
@@ -1280,7 +1399,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     placeholder="Enter Remark"
                                                     value={Remark}
                                                     onChangeText={(text) => setRemark(text)}
-                                                    style={[checkingScannerStyles.input, { height: 60 }]}
+                                                    style={[checkingScannerStyles.input, { height: 60, color: '#000' }]}
                                                     multiline
                                                 />
                                             </View>
@@ -1542,7 +1661,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                     borderColor: '#ccc',
                                     borderRadius: 8,
                                     paddingHorizontal: 10,
-                                    height: 40
+                                    height: 40,
+                                    color: '#000'
                                 }}
                             />
                             <TouchableOpacity
@@ -1575,12 +1695,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                     onPress={() => setSelectedItem(item)}
                                 >
                                     {/* ✅ carton only */}
-                                    <Text style={{ fontSize: 13, fontWeight: 'bold' }}>
+                                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#000' }}>
                                         {item.CartNo}
                                     </Text>
 
                                     {/* optional detail */}
-                                    <Text style={{ fontSize: 11, color: '#666' }}>
+                                    <Text style={{ fontSize: 11, color: '#666', color: '#000' }}>
                                         {item.ItmName} / {item.MerName} / {item.ShdName}
                                     </Text>
                                 </TouchableOpacity>

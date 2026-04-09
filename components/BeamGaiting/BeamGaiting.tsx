@@ -316,7 +316,8 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                             padding: 10,
                             marginBottom: 10,
                             backgroundColor: '#fff',
-                            marginHorizontal: 10
+                            marginHorizontal: 10,
+                            color: '#000'
                         }}
                         placeholder="Search Machine / Beam / Property"
                         value={searchText}
@@ -336,10 +337,11 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                                 backgroundColor: selectedFilter === 'running' ? '#ddd' : '#fff',
                                 padding: 6,
                                 marginRight: 5,
-                                borderRadius: 4
+                                borderRadius: 4,
+
                             }}>
                             <View style={{ width: 14, height: 14, backgroundColor: '#ccc', marginRight: 5 }} />
-                            <Text>Running</Text>
+                            <Text style={{ color: '#000' }}>Running</Text>
                         </TouchableOpacity>
 
                         {/* Completed */}
@@ -354,7 +356,7 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                                 borderRadius: 4
                             }}>
                             <View style={{ width: 14, height: 14, backgroundColor: '#b2b2ff', marginRight: 5 }} />
-                            <Text>Completed</Text>
+                            <Text style={{ color: '#000' }}>Completed</Text>
                         </TouchableOpacity>
 
                         {/* Beam Gaiting */}
@@ -369,7 +371,7 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                                 borderRadius: 4
                             }}>
                             <View style={{ width: 14, height: 14, backgroundColor: '#90ee90', marginRight: 5 }} />
-                            <Text>Beam Gaiting</Text>
+                            <Text style={{ color: '#000' }}>Beam Gaiting</Text>
                         </TouchableOpacity>
 
                         {/* Empty Machine */}
@@ -383,7 +385,7 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                                 borderRadius: 4
                             }}>
                             <View style={{ width: 14, height: 14, backgroundColor: 'gray', marginRight: 5 }} />
-                            <Text>Empty Machine</Text>
+                            <Text style={{ color: '#000' }}>Empty Machine</Text>
                         </TouchableOpacity>
 
                     </View>

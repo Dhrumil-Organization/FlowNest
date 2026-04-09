@@ -1481,6 +1481,74 @@ export const checkingScannerStyles = StyleSheet.create({
         lineHeight: 1,
         marginTop: 10
     },
+    formGroup: {
+        marginBottom: 12,
+    },
+
+    rowHorizontal: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+
+    labelHorizontal: {
+        width: 110,
+        fontWeight: 'bold',
+        fontSize: 12,
+        color: '#0a0a0a',
+    },
+
+    inputHorizontal: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        backgroundColor: '#fff',
+    },
+
+    inputDisabledHorizontal: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        backgroundColor: '#f2f2f2',
+    },
+    dropdownWrapper: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+        position: 'relative',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+
+    modalBox: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 15,
+        elevation: 10
+    },
+
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        textAlign: 'center'
+    },
 });
 
 export const yarnstockverificatio_styles = StyleSheet.create({
@@ -2462,6 +2530,6 @@ export const StyleSheetPCA = StyleSheet.create({
         width: '65%',
         textAlign: 'left'
     },
-    
+
 
 });

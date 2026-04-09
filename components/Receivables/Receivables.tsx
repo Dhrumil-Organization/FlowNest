@@ -103,22 +103,63 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     const searchRefDetails = useRef(searchQueryPOTDetails);
     const ROW_HEIGHT = 52;
 
+    // useEffect(() => {
+    //     const initializeRole = async () => {
+    //         try {
+    //             const role = await AsyncStorage.getItem('user_login_role');
+    //             console.log('Role from AsyncStorage:', role);
+    //             if (role) {
+    //                 const roleString = role.toString();
+    //                 const rolesArray = roleString.split(',');
+    //                 const hasReceivablesViewCombine = rolesArray.includes("Receivables View Combine");
+    //                 sethideprpGroup(hasReceivablesViewCombine);
+    //                 console.log('Role check result:', hasReceivablesViewCombine);
+    //             } else {
+    //                 sethideprpGroup(false);
+    //                 console.log('No role found in AsyncStorage.');
+    //             }
+    //         } catch (error) {
+    //             console.error("Error reading role from AsyncStorage:", error);
+    //             sethideprpGroup(false);
+    //         }
+    //     };
+
+    //     initializeRole();
+    // }, []);
     useEffect(() => {
         const initializeRole = async () => {
             try {
                 const role = await AsyncStorage.getItem('user_login_role');
+                console.log('=== Role from AsyncStorage (Raw) ===', role);
+
                 if (role) {
-                    const roleString = role.toString();
-                    const rolesArray = roleString.split(',');
-                    const hasReceivablesViewCombine = rolesArray.includes("Receivables View Combine");
+                    // Parse as JSON (since it's already an array string)
+                    const rolesArray = JSON.parse(role);
+                    console.log('=== Parsed as JSON ===', rolesArray);
+
+                    // Check if the first element is a comma-separated string
+                    let finalRoles = [];
+                    if (rolesArray.length > 0 && typeof rolesArray[0] === 'string') {
+                        // Split the first element by comma
+                        finalRoles = rolesArray[0].split(',').map(r => r.trim());
+                    } else {
+                        // If not, use the array as-is
+                        finalRoles = rolesArray.map(r => r.trim());
+                    }
+
+                    console.log('=== Final Roles Array ===', finalRoles);
+
+                    // Check if "Receivables View Combine" exists
+                    const hasReceivablesViewCombine = finalRoles.includes("Receivables View Combine");
+                    console.log('=== Role check result ===', hasReceivablesViewCombine);
+
                     sethideprpGroup(hasReceivablesViewCombine);
-                    console.log('Role check result:', hasReceivablesViewCombine);
                 } else {
                     sethideprpGroup(false);
-                    console.log('No role found in AsyncStorage.');
+                    console.log('=== No role found in AsyncStorage ===');
                 }
             } catch (error) {
-                console.error("Error reading role from AsyncStorage:", error);
+                console.error("=== Error reading role from AsyncStorage ===", error);
                 sethideprpGroup(false);
             }
         };
@@ -1709,68 +1750,80 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
         );
     };
 
-
     // const DetailTable = () => {
     //     console.log("Filtered Details:", filteredDetails);
 
-    //     // Data ko TRANID ke hisaab se ascending order mein sort karo
-    //     const sortedData = [...filteredDetails].sort((a, b) => a.TRANID - b.TRANID);
+    //     // Data ko NTRANDATE ke hisaab se ascending order mein sort karo
+    //     const sortedData = [...filteredDetails].sort((a, b) =>
+    //         parseFloat(a.NTRANDATE) - parseFloat(b.NTRANDATE)
+    //     );
 
-    //     // Cumulative value calculate karo
-    //     let cumulativeData = sortedData.map((item, index) => {
+    //     console.log("Sorted Data (Ascending by NTRANDATE):", sortedData);
+
+    //     // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
+    //     let cumulativeData = [];
+    //     sortedData.forEach((item, index) => {
+    //         const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
+
     //         if (index === 0) {
-    //             return { ...item, Cumulative: parseFloat(item.CUMBAL) || 0 };
+    //             cumulativeData.push({
+    //                 ...item,
+    //                 Cumulative: currentCUMBAL.toString(), // String format mein rakha
+    //             });
     //         } else {
-    //             const prevCumulative = cumulativeData[index - 1].Cumulative;
-    //             const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
-    //             return { ...item, Cumulative: prevCumulative + currentCUMBAL };
+    //             const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
+    //             const newCumulative = prevCumulative + currentCUMBAL;
+    //             cumulativeData.push({
+    //                 ...item,
+    //                 Cumulative: newCumulative.toString(), // String format mein rakha
+    //             });
     //         }
     //     });
 
-    //     // Descending order mein sort karo
-    //     cumulativeData = cumulativeData.sort((a, b) => b.TRANID - a.TRANID);
+    //     console.log("Cumulative Data (Ascending by NTRANDATE):", cumulativeData);
 
-    //     // Console mein final data dikhao
-    //     console.log("Final Cumulative Data:", cumulativeData);
+    //     // Descending order mein sort karo (NTRANDATE ko number mein convert karke)
+    //     const finalData = cumulativeData.sort((a, b) =>
+    //         parseFloat(b.NTRANDATE) - parseFloat(a.NTRANDATE)
+    //     );
 
+    //     console.log("Final Data (Descending by NTRANDATE):", finalData);
+
+    //     // Columns definition
     //     const detailColumns = [
     //         { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
     //         { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
     //         { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
     //         { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
-    //         { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'right' }, // Naya column
+    //         { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' }, // Naya column
     //     ];
 
-    //     const columnsToFormat = ['CUMBAL'];
+    //     const columnsToFormat = ['CUMBAL', 'Cumulative'];
 
-    //     // Specify which columns to sum in the footer
-    //     const columnsToSum = ['CUMBAL'];
-
-
+    //     // Calculate totals for CUMBAL and Cumulative
     //     const calculateTotals = () => {
-    //         const totals = {};
-    //         columnsToSum.forEach(key => {
-    //             totals[key] = filteredDetails.reduce((sum, item) => {
-    //                 const value = parseFloat(item[key]) || 0;
-    //                 return sum + value;
-    //             }, 0);
+    //         const totals = { CUMBAL: 0, Cumulative: 0 };
+    //         finalData.forEach(item => {
+    //             totals.CUMBAL += parseFloat(item.CUMBAL) || 0;
+    //             totals.Cumulative += parseFloat(item.Cumulative) || 0;
     //         });
     //         return totals;
     //     };
 
     //     // Format number as Indian comma-separated value
     //     const formatIndianNumber = (value) => {
-    //         return value?.toLocaleString('en-IN', {
+    //         if (!value && value !== 0) return "0";
+    //         const num = parseFloat(value);
+    //         return num.toLocaleString('en-IN', {
     //             minimumFractionDigits: 2,
     //             maximumFractionDigits: 2,
     //         });
     //     };
 
     //     const totals = calculateTotals();
+    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 160;
 
-    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 120;
-
-
+    //     // Header component
     //     const Header = () => (
     //         <View style={styles.tableHeader}>
     //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
@@ -1790,29 +1843,25 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     //         </View>
     //     );
 
-    //     const Footer = () => {
-    //         const cumulativeTotal = cumulativeData.reduce((sum, item) => sum + (parseFloat(item.Cumulative) || 0), 0);
+    //     // Footer component
+    //     const Footer = () => (
+    //         <View style={[styles.tableHeader]}>
+    //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
+    //                 Totals
+    //             </Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'right' }]}>
+    //                 {formatIndianNumber(totals.CUMBAL)}
+    //             </Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
+    //                 {formatIndianNumber(totals.Cumulative)}
+    //             </Text>
+    //         </View>
+    //     );
 
-    //         return (
-    //             <View style={[styles.tableHeader]}>
-    //                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>Totals</Text>
-    //                 <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-    //                 <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-    //                 {detailColumns.slice(2).map(col => (
-    //                     <Text
-    //                         key={col.key}
-    //                         style={[
-    //                             styles.headerText,
-    //                             { width: col.width, textAlign: col.align }
-    //                         ]}
-    //                     >
-    //                         {col.key === 'Cumulative' ? formatIndianNumber(cumulativeTotal) : ''}
-    //                     </Text>
-    //                 ))}
-    //             </View>
-    //         );
-    //     };
-
+    //     // Row component
     //     const Row = React.memo(({ item }) => (
     //         <View style={styles.tableRow}>
     //             <Text
@@ -1830,8 +1879,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     //                     ]}
     //                     numberOfLines={2}
     //                 >
-    //                     {columnsToFormat.includes(col.key) || col.key === 'Cumulative'
-    //                         ? formatIndianNumber(parseFloat(item[col.key]) || 0)
+    //                     {columnsToFormat.includes(col.key)
+    //                         ? formatIndianNumber(item[col.key])
     //                         : item[col.key]}
     //                 </Text>
     //             ))}
@@ -1844,172 +1893,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     //                 <View style={{ minWidth: totalWidth }}>
     //                     <Header />
     //                     <FlatList
-    //                         data={filteredDetails}
+    //                         data={finalData} // Use finalData instead of filteredDetails
     //                         renderItem={({ item }) => <Row item={item} />}
-    //                         keyExtractor={(item, index) =>
-    //                             `${item.ACCCODE}-${index}`
-    //                         }
-    //                         getItemLayout={(_, index) => ({
-    //                             length: ROW_HEIGHT,
-    //                             offset: ROW_HEIGHT * index,
-    //                             index,
-    //                         })}
-    //                         initialNumToRender={20}
-    //                         maxToRenderPerBatch={20}
-    //                         windowSize={10}
-    //                         removeClippedSubviews
-    //                         showsVerticalScrollIndicator={false}
-    //                     />
-    //                     <Footer />
-    //                 </View>
-    //             </ScrollView>
-    //         </View>
-    //     );
-    // };
-
-    // const DetailTable = () => {
-    //     const detailColumns = [
-    //         { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
-    //         { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
-    //         { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
-    //         { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
-    //     ];
-
-    //     const columnsToFormat = ['CUMBAL'];
-    //     const columnsToSum = ['CUMBAL'];
-
-    //     // Sort by TRANDATE in descending order
-    //     const sortedByDate = [...filteredDetails].sort((a, b) => new Date(b.TRANDATE) - new Date(a.TRANDATE));
-
-    //     const calculateTotals = () => {
-    //         const totals = {};
-    //         columnsToSum.forEach(key => {
-    //             totals[key] = sortedByDate.reduce((sum, item) => {
-    //                 const value = parseFloat(item[key]) || 0;
-    //                 return sum + value;
-    //             }, 0);
-    //         });
-    //         return totals;
-    //     };
-
-    //     const formatIndianNumber = (value) => {
-    //         return value?.toLocaleString('en-IN', {
-    //             minimumFractionDigits: 2,
-    //             maximumFractionDigits: 2,
-    //         });
-    //     };
-
-    //     const totals = calculateTotals();
-
-    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 140; // Add width for Cumulative column
-
-    //     const Header = () => (
-    //         <View style={styles.tableHeader}>
-    //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-    //                 Type
-    //             </Text>
-    //             {detailColumns.map(col => (
-    //                 <Text
-    //                     key={col.key}
-    //                     style={[
-    //                         styles.headerText,
-    //                         { width: col.width, textAlign: col.align }
-    //                     ]}
-    //                 >
-    //                     {col.label}
-    //                 </Text>
-    //             ))}
-    //             <Text
-    //                 style={[
-    //                     styles.headerText,
-    //                     { width: 140, textAlign: 'right' }
-    //                 ]}
-    //             >
-    //                 Cumulative
-    //             </Text>
-    //         </View>
-    //     );
-
-    //     const Footer = () => {
-    //         const cumulativeTotal = sortedByDate.reduce((sum, item, index, array) => {
-    //             return sum + (parseFloat(array.slice(0, index + 1).reduce((acc, curr) => acc + (parseFloat(curr.CUMBAL) || 0), 0)));
-    //         }, 0);
-
-    //         return (
-    //             <View style={[styles.tableHeader]}>
-    //                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-    //                     Totals
-    //                 </Text>
-    //                 {detailColumns.slice(0).map(col => (
-    //                     <Text
-    //                         key={col.key}
-    //                         style={[
-    //                             styles.headerText,
-    //                             { width: col.width, textAlign: col.align }
-    //                         ]}
-    //                     >
-    //                         {columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
-    //                     </Text>
-    //                 ))}
-    //                 <Text
-    //                     style={[
-    //                         styles.headerText,
-    //                         { width: 140, textAlign: 'right' }
-    //                     ]}
-    //                 >
-    //                     {formatIndianNumber(cumulativeTotal)}
-    //                 </Text>
-    //             </View>
-    //         );
-    //     };
-
-    //     const Row = React.memo(({ item, index }) => {
-    //         // Calculate cumulative balance up to the current row
-    //         const cumulativeBalance = sortedByDate.slice(0, index + 1).reduce((sum, currentItem) => {
-    //             return sum + (parseFloat(currentItem.CUMBAL) || 0);
-    //         }, 0);
-
-    //         return (
-    //             <View style={styles.tableRow}>
-    //                 <Text
-    //                     style={[styles.rowText, { width: 160, textAlign: 'center' }]}
-    //                     numberOfLines={2}
-    //                 >
-    //                     {item.TYPE}
-    //                 </Text>
-    //                 {detailColumns.map(col => (
-    //                     <Text
-    //                         key={col.key}
-    //                         style={[
-    //                             styles.rowText,
-    //                             { width: col.width, textAlign: col.align }
-    //                         ]}
-    //                         numberOfLines={2}
-    //                     >
-    //                         {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
-    //                     </Text>
-    //                 ))}
-    //                 <Text
-    //                     style={[
-    //                         styles.rowText,
-    //                         { width: 140, textAlign: 'right' }
-    //                     ]}
-    //                     numberOfLines={2}
-    //                 >
-    //                     {formatIndianNumber(cumulativeBalance)}
-    //                 </Text>
-    //             </View>
-    //         );
-    //     });
-
-    //     return (
-    //         <View style={styles.tableWrapper}>
-    //             <ScrollView horizontal showsHorizontalScrollIndicator>
-    //                 <View style={{ minWidth: totalWidth }}>
-    //                     <Header />
-    //                     <FlatList
-    //                         data={sortedByDate}
-    //                         renderItem={({ item, index }) => <Row item={item} index={index} />}
     //                         keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
     //                         getItemLayout={(_, index) => ({
     //                             length: ROW_HEIGHT,
@@ -2029,18 +1914,24 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
     //     );
     // };
 
-
     const DetailTable = () => {
         console.log("Filtered Details:", filteredDetails);
 
-        // Data ko TRANID ke hisaab se ascending order mein sort karo
-        const sortedData = [...filteredDetails].sort((a, b) =>
-            parseFloat(a.TRANID) - parseFloat(b.TRANID)
-        );
+        // Helper function to generate a unique key from NTRANDATE + TRANID
+        const calcValue = (item) => {
+            return `${item.NTRANDATE}-${item.TRANID}`; // Example: "20231201-12345"
+        };
 
-        console.log("Sorted Data (Ascending by TRANID):", sortedData);
+        // Sort by calcValue (ascending)
+        const sortedData = [...filteredDetails].sort((a, b) => {
+            const keyA = calcValue(a);
+            const keyB = calcValue(b);
+            return keyA.localeCompare(keyB); // String comparison for NTRANDATE-TRANID
+        });
 
-        // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
+        console.log("Sorted Data (Ascending by NTRANDATE + TRANID):", sortedData);
+
+        // Calculate cumulative CUMBAL
         let cumulativeData = [];
         sortedData.forEach((item, index) => {
             const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
@@ -2048,26 +1939,24 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             if (index === 0) {
                 cumulativeData.push({
                     ...item,
-                    Cumulative: currentCUMBAL.toString(), // String format mein rakha
+                    Cumulative: currentCUMBAL.toString(),
                 });
             } else {
                 const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
                 const newCumulative = prevCumulative + currentCUMBAL;
                 cumulativeData.push({
                     ...item,
-                    Cumulative: newCumulative.toString(), // String format mein rakha
+                    Cumulative: newCumulative.toString(),
                 });
             }
         });
 
-        console.log("Cumulative Data (Ascending by TRANID):", cumulativeData);
+        console.log("Cumulative Data (Ascending by NTRANDATE + TRANID):", cumulativeData);
 
-        // Descending order mein sort karo (TRANID ko number mein convert karke)
-        const finalData = cumulativeData.sort((a, b) =>
-            parseFloat(b.TRANID) - parseFloat(a.TRANID)
-        );
+        // Reverse to descending order (latest first)
+        const finalData = [...cumulativeData].reverse();
 
-        console.log("Final Data (Descending by TRANID):", finalData);
+        console.log("Final Data (Descending by NTRANDATE + TRANID):", finalData);
 
         // Columns definition
         const detailColumns = [
@@ -2075,7 +1964,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
             { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
             { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
-            { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' }, // Naya column
+            { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' },
         ];
 
         const columnsToFormat = ['CUMBAL', 'Cumulative'];
@@ -2173,9 +2062,9 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                     <View style={{ minWidth: totalWidth }}>
                         <Header />
                         <FlatList
-                            data={finalData} // Use finalData instead of filteredDetails
+                            data={finalData}
                             renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
+                            keyExtractor={(item, index) => `${calcValue(item)}-${index}`}
                             getItemLayout={(_, index) => ({
                                 length: ROW_HEIGHT,
                                 offset: ROW_HEIGHT * index,

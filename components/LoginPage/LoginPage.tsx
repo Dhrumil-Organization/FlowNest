@@ -15,12 +15,15 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+// import messaging from '@react-native-firebase/messaging';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
 import theme from '../../android/app/src/theme';
 import { Picker } from '@react-native-picker/picker';
 import { Dropdown } from 'react-native-element-dropdown';
+import { PermissionsAndroid, Platform } from 'react-native';
+  import messaging from '@react-native-firebase/messaging';
 // import React, { useEffect, useRef, useState } from 'react';
 // import {
 //   View,
@@ -75,6 +78,7 @@ const LoginScreen: React.FC<Props> = ({
   const [selectedProperty, setSelectedProperty] = useState('');
   const [showDropdown, setShowDropdown] = useState(true);
   const [getNoti_Token, setNoti_Token] = useState(null);
+  const [isFetchingToken, setIsFetchingToken] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // Hardcoded Property Data
@@ -85,27 +89,116 @@ const LoginScreen: React.FC<Props> = ({
   ];
 
 
+  // useEffect(() => {
+  //   const initializeApp = async () => {
+  //     try {
+  //       const n_token = await messaging().getToken();
+  //       const notification_token = n_token
+  //       setNoti_Token(notification_token);
+  //     } catch (error) {
+  //       console.error("Initialization error:", error);
+  //     } finally {
+  //       setIsFetchingToken(false);
+  //     }
+  //   };
+  //   initializeApp();
+  // }, []);
+
+  
+
+  // Add this function to request notification permission
+  const requestNotificationPermission = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        // For Android 13+, you need to request the POST_NOTIFICATIONS permission
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+          {
+            title: 'Notification Permission',
+            message: 'This app needs notification permission to send you alerts.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          console.log('Notification permission granted');
+          return true;
+        } else {
+          console.log('Notification permission denied');
+          return false;
+        }
+      } else if (Platform.OS === 'ios') {
+        // For iOS, use the built-in permission request
+        const authStatus = await messaging().requestPermission();
+        const enabled =
+          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        if (enabled) {
+          console.log('Notification permission granted');
+          return true;
+        } else {
+          console.log('Notification permission denied');
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return false;
+    }
+  };
+
+  // Update your useEffect to request permission before fetching the token
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-
-        const notification_token = await AsyncStorage.getItem('notification_token');
-
-        setNoti_Token(notification_token as any);
-
-
-
-
-      } catch (error) {
-        console.error("Initialization error:", error);
-
-      } finally {
-        // setIsLoading(false);
+    const fetchFCMToken = async () => {
+      const hasPermission = await requestNotificationPermission();
+      if (hasPermission) {
+        try {
+          const n_token = await messaging().getToken();
+          console.log('🔥 REAL FCM TOKEN:', n_token);
+          if (n_token) {
+            setNoti_Token(n_token);
+          }
+        } catch (error) {
+          console.error('Error fetching FCM token:', error);
+        }
+      } else {
+        Alert.alert(
+          'Notification Permission Required',
+          'Please enable notifications in settings to proceed.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        );
       }
     };
 
-    initializeApp();
-  }, []);
+    if (!getNoti_Token) {
+      fetchFCMToken();
+    }
+  }, [getNoti_Token]);
+
+  // useEffect(() => {
+  //   if (getNoti_Token == null || !getNoti_Token) {
+  //     async function getToken() {
+  //       const n_token = await messaging().getToken();
+  //       console.log('🔥 REAL FCM TOKEN:', n_token);
+  //       if (n_token) {
+  //         // const notification_token = await AsyncStorage.setItem('notification_token', n_token);
+  //         // return notification_token;
+  //         setNoti_Token(n_token);
+  //       }
+  //     }
+  //     getToken();
+  //   }
+  // }, [getNoti_Token]);
+
+  // if (isFetchingToken) {
+  //   return <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} />;
+  // }
+
+
 
   console.log('getNoti_Token_login', getNoti_Token, 'check device ID', getDeviceId);
 
@@ -249,6 +342,17 @@ const LoginScreen: React.FC<Props> = ({
       Alert.alert('❌ Error', 'Please enter username and password.');
       return;
     }
+    if (!getNoti_Token) {
+      Alert.alert(
+        'Notification Permission Required',
+        'Please enable notifications in settings to proceed.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
     const payload = {
       name: username.trim(),
       password: password.trim(),
@@ -288,6 +392,7 @@ const LoginScreen: React.FC<Props> = ({
           setUserDetails(user_details);
           setMenuApps(user_menu_apps);
           setIsLoggedIn(true);
+          // Alert.alert('check', `After Login ${JSON.stringify(payload)}`);
           // const cachedParty = await getCachedGlobalData('party').catch(() => []);
           const cachePopulated = await isCachePopulated();
           if (!cachePopulated) {
@@ -308,6 +413,7 @@ const LoginScreen: React.FC<Props> = ({
                 const summary = await getPrptypeSummary(key);
                 console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
               }
+
               // await printCachedPrptypesWithData();
             } catch (err) {
               console.warn('Master-sync or verification failed:', err);
@@ -321,7 +427,7 @@ const LoginScreen: React.FC<Props> = ({
       }
     } catch (error) {
       console.error('❌ Login API Error:', error);
-      Alert.alert('Error', 'Server error');
+      Alert.alert('Error', `Server error ${error} ${JSON.stringify(payload)}`);
     } finally {
       setIsLoading(false);
     }

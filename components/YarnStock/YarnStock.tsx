@@ -279,8 +279,15 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
 
 
     const getSubItemSummary = (mainItm = {}, data = [], order = 'asc') => {
+        // const filtered = data.filter(
+        //     item => item.MITMCODE === mainItm?.MITMCODE
+        // );
+
         const filtered = data.filter(
-            item => item.MITMCODE === mainItm?.MITMCODE
+            item =>
+                mainItm?.MITMCODE === 'ALL'
+                    ? true
+                    : item.MITMCODE === mainItm?.MITMCODE
         );
 
         const summary = filtered.reduce((acc, item) => {
@@ -364,9 +371,14 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     // };
 
     const getmergeSummary = (selectedItem = {}, data = [], order = 'asc') => {
+        // const filtered = data.filter(item =>
+        //     item.MITMCODE === selectedItem?.MITMCODE &&
+        //     item.ITMCODE === selectedItem?.ITMCODE
+        // );
+
         const filtered = data.filter(item =>
-            item.MITMCODE === selectedItem?.MITMCODE &&
-            item.ITMCODE === selectedItem?.ITMCODE
+            (selectedItem?.MITMCODE === 'ALL' || item.MITMCODE === selectedItem?.MITMCODE) &&
+            (selectedItem?.ITMCODE === 'ALL' || item.ITMCODE === selectedItem?.ITMCODE)
         );
 
         const summary = filtered.reduce((acc, item) => {
@@ -457,10 +469,16 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     // };
 
     const getshadeSummary = (selectedMerge = {}, data = [], order = 'asc') => {
+        // const filtered = data.filter(item =>
+        //     item.MITMCODE === selectedMerge?.MITMCODE &&
+        //     item.ITMCODE === selectedMerge?.ITMCODE &&
+        //     item.MERCODE === selectedMerge?.MERCODE
+        // );
+
         const filtered = data.filter(item =>
-            item.MITMCODE === selectedMerge?.MITMCODE &&
-            item.ITMCODE === selectedMerge?.ITMCODE &&
-            item.MERCODE === selectedMerge?.MERCODE
+            (selectedMerge?.MITMCODE === 'ALL' || item.MITMCODE === selectedMerge?.MITMCODE) &&
+            (selectedMerge?.ITMCODE === 'ALL' || item.ITMCODE === selectedMerge?.ITMCODE) &&
+            (selectedMerge?.MERCODE === 'ALL' || item.MERCODE === selectedMerge?.MERCODE)
         );
 
         const summary = filtered.reduce((acc, item) => {
@@ -621,7 +639,7 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                             flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                             shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                         }}>
-                                        <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
+                                        <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
                                             {item.MITMNAME}
                                         </Text>
                                         {/* <View style={{
@@ -683,7 +701,7 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                                 justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1,
                                                 shadowRadius: 4, elevation: 3
                                             }}>
-                                            <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.ITMNAME} </Text>
+                                            <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.ITMNAME} </Text>
                                             {/* <View
                                                 style={{
                                                     backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center',
@@ -744,7 +762,7 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                                 shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                             }}>
-                                            <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MERNAME} </Text>
+                                            <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MERNAME} </Text>
                                             {/* <View
                                                 style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
@@ -797,7 +815,7 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                                 shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                             }} >
-                                            <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
+                                            <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
 
                                             {/* <View
                                                 style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >

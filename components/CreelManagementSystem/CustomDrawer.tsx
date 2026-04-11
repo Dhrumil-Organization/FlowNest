@@ -86,7 +86,9 @@ const CustomDrawer = (props) => {
 
     return (
         <>
-            <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
+            <Modal visible={isVisible} transparent animationType="none"
+            // onRequestClose={onClose}
+            >
                 <View style={styles.modalOverlay}>
                     {isLoadingMore && <FullScreenLoader />}
                     <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
@@ -95,9 +97,9 @@ const CustomDrawer = (props) => {
                             style={styles.gradientBackground}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}>
-                            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                            {/* <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                                 <Icon name="close" size={28} color="#fff" />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                             <ScrollView
                                 style={styles.scrollableFormContainer}
                                 contentContainerStyle={styles.scrollableFormContent}
@@ -119,6 +121,8 @@ const CustomDrawer = (props) => {
                                                 values: {
                                                     ...FormState.values,
                                                     PrpCode: item?.PrpCode || '',
+                                                    LngName: item?.LngName || ''
+
                                                 }
                                             }));
                                         }}
@@ -142,6 +146,7 @@ const CustomDrawer = (props) => {
                                                 values: {
                                                     ...FormState.values,
                                                     YearNo: item?.YearNo || '',
+                                                    YearName: item?.YearName || ''
                                                 }
                                             }));
                                         }}
@@ -189,7 +194,7 @@ const CustomDrawer = (props) => {
                                         style={styles.dateTrigger}
                                         onPress={() => setCheckingDatePickerVisible1(true)}
                                     >
-                                        <Text style={{ color: '#000' }}> 
+                                        <Text style={{ color: '#000' }}>
                                             {FormState.values.todate
                                                 ? formatDisplayDate(FormState.values.todate)
                                                 : "Select To Date"}

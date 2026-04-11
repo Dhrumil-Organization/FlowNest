@@ -113,7 +113,7 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
     const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
     const [beamdata, setbeamdata] = useState([]);
     const [searchText, setSearchText] = useState('');
-    const [selectedFilter, setSelectedFilter] = useState(null);
+    const [selectedFilter, setSelectedFilter] = useState([]);
 
     let cancelToken: any;
 
@@ -232,7 +232,33 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
     //     item.DsnName?.toLowerCase().includes(searchText.toLowerCase())
     // );
 
+    // const filteredData = beamdata.filter(item => {
+    //     const matchesSearch =
+    //         item.MacName?.toLowerCase().includes(searchText.toLowerCase()) ||
+    //         item.BeamNo?.toString().includes(searchText) ||
+    //         item.PrpCode?.toLowerCase().includes(searchText.toLowerCase()) ||
+    //         item.DsnName?.toLowerCase().includes(searchText.toLowerCase());
+
+    //     if (!matchesSearch) return false;
+    //     const isRunning = item.Status === '0' && item.BeamNo !== '';
+    //     const isCompleted = item.Status === '1';
+    //     const isBeamGaiting = item.Status === '-3';
+    //     const isEmptyMachine = item.Status === '0' && item.BeamNo === '';
+
+    //     if (!selectedFilter) return true;
+
+    //     if (selectedFilter === 'running') return isRunning;
+    //     if (selectedFilter === 'completed') return isCompleted;
+    //     if (selectedFilter === 'beamGaiting') return isBeamGaiting;
+    //     if (selectedFilter === 'emptyMachine') return isEmptyMachine;
+
+    //     return true;
+
+    // });
+
     const filteredData = beamdata.filter(item => {
+
+        // 🔍 SEARCH
         const matchesSearch =
             item.MacName?.toLowerCase().includes(searchText.toLowerCase()) ||
             item.BeamNo?.toString().includes(searchText) ||
@@ -240,19 +266,25 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
             item.DsnName?.toLowerCase().includes(searchText.toLowerCase());
 
         if (!matchesSearch) return false;
+
+        // 🎯 STATUS CONDITIONS
         const isRunning = item.Status === '0' && item.BeamNo !== '';
         const isCompleted = item.Status === '1';
         const isBeamGaiting = item.Status === '-3';
         const isEmptyMachine = item.Status === '0' && item.BeamNo === '';
 
-        if (!selectedFilter) return true;
+        // ✅ IMPORTANT: NO FILTER SELECTED → SHOW ALL (335 rows)
+        if (!selectedFilter || selectedFilter.length === 0) {
+            return true;
+        }
 
-        if (selectedFilter === 'running') return isRunning;
-        if (selectedFilter === 'completed') return isCompleted;
-        if (selectedFilter === 'beamGaiting') return isBeamGaiting;
-        if (selectedFilter === 'emptyMachine') return isEmptyMachine;
-
-        return true;
+        // ✅ MULTIPLE FILTER MATCH
+        return (
+            (selectedFilter.includes('running') && isRunning) ||
+            (selectedFilter.includes('completed') && isCompleted) ||
+            (selectedFilter.includes('beamGaiting') && isBeamGaiting) ||
+            (selectedFilter.includes('emptyMachine') && isEmptyMachine)
+        );
 
     });
 
@@ -276,16 +308,43 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
         weight: 110
     };
 
+    // const getRowStyle = (item) => {
+    //     if (item.Status === '0' && item.BeamNo === '') {
+    //         return { backgroundColor: 'gray' };
+    //     } else if (item.Status === '1') {
+    //         return { backgroundColor: 'rgb(178 178 255)' };
+    //     } else if (item.Status === '-3') {
+    //         return { backgroundColor: '#90ee90' };
+    //     }
+    //     return {};
+
+    // };
+
     const getRowStyle = (item) => {
-        if (item.Status === '0' && item.BeamNo === '') {
-            return { backgroundColor: 'gray' };
-        } else if (item.Status === '1') {
-            return { backgroundColor: 'rgb(178 178 255)' };
-        } else if (item.Status === '-3') {
+
+        const isRunning = item.Status === '0' && item.BeamNo !== '';
+        const isCompleted = item.Status === '1';
+        const isBeamGaiting = item.Status === '-3';
+        const isEmptyMachine = item.Status === '0' && item.BeamNo === '';
+
+        // 🎯 SAME COLOR LOGIC FOR ALL + FILTER
+        if (isRunning) {
+            return { backgroundColor: '#ffffff' };
+        }
+
+        if (isCompleted) {
+            return { backgroundColor: '#b2b2ff' };
+        }
+
+        if (isBeamGaiting) {
             return { backgroundColor: '#90ee90' };
         }
-        return {};
 
+        if (isEmptyMachine) {
+            return { backgroundColor: '#f0f0f0' };
+        }
+
+        return {};
     };
 
     const toggleFilter = (key) => {
@@ -304,10 +363,8 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
             />
 
 
-            <ScrollView horizontal style={{ marginTop: 10 }}>
+            {/* <ScrollView horizontal style={{ marginTop: 10 }}>
                 <View>
-
-                    {/* 🔍 Search Bar (TOP PE) */}
                     <RNTextInput
                         style={{
                             borderWidth: 1,
@@ -325,10 +382,7 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                     />
 
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-
                         <Text style={{ marginRight: 10 }}>Filter:</Text>
-
-                        {/* Running */}
                         <TouchableOpacity
                             onPress={() => setSelectedFilter('running')}
                             style={{
@@ -343,8 +397,6 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                             <View style={{ width: 14, height: 14, backgroundColor: '#ccc', marginRight: 5 }} />
                             <Text style={{ color: '#000' }}>Running</Text>
                         </TouchableOpacity>
-
-                        {/* Completed */}
                         <TouchableOpacity
                             onPress={() => setSelectedFilter('completed')}
                             style={{
@@ -358,8 +410,6 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                             <View style={{ width: 14, height: 14, backgroundColor: '#b2b2ff', marginRight: 5 }} />
                             <Text style={{ color: '#000' }}>Completed</Text>
                         </TouchableOpacity>
-
-                        {/* Beam Gaiting */}
                         <TouchableOpacity
                             onPress={() => setSelectedFilter('beamGaiting')}
                             style={{
@@ -373,8 +423,6 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                             <View style={{ width: 14, height: 14, backgroundColor: '#90ee90', marginRight: 5 }} />
                             <Text style={{ color: '#000' }}>Beam Gaiting</Text>
                         </TouchableOpacity>
-
-                        {/* Empty Machine */}
                         <TouchableOpacity
                             onPress={() => setSelectedFilter('emptyMachine')}
                             style={{
@@ -392,8 +440,6 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
 
                     <ScrollView horizontal style={{ marginTop: 10 }}>
                         <View>
-
-                            {/* HEADER */}
                             <View style={styles.headerRow}>
                                 <Text style={[styles.header, { width: columnWidth.sn }]}>SN</Text>
                                 <Text style={[styles.header, { width: columnWidth.machine }]}>Machine</Text>
@@ -409,10 +455,8 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                                 <Text style={[styles.header, { width: columnWidth.meters }]}>Meters</Text>
                                 <Text style={[styles.header, { width: columnWidth.weight }]}>Weight</Text>
                             </View>
-
-                            {/* LIST */}
                             <FlatList
-                                data={filteredData}   // 🔥 IMPORTANT (filter use kar)
+                                data={filteredData}   
                                 keyExtractor={(item, index) => index.toString()}
                                 renderItem={({ item, index }) => (
                                     <View style={[styles.row, getRowStyle(item)]}>
@@ -445,7 +489,175 @@ const BeamGaiting: React.FC<{ token: string, navigation: any; username: string }
                     </ScrollView>
 
                 </View>
-            </ScrollView >
+            </ScrollView> */}
+
+            <View style={{ flex: 1 }}>
+
+                {/* 🔍 SEARCH BAR (FIXED) */}
+                <RNTextInput
+                    style={{
+                        borderWidth: 1,
+                        borderColor: '#ccc',
+                        borderRadius: 8,
+                        padding: 10,
+                        margin: 10,
+                        backgroundColor: '#fff',
+                        color: '#000'
+                    }}
+                    placeholder="Search Machine / Beam / Property"
+                    value={searchText}
+                    onChangeText={(text) => setSearchText(text)}
+                />
+
+                {/* ✅ FILTER (FIXED + RESPONSIVE) */}
+                {/* <View style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    paddingHorizontal: 10,
+                    marginBottom: 10
+                }}>
+                    {[
+                        { key: 'running', label: 'Running', color: '#ccc' },
+                        { key: 'completed', label: 'Completed', color: '#b2b2ff' },
+                        { key: 'beamGaiting', label: 'Beam Gaiting', color: '#90ee90' },
+                        { key: 'emptyMachine', label: 'Empty Machine', color: '#999' }
+                    ].map((item) => (
+                        <TouchableOpacity
+                            key={item.key}
+                            onPress={() => setSelectedFilter(item.key)}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: selectedFilter === item.key ? item.color : '#fff',
+                                padding: 8,
+                                margin: 5,
+                                borderRadius: 6,
+                                minWidth: '45%'
+                            }}
+                        >
+                            <View style={{
+                                width: 14,
+                                height: 14,
+                                backgroundColor: item.color,
+                                marginRight: 5
+                            }} />
+                            <Text style={{ color: '#000' }}>{item.label}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View> */}
+
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{
+                        paddingHorizontal: 10,
+                        marginBottom: 10,
+                        alignItems: 'center'
+                    }}
+                >
+                    {[
+                        { key: 'running', label: 'Running', color: '#ffffff' },
+                        { key: 'completed', label: 'Completed', color: '#b2b2ff' },
+                        { key: 'beamGaiting', label: 'Beam Gaiting', color: '#90ee90' },
+                        { key: 'emptyMachine', label: 'Empty Machine', color: '#808080' }
+                    ].map((item) => (
+                        <TouchableOpacity
+                            key={item.key}
+                            // onPress={() => setSelectedFilter(item.key)}
+                            onPress={() => {
+                                setSelectedFilter(prev => {
+                                    if (prev.includes(item.key)) {
+                                        return prev.filter(f => f !== item.key);
+                                    } else {
+                                        return [...prev, item.key];
+                                    }
+                                });
+                            }}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: selectedFilter.includes(item.key) ? item.color : '#fff',
+                                paddingVertical: 8,
+                                paddingHorizontal: 12,
+                                marginRight: 8,
+                                borderRadius: 6
+                            }}
+                        >
+                            <View style={{
+                                width: 14,
+                                height: 14,
+                                backgroundColor: item.color,
+                                marginRight: 5
+                            }} />
+                            <Text style={{ color: '#000' }}>{item.label}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                {/* 🔥 TABLE (HORIZONTAL + VERTICAL SCROLL) */}
+                <ScrollView horizontal showsHorizontalScrollIndicator>
+
+                    <View>
+
+                        {/* HEADER */}
+                        <View style={styles.headerRow}>
+                            <Text style={[styles.header, { width: columnWidth.sn }]}>SN</Text>
+                            <Text style={[styles.header, { width: columnWidth.machine }]}>Machine</Text>
+                            <Text style={[styles.header, { width: columnWidth.location }]}>Location</Text>
+                            <Text style={[styles.header, { width: columnWidth.property }]}>Property</Text>
+                            <Text style={[styles.header, { width: columnWidth.beam }]}>Beam No</Text>
+                            <Text style={[styles.header, { width: columnWidth.design }]}>Design</Text>
+                            <Text style={[styles.header, { width: columnWidth.reed }]}>Reed</Text>
+                            <Text style={[styles.header, { width: columnWidth.picks }]}>Picks</Text>
+                            <Text style={[styles.header, { width: columnWidth.length }]}>Length</Text>
+                            <Text style={[styles.header, { width: columnWidth.balance }]}>Balance</Text>
+                            <Text style={[styles.header, { width: columnWidth.taka }]}>Taka</Text>
+                            <Text style={[styles.header, { width: columnWidth.meters }]}>Meters</Text>
+                            <Text style={[styles.header, { width: columnWidth.weight }]}>Weight</Text>
+                        </View>
+
+                        {/* 🔥 IMPORTANT: HEIGHT FIX for vertical scroll */}
+                        <FlatList
+                            data={filteredData}
+                            keyExtractor={(item, index) => index.toString()}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                            style={{ maxHeight: '75%' }}   
+                            renderItem={({ item, index }) => (
+                                <View style={[styles.row, getRowStyle(item)]}>
+
+                                    <Text style={[styles.cell, { width: columnWidth.sn }]}>{index + 1}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.machine }]}>{item.MacName}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.location }]}>{item.Location}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.property }]}>{item.PrpCode}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.beam }]}>{item.BeamNo}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.design }]}>{item.DsnName}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.reed }]}>{item.ReedCount}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.picks }]}>{item.Picks}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.length }]}>{item.WarpLen}</Text>
+
+                                    <Text style={[
+                                        styles.cell,
+                                        { width: columnWidth.balance },
+                                        { backgroundColor: item.BalLen <= 0 ? '#ff7272' : '#fff' }
+                                    ]}>
+                                        {item.BalLen}
+                                    </Text>
+
+                                    <Text style={[styles.cell, { width: columnWidth.taka }]}>{item.CheckedTaka}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.meters }]}>{item.CheckedQty}</Text>
+                                    <Text style={[styles.cell, { width: columnWidth.weight }]}>{item.CheckedWt}</Text>
+
+                                </View>
+                            )}
+                        />
+
+                    </View>
+
+                </ScrollView>
+
+            </View>
+
             <View style={styles.buttonRow}>
                 <TouchableOpacity style={styles.listIconContainer}>
                     <Icon name="playlist-add" size={24} color="white" onPress={openbeamdetail} />

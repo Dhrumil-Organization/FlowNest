@@ -342,22 +342,22 @@ const LoginScreen: React.FC<Props> = ({
       Alert.alert('❌ Error', 'Please enter username and password.');
       return;
     }
-    if (!getNoti_Token) {
-      Alert.alert(
-        'Notification Permission Required',
-        'Please enable notifications in settings to proceed.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ]
-      );
-      return;
-    }
+    // if (!getNoti_Token) {
+    //   Alert.alert(
+    //     'Notification Permission Required',
+    //     'Please enable notifications in settings to proceed.',
+    //     [
+    //       { text: 'Cancel', style: 'cancel' },
+    //       { text: 'Open Settings', onPress: () => Linking.openSettings() },
+    //     ]
+    //   );
+    //   return;
+    // }
     const payload = {
       name: username.trim(),
       password: password.trim(),
       checkdevice: getDeviceId,
-      noti_token: getNoti_Token
+      noti_token: getNoti_Token||"test"
     };
     console.log('🔵 Sending login payload:', payload);
     try {

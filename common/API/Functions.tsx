@@ -1152,7 +1152,7 @@ export const fetchAllPropertyData = async (token: string) => {
 
         let params = null;
         const response = await axios.get(
-            `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`,
+            `${API}/api/get_criterion?prptype=${'S'}&txntype=''&fetch=prp`,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -1162,7 +1162,7 @@ export const fetchAllPropertyData = async (token: string) => {
                 params
             }
         );
-        console.log("response",response)
+        console.log("Api response",response)
 
         if (response.data.success && response.data.response.data.length > 0) {
             const propertyGroupData = response.data.response.data;

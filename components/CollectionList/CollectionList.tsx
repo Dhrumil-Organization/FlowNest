@@ -24,7 +24,7 @@ import theme from '../../android/app/src/theme';
 import ChequeForm from './ChequeForm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fetchPropertyData, fetchCurrentYearData } from '../../common/API/Functions';
+import { fetchPropertyData, fetchCurrentYearData, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';
 import CollectionCard from './CollectionCard';
 import Footer from '../Footer/Footer';
@@ -170,7 +170,10 @@ const CollectionList: React.FC<Props> = ({ token, navigation, isConnected, usern
     const [searchQueryPOT, setSearchQueryPOT] = useState('');
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [toDate, setToDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear12 = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear12);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [selectedExe, setSelectedExe] = useState(null);
     const [exeData, setExeData] = useState([]);
     const [designData, setDesignData] = useState([]);
@@ -929,6 +932,7 @@ const CollectionList: React.FC<Props> = ({ token, navigation, isConnected, usern
                     setForm={setForm}
                     setIsLoggedIn={setIsLoggedIn}
                     isConnected={isConnected}
+                    yearOptions={yearOptions}
                 // selectedItemStatus={selectedItemStatus}
                 // onItemStatusChange={handleItemStatusChange}
                 />

@@ -97,11 +97,11 @@ export const fetchPropertyData = async (token: string) => {
     try {
         // 1. Pehle cache check karo
         const cached = await AsyncStorage.getItem('get_property');
-        if (cached) {
-            console.log('✅ Property from cache');
-            const parsed = JSON.parse(cached);
-            return Array.isArray(parsed) ? parsed : [];
-        }
+        // if (cached) {
+        //     console.log('✅ Property from cache');
+        //     const parsed = JSON.parse(cached);
+        //     return Array.isArray(parsed) ? parsed : [];
+        // }
 
         // 2. Cache nahi mila toh API call
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -146,12 +146,12 @@ export const fetchCurrentYearData = async (token: string) => {
     try {
         // 1. Pehle cache check karo
         const cached = await AsyncStorage.getItem('current_year');
-        if (cached) {
-            console.log('✅ Year from cache');
-            const parsed = JSON.parse(cached);
-            console.log('parsed year', parsed.data);
-            return parsed ? parsed : null;
-        }
+        // if (cached) {
+        //     console.log('✅ Year from cache');
+        //     const parsed = JSON.parse(cached);
+        //     console.log('parsed year', parsed.data);
+        //     return parsed ? parsed : null;
+        // }
 
         // 2. Cache nahi mila toh API call
         if (cancelToken?.cancel) cancelToken.cancel();

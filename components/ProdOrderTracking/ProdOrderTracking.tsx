@@ -9,6 +9,7 @@ import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from 
 import ProdOrderTrackingCard from './ProdOrderTrackingCard';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
+import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 
 const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, username }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +17,10 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
     const [searchQueryPOT, setSearchQueryPOT] = useState('');
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [toDate, setToDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [selectedExe, setSelectedExe] = useState<ExeData | null>(null);
     const [exeData, setExeData] = useState<ExeData[]>([]);
     const [designData, setDesignData] = useState<DesignData[]>([]);
@@ -397,6 +401,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, navigation, isConnected, us
                 itemData={itemData}
                 selectedItemStatus={selectedItemStatus}
                 onItemStatusChange={handleItemStatusChange}
+                yearOptions={yearOptions}
             />
         </>
     );

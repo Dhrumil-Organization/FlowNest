@@ -341,6 +341,7 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(0,0,0,0.03)',
         borderBottomWidth: 1,
         backgroundColor: 'transparent',
+        color: '#000',
     },
     rowSelected: {
         // backgroundColor: 'rgba(106,13,173,0.06)', // subtle theme highlight

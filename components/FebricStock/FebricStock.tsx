@@ -8,6 +8,7 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import { CardPayload } from './Modal';
+import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 interface Party {
     parcode: string;
     partyname: string;
@@ -32,7 +33,10 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [filteredData, setFilteredData] = useState<Party[]>([]);
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [toDate, setToDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [PrpCodeList, setPrpCodeList] = useState([]);
     const [getpayload, setPayload] = useState<CardPayload[]>([]);
     const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(null);

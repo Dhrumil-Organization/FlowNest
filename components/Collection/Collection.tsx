@@ -29,6 +29,7 @@ import {
 } from '../../common/API/Functions';
 import { SuccessModal } from '../Shared/SuccessModal';
 import { API } from '../../common/API/dynamicAPI';
+import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 
 // ========== INTERFACES ==========
 interface CardData {
@@ -231,6 +232,9 @@ const Collection: React.FC<Props> = ({
     const [getCardDataMode, setCardDataMode] = useState<string | null>(null);
     const [successModalVisible, setSuccessModalVisible] = useState(false);
     const [successModalPayload, setSuccessModalPayload] = useState<any>(null);
+    const currentDate = new Date();
+    const currentYear12 = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear12);
 
     // ========== CACHE MANAGEMENT ==========
     const prptypeCacheRef = useRef<Record<string, any>>({});
@@ -1037,6 +1041,7 @@ const Collection: React.FC<Props> = ({
                 onSavePart1={''}
                 onSavePart2={handleSavePart2}
                 getSaveLoading={getSaveLoading}
+                yearOptions={yearOptions}
             />
             <SuccessModal
                 visible={successModalVisible}

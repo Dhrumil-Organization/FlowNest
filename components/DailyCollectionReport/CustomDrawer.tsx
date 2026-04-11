@@ -301,7 +301,8 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
 
                                 <SearchableDropdown
                                     data={getPropertyData}
-                                    labelKey="PrpName"
+                                    // labelKey="PrpName"
+                                    labelKey={["PrpName", "PrpCode"]}
                                     valueKey="PrpCode"
                                     placeholder="Choose property..."
                                     pageSize={10}

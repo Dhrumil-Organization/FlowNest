@@ -68,7 +68,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
                 setPrpCodeList(response.data.response.data);
 
-            }).catch(error => { console.log('Hook Property Get Error: ', error) });
+            }).catch(error => {});
     };
 
     useEffect(() => { isDrawerVisible && PrpCodeList.length === 0 && fetchPrpCode() }, [isDrawerVisible]);
@@ -152,8 +152,15 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         setIsLoading(true);
 
+        console.log("selectedPrpCode :", selectedPrpCode)
+        let pcodes = [];
+        let pcodesCntr = 0;
+        selectedPrpCode && selectedPrpCode.filter((el, ind) => {
+            pcodes[pcodesCntr] = el.PrpCode
+        });
+
         const payload = {
-            prpcode: selectedPrpCode.PrpCode,
+            prpcodes: pcodes,
             prptype: "S",
             txntype: "mob_fabric_stock"
         };
@@ -166,6 +173,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             'X-Requested-with': 'XMLHttpRequest',
         };
 
+        console.log("appgreyinstockdata API payload :", payload )
+        console.log("appgreyinstockdata API URL :", `${API}/api/appgreyinstockdata` )
+
         try {
             const response = await axios.get(`${API}/api/appgreyinstockdata`, {
                 params: payload,
@@ -173,18 +183,25 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             });
 
             const responseData = response?.data?.response?.data || [];
+            console.log("appgreyinstockdata API responseData", responseData)
 
             if (response.data.success === true) {
 
                 if (responseData.length > 0) {
 
                     const prData = responseData.filter(item => item.dptcode == 'PR')
-                    const nonPrData = responseData.filter(item => item.dptcode !== 'PR')
+                    const nonPrData = responseData.filter(item => item.dptcode !== 'PR');
 
-                    const prSummary = getItemWiseSummary(prData);
-                    const nonPrSummary = getItemWiseSummary(nonPrData);
+                    //console.log("nonPrData", nonPrData);
+
+                    const prSummary = getItemWiseSummary(prData, true, true);
+                    const nonPrSummary = getItemWiseSummary(nonPrData, false, false);
+
+                    //console.log("getItemWiseSummary", getItemWiseSummary);
 
                     setGreyStockData(prSummary);
+                    //console.log("prSummary :", prSummary)
+                    //console.log("nonPrSummary :", nonPrSummary)
                     setFinishStockData(nonPrSummary);
                     setsalesdata(responseData);
                     setsalessumdata(responseData);
@@ -240,8 +257,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         // 🔽 FILTER (2 conditions)
         const filtered = data.filter(item =>
-            (filter1 ? item.dptcode === 'PR' : true) &&   // 👉 filter 1
-            (filter2 ? item.TOTQTY > 0 : true)            // 👉 filter 2
+            (filter1 ? item.dptcode == 'PR' : item.dptcode != 'PR') //&& (filter2 ? item.TOTQTY > 0 : true) 
         );
 
         // 🔽 GROUP + SUM
@@ -271,6 +287,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                 : (b.ITMNAME || '').localeCompare(a.ITMNAME || '')
         );
 
+        //console.log("===== ITEM WISE TOTAL QTY =====");
+        // result.forEach(item => {
+        //     console.log(`ITMCODE: ${item.ITMCODE} | TOTAL QTY: ${item.TOTQTY}`);
+        // });
+
         return result;
     };
 
@@ -294,7 +315,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         return Object.values(summary);
     };
 
-    const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes') => {
+    const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes', order = 'asc') => {
 
         let filtered = [];
 
@@ -329,8 +350,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         const result = Object.values(grouped);
 
-        result.sort((a, b) =>
-            order === 'asc'
+        result.sort((a, b) => order === 'asc'
                 ? (a.SHDNAME || '').localeCompare(b.SHDNAME || '')
                 : (b.SHDNAME || '').localeCompare(a.SHDNAME || '')
         );
@@ -751,7 +771,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                     shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                 }}>
-                                <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
+                                <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
                                     {item.ITMNAME}
                                 </Text>
                                 {/* <View style={{
@@ -812,7 +832,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1,
                                         shadowRadius: 4, elevation: 3
                                     }}>
-                                    <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MDSNNAME} </Text>
+                                    <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MDSNNAME} </Text>
                                     {/* <View
                                         style={{
                                             backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center',
@@ -876,7 +896,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                     }}>
-                                    <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SDSNNAME} </Text>
+                                    <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SDSNNAME} </Text>
                                     {/* <View
                                         style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
@@ -903,6 +923,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     </View>
                 </View>
             </Modal>
+
             {/** shade */}
             <Modal visible={isShadeVisible} animationType="slide">
                 <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
@@ -929,7 +950,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                     }} >
-                                    <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
+                                    <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
                                     {/* <View
                                         style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>

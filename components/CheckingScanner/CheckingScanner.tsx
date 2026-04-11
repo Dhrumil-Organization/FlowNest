@@ -861,7 +861,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 header={'Checking scanner'}
                 subHeader={'scan with QR code'}
             />
-            {/* <View style={{ flexDirection: 'row', justifyContent: 'flex-start', margin: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-start', margin: 10 }}>
                 <TouchableOpacity
                     style={{
                         backgroundColor: '#007EA7',
@@ -875,7 +875,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                         Manual Entry
                     </Text>
                 </TouchableOpacity>
-            </View> */}
+            </View>
             <View style={checkingScannerStyles.flexContainer}>
                 <Icon name="camera" style={checkingScannerStyles.cameraIcon} />
                 <Text style={checkingScannerStyles.titleTextWithIcon}> QR scanner </Text>
@@ -886,7 +886,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 />
             </View>
 
-            <ScrollView
+            {/* <ScrollView
                 style={checkingScannerStyles.container}
                 contentContainerStyle={{ paddingBottom: 40 }}
                 keyboardShouldPersistTaps="handled"
@@ -1211,7 +1211,237 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                         <Text style={checkingScannerStyles.infoText}> Fill all fields to enable submission </Text>
                     </View>
                 </View>
+            </ScrollView> */}
+
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+                keyboardShouldPersistTaps="handled">
+                {
+                    isScanning &&
+                    (
+                        <View style={checkingScannerStyles.cameraContainer}>
+                            <>
+                                {device && hasPermission && (
+                                    <Camera
+                                        style={checkingScannerStyles.camera}
+                                        device={device}
+                                        isActive={true}
+                                        codeScanner={codeScanner}
+                                    />
+                                )}
+                                <View style={checkingScannerStyles.overlay}>
+                                    <View style={checkingScannerStyles.scanBox} />
+                                </View>
+                            </>
+                        </View>
+                    )
+                }
+                <View style={{
+                    backgroundColor: '#fff',
+                    borderRadius: 12,
+                    padding: 12,
+                    elevation: 2,
+                }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <View style={{ width: '48%' }}>
+                            <Text style={checkingScannerStyles.label}>Beam Number <Text style={{ color: 'red' }}> *</Text></Text>
+                            <TextInput
+                                style={checkingScannerStyles.inputDisabled}
+                                value={beamNo}
+                                editable={false}
+                            />
+                        </View>
+
+                        <View style={{ width: '48%' }}>
+                            <Text style={checkingScannerStyles.label}>Taka No <Text style={{ color: 'red' }}> *</Text></Text>
+                            <TextInput
+                                style={checkingScannerStyles.inputDisabled}
+                                value={takaNo}
+                                editable={false}
+                            />
+                        </View>
+                    </View>
+                    <Text style={checkingScannerStyles.label}>Design <Text style={{ color: 'red' }}> *</Text></Text>
+                    <View style={checkingScannerStyles.dropdown}>
+                        {/* <Picker
+                            selectedValue={design || ''}
+                            onValueChange={(itemValue) => {
+                                setDesign(itemValue);
+                                const selectedRow = getData.find(el => el.DsnCode === itemValue);
+                                setWarpLen(selectedRow?.WarpLen || '0');
+                            }}
+                        >
+                            <Picker.Item label="Select Design" value="" enabled={false} />
+                            {getData.map((item, index) => (
+                                <Picker.Item key={index} label={item.DsnName} value={item.DsnCode} />
+                            ))}
+                        </Picker> */}
+                        <View style={{ flex: 1 }}>
+                            <PartyDropdown
+                                data={getData}
+                                placeholder="Choose design..."
+                                labelKey={["DsnName", "DsnCode"]}
+                                valueKey="DsnCode"
+                                pageSize={12}
+                                initialValue={null}
+                                selected={null}
+                                loading={false}
+                                type="design"
+                                onSelect={(item) => {
+                                    setDesign(item.DsnCode);
+                                    setWarpLen(item.WarpLen || '0');
+                                }}
+                                setSelected={(val) => {
+                                    if (!val) {
+                                        setDesign('');
+                                        setWarpLen('0');
+                                    } else {
+                                        setDesign(val.DsnCode);
+                                        setWarpLen(val.WarpLen || '0');
+                                    }
+                                }}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <View style={{ width: '48%' }}>
+                            <Text style={checkingScannerStyles.label}>Meter <Text style={{ color: 'red' }}> *</Text>
+                                {
+                                    typeof getWarpLen != 'undefined' && getWarpLen != '' && getWarpLen != null && parseFloat(getWarpLen) != 0 ? <Text style={{ fontSize: 11, color: '#000', }}> [ {getWarpLen} ] </Text> : null
+                                }
+                            </Text>
+                            <TextInput
+                                style={checkingScannerStyles.input}
+                                value={meter}
+                                keyboardType="decimal-pad"
+                                onChangeText={handleMeterChange}
+                            />
+                        </View>
+
+                        <View style={{ width: '48%' }}>
+                            <Text style={checkingScannerStyles.label}>Kgs <Text style={{ color: 'red' }}> *</Text></Text>
+                            <TextInput
+                                style={checkingScannerStyles.input}
+                                value={kgs}
+                                keyboardType="decimal-pad"
+                                onChangeText={handleKgsChange}
+                            />
+                        </View>
+                    </View>
+                    <Text style={checkingScannerStyles.label}>Avg. Wt <Text style={{ color: 'red' }}> *</Text></Text>
+                    <TextInput
+                        style={checkingScannerStyles.inputDisabled}
+                        value={getavgWt}
+                        editable={false}
+                    />
+                    <Text style={checkingScannerStyles.label}>Grade <Text style={{ color: 'red' }}> *</Text></Text>
+                    <View style={checkingScannerStyles.dropdown}>
+                        {/* <Picker selectedValue={grade} onValueChange={setGrade}>
+                            <Picker.Item label="Select Grade" value="" enabled={false} />
+                            {getGradeData.map((item, i) => (
+                                <Picker.Item key={i} label={item.GrdName} value={item.GrdCode} />
+                            ))}
+                        </Picker> */}
+                        {/* <View style={{ flex: 1 }}> */}
+                        <PartyDropdown
+                            data={getGradeData}
+                            placeholder="Choose grade..."
+                            labelKey={["GrdName", "GrdCode"]}
+                            valueKey="GrdCode"
+                            pageSize={12}
+                            initialValue={null}
+                            selected={null}
+                            loading={false}
+                            type="grd"
+                            onSelect={(item) => {
+                                setGrade(item.GrdCode);
+                            }}
+                            setSelected={(val) => {
+                                if (!val) {
+                                    setGrade('');
+                                } else {
+                                    setGrade(val.GrdCode);
+                                }
+                            }}
+                        />
+                        {/* </View> */}
+                    </View>
+                    <Text style={checkingScannerStyles.label}>Checker <Text style={{ color: 'red' }}> *</Text></Text>
+                    {/* <View style={checkingScannerStyles.dropdown}> */}
+                        {/* <Picker
+                            selectedValue={checker}
+                            onValueChange={(val) => {
+                                setChecker(val);
+                                AsyncStorage.setItem('csChecker', val);
+                            }}
+                        >
+                            <Picker.Item label="Select Checker" value="" enabled={false} />
+                            {getCheckerData.map((item, i) => (
+                                <Picker.Item key={i} label={item.EmpName} value={item.EmpCode} />
+                            ))}
+                        </Picker> */}
+                        <View style={checkingScannerStyles.dropdown}>
+                            <PartyDropdown
+                                data={getCheckerData}
+                                placeholder="Choose checker..."
+                                labelKey={["EmpName", "EmpCode"]}
+                                valueKey="EmpCode"
+                                pageSize={12}
+                                initialValue={null}
+                                selected={null}
+                                loading={false}
+                                type="checker"
+                                onSelect={(item) => {
+                                    setChecker(item.EmpCode);
+                                }}
+                                setSelected={(val) => {
+                                    if (!val) {
+                                        setChecker('');
+                                    } else {
+                                        setChecker(val.EmpCode);
+                                    }
+                                }}
+                            />
+                        </View>
+                    {/* </View> */}
+                    <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}> *</Text></Text>
+                    <View style={checkingScannerStyles.dropdown}>
+                        <Picker selectedValue={shift} onValueChange={setShift}>
+                            <Picker.Item label="Select shift" value="" enabled={false} />
+                            {getShiftData.map((item, i) => (
+                                <Picker.Item key={i} label={item.ShfName} value={item.ShfCode} />
+                            ))}
+                        </Picker>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                        <Text style={checkingScannerStyles.label}>Is mending?</Text>
+                        <Switch
+                            value={isMending}
+                            onValueChange={setIsMending}
+                            trackColor={{ false: "#ccc", true: "#007EA7" }}
+                        />
+                    </View>
+                    <TouchableOpacity style={checkingScannerStyles.submitBtn} onPress={handleSubmitScan}>
+                        <Text style={checkingScannerStyles.submitText}>Submit Scan</Text>
+                    </TouchableOpacity>
+                    {getDataSaved && (
+                        <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                            <TouchableOpacity style={checkingScannerStyles.printBtn} onPress={printSticker}>
+                                <Text style={checkingScannerStyles.actionText}>Print</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={checkingScannerStyles.clearBtn}>
+                                <Text style={checkingScannerStyles.actionText}>Clear</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                </View>
             </ScrollView>
+
+
 
             <Modal
                 visible={showManualPopup}

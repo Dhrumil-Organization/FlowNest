@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import {
-    View, Text, StyleSheet, TouchableOpacity
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import FullScreenLoader from '@/components/FullScreenLoader';
+import { theme } from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import FullScreenLoader from '../../../components/FullScreenLoader';
 import * as Device from 'expo-device';
-import { theme } from '../../../components/theme';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 export default function AccessDeniedScreen({ fromInit = false }: { fromInit?: boolean }) {
     const router = useRouter();

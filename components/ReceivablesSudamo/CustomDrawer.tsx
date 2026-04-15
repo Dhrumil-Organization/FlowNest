@@ -1,37 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    Modal,
-    StyleSheet,
-    Animated,
-    Dimensions,
-    Platform,
-    ScrollView,
-    ActivityIndicator,
-    TextInput,
-} from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { LocaleConfig } from 'react-native-calendars';
 import {
     format,
-    subDays,
-    startOfWeek,
-    endOfWeek,
-    startOfMonth,
-    endOfMonth,
-    subMonths,
-    startOfYear,
-    endOfYear,
-    subYears,
-    isSameDay,
     isBefore,
-    isAfter
+    isSameDay
 } from 'date-fns';
-import { CustomDrawerProps, CustomDrawerReceiveableProps, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ItemData, ItemStatus } from './Modal';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { LocaleConfig } from 'react-native-calendars';
 import theme from '../../components/theme';
+import { CustomDrawerReceiveableProps, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ItemData, ItemStatus } from './Modal';
 
 const { height } = Dimensions.get('window');
 
@@ -910,7 +899,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                             >
                                                 <Text style={styles.dropdownOptionText}>Select Property Group</Text>
                                             </TouchableOpacity>
-                                            {receivables_prpgroup.map((exe) => (
+                                            {receivables_prpgroup && receivables_prpgroup.map((exe) => (
                                                 <TouchableOpacity
                                                     key={exe.PrpTypeCode}
                                                     style={[

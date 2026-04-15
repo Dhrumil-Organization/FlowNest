@@ -1,6 +1,6 @@
 // components/AppCard.tsx
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 export default function AppCard({ title, route }: any) {
   const router = useRouter();
@@ -8,7 +8,7 @@ export default function AppCard({ title, route }: any) {
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => router.push(route)}
+      onPress={() => router.replace(route)}
     >
       <Text style={styles.icon}>📱</Text>
       <Text style={styles.title}>{title}</Text>

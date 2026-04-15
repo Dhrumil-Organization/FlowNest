@@ -1,24 +1,34 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    View, Text, FlatList, TextInput as RNTextInput, TouchableOpacity,
-    Alert, Modal, ActivityIndicator
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    TextInput as RNTextInput,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
+import { API } from '@/common/API/dynamicAPI';
+import { crlimtreq_styles } from '@/common/Style';
+import PartyHistoryModal from '@/components/CreditLimitRequest/PartyHistoryModal'; // 👈 path adjust
+import FullScreenLoader from '@/components/FullScreenLoader';
+import Header from '@/components/Header';
+import { theme } from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useWindowDimensions } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import FullScreenLoader from '../../../components/FullScreenLoader';
-import Header from '../../../components/Header';
-import { crlimtreq_styles } from '../../../common/Style';
-import { API } from '../../../common/API/dynamicAPI';
-import PartyHistoryModal from '../../../components/CreditLimitRequest/PartyHistoryModal'; // 👈 path adjust
-import { theme } from '../../../components/theme';
-import { useAuth } from '../../../hooks/AuthContext';
+interface Props {
+    token: string;
+    username?: string;
+    duration?: number;
+}
 
-export default function CreditLimit() {
-    const { token, username } = useAuth();
+// export default function CreditLimit() {
+const CreditLimit: React.FC<Props> = ({ token, username }) => {
+    // const { token, username } = useAuth();
     const flatListRef = useRef<FlatList>(null);
     const flatHistoryListRef = useRef<FlatList>(null);
 
@@ -90,6 +100,7 @@ export default function CreditLimit() {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { txntype: 'creditlimitrequest', referrer: 'dashboard' }
             });
+            console.log("res", res);
 
             setData(res.data.success ? res.data.data : []);
             setAllHistoryData([]);
@@ -1067,3 +1078,5 @@ export default function CreditLimit() {
         </View>
     );
 }
+
+export default CreditLimit;

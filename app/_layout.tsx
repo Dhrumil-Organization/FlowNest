@@ -1,3 +1,6 @@
+import { initAPI, initAPIForPrinterList, initAPIForSticker } from '@/common/API/dynamicAPI';
+import { initDB } from '@/common/utils/chatDB';
+import { initGlobalCacheDB } from '@/common/utils/sqliteCacheManager';
 import { getFCMToken } from '@/hooks/NotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -6,7 +9,6 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AccessDeniedScreen from '../common/access-denied';
 import FullScreenLoader from '../components/FullScreenLoader';
-import { AuthProvider } from '../hooks/AuthContext';
 
 
 export default function RootLayout() {
@@ -15,12 +17,25 @@ export default function RootLayout() {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    // 🔥 Get FCM token
-    getFCMToken();
+  initAPI();
+  initAPIForPrinterList();
+  initAPIForSticker();
 
-    // 🔥 Setup notification handlers
-    // setupNotificationHandlers(handleNotification);
+  const initializeDatabases = async () => {
+    try {
+      await initDB(); // Initialize chat.db
+      await initGlobalCacheDB(); // Initialize GlobalCache.db
+      getFCMToken();
+      console.log('✅ All databases initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing databases:', error);
+      // Retry or show user-friendly error
+    }
+  };
+
+  // Call this function when your app starts
+  useEffect(() => {
+    initializeDatabases();
   }, []);
 
   useEffect(() => {
@@ -31,9 +46,9 @@ export default function RootLayout() {
       router.replace('/(auth)/login');
     }
 
-    // ✅ LOGGED IN → FORCE HOME
+    // ✅ LOGGED IN → FORCE HOMEx
     if (isAllowed && isLoggedIn === true) {
-      router.replace('/');
+      router.replace('/(tabs)'); // 👈 Change from "index" to "(tabs)"
     }
 
   }, [isReady, isAllowed, isLoggedIn]);
@@ -44,6 +59,7 @@ export default function RootLayout() {
         console.log("🚀 App Start");
 
         const deviceId = Device.osInternalBuildId || "test-device";
+        await AsyncStorage.setItem('cache_deviceId', deviceId);
 
         // 🔥 1. DEVICE CHECK
         const res = await axios.post(
@@ -52,6 +68,7 @@ export default function RootLayout() {
         );
 
         console.log("✅ checkdevice:", res.data);
+        console.log("Monthly:", deviceId);
 
         // ❌ ACCESS DENIED
         if (Number(res.data) !== 1) {
@@ -98,17 +115,52 @@ export default function RootLayout() {
 
   // 🔥 FINAL ROUTING
   return (
-    <AuthProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        {isAllowed && isLoggedIn === true ? (
-
+    // <AuthProvider>
+    // <Stack screenOptions={{ headerShown: false }}>
+    //   {isAllowed && isLoggedIn === true ? (
+    //     <>
+    //       <Stack.Screen name="(tabs)" />
+    //       <Stack.Screen name="index" options={{ title: 'Home' }} />
+    //       {/* 👇 Yahan sab routes define karna */}
+    //       <Stack.Screen name="receivables-sudamo" options={{ title: 'Receivables' }} />
+    //       <Stack.Screen name="credit-limit" options={{ title: 'Credit Limit' }} />
+    //       <Stack.Screen name="receivables" options={{ title: 'Receivables' }} />
+    //       <Stack.Screen name="collection" options={{ title: 'Collection' }} />
+    //       <Stack.Screen name="upload" options={{ title: 'Upload' }} />
+    //       {/* ... aur baki sab routes */}
+    //     </>
+    //   ) : (
+    //     <Stack.Screen name="(auth)/login" />
+    //   )}
+    // </Stack>
+    // <Stack
+    //   screenOptions={{ headerShown: false }}
+    //   initialRouteName="(tabs)" // Default route set karna
+    // >
+    //   {isAllowed && isLoggedIn === true ? (
+    //     <>
+    //       <Stack.Screen name="(tabs)" />
+    //       <Stack.Screen name="index" options={{ title: 'Home' }} />
+    //       <Stack.Screen name="receivables" options={{ title: 'Receivables' }} />
+    //       <Stack.Screen name="receivables-sudamo" options={{ title: 'Receivables' }} />
+    //       <Stack.Screen name="credit-limit" options={{ title: 'Credit Limit' }} />
+    //       {/* ... aur baki sab routes */}
+    //     </>
+    //   ) : (
+    //     <Stack.Screen name="(auth)/login" />
+    //   )}
+    // </Stack>
+    // </AuthProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      {isAllowed && isLoggedIn === true ? (
+        <>
           <Stack.Screen name="(tabs)" />
-
-        ) : (
-          <Stack.Screen name="(auth)/login" />
-        )}
-      </Stack>
-    </AuthProvider>
+          <Stack.Screen name="index" />
+        </>
+      ) : (
+        <Stack.Screen name="(auth)/login" />
+      )}
+    </Stack>
   );
 }
 

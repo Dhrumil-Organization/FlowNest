@@ -22,7 +22,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function Header({ userName, onSearch, placeholder = 'Search...' }: any) {
+export default function Header({ userName, onSearch, placeholder = 'Search...', breadcrumb, SearchBar = true, breadcrumbWithNoHome }: any) {
     const [search, setSearch] = useState('');
     const [showUserBar, setShowUserBar] = useState(false);
     const router = useRouter();
@@ -73,12 +73,12 @@ export default function Header({ userName, onSearch, placeholder = 'Search...' }
                             <Icon name="notifications-none" size={22} color="#fff" />
                         </TouchableOpacity>
 
-                        {/* <TouchableOpacity
+                        <TouchableOpacity
                             style={styles.iconBtn}
-                            onPress={() => router.push('/settings')}
+                            onPress={() => router.replace('/settings')}
                         >
                             <Icon name="settings" size={22} color="#fff" />
-                        </TouchableOpacity> */}
+                        </TouchableOpacity>
 
                         {/* 🔥 AVATAR */}
                         <TouchableOpacity onPress={toggleUserBar}>
@@ -103,7 +103,7 @@ export default function Header({ userName, onSearch, placeholder = 'Search...' }
                 )}
 
                 {/* 🔥 SEARCH */}
-                <View style={styles.searchBox}>
+                {SearchBar && (<View style={styles.searchBox}>
                     <Icon name="search" size={18} color={theme.BRAND_DARK} />
                     <TextInput
                         value={search}
@@ -124,7 +124,45 @@ export default function Header({ userName, onSearch, placeholder = 'Search...' }
                             <Icon name="close" size={18} color={theme.BRAND_DARK} />
                         </TouchableOpacity>
                     )}
-                </View>
+                </View>)}
+
+
+                {/* 🔥 BREADCRUMB */}
+                {breadcrumb && (
+                    <>
+                        <View style={styles.breadcrumbContainer}>
+                            <View style={styles.breadcrumb}>
+                                <TouchableOpacity onPress={() => router.back()}>
+                                    <Text style={styles.breadcrumbLink}>Back</Text>
+                                </TouchableOpacity>
+                            </View>
+                             <View style={[styles.breadcrumb, styles.breadcrumbRight]}>
+                                <TouchableOpacity onPress={() => router.replace('/')}>
+                                    <Text style={styles.breadcrumbLink}>Home</Text>
+                                </TouchableOpacity>
+
+                                <Text style={styles.breadcrumbSeparator}>›</Text>
+
+                                <Text style={styles.breadcrumbCurrent}>{breadcrumb}</Text>
+                            </View>
+                        </View>
+                    </>
+                )}
+
+                {breadcrumbWithNoHome && (
+                    <>
+                        <View style={styles.breadcrumbContainer}>
+                            <View style={styles.breadcrumb}>
+                                <TouchableOpacity onPress={() => router.back()}>
+                                    <Text style={styles.breadcrumbLink}>Back</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={[styles.breadcrumb, styles.breadcrumbRight]}>
+                                <Text style={styles.breadcrumbCurrent}>{breadcrumbWithNoHome}</Text>
+                            </View>
+                        </View>
+                    </>
+                )}
 
             </SafeAreaView>
         </LinearGradient>
@@ -240,5 +278,49 @@ const styles = StyleSheet.create({
     logoImage: {
         width: 30,
         height: 30,
+    },
+    // 
+    breadcrumb: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    breadcrumbContainer: {
+        display: 'flex',
+        // flexDirection: 'row',
+        justifyContent: 'space-between',
+        flexDirection: 'row',
+        alignItems: 'flex-start'
+    },
+    breadcrumbRight: {
+        flex: 1,              // remaining space le
+        maxWidth: '55%',     // 🔥 important (control width)
+        marginLeft: 10,
+        alignSelf: 'flex-end',
+        alignItems: 'flex-end',
+        textAlign: 'right',
+        alignContent: 'flex-end',
+        justifyContent: 'flex-end',
+        position: 'relative'
+    },
+    breadcrumbLink: {
+        color: '#fff',
+        fontSize: 13,
+        opacity: 0.9
+    },
+    breadcrumbSeparator: {
+        color: '#fff',
+        marginHorizontal: 6
+    },
+    // breadcrumbCurrent: {
+    //     color: '#fff',
+    //     fontWeight: '600',
+    //     fontSize: 13
+    // },
+    breadcrumbCurrent: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 13,
+        flexWrap: 'wrap',   // 🔥 multiline enable
     },
 });

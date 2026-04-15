@@ -1,7 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from './theme';
 
 export default function Footer() {
@@ -10,6 +10,25 @@ export default function Footer() {
   const handleLogout = async () => {
     await AsyncStorage.clear();
     router.replace('/(auth)/login');
+    // router.push({
+    //   pathname: `/(auth)/login'`,
+    //   params: {
+    //     _key: Math.random().toString(36).substring(2, 9) // Force remount
+    //   }
+    // })
+
+  };
+
+  const handleHome = async () => {
+    // await AsyncStorage.clear();
+    router.replace('/(tabs)');
+    // router.push({
+    //   pathname: `/`,
+    //   params: {
+    //     _key: Math.random().toString(36).substring(2, 9) // Force remount
+    //   }
+    // })
+
   };
 
   return (
@@ -17,7 +36,7 @@ export default function Footer() {
       <View style={styles.container}>
 
         {/* HOME */}
-        <TouchableOpacity style={styles.item} onPress={() => router.replace('/')}>
+        <TouchableOpacity style={styles.item} onPress={handleHome}>
           <Icon name="home" size={22} color="#fff" />
           <Text style={styles.text}>Home</Text>
         </TouchableOpacity>

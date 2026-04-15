@@ -10,17 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "jsEngine": "jsc",
+      // "jsEngine": "jsc",
       "bundleIdentifier": "com.anonymous.FlowNest",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "experimental": {
-      "newArchEnabled": false
-    },
     "android": {
-      "jsEngine": "jsc",
+      // "jsEngine": "jsc",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/log_white.png",

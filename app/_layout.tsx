@@ -1,7 +1,9 @@
+import { handleNotification } from '@/hooks/notificationHandler';
 import { getFCMToken } from '@/hooks/NotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AccessDeniedScreen from '../common/access-denied';
@@ -20,7 +22,7 @@ export default function RootLayout() {
     getFCMToken();
 
     // 🔥 Setup notification handlers
-    // setupNotificationHandlers(handleNotification);
+    setupNotificationHandlers(handleNotification);
   }, []);
 
   useEffect(() => {
@@ -112,6 +114,17 @@ export default function RootLayout() {
   );
 }
 
-function setupNotificationHandlers(handleNotification: (data: any) => void) {
-  throw new Error('Function not implemented.');
+function setupNotificationHandlers(handleNotification) {
+  // 🔔 Foreground
+  Notifications.addNotificationReceivedListener(notification => {
+    console.log('📩 Foreground Notification:', notification);
+  });
+
+  // 👆 Click / Tap
+  Notifications.addNotificationResponseReceivedListener(response => {
+    const data = response.notification.request.content.data;
+    console.log('👉 Notification Click:', data);
+
+    handleNotification(data);
+  });
 }

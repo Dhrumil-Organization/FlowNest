@@ -76,6 +76,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [getpayload, setPayload] = useState<CardPayload[]>([]);
     const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(null);
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
+    const [isAll, setisALL] = useState(false);
     // 
     const [isDesignModalVisible, setIsDesignModalVisible] = useState(false);
     const [selectedDesignData, setSelectedDesignData] = useState<{
@@ -87,19 +88,27 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [filteredDesignDetails, setFilteredDesignDetails] = useState(selectedDesignData?.designdetails || []);
     // 
     const [designPage, setDesignPage] = useState(1);
+    const [subdesignPage, setsubDesignPage] = useState(1);
     const designItemsPerPage = 10;
+    const subdesignItemsPerPage = 10;
     const [isListReady, setIsListReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
     const [isPartyDetailsModalVisible, setIsPartyDetailsModalVisible] = useState(false);
     const [selectedPartyDetails, setSelectedPartyDetails] = useState<{
-        partydetails: any[];
-        party_summary: any[];
+        designdetails: any[];
+        design_summary: any[];
+        payload: any;
     } | null>(null);
     const [searchQueryPartyDetails, setSearchQueryPartyDetails] = useState('');
-    const [filteredPartyDetails, setFilteredPartyDetails] = useState(selectedPartyDetails?.partydetails || []);
+    const [filteredPartyDetails, setFilteredPartyDetails] = useState(selectedPartyDetails?.designdetails || []);
     const loadMoreDesignDetails = () => {
         if (designPage * designItemsPerPage < filteredDesignDetails.length) {
             setDesignPage(designPage + 1);
+        }
+    };
+    const loadMoreSubDesignDetails = () => {
+        if (subdesignPage * subdesignItemsPerPage < filteredPartyDetails.length) {
+            setsubDesignPage(subdesignPage + 1);
         }
     };
 
@@ -108,10 +117,19 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             const lowercasedQuery = searchQuery.toLowerCase();
             const filtered = selectedDesignData.designdetails.filter(
                 (item) =>
+                    item.parcode.toLowerCase().includes(lowercasedQuery) ||
+                    item.partyname.toLowerCase().includes(lowercasedQuery) ||
+                    item.sono.toLowerCase().includes(lowercasedQuery) ||
+                    item.sodate.toLowerCase().includes(lowercasedQuery) ||
                     item.Dsnname.toLowerCase().includes(lowercasedQuery) ||
                     item.dsncode.toLowerCase().includes(lowercasedQuery) ||
                     item.totmtr.toLowerCase().includes(lowercasedQuery) ||
-                    item.pending.toLowerCase().includes(lowercasedQuery)
+                    item.totamt.toLowerCase().includes(lowercasedQuery) ||
+                    item.chalqty.toLowerCase().includes(lowercasedQuery) ||
+                    item.chalamt.toLowerCase().includes(lowercasedQuery) ||
+                    item.noofchallan.toLowerCase().includes(lowercasedQuery) ||
+                    item.pending.toLowerCase().includes(lowercasedQuery) ||
+                    item.pendingamt.toLowerCase().includes(lowercasedQuery)
             );
             setFilteredDesignDetails(filtered);
         }
@@ -119,14 +137,22 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
 
     // Filter partydetails based on search query
     useEffect(() => {
-        if (selectedPartyDetails?.partydetails) {
+        if (selectedPartyDetails?.designdetails) {
             const lowercasedQuery = searchQueryPartyDetails.toLowerCase();
-            const filtered = selectedPartyDetails.partydetails.filter(
+            const filtered = selectedPartyDetails.designdetails.filter(
                 (item) =>
+                    item.parcode.toLowerCase().includes(lowercasedQuery) ||
                     item.partyname.toLowerCase().includes(lowercasedQuery) ||
-                    item.Dsnname.toLowerCase().includes(lowercasedQuery) ||
                     item.sono.toLowerCase().includes(lowercasedQuery) ||
-                    item.status.toLowerCase().includes(lowercasedQuery)
+                    item.sodate.toLowerCase().includes(lowercasedQuery) ||
+                    item.Dsnname.toLowerCase().includes(lowercasedQuery) ||
+                    item.dsncode.toLowerCase().includes(lowercasedQuery) ||
+                    item.totmtr.toLowerCase().includes(lowercasedQuery) ||
+                    item.chalqty.toLowerCase().includes(lowercasedQuery) ||
+                    item.chalamt.toLowerCase().includes(lowercasedQuery) ||
+                    item.noofchallan.toLowerCase().includes(lowercasedQuery) ||
+                    item.pending.toLowerCase().includes(lowercasedQuery) ||
+                    item.pendingamt.toLowerCase().includes(lowercasedQuery)
             );
             setFilteredPartyDetails(filtered);
         }
@@ -700,7 +726,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     //     }
     // };
 
-    const handleCardSubDesignPress = async (getDData?: any, parname, customPayload?: any, item?: any) => {
+    const handleCardSubDesignPress = async (getDData?: any, parname, customPayload?: any, item?: any, isall = false) => {
         console.log('🔵 payload PARTY', getDData || "", parname || "", customPayload || "", item || "");
         const headers = {
             Authorization: `Bearer ${token}`,
@@ -708,6 +734,11 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             'X-Requested-with': 'XMLHttpRequest',
         };
         setTrackingLoader(true);
+        if (isall) {
+            setisALL(true);
+        } else {
+            setisALL(false);
+        }
         const payload = {
             // fromdate: formatDate(fromDate),
             fromdate: "",
@@ -719,15 +750,15 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             sexes: selectedExe?.Code ? selectedExe?.Code : '0',
             type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
             dsncodes: customPayload.dsncodes,
-            uid: item.muid ? item.muid : "",
-            mdsncode: item.mdsncode ? item.mdsncode : "",
+            uid: item?.muid ? item?.muid : "",
+            mdsncode: item?.mdsncode ? item?.mdsncode : "",
             parcode: customPayload.parcode,
             prptype: 'S',
             txntype: 'prodorderlist'
         };
         try {
 
-            const response = await axios.post(`${API}/api/salesorderpartytracking`, payload, { headers });
+            const response = await axios.post(`${API}/api/salesordersubdesigntracking`, payload, { headers });
             console.log("🔵 response subdesign ddddd", response.data.data, payload);
             if (response.data.success) {
                 // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
@@ -737,8 +768,9 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 // setLastViewedParcode(getDData.parcode);
                 // navigation.navigate('SOPartyDetails', { party: parname.parname });
                 setSelectedPartyDetails({
-                    partydetails: response.data.data.partydetails,
-                    party_summary: response.data.data.party_summary,
+                    designdetails: response.data.data.designdetails,
+                    design_summary: response.data.data.design_summary,
+                    payload: payload
                 });
                 setIsPartyDetailsModalVisible(true);
             }
@@ -767,10 +799,10 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 yearno: selectedYear.split('-')[1].substring(2),
                 sexes: selectedExe?.Code ? selectedExe?.Code : '0',
                 type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-                dsncodes: item.dsncode ? [item.dsncode] : customPayload.dsncodes,
-                uid: customPayload.uid,
-                mdsncode: customPayload.mdsncode,
-                parcode: getDData.parcode,
+                dsncodes: item?.dsncode ? [item?.dsncode] : [],
+                uid: item?.suid ? item?.suid : "",
+                mdsncode: item?.mdsncode ? item?.mdsncode : "",
+                parcode: getDData?.parcode,
                 prptype: 'S',
                 txntype: 'prodorderlist'
             };
@@ -947,7 +979,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Design Summary</Text>
+                        <Text style={styles.modalTitle}>Main Design Summary</Text>
                         <TouchableOpacity onPress={closeDesignModal}>
                             <Icon name="close" size={24} color="#333" />
                         </TouchableOpacity>
@@ -959,7 +991,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
-                     } 
+                    }
                     {selectedDesignData?.design_summary.map((summary, index) => (
                         <TouchableOpacity
                             key={index}
@@ -967,6 +999,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                             onPress={() => {
                                 // handleCardPress(getDData, { parname: selectedDesignData?.designdetails[0].partyname }, selectedDesignData?.payload);
                                 handleCardSubDesignPress(getDData, { parname: selectedDesignData?.designdetails[0].partyname }, selectedDesignData?.payload);
+                                setisALL(true);
                             }}
                         >
                             <Text style={styles.partyNameInSummary}>
@@ -994,7 +1027,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                             </View>
                         </TouchableOpacity>
                     ))}
-                    <Text style={styles.sectionTitle}>Design Details</Text>
+                    <Text style={styles.sectionTitle}>Main Design Details</Text>
                     <FlatList
                         data={filteredDesignDetails.slice(0, designPage * designItemsPerPage)}
                         renderItem={({ item }) => (
@@ -1004,6 +1037,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                     const payload = { ...selectedDesignData!.payload, dsncodes: [item.dsncode] };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);
                                     handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);
+                                    setisALL(false);
                                 }}
                             >
                                 <View style={styles.designHeader}>
@@ -1050,25 +1084,80 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 onRequestClose={() => setIsPartyDetailsModalVisible(false)}
             >
                 <View style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Party Details</Text>
-                        <TouchableOpacity onPress={() => setIsPartyDetailsModalVisible(false)}>
-                            <Icon name="close" size={24} color="#333" />
-                        </TouchableOpacity>
-                    </View>
+                    {!isAll ? (
+                        <>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Sub Design Summary</Text>
+                                <TouchableOpacity onPress={() => setIsPartyDetailsModalVisible(false)}>
+                                    <Icon name="close" size={24} color="#333" />
+                                </TouchableOpacity>
+                            </View>
 
-                    {/* Search Input */}
-                    {getTrackingLoader ? <ActivityIndicator style={{ marginBottom: 10 }} size={24} color={theme.BRAND_GRADIENT_END} /> :
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search party details..."
-                            value={searchQueryPartyDetails}
-                            onChangeText={setSearchQueryPartyDetails}
-                        />
-                    }
-
+                            {/* Search Input */}
+                            {getTrackingLoader ? <ActivityIndicator style={{ marginBottom: 10 }} size={24} color={theme.BRAND_GRADIENT_END} /> :
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search sub design details..."
+                                    value={searchQueryPartyDetails}
+                                    onChangeText={setSearchQueryPartyDetails}
+                                />
+                            }
+                            {selectedPartyDetails?.design_summary.map((summary, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={styles.summaryCard}
+                                    onPress={() => {
+                                        // handleCardPress(getDData, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload);
+                                        // handleCardSubDesignPress(getDData, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload);
+                                        handleCardPress(selectedPartyDetails?.payload, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload, summary);
+                                    }}
+                                >
+                                    <Text style={styles.partyNameInSummary}>
+                                        Party: {selectedPartyDetails?.designdetails[0].partyname}
+                                    </Text>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Total Meter:</Text>
+                                        <Text style={styles.summaryValue}>{summary.totmtr}</Text>
+                                    </View>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Total Amount:</Text>
+                                        <Text style={styles.summaryValue}>{formatValue(summary.totamt)}</Text>
+                                    </View>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Challan Qty:</Text>
+                                        <Text style={styles.summaryValue}>{formatNumber(summary.chalqty)}</Text>
+                                    </View>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Pending Meter:</Text>
+                                        <Text style={[styles.summaryValue, { color: '#E65100' }]}>{formatNumber(summary.pending)}</Text>
+                                    </View>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Pending Amount:</Text>
+                                        <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatValue(summary.pendingamt)}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+                        </>
+                    ) : (
+                        <View>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Sub Design Summary</Text>
+                                <TouchableOpacity onPress={() => setIsPartyDetailsModalVisible(false)}>
+                                    <Icon name="close" size={24} color="#333" />
+                                </TouchableOpacity>
+                            </View>
+                            {getTrackingLoader ? <ActivityIndicator style={{ marginBottom: 10 }} size={24} color={theme.BRAND_GRADIENT_END} /> :
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search sub design details..."
+                                    value={searchQueryPartyDetails}
+                                    onChangeText={setSearchQueryPartyDetails}
+                                />
+                            }
+                        </View>
+                    )}
                     {/* Party Details List */}
-                    <FlatList
+                    {/* <FlatList
                         data={filteredPartyDetails}
                         renderItem={({ item }) => (
                             <TouchableOpacity
@@ -1100,6 +1189,63 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                 <Text style={styles.emptyText}>No party details found!</Text>
                             </View>
                         }
+                    /> */}
+                    <Text style={styles.sectionTitle}>Sub Design Details</Text>
+                    <FlatList
+                        data={filteredPartyDetails.slice(0, subdesignPage * subdesignItemsPerPage)}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.designCard}
+                                onPress={() => {
+                                    const payload = { ...selectedPartyDetails!.payload, dsncodes: [item.dsncode] };
+                                    // handleCardPress(getDData, { parname: item.partyname }, payload);
+                                    // handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);
+                                    handleCardPress(selectedPartyDetails?.payload, { parname: item.partyname }, payload, item);
+                                }}
+                            >
+                                <View style={styles.designHeader}>
+                                    <Text style={styles.designName}>{item.Dsnname}</Text>
+                                    <Text style={styles.designCode}>{item.dsncode}</Text>
+                                </View>
+                                <View style={styles.designValues}>
+                                    <View style={styles.valueRow}>
+                                        <View style={styles.valueItem}>
+                                            <Text style={styles.valueLabel}>Total Meter:</Text>
+                                            <Text style={styles.valueText}>{formatNumber(item.totmtr)}</Text>
+                                        </View>
+                                        <View style={styles.valueItem}>
+                                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>Pending Meter:</Text>
+                                            <Text style={[styles.valueText, { color: '#E65100' }]}>{formatNumber(item.pending)}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.valueRow}>
+                                        <View style={styles.valueItem}>
+                                            <Text style={styles.valueLabel}>Total Amount:</Text>
+                                            <Text style={styles.valueText}>{formatValue(item.totamt)}</Text>
+                                        </View>
+                                        <View style={styles.valueItem}>
+                                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>Pending Amount:</Text>
+                                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>{formatValue(item.pendingamt)}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.valueRow}>
+                                        <View style={styles.valueItem}>
+                                            <Text style={styles.valueLabel}>So No:</Text>
+                                            <Text style={styles.valueText}>{item.sono}</Text>
+                                        </View>
+                                        <View style={styles.valueItem}>
+                                            <Text style={[styles.valueLabel]}>So Date:</Text>
+                                            <Text style={[styles.valueText]}>{item.sodate}</Text>
+                                        </View>
+                                    </View>
+
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                        keyExtractor={(item, index) => `${item.dsncode}-${index}`}
+                        onEndReached={loadMoreSubDesignDetails}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={subdesignPage * subdesignItemsPerPage < filteredPartyDetails.length ? <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} /> : null}
                     />
                 </View>
             </Modal>

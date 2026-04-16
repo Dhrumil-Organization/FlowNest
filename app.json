@@ -25,6 +25,10 @@
         "monochromeImage": "./assets/images/log_white.png"
       },
       "edgeToEdgeEnabled": true,
+      "permissions": [
+        "INTERNET",
+        "RECORD_AUDIO"
+      ],
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.FlowNest"
     },
@@ -46,7 +50,9 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-mail-composer",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import { initDatabase } from '@/common/API/DatabaseManager';
+import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
 import {
-    View, Text, TextInput, TouchableOpacity,
-    ActivityIndicator, StyleSheet, Image, Alert
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
+    fetchAndCacheGlobalData,
+    getCachedGlobalData,
+    initGlobalCacheDB
+} from '@/common/utils/sqliteCacheManager';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { theme } from '../../components/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View
+} from 'react-native';
 import { API, initAPI } from '../../common/API/dynamicAPI';
+import { theme } from '../../components/theme';
 // import { getStoredToken } from '../../hooks/NotificationService';
 
 export default function LoginScreen() {
@@ -50,6 +61,18 @@ export default function LoginScreen() {
         };
         load();
     }, []);
+
+    const isCachePopulated = async (): Promise<boolean> => {
+        try {
+            const cachedParty = await getCachedGlobalData('party');
+            const cachedItem = await getCachedGlobalData('item');
+            const cachedShade = await getCachedGlobalData('shade');
+            return cachedParty.length > 0 && cachedItem.length > 0 && cachedShade.length > 0;
+        } catch (error) {
+            console.error('❌ Error checking cache status:', error);
+            return false;
+        }
+    };
 
     // 🔥 LOGIN
     const handleLogin = async () => {
@@ -96,24 +119,81 @@ export default function LoginScreen() {
                 const token = response.data.response?.access_token;
                 const user_details = response.data.response?.user?.first_name || 'user';
                 const user_menu_apps = response.data.response?.usermenu || '';
-                // const ismastersync = response.data.response?.ismastersync || '';
-                // const ismastersyncData = response.data.response?.mastersyncprptypes || [];
-                // const userof = response.data.response?.userof;
-                // const yno = response.data.response?.year?.YearNo || '';
+                const ismastersync = response.data.response?.ismastersync || '';
+                const ismastersyncData = response.data.response?.mastersyncprptypes || [];
+                const userof = response.data.response?.userof;
+                const yno = response.data.response?.year?.YearNo || '';
                 const role1 = response.data.response?.role1;
+                // const role1 = response.data.response?.role1;
                 if (response.data.success === true) {
+                    // if (token && user_details && user_menu_apps) {
+                    //     await AsyncStorage.setItem('access_token', token);
+                    //     await AsyncStorage.setItem('user_details', user_details);
+                    //     await AsyncStorage.setItem('login_user_name', username.trim());
+                    //     await AsyncStorage.setItem('login_user_passwd', password.trim());
+                    //     await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
+                    //     await AsyncStorage.setItem('user_login_role', JSON.stringify(role1));
+
+                    //     console.log("💾 SAVED SUCCESS");
+
+                    //     router.replace('/(tabs)');
+                    // } else {
+                    //     Alert.alert("Error", response.data.message);
+                    // }
+
+                    // 
                     if (token && user_details && user_menu_apps) {
                         await AsyncStorage.setItem('access_token', token);
                         await AsyncStorage.setItem('user_details', user_details);
                         await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
+                        await AsyncStorage.setItem('user_prptype', userof);
+                        await AsyncStorage.setItem('login_user_name', username.trim());
+                        await AsyncStorage.setItem('login_user_passwd', password.trim());
+                        await AsyncStorage.setItem('yno', yno.trim());
                         await AsyncStorage.setItem('user_login_role', JSON.stringify(role1));
+                        // setToken(token);
+                        // setUserDetails(user_details);
+                        // setMenuApps(user_menu_apps);
+                        // setIsLoggedIn(true);
+                        // Alert.alert('check', `After Login ${JSON.stringify(payload)}`);
+                        // const cachedParty = await getCachedGlobalData('party').catch(() => []);
+                        // await initGlobalCacheDB();
+                        router.replace('/(tabs)');
+                        await initGlobalCacheDB();
+                        const cachePopulated = await isCachePopulated();
+                        if (!cachePopulated) {
+                            await fetchAndCacheGlobalData(token); // Only fetch if cache is empty
+                        } else {
+                            console.log('✅ Using existing cached data');
+                        }
+                        await fetchAndCacheGlobalData(token); // Cache global data
+                        // await fetchAndCacheGlobalData(token);
+                        await AsyncStorage.setItem('master_sync_data_common', JSON.stringify(ismastersyncData));
+                        if (ismastersync == 1 || ismastersync === '1' || ismastersync === true) {
+                            try {
+                                
+                                await AsyncStorage.setItem('master_sync_data', JSON.stringify(ismastersyncData));
+                                await initDatabase();
+                                await fetchMasterSyncPartyDataPerPrptypeCache(token || '', ismastersyncData);
+                                for (const itm of ismastersyncData) {
+                                    const key = normalizePrptype(itm.prptype ?? itm.PrpType ?? '');
+                                    const summary = await getPrptypeSummary(key);
+                                    console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
+                                }
 
-                        console.log("💾 SAVED SUCCESS");
+                                // await printCachedPrptypesWithData();
+                                console.log("💾 SAVED SUCCESS");
 
-                        router.replace('/');
+                                
+                            } catch (err) {
+                                console.warn('Master-sync or verification failed:', err);
+                            }
+                        }
                     } else {
-                        Alert.alert("Error", response.data.message);
+                        Alert.alert('❌ Error', `${response.data.response.message}`);
                     }
+                } else {
+                    Alert.alert('❌ Error', `${response.data.message}`);
                 }
             }
         }

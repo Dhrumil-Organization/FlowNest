@@ -223,6 +223,9 @@ export const crlimtreq_styles = StyleSheet.create({
         backgroundColor: '#f8f9fa', // Light gray background
         paddingBottom: 80,
     },
+    carouselModalContainer: {
+        // padding: 15
+    },
     containerTable: {
         flex: 1,
         // padding: 10,
@@ -244,6 +247,7 @@ export const crlimtreq_styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 8,
+        marginTop: 50
     },
     pdfHeaderButtonText: {
         marginLeft: 8,
@@ -896,17 +900,24 @@ export const crlimtreq_styles = StyleSheet.create({
     //   
     // ... aapke existing styles
     carouselModalOverlay: {
-        flex: 1,
+        // flex: 1,
+        height: '100%',
         backgroundColor: 'white',  // Full-screen white
+        justifyContent: 'center',
+        alignContent: 'center',
+        alignItems: 'center'
     },
     modalCloseButton: {
         position: 'absolute',
-        top: 10,
+        top: 60,
         right: 10,
         zIndex: 1,
-        backgroundColor: '#f0f0f0',
+        // backgroundColor: '#f0f0f0',
         borderRadius: 20,
-        padding: 8,
+        // padding: 8,
+        // paddingTop: "10",
+        justifyContent: 'flex-end',
+       
     },
     verticalScrollContainer: {
         paddingTop: 50,  // Close button ke neeche space

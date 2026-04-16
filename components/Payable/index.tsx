@@ -1,23 +1,17 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated, ScrollView, Modal, FlatList, TextInput, Platform } from 'react-native';
+import { API } from '@/common/API/dynamicAPI';
+import { crlimtreq_styles } from '@/common/Style';
+import Ticker from '@/common/Ticker';
+import HeaderBar from '@/components/Header';
+import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import qs from 'qs';
 import axios from 'axios';
-import {
-    format,
-
-} from 'date-fns';
-import Header from '../../components/Header';
-import { crlimtreq_styles } from '../../common/Style';
-import CustomDrawer from './CustomDrawer';
-import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload, ReceivablesPrpgroup, InternalDropdown, DashPrp, DashParty, DashSubHead, DashSexe, DashAccount, ReceivablesSummary, ReceivablesDetails } from './Modal';
-import ProdOrderTrackingCard from './ProdOrderTrackingCard';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import theme from '../../components/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import Ticker from '../../common/Ticker';
+import qs from 'qs';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import CustomDrawer from './CustomDrawer';
 import { TableData } from './data';
-import { API } from '../../common/API/dynamicAPI';
+import { CardPayload, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ExeData, InternalDropdown, ItemData, ItemStatus, POTData, ReceivablesDetails, ReceivablesPrpgroup, ReceivablesSummary } from './Modal';
 
 interface Props {
     token: string;
@@ -25,7 +19,7 @@ interface Props {
     duration?: number;
 }
 
-const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
+const Payable: React.FC<Props> = ({ token, username }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
@@ -79,7 +73,6 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
     const [gePOTData, setPOTData] = useState<POTData[]>([])
     const [getpayload, setPayload] = useState<CardPayload[]>([])
-    // const [getUserRole, setUserRole] = useState([])
     const [getdashPrp, setdashPrp] = useState<DashPrp[]>([])
     const [getdashParty, setdashParty] = useState<DashParty[]>([])
     const [getdashSexe, setdashSexe] = useState<DashSexe[]>([])
@@ -102,43 +95,14 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     const [activeCard, setActiveCard] = useState(null);
     const [getActiveCardDetails, setActiveCardDetails] = useState(null);
     const [summaryDrawerVisible, setSummaryDrawerVisible] = useState(false);
-    // const [hideprpGroup, sethideprpGroup] = useState(false);
     const summaryVisibleRef = useRef(false);
-    const VisibleRef = useRef(false);
     const searchRef = useRef(searchQueryPOT);
     const searchRefDetails = useRef(searchQueryPOTDetails);
     const ROW_HEIGHT = 52;
-    console.log("ddd sud token:", token);
 
-    // useEffect(() => {
-    //     const initializeApp = async () => {
-    //         try {
-
-    //             const role = await AsyncStorage.getItem('user_details_role');
-
-    //             setUserRole(JSON.parse(role as any));
-
-
-
-    //         } catch (error) {
-    //             console.error("Initialization error:", error);
-
-    //         } finally {
-    //             // setIsLoading(false);
-    //         }
-    //     };
-
-    //     initializeApp();
-    // }, []);
-
-    // useEffect(() => {
-    //     summaryVisibleRef.current = summaryDrawerVisible;
-    // }, [summaryDrawerVisible]);
-
-    //  useEffect(() => {
-    //     VisibleRef.current = modalVisible;
-    // }, [modalVisible]);
-
+    useEffect(() => {
+        summaryVisibleRef.current = summaryDrawerVisible;
+    }, [summaryDrawerVisible]);
 
 
     useEffect(() => {
@@ -168,11 +132,10 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         setFilteredCards(filtered);
     }, [searchQueryPOTCard, getOutCardData]);
 
-
     // For Internal Dropdown
     useEffect(() => {
         if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "")) {
-            setSelectedInternal(internal_dropdown[1]);
+            setSelectedInternal(internal_dropdown[0]);
         }
     }, [internal_dropdown, selectedInternal]);
 
@@ -184,6 +147,35 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     }, [receivables_prpgroup, selectedPrpgrp]);
 
 
+    // useEffect(() => {
+    //     const timeout = setTimeout(() => {
+    //         searchRefDetails.current = searchQueryPOTDetails;
+
+    //         const filteredDetails12 = getCardData[0]?.data?.outdetail?.filter(item =>
+    //             Object.values(item).some(val =>
+    //                 String(val).toLowerCase().includes(searchQueryPOTDetails.toLowerCase())
+    //             )
+    //         );
+
+    //         setFilteredDetails(filteredDetails12 || []);
+    //     }, 250); // 👈 debounce
+
+    //     return () => clearTimeout(timeout);
+    // }, [searchQueryPOTDetails]);
+
+    // Filter details for modal
+    // useEffect(() => {
+    //     // const details = getCardData[0]?.data?.outdetail?.filter(
+    //     const details = getOutDetails?.filter(
+    //         (detail) => detail.AccCode === selectedAccCode
+    //     );
+    //     const filtered = details?.filter((item) =>
+    //         Object.values(item).some((val) =>
+    //             String(val).toLowerCase().includes(searchQueryPOTDetails.toLowerCase())
+    //         )
+    //     );
+    //     setFilteredDetails(filtered?.slice(0, getOutDetails));
+    // }, [searchQueryPOTDetails, selectedAccCode, visibleDetailItems, getOutDetails]);
 
     useEffect(() => {
         console.log('ddd:', selectedAccCode, getOutDetails);
@@ -277,7 +269,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                         Accept: 'application/json'
                     },
                     params: {
-                        txntype: '/receivables-view'
+                        txntype: '/payable-view'
                     }
                 }
             );
@@ -301,16 +293,16 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
 
 
     const dashProperty = useCallback(async (selectedPrpgrp) => {
-
         setdashPropertyLoading(true);
         try {
             const payload = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
-                txntype: '/receivables-view'
+                txntype: '/payable-view'
             }
             // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
             // const receivables_prpgroup_from_cache = await AsyncStorage.getItem('receivables_prpgroup');
             const responseprp = await axios.get(
+                // 'https://apig.tms-webapp.com/api/dashprp',
                 `${API}/api/dashprp`,
                 {
                     headers: {
@@ -345,13 +337,13 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             const payload = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
                 fetch: 'dr',
-                dashview: 'outstanding',
-                txntype: '/receivables-view'
+                dashview: 'payable',
+                txntype: '/payable-view'
             }
 
             const payloadSexe = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
-                dashview: 'outstanding',
+                dashview: 'payable',
                 fetch: 'salesexe',
             }
             const responseparty = await axios.get(
@@ -369,6 +361,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 }
             );
             const responsesexe = await axios.get(
+                // 'https://apig.tms-webapp.com/api/get_criterion',
                 `${API}/api/get_criterion`,
                 {
                     headers: {
@@ -400,13 +393,13 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         }
     }, []);
 
-    const dashSubHead = useCallback(async (selectedPrpgrp, selectedDashPrp) => {
+    const dashSubHead = async (selectedPrpgrp, selectedDashPrp) => {
         setdashSubHeadLoading(true);
         console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
 
         const payload = {
             prptype: selectedPrpgrp?.PrpTypeCode,
-            dashview: 'outstanding',
+            dashview: 'payable',
             prpcodes: Array.isArray(selectedDashPrp)
                 ? selectedDashPrp.map(item => item.PrpCode)
                 : [],
@@ -435,7 +428,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         }
 
 
-    }, []);
+    };
 
 
 
@@ -469,12 +462,12 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         try {
             console.log('🔵 🔵I am Calling3 dashAccount');
             const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'summary',
                 dashstyle: '1',
-                dashview: 'outstanding',
+                dashview: 'payable',
                 fromdate: fromdate,
                 todate: todate,
                 for: 'sales',
@@ -491,7 +484,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 export: 'Excel',
                 salesexes: sexeArray ? sexeArray : [],
                 dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode,
-                txntype: '/receivables-view'
+                txntype: '/payable-view'
             };
 
             // const response = await axios.get(
@@ -590,6 +583,16 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         setToDate(today);
     }, []);
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
+
     let cancelToken: any;
 
     const getRequestConfig = (props: any) => ({
@@ -621,7 +624,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',
@@ -656,7 +659,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         try {
             const payload = {
                 prpcode: 'SIP',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 strcode: '012',
                 itmcode: '',
                 dsncode: '',
@@ -671,7 +674,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         itmcode: '',
                         dsncode: '',
@@ -707,7 +710,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         try {
             const payload = {
                 // prpcode: 'SIP',
-                // yearno: '26',
+                // yearno: getCurrentFinancialYear(),
                 // strcode: '012',
                 // itmcode: '',
                 // dsncode: '',
@@ -717,7 +720,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 // fetch: 'itm',
                 // txntype: 'production_order_track'
                 prpcode: 'SIP',
-                yearno: '26',
+                yearno: getCurrentFinancialYear(),
                 strcode: '012',
                 txntype: 'production_order_track',
                 prptype: '',
@@ -733,7 +736,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
-                        yearno: '26',
+                        yearno: getCurrentFinancialYear(),
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',
@@ -801,23 +804,19 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         const sexeArray = selectedDashSexe.map(item => item.Code);
         const accountArray = selectedDashAccount.map(item => item.AccCode);
         console.log('🔵 🔵I am Callin2 Table');
-        const fdate = fromDate ? format(fromDate, 'yyyy-MM-dd') : null;
-        const tdate = toDate ? format(toDate, 'yyyy-MM-dd') : null;
         try {
             console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 accounts: accountArray ? accountArray : [],
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'summary',
                 dashstyle: '1',
-                dashview: 'outstanding',
-                // fromdate: fromdate,
-                fromdate: fdate,
-                // todate: todate,
-                todate: tdate,
+                dashview: 'payable',
+                fromdate: fromdate,
+                todate: todate,
                 for: 'sales',
                 uom: '1',
                 uomname: '',
@@ -825,15 +824,14 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 gridgroup: '',
                 showinternal: selectedInternal && selectedInternal?.value,
                 storecode: '',
-                // stockdate: todate,
-                stockdate: tdate,
+                stockdate: todate,
                 ageing: '30',
                 ageing2: '60',
                 display: '1',
                 export: 'Excel',
                 salesexes: sexeArray ? sexeArray : [],
                 dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode,
-                txntype: '/receivables-view'
+                txntype: '/payable-view'
             };
             console.log('🔵 Table API Payload:', payload);
             const headers = {
@@ -878,7 +876,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [selectedPrpgrp, selectedInternal, fromDate, toDate]);
+    }, [selectedPrpgrp, selectedInternal]);
 
 
     const handleConfirmActionNew = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0, card) => {
@@ -915,12 +913,12 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             const payload = {
                 CardName: CardName.toUpperCase(),
                 accounts: accountArray ? accountArray : [],
-                prptype: selectedPrpgrp?.PrpTypeCode,
+                prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
                 sheadcodes: subHeadArray && subHeadArray,
                 fetch: 'slabdetail',
                 dashstyle: '1',
-                dashview: 'outstanding',
+                dashview: 'payable',
                 fromdate: fromdate,
                 todate: todate,
                 for: 'sales',
@@ -940,7 +938,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 export: 'Excel',
                 salesexes: sexeArray ? sexeArray : [],
                 dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode || "",
-                txntype: '/receivables-view'
+                txntype: '/payable-view'
             };
             console.log('🔵 Table API Payload:', payload);
             const headers = {
@@ -955,7 +953,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             const data = response.data.data?.dashoutcards || [];
             const data1 = response.data.data?.outdetail || [];
             console.log('🔵 ddd', data1);
-            const data2 = response.data.data?.outsummary || [];
+            const data2 = response.data.data?.outsummary || {};
 
 
             if (response.data.success == true) {
@@ -1021,6 +1019,17 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     const handleItemStatusChange = (status: ItemStatus) => {
         setSelectedItemStatus(status);
     };
+
+    // const DASHBOARD_COLORS = [
+    //     ['#E3F2FD', '#BBDEFB'], // blue
+    //     ['#E8F5E9', '#C8E6C9'], // green
+    //     ['#FFF3E0', '#FFE0B2'], // orange
+    //     ['#F3E5F5', '#E1BEE7'], // purple
+    //     ['#E0F7FA', '#B2EBF2'], // cyan
+    //     ['#FCE4EC', '#F8BBD0'], // pink
+    //     ['#FBE9E7', '#FFCCBC'], // red
+    //     ['#E8F5E9', '#C8E6C9'], // green
+    // ];
     const DASHBOARD_COLORS = [
         ['#0F2027', '#203A43'], // Deep Teal
         ['#141E30', '#243B55'], // Navy Blue
@@ -1031,8 +1040,6 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         ['#283048', '#859398'], // Steel Blue
         ['#16222A', '#3A6073'], // Dark Cyan
     ];
-
-
 
     const formatIndianNumber = (value: any) => {
         if (!value && value !== 0) return "0"; // Handle undefined/null
@@ -1129,10 +1136,11 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     };
 
 
+
     const SummaryTable = () => {
         const summaryColumns = [
             { key: 'AccName', label: 'Account Name', width: 160, align: 'left' },
-            { key: 'Total', label: 'Total', width: 100, align: 'right' },
+            { key: 'Total', label: 'Outstanding', width: 100, align: 'right' },
             { key: 'advance', label: 'Advance', width: 100, align: 'right' },
             { key: 'onaccount', label: 'On Account', width: 120, align: 'right' },
             { key: 'nclramt', label: 'NCL Amount', width: 120, align: 'right' },
@@ -1140,17 +1148,17 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             { key: 'slab1', label: '0-30', width: 100, align: 'right' },
             { key: 'slab2', label: '31-60', width: 100, align: 'right' },
             { key: 'slab3', label: '61-90', width: 100, align: 'right' },
-            { key: 'slab4', label: '91-Above', width: 100, align: 'right' },
-            { key: 'slab5', label: 'Slab5', width: 100, align: 'right' },
+            { key: 'slab4', label: '91-120', width: 100, align: 'right' },
+            { key: 'slab5', label: '121 Above', width: 100, align: 'right' },
             { key: 'crday', label: 'Crday', width: 100, align: 'center' },
-            { key: 'sename', label: 'Sename', width: 100, align: 'left' },
-            { key: 'AccCode', label: 'Acc Code', width: 120, align: 'center' },
-            { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
-            { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
+            // { key: 'sename', label: 'Sename', width: 100, align: 'left' },
+            { key: 'AccCode', label: 'Code', width: 120, align: 'center' },
+            // { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
+            // { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
         ];
 
         // Specify which columns to format as Indian comma-separated values
-        const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt'];
+        const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5'];
 
         // Specify which columns to sum in the footer
         const columnsToSum = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
@@ -1185,7 +1193,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                     Account Name
                 </Text>
                 <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
-                    Total
+                    Outstanding
                 </Text>
                 <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
                     Actions
@@ -1299,40 +1307,30 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             </View>
         );
     };
+
     const SummaryAdvanceTable = () => {
         const summaryColumns = [
             { key: 'AccName', label: 'Account Name', width: 160, align: 'left' },
             { key: 'advance', label: 'Advance', width: 100, align: 'right' }, // Pehle Advance
-            { key: 'Total', label: 'Total', width: 100, align: 'right' }, // Phir Total
+            { key: 'Total', label: 'Outstanding', width: 100, align: 'right' }, // Phir Total
             { key: 'onaccount', label: 'On Account', width: 120, align: 'right' },
             { key: 'nclramt', label: 'NCL Amount', width: 120, align: 'right' },
             { key: 'pdcamt', label: 'PDC Amount', width: 100, align: 'right' },
             { key: 'slab1', label: '0-30', width: 100, align: 'right' },
             { key: 'slab2', label: '31-60', width: 100, align: 'right' },
             { key: 'slab3', label: '61-90', width: 100, align: 'right' },
-            { key: 'slab4', label: '91-Above', width: 100, align: 'right' },
-            { key: 'slab5', label: 'Slab5', width: 100, align: 'right' },
+            { key: 'slab4', label: '91-120', width: 100, align: 'right' },
+            { key: 'slab5', label: '121 Above', width: 100, align: 'right' },
             { key: 'crday', label: 'Crday', width: 100, align: 'center' },
-            { key: 'sename', label: 'Sename', width: 100, align: 'left' },
-            { key: 'AccCode', label: 'Acc Code', width: 120, align: 'center' },
-            { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
-            { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
+            { key: 'AccCode', label: 'Code', width: 120, align: 'center' },
         ];
 
-        // Specify which columns to format as Indian comma-separated values (bina decimal)
-        const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
+
+        // Specify which columns to format as Indian comma-separated values
+        const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5'];
 
         // Specify which columns to sum in the footer
         const columnsToSum = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
-
-        // Format number as Indian comma-separated value (bina decimal)
-        const formatIndianNumber = (value) => {
-            if (!value && value !== 0) return "0"; // Handle undefined/null
-            const cleanedValue = typeof value === 'string' ? value.replace(/,/g, '') : value;
-            const num = parseFloat(cleanedValue);
-            if (isNaN(num)) return "0"; // Handle non-numeric values
-            return Math.floor(num).toLocaleString('en-IN'); // Remove decimal and format
-        };
 
         // Calculate totals for specified columns
         const calculateTotals = () => {
@@ -1344,6 +1342,14 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 }, 0);
             });
             return totals;
+        };
+
+        // Format number as Indian comma-separated value
+        const formatIndianNumber = (value) => {
+            return value.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
         };
 
         const totals = calculateTotals();
@@ -1358,13 +1364,12 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
                     Advance
                 </Text>
+                <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
+                    Outstanding
+                </Text>
                 <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
                     Actions
                 </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
-                    Total
-                </Text>
-
                 {summaryColumns.slice(3).map(col => (
                     <Text
                         key={col.key}
@@ -1379,6 +1384,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
+
         const Footer = () => (
             <View style={[styles.tableHeader]}>
                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
@@ -1387,13 +1393,12 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 <Text style={[styles.headerText, { width: 100, textAlign: 'right' }]}>
                     {formatIndianNumber(totals['advance'])}
                 </Text>
-                <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
-                    {/* Empty cell for Actions column */}
-                </Text>
                 <Text style={[styles.headerText, { width: 100, textAlign: 'right' }]}>
                     {formatIndianNumber(totals['Total'])}
                 </Text>
-
+                <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
+                    {/* Empty cell for Actions column */}
+                </Text>
                 {summaryColumns.slice(3).map(col => (
                     <Text
                         key={col.key}
@@ -1408,6 +1413,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
+
         const Row = React.memo(({ item }) => (
             <View style={styles.tableRow}>
                 <Text
@@ -1420,7 +1426,13 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                     style={[styles.rowText, { width: 100, textAlign: 'right' }]}
                     numberOfLines={2}
                 >
-                    {formatIndianNumber(item.advance)}
+                    {columnsToFormat.includes('advance') ? formatIndianNumber(parseFloat(item.advance) || 0) : item.advance}
+                </Text>
+                <Text
+                    style={[styles.rowText, { width: 100, textAlign: 'right' }]}
+                    numberOfLines={2}
+                >
+                    {columnsToFormat.includes('Total') ? formatIndianNumber(parseFloat(item.Total) || 0) : item.Total}
                 </Text>
                 <View style={[styles.actionColumn, { width: 80 }]}>
                     <TouchableOpacity
@@ -1436,13 +1448,6 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                         />
                     </TouchableOpacity>
                 </View>
-                <Text
-                    style={[styles.rowText, { width: 100, textAlign: 'right' }]}
-                    numberOfLines={2}
-                >
-                    {formatIndianNumber(item.Total)}
-                </Text>
-
                 {summaryColumns.slice(3).map(col => (
                     <Text
                         key={col.key}
@@ -1452,11 +1457,12 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                         ]}
                         numberOfLines={2}
                     >
-                        {formatIndianNumber(item[col.key])}
+                        {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
                     </Text>
                 ))}
             </View>
         ));
+
 
         return (
             <View style={styles.tableWrapper}>
@@ -1477,6 +1483,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                             windowSize={10}
                             removeClippedSubviews
                             showsVerticalScrollIndicator={false}
+                        // ListFooterComponent={<Footer />}
                         />
                         <Footer />
                     </View>
@@ -1484,18 +1491,18 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             </View>
         );
     };
-
     const OnAccountSummaryTable = () => {
         // Define columns with 'AccName', 'amount' (as Total), and an Actions column
         const summaryColumns = [
             { key: 'AccName', label: 'Account Name', width: 160, align: 'center' },
-            { key: 'amount', label: 'Total', width: 100, align: 'right' }, // 'amount' as 'Total'
+            { key: 'amount', label: 'Amount', width: 100, align: 'right' }, // 'amount' as 'Total'
             { key: 'actions', label: 'Actions', width: 80, align: 'center' }, // Actions column for the info icon
-            { key: 'crday', label: 'Crday', width: 100, align: 'right' },
-            { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
-            { key: 'sexename', label: 'Sexename', width: 120, align: 'right' },
-            { key: 'AccCode', label: 'Acc Code', width: 100, align: 'right' },
-            { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
+            // { key: 'crday', label: 'Crday', width: 100, align: 'right' },
+            // { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
+            { key: 'city', label: 'City', width: 120, align: 'center' },
+            { key: 'AccCode', label: 'Code', width: 120, align: 'center' },
+            // { key: 'AccCode', label: 'Acc Code', width: 100, align: 'right' },
+            // { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
         ];
 
         // Specify which columns to format as Indian comma-separated values
@@ -1642,47 +1649,80 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         );
     };
 
-
     // const DetailTable = () => {
+    //     console.log("Filtered Details:", filteredDetails);
+
+    //     // Data ko NTRANDATE ke hisaab se ascending order mein sort karo
+    //     const sortedData = [...filteredDetails].sort((a, b) =>
+    //         parseFloat(a.NTRANDATE) - parseFloat(b.NTRANDATE)
+    //     );
+
+    //     console.log("Sorted Data (Ascending by NTRANDATE):", sortedData);
+
+    //     // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
+    //     let cumulativeData = [];
+    //     sortedData.forEach((item, index) => {
+    //         const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
+
+    //         if (index === 0) {
+    //             cumulativeData.push({
+    //                 ...item,
+    //                 Cumulative: currentCUMBAL.toString(), // String format mein rakha
+    //             });
+    //         } else {
+    //             const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
+    //             const newCumulative = prevCumulative + currentCUMBAL;
+    //             cumulativeData.push({
+    //                 ...item,
+    //                 Cumulative: newCumulative.toString(), // String format mein rakha
+    //             });
+    //         }
+    //     });
+
+    //     console.log("Cumulative Data (Ascending by NTRANDATE):", cumulativeData);
+
+    //     // Descending order mein sort karo (NTRANDATE ko number mein convert karke)
+    //     const finalData = cumulativeData.sort((a, b) =>
+    //         parseFloat(b.NTRANDATE) - parseFloat(a.NTRANDATE)
+    //     );
+
+    //     console.log("Final Data (Descending by NTRANDATE):", finalData);
+
+    //     // Columns definition
     //     const detailColumns = [
-    //         // { key: 'TYPE', label: 'Type', width: 120, align: 'center' },
     //         { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
     //         { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
     //         { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
     //         { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
+    //         { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' }, // Naya column
     //     ];
 
+    //     const columnsToFormat = ['CUMBAL', 'Cumulative'];
 
-    //     const columnsToFormat = ['CUMBAL'];
-
-    //     // Specify which columns to sum in the footer
-    //     const columnsToSum = ['CUMBAL'];
-
-
+    //     // Calculate totals for CUMBAL and Cumulative
     //     const calculateTotals = () => {
-    //         const totals = {};
-    //         columnsToSum.forEach(key => {
-    //             totals[key] = filteredDetails.reduce((sum, item) => {
-    //                 const value = parseFloat(item[key]) || 0;
-    //                 return sum + value;
-    //             }, 0);
+    //         const totals = { CUMBAL: 0, Cumulative: 0 };
+    //         finalData.forEach(item => {
+    //             totals.CUMBAL += parseFloat(item.CUMBAL) || 0;
+    //             totals.Cumulative += parseFloat(item.Cumulative) || 0;
     //         });
     //         return totals;
     //     };
 
     //     // Format number as Indian comma-separated value
     //     const formatIndianNumber = (value) => {
-    //         return value?.toLocaleString('en-IN', {
+    //         if (!value && value !== 0) return "0";
+    //         const num = parseFloat(value);
+    //         return num.toLocaleString('en-IN', {
     //             minimumFractionDigits: 2,
     //             maximumFractionDigits: 2,
     //         });
     //     };
 
     //     const totals = calculateTotals();
+    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 160;
 
-    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 120;
-
-
+    //     // Header component
     //     const Header = () => (
     //         <View style={styles.tableHeader}>
     //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
@@ -1702,32 +1742,25 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     //         </View>
     //     );
 
+    //     // Footer component
     //     const Footer = () => (
     //         <View style={[styles.tableHeader]}>
     //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
     //                 Totals
     //             </Text>
-    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
-    //                 {/* Empty cell for Actions column */}
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'right' }]}>
+    //                 {formatIndianNumber(totals.CUMBAL)}
     //             </Text>
+    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
     //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
-    //                 {/* Empty cell for Actions column */}
+    //                 {formatIndianNumber(totals.Cumulative)}
     //             </Text>
-    //             {detailColumns.slice(2).map(col => (
-    //                 <Text
-    //                     key={col.key}
-    //                     style={[
-    //                         styles.headerText,
-    //                         { width: col.width, textAlign: col.align }
-    //                     ]}
-    //                 >
-    //                     {columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
-    //                 </Text>
-    //             ))}
     //         </View>
     //     );
 
-
+    //     // Row component
     //     const Row = React.memo(({ item }) => (
     //         <View style={styles.tableRow}>
     //             <Text
@@ -1745,7 +1778,9 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     //                     ]}
     //                     numberOfLines={2}
     //                 >
-    //                     {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
+    //                     {columnsToFormat.includes(col.key)
+    //                         ? formatIndianNumber(item[col.key])
+    //                         : item[col.key]}
     //                 </Text>
     //             ))}
     //         </View>
@@ -1757,11 +1792,9 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     //                 <View style={{ minWidth: totalWidth }}>
     //                     <Header />
     //                     <FlatList
-    //                         data={filteredDetails}
+    //                         data={finalData} // Use finalData instead of filteredDetails
     //                         renderItem={({ item }) => <Row item={item} />}
-    //                         keyExtractor={(item, index) =>
-    //                             `${item.ACCCODE}-${index}`
-    //                         }
+    //                         keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
     //                         getItemLayout={(_, index) => ({
     //                             length: ROW_HEIGHT,
     //                             offset: ROW_HEIGHT * index,
@@ -1779,17 +1812,25 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     //         </View>
     //     );
     // };
+
     const DetailTable = () => {
         console.log("Filtered Details:", filteredDetails);
 
-        // Data ko TRANID ke hisaab se ascending order mein sort karo
-        const sortedData = [...filteredDetails].sort((a, b) =>
-            parseFloat(a.TRANID) - parseFloat(b.TRANID)
-        );
+        // Helper function to generate a unique key from NTRANDATE + TRANID
+        const calcValue = (item) => {
+            return `${item.NTRANDATE}-${item.TRANID}`; // Example: "20231201-12345"
+        };
 
-        console.log("Sorted Data (Ascending by TRANID):", sortedData);
+        // Sort by calcValue (ascending)
+        const sortedData = [...filteredDetails].sort((a, b) => {
+            const keyA = calcValue(a);
+            const keyB = calcValue(b);
+            return keyA.localeCompare(keyB); // String comparison for NTRANDATE-TRANID
+        });
 
-        // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
+        console.log("Sorted Data (Ascending by NTRANDATE + TRANID):", sortedData);
+
+        // Calculate cumulative CUMBAL
         let cumulativeData = [];
         sortedData.forEach((item, index) => {
             const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
@@ -1797,26 +1838,24 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             if (index === 0) {
                 cumulativeData.push({
                     ...item,
-                    Cumulative: currentCUMBAL.toString(), // String format mein rakha
+                    Cumulative: currentCUMBAL.toString(),
                 });
             } else {
                 const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
                 const newCumulative = prevCumulative + currentCUMBAL;
                 cumulativeData.push({
                     ...item,
-                    Cumulative: newCumulative.toString(), // String format mein rakha
+                    Cumulative: newCumulative.toString(),
                 });
             }
         });
 
-        console.log("Cumulative Data (Ascending by TRANID):", cumulativeData);
+        console.log("Cumulative Data (Ascending by NTRANDATE + TRANID):", cumulativeData);
 
-        // Descending order mein sort karo (TRANID ko number mein convert karke)
-        const finalData = cumulativeData.sort((a, b) =>
-            parseFloat(b.TRANID) - parseFloat(a.TRANID)
-        );
+        // Reverse to descending order (latest first)
+        const finalData = [...cumulativeData].reverse();
 
-        console.log("Final Data (Descending by TRANID):", finalData);
+        console.log("Final Data (Descending by NTRANDATE + TRANID):", finalData);
 
         // Columns definition
         const detailColumns = [
@@ -1824,7 +1863,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
             { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
             { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
-            { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' }, // Naya column
+            { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' },
         ];
 
         const columnsToFormat = ['CUMBAL', 'Cumulative'];
@@ -1922,9 +1961,9 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                     <View style={{ minWidth: totalWidth }}>
                         <Header />
                         <FlatList
-                            data={finalData} // Use finalData instead of filteredDetails
+                            data={finalData}
                             renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
+                            keyExtractor={(item, index) => `${calcValue(item)}-${index}`}
                             getItemLayout={(_, index) => ({
                                 length: ROW_HEIGHT,
                                 offset: ROW_HEIGHT * index,
@@ -1942,6 +1981,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             </View>
         );
     };
+
     const OnAccountDetailTable = () => {
         // Define all columns, including 'TYPE'
         const detailColumns = [
@@ -2072,26 +2112,20 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
     const closeDrawer123 = () => setSummaryDrawerVisible(false);
-    const closeDrawer456 = () => {
-        setModalVisible(false)
-    };
 
     console.log('🔵 POT Data:', gePOTData);
+    console.log('🔵 Caption:', getActiveCardDetails?.caption);
     console.log('🔵 selectedPrpgrp', selectedPrpgrp, selectedPrpgrp?.PrpTypeCode, selectedPrpgrp?.PrpTypeOf);
     console.log('🔵 selectedInternal', selectedInternal, selectedInternal?.lable, selectedInternal?.value);
-
-
-    console.log("aaa parent Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
-    console.log("aaa parent Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
     return (
         <>
             {/* Narration bar */}
 
-            <Header
+            <HeaderBar
                 userName={username}
                 onSearch={setSearchQueryPOTCard}
-                placeholder="Search receivables..."
+                placeholder="Search payable..."
             />
             <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
                 <Icon name="list" size={24} color="white" />
@@ -2145,18 +2179,18 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                         {/* HEADER */}
                         <View style={styles.drawerHeader}>
                             <Text style={styles.drawerTitle}>
-                                {`Receivables > ${getActiveCardDetails && getActiveCardDetails?.caption} summary`}
+                                {`Payable > ${getActiveCardDetails && getActiveCardDetails?.caption} summary`}
                             </Text>
 
                             <TouchableOpacity onPress={closeDrawer123}>
                                 {/* <TouchableOpacity onPress={''}> */}
-                                <Icon name="close" size={26} />
+                                <Icon name="close" size={26} color={theme.BRAND_GRADIENT_END} />
                             </TouchableOpacity>
                         </View>
 
                         {/* SEARCH */}
                         <TextInput
-                            placeholder="Search summary..."
+                            placeholder="search summary..."
                             style={styles.drawerSearch}
                             value={searchQueryPOT}
                             onChangeText={setSearchQueryPOT}
@@ -2174,16 +2208,15 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                     </View>
                 </View>
             )}
-
-            
+            {/* <DetailModal /> */}
             {modalVisible && (
                 <View style={styles.detailOverlay123}>
                     <View style={styles.detailContainer}>
-                         <View style={styles.drawerHeader}>
+                        <View style={styles.drawerHeader}>
                             <Text style={styles.drawerTitle}>
-                                {`Receivables > ${getActiveCardDetails && getActiveCardDetails?.caption} summary > details`}
+                                {`Payable > ${getActiveCardDetails && getActiveCardDetails?.caption} summary > details`}
                             </Text>
-                            <TouchableOpacity onPress={closeDrawer456}>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}>
                                 <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
                             </TouchableOpacity>
                         </View>
@@ -2198,16 +2231,16 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                             placeholderTextColor={theme.BRAND_GRADIENT_END}
                         />
                         {getActiveCardDetails?.caption == 'On Account' ? <OnAccountDetailTable /> : <DetailTable />}
+
                     </View>
                 </View>
+
             )}
             <CustomDrawer
                 isVisible={isDrawerVisible}
                 onClose={closeDrawer}
                 fromDate={fromDate}
                 toDate={toDate}
-                setFromDate={setFromDate}
-                setToDate={setFromDate}
                 selectedYear={selectedYear}
                 onFromDateChange={setFromDate}
                 onToDateChange={setToDate}
@@ -2265,7 +2298,6 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
                 selectedDashAccount={selectedDashAccount}
                 getdashAccountLoading={getdashAccountLoading}
                 setAccountLoading={setAccountLoading}
-            // hideprpGroup={hideprpGroup}
             // 
             />
         </>
@@ -2392,7 +2424,6 @@ const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        marginTop: 45
     },
     modalContent: {
         backgroundColor: '#fff',
@@ -2458,9 +2489,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-
-    // Detail Container
-    detailContainer: {
+     detailContainer: {
         backgroundColor: '#fff',
         // padding: 20,
         paddingTop: 45,
@@ -2614,7 +2643,6 @@ const styles = StyleSheet.create({
     drawerContainer: {
         flex: 1,
         backgroundColor: '#fff',
-        marginTop: 45
     },
     drawerHeader: {
         height: 60,
@@ -2643,4 +2671,4 @@ const styles = StyleSheet.create({
 });
 
 
-export default ReceivablesSudamo;
+export default Payable;

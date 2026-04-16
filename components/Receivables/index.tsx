@@ -1,33 +1,30 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated, ScrollView, Modal, FlatList, TextInput, Platform } from 'react-native';
+import { API } from '@/common/API/dynamicAPI';
+import { crlimtreq_styles } from '@/common/Style';
+import Ticker from '@/common/Ticker';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import qs from 'qs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { FlashList } from '@shopify/flash-list';
 import {
     format,
-
 } from 'date-fns';
-import Header from '../../components/Header';
-import { crlimtreq_styles } from '../../common/Style';
-import CustomDrawer from './CustomDrawer';
-import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload, ReceivablesPrpgroup, InternalDropdown, DashPrp, DashParty, DashSubHead, DashSexe, DashAccount, ReceivablesSummary, ReceivablesDetails } from './Modal';
-import ProdOrderTrackingCard from './ProdOrderTrackingCard';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import theme from '../../components/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import Ticker from '../../common/Ticker';
+import qs from 'qs';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Header from '../Header';
+import theme from '../theme';
+import CustomDrawer from './CustomDrawer';
 import { TableData } from './data';
-import { API } from '../../common/API/dynamicAPI';
+import { CardPayload, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ExeData, InternalDropdown, ItemData, ItemStatus, POTData, ReceivablesDetails, ReceivablesPrpgroup, ReceivablesSummary } from './Modal';
 
 interface Props {
     token: string;
     username?: string;
     duration?: number;
-    API: string;
 }
 
-const Receivables: React.FC<Props> = ({ token, username, API }) => {
+const Receivables: React.FC<Props> = ({ token, username }) => {
+    console.log("Token received in Receivables:", token);
     const [isLoading, setIsLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
@@ -115,18 +112,36 @@ const Receivables: React.FC<Props> = ({ token, username, API }) => {
         const initializeRole = async () => {
             try {
                 const role = await AsyncStorage.getItem('user_login_role');
+                console.log('=== Role from AsyncStorage (Raw) ===', role);
+
                 if (role) {
-                    const roleString = role.toString();
-                    const rolesArray = roleString.split(',');
-                    const hasReceivablesViewCombine = rolesArray.includes("Receivables View Combine");
+                    // Parse as JSON (since it's already an array string)
+                    const rolesArray = JSON.parse(role);
+                    console.log('=== Parsed as JSON ===', rolesArray);
+
+                    // Check if the first element is a comma-separated string
+                    let finalRoles = [];
+                    if (rolesArray.length > 0 && typeof rolesArray[0] === 'string') {
+                        // Split the first element by comma
+                        finalRoles = rolesArray[0].split(',').map(r => r.trim());
+                    } else {
+                        // If not, use the array as-is
+                        finalRoles = rolesArray.map(r => r.trim());
+                    }
+
+                    console.log('=== Final Roles Array ===', finalRoles);
+
+                    // Check if "Receivables View Combine" exists
+                    const hasReceivablesViewCombine = finalRoles.includes("Receivables View Combine");
+                    console.log('=== Role check result ===', hasReceivablesViewCombine);
+
                     sethideprpGroup(hasReceivablesViewCombine);
-                    console.log('Role check result:', hasReceivablesViewCombine);
                 } else {
                     sethideprpGroup(false);
-                    console.log('No role found in AsyncStorage.');
+                    console.log('=== No role found in AsyncStorage ===');
                 }
             } catch (error) {
-                console.error("Error reading role from AsyncStorage:", error);
+                console.error("=== Error reading role from AsyncStorage ===", error);
                 sethideprpGroup(false);
             }
         };
@@ -314,30 +329,27 @@ const Receivables: React.FC<Props> = ({ token, username, API }) => {
 
 
 
-    const chacheData = useCallback(async () => {
+    const chacheData = async () => {
+        if (!token) {
+            console.error("Token is missing!");
+            Alert.alert("Error", "User not authenticated. Please log in again.");
+            return;
+        }
+
         setSyncLoading(true);
         try {
             // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
             // const receivables_prpgroup_from_cache = await AsyncStorage.getItem('receivables_prpgroup');
-            const responsesync = await axios.get(
-                // 'https://apig.tms-webapp.com/api/dashprpgrp',
-                `${API}/api/dashprpgrp`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
-                    },
-                    params: {
-                        txntype: '/receivables-view'
-                    }
-                }
-            );
-            if (responsesync.data.success === true) {
+            const response = await axios.get(`${API}/api/dashprpgrp`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { txntype: '/receivables-view' }
+            });
+            if (response.data.success === true) {
+                console.log("yoyo", response);
                 setSyncLoading(false);
-                console.log('🔵 Sync API Response:', responsesync.data.data?.dashlastsync, '🔵 Sync API Response Prpgroup:', responsesync.data.data?.prpgroup);
-                const receivables_sync_date_api = responsesync.data.data?.dashlastsync || '';
-                const receivables_prpgroup_api = responsesync.data.data?.prpgroup || '';
+                console.log('🔵 Sync API Response:', response.data.data?.dashlastsync, '🔵 Sync API Response Prpgroup:', response.data.data?.prpgroup);
+                const receivables_sync_date_api = response.data.data?.dashlastsync || '';
+                const receivables_prpgroup_api = response.data.data?.prpgroup || '';
                 console.log('🔵 receivables_sync_date_api', receivables_sync_date_api, '🔵 receivables_prpgroup_api', receivables_prpgroup_api);
 
                 setreceivables_sync_date(receivables_sync_date_api);
@@ -349,7 +361,7 @@ const Receivables: React.FC<Props> = ({ token, username, API }) => {
             setSyncLoading(false);
             console.error("Token check error:", error);
         }
-    }, []);
+    };
 
 
     const dashProperty = useCallback(async (selectedPrpgrp) => {
@@ -627,9 +639,16 @@ const Receivables: React.FC<Props> = ({ token, username, API }) => {
                 ])
             ).start();
         }
-        chacheData();
+        // chacheData();
 
     }, [contentWidth, containerWidth]);
+
+    useEffect(() => {
+        if (!token) return;
+        chacheData();
+
+    }, [token]);
+
 
 
 

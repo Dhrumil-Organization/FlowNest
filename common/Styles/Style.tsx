@@ -1266,7 +1266,7 @@ export const checkingScannerStyles = StyleSheet.create({
         flexDirection: 'row',
         //margin: 20
         paddingHorizontal: 10,
-        paddingVertical: 20
+        paddingVertical: 20,
     },
     titleTextWithIcon: {
         fontSize: 18,
@@ -1343,7 +1343,7 @@ export const checkingScannerStyles = StyleSheet.create({
         //marginTop: 5
     },
     inputDisabled: {
-        backgroundColor: '#DDD',
+        backgroundColor: '#fff',
         paddingVertical: 0,
         paddingHorizontal: 20,
         color: '#000000',
@@ -1422,7 +1422,7 @@ export const checkingScannerStyles = StyleSheet.create({
         marginTop: 5,
         height: 40,
         justifyContent: 'center',
-        width: '90%'
+        width: '100%'
 
 
     },
@@ -2533,3 +2533,158 @@ export const StyleSheetPCA = StyleSheet.create({
 
 
 });
+
+
+export const yarnmanagementsystemstyle = StyleSheet.create({
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+
+    emptyTextRed: {
+        color: '#ff3b30',
+        fontSize: 16,
+        fontWeight: '600',
+        textAlign: 'center',
+        // backgroundColor: '#ffe5e5',
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+        overflow: 'hidden'
+    },
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+
+    mainCard: {
+        flex: 1,
+        padding: 15,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2
+    },
+
+    title: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#222'
+    },
+
+    subTitle: {
+        fontSize: 12,
+        color: '#777',
+        marginBottom: 10
+    },
+
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#eee',
+        borderRadius: 8,
+        overflow: 'hidden',
+        marginVertical: 10
+    },
+
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center'
+    },
+
+    activeTab: {
+        backgroundColor: theme.BRAND_GRADIENT_END
+    },
+
+    tabText: {
+        color: '#555',
+        fontSize: 13
+    },
+
+    activeTabText: {
+        color: '#fff',
+        fontWeight: '600'
+    },
+
+    addButton: {
+        backgroundColor: '#007EA7',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        alignContent: 'center',
+        marginTop: 5,
+        width: '50%'
+    },
+
+    addButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600'
+    },
+
+    emptyBox: {
+        marginTop: 15,
+        padding: 20,
+        borderRadius: 10,
+        borderWidth: 0,
+        borderColor: '#ddd',
+        alignItems: 'center'
+    },
+
+    emptyText: {
+        fontSize: 13,
+        color: '#555'
+    },
+
+    emptySubText: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 5
+    },
+    formCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 15,
+        borderWidth: 1,
+        borderColor: '#eee'
+    },
+
+    formTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 15,
+        color: '#222'
+    },
+
+    inputGroup: {
+        marginBottom: 15
+    },
+
+    label: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 6
+    },
+
+    dropdownBox: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        height: 45,
+        justifyContent: 'center'
+    },
+
+    inputBox: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        height: 45,
+        justifyContent: 'center',
+        paddingHorizontal: 10
+    },
+});
+

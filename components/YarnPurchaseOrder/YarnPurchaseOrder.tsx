@@ -13,7 +13,8 @@ import {
     LayoutAnimation,
     ScrollView,
     ToastAndroid,
-    Share
+    Share,
+    StyleSheet
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -178,6 +179,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             StrCode: ''
         }
     })
+
+    const [mailLogData, setMailLogData] = useState([]);
+    const [mailLogModal, setMailLogModal] = useState(false);
+    const [prptype, setPrptype] = useState('');
+
     const didFetchStore = useRef(false);
     const cancelTokenRef = useRef(null);
     const didInitialFetch = useRef(false);
@@ -189,6 +195,94 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [subCardData, setSubCardData] = useState<{ [key: string]: D1datakeys[] }>({});
     const [loadingSubCard, setLoadingSubCard] = useState<{ [key: string]: boolean }>({});
 
+    const styles = StyleSheet.create({
+        modalContainer: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        modalContent: {
+            width: '100%', // ✅ simple responsive
+            maxHeight: '90%',
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 16
+        },
+
+        modalTitle: {
+            fontSize: 18, // ✅ fixed
+            fontWeight: '700',
+            marginBottom: 14,
+            color: '#1e88e5',
+            textAlign: 'center'
+        },
+
+        logCard: {
+            backgroundColor: '#f4f8f4',
+            borderRadius: 12,
+            padding: 14,
+            marginBottom: 12,
+        },
+
+        logHeaderBox: {
+            backgroundColor: '#6d756d',
+            paddingVertical: 6,
+            borderRadius: 6,
+            marginBottom: 10
+        },
+
+        logHeader: {
+            textAlign: 'center',
+            fontWeight: 'bold',
+            fontSize: 15,
+            color: '#fff'
+        },
+
+        rowBox: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 6
+        },
+
+        label: {
+            fontSize: 12,
+            color: '#555',
+            fontWeight: '600',
+            flex: 1
+        },
+
+        value: {
+            fontSize: 12,
+            color: '#0a0a0a',
+            flex: 1.2,
+            textAlign: 'left'
+        },
+
+        closeBtn: {
+            backgroundColor: '#1e88e5',
+            paddingVertical: 12,
+            borderRadius: 10,
+            alignItems: 'center',
+            marginTop: 10
+        },
+
+        closeText: {
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: '600'
+        }
+    });
+
+    useEffect(() => {
+        const getType = async () => {
+            const type = await AsyncStorage.getItem('user_prptype');
+            setPrptype(type);
+        };
+        getType();
+    }, []);
 
     const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
@@ -312,6 +406,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
+            console.log("response", response)
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => ({
                     ...item,
@@ -826,7 +921,65 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         flatVerifyListRefYPO.current?.scrollToOffset({ offset: 0, animated: true });
     };
 
+    const sendmailorder = async (selectedItem) => {
+        try {
+            setIsLoadingYPO(true);
 
+            const yno = await AsyncStorage.getItem('yno');
+
+            const removed1 = { ...selectedItem };
+
+            const today = new Date().toISOString().split('T')[0];
+
+            const authItem = {
+                UId: selectedItemYPO?.UId,
+                IsAuth: selectedItemYPO?.IsAuth,
+                ParName: selectedItemYPO?.ParName,
+                Remark: selectedItemYPO?.Remark,
+                PODate: selectedItemYPO?.PODate,
+                PONo: selectedItemYPO?.PONo,
+                NPODate: selectedItemYPO?.NPODate,
+                mailsent: selectedItemYPO?.mailsent,
+                strcode: selectedItemYPO?.StrCode,
+                CreatedDate: today,
+                ARemark: editableValuesYPO[selectedItemYPO.UId]?.ARemark || selectedItemYPO.ARemark || ''
+            };
+
+            const authArray = [authItem];
+            // delete removed1.d1; // 
+
+            const payload = {
+                prpcode: selectedItem?.PrpCode || '',
+                yearno: yno,
+                strcode: selectedItem?.StrCode || '',
+                sodate: selectedItem?.PODate || '',
+                auth: authArray,
+                txntype: 'purchase_order_auth',
+                mailtxntype: 'purchase_order_detail'
+            };
+
+            console.log('📤 MAIL PAYLOAD:', payload);
+
+            const response = await axios.post(
+                `${API}/api/send_mail_order`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            console.log('📥 MAIL RESPONSE:', response);
+
+        } catch (error) {
+            console.log('❌ Mail Error:', error);
+            Alert.alert('Error', 'Mail API failed');
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    };
 
     const handleConfirmAction = async () => {
         if (!selectedItemYPO) return;
@@ -899,6 +1052,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     setTimeout(() => {
                         setSuccessYPO(false);
                         setShowOverlayYPO(false);
+
+                        if (selectedActionYPO === 'accept' && prptype === 'R') {
+                            console.log('✅ Calling Mail API after success message...');
+                            sendmailorder(selectedItemYPO);
+                        }
+
                     }, 2000);
 
                     setData(prevData => {
@@ -933,6 +1092,51 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         }
     };
+
+
+    const handleInfoClick = async (selectedItem) => {
+        try {
+            setIsLoadingYPO(true);
+
+            const yno = await AsyncStorage.getItem('yno');
+
+            const payload = {
+                prpcode: selectedItem?.PrpCode || '',
+                uid: selectedItem?.UId || '',
+                yearno: yno,
+                strcode: selectedItem?.StrCode || '',
+                txntype: 'purchase_order_auth',
+            };
+
+            console.log("payload", payload);
+
+            const response = await axios.get(
+                `${API}/api/mailordersentlog`,
+                {
+                    params: payload,
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            console.log("response", response);
+
+            if (response?.data?.success && response.data.data?.length > 0) {
+                setMailLogData(response.data.data);
+                setMailLogModal(true);
+            } else {
+                Alert.alert('Info', 'No Data Found');
+            }
+
+        } catch (error) {
+            console.log('❌ Mail Error:', error);
+            Alert.alert('Error', 'Mail API failed');
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    };
+
 
     const handleCallURL = async (item: CardData) => {
         setSelectedItem(item);
@@ -1335,6 +1539,28 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 </View>
             </View>
             <View style={crlimtreq_styles.expandRow}>
+
+                <View style={{ flex: 1, alignItems: 'left' }}>
+
+                    {prptype === 'R' && item.mailsent === '1' && (
+                        <TouchableOpacity
+                            onPress={() => handleInfoClick(item)}
+                            disabled={!isConnected}
+                        >
+                            <View style={crlimtreq_styles.infoIconContainer}>
+                                <Icon
+                                    name="email"
+                                    size={32}
+                                    color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
+                                />
+                            </View>
+                        </TouchableOpacity>
+                    )}
+
+                </View>
+
+            </View>
+            <View style={crlimtreq_styles.expandRow}>
                 <TouchableOpacity
                     style={crlimtreq_styles.expandButton}
                     onPress={() => toggleExpandHistory(item.UId, item)}
@@ -1349,6 +1575,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         color="#333"
                     />
                 </TouchableOpacity>
+
             </View>
             {
                 expandedHistoryCards[item.UId] && item.d1.map((d1Item, index) => (
@@ -1425,6 +1652,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     </View>
                 ))
             }
+
             {/* <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
@@ -1541,6 +1769,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         color="#333"
                     />
                 </TouchableOpacity>
+
             </View>
             {
                 expandedVerifyCards[item.UId] && item.d1.map((d1Item, index) => (
@@ -1624,6 +1853,20 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity>
+                {prptype === 'R' && item.mailsent === '1' && (
+                    <TouchableOpacity
+                        onPress={() => handleInfoClick(item)}
+                        disabled={!isConnected}
+                    >
+                        <View style={crlimtreq_styles.infoIconContainer}>
+                            <Icon
+                                name="email"
+                                size={32}
+                                color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
+                            />                          
+                        </View>
+                    </TouchableOpacity>
+                )}
                 {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
@@ -2035,6 +2278,68 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 </Modal>
 
             </View>
+
+            <Modal visible={mailLogModal} animationType="slide" transparent>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+
+                        <Text style={styles.modalTitle}>
+                            {mailLogData.length} Sent Log(s) found
+                        </Text>
+
+                        <FlatList
+                            data={mailLogData}
+                            keyExtractor={(item, index) => index.toString()}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 10 }}
+                            renderItem={({ item }) => (
+                                <View style={styles.logCard}>
+
+                                    <View style={styles.logHeaderBox}>
+                                        <Text style={styles.logHeader}>
+                                            {item.usrname}
+                                        </Text>
+                                    </View>
+
+                                    {[
+                                        { label: 'Sent Date', value: item.sentdt },
+                                        { label: 'From', value: item.from },
+                                        { label: 'To', value: item.to },
+                                        { label: 'Subject', value: item.subject },
+                                        { label: 'Remarks', value: item.remarks },
+                                        { label: 'Sent', value: item.mailsent }
+                                    ].map((row, index) => (
+                                        <View key={index} style={styles.rowBox}>
+                                            <Text style={styles.label}>{row.label}</Text>
+                                            <Text
+                                                style={[
+                                                    styles.value,
+                                                    row.label === 'Sent' && {
+                                                        color: row.value === 'Yes' ? '#4CAF50' : '#F44336'
+                                                    }
+                                                ]}
+                                                numberOfLines={2} // 🔥 wrap control
+                                            >
+                                                {row.value}
+                                            </Text>
+                                        </View>
+                                    ))}
+
+                                </View>
+                            )}
+                        />
+
+                        <TouchableOpacity
+                            style={styles.closeBtn}
+                            onPress={() => setMailLogModal(false)}
+                        >
+                            <Text style={styles.closeText}>Close</Text>
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+            </Modal>
+
             <PdfViewerModal
                 visible={showPdfModal}
                 pdfUrl={pdfUrl}

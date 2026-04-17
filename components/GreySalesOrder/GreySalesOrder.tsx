@@ -13,7 +13,9 @@ import {
     LayoutAnimation,
     ScrollView,
     UIManager, Platform,
-    useWindowDimensions
+    useWindowDimensions,
+    StyleSheet,
+    Dimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -156,7 +158,6 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     const [showCarouselModal, setShowCarouselModal] = useState(false);
     const [selectedD1Data, setSelectedD1Data] = useState<D1datakeys[]>([]);
     const [openAccordion, setOpenAccordion] = useState({})
-
     const [criteriaFormOpen, setCriteriaFormOpen] = useState(false)
     const [getAllStoreData, setAllStoreData] = useState([]);
     const [FormState, setFormState] = useState({
@@ -166,6 +167,11 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             StrCode: ''
         }
     })
+
+    const [mailLogData, setMailLogData] = useState([]);
+    const [mailLogModal, setMailLogModal] = useState(false);
+    const [prptype, setPrptype] = useState('');
+
     const didFetchStore = useRef(false);
     const cancelTokenRef = useRef(null);
     const didInitialFetch = useRef(false);
@@ -173,6 +179,97 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
 
     const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
+
+    // const { width } = Dimensions.get('window');
+
+    const styles = StyleSheet.create({
+        modalContainer: {
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        modalContent: {
+            width: '100%', // ✅ simple responsive
+            maxHeight: '90%',
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 16
+        },
+
+        modalTitle: {
+            fontSize: 18, // ✅ fixed
+            fontWeight: '700',
+            marginBottom: 14,
+            color: '#1e88e5',
+            textAlign: 'center'
+        },
+
+        logCard: {
+            backgroundColor: '#f4f8f4',
+            borderRadius: 12,
+            padding: 14,
+            marginBottom: 12,
+        },
+
+        logHeaderBox: {
+            backgroundColor: '#6d756d',
+            paddingVertical: 6,
+            borderRadius: 6,
+            marginBottom: 10
+        },
+
+        logHeader: {
+            textAlign: 'center',
+            fontWeight: 'bold',
+            fontSize: 15,
+            color: '#fff'
+        },
+
+        rowBox: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 6
+        },
+
+        label: {
+            fontSize: 12,
+            color: '#555',
+            fontWeight: '600',
+            flex: 1
+        },
+
+        value: {
+            fontSize: 12,
+            color: '#0a0a0a',
+            flex: 1.2,
+            textAlign: 'left'
+        },
+
+        closeBtn: {
+            backgroundColor: '#1e88e5',
+            paddingVertical: 12,
+            borderRadius: 10,
+            alignItems: 'center',
+            marginTop: 10
+        },
+
+        closeText: {
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: '600'
+        }
+    });
+
+    useEffect(() => {
+        const getType = async () => {
+            const type = await AsyncStorage.getItem('user_prptype');
+            setPrptype(type);
+        };
+        getType();
+    }, []);
 
     useEffect(() => {
         if (didFetchStore.current) return;
@@ -410,8 +507,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 atype: 'A',
                 strtype: strtypeFromApi
             };
-            console.log("fetchAllVerifyData AOI payload" , allhistoryPayload)
-            console.log("fetchAllVerifyData AOI URL" , `${API}/api/sosortbrowse`)
+            console.log("fetchAllVerifyData AOI payload", allhistoryPayload)
+            console.log("fetchAllVerifyData AOI URL", `${API}/api/sosortbrowse`)
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
@@ -421,8 +518,8 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     }
                 })
             );
-            console.log("fetchAllVerifyData AOI response" , response.data)
-            
+            console.log("fetchAllVerifyData AOI response", response.data)
+
             if (response.data.success && response.data.response.data.length > 0) {
                 console.log('✅All History Data:', response.data.response.data);
 
@@ -542,6 +639,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         const num = parseFloat(numericValue) || 0;
         return num.toLocaleString('en-IN');
     };
+
     const handleEdit = (UId: string, field: 'limit2' | 'crday2' | 'rate' | 'qty' | 'shkperc' | 'ARemark', formattedValue: string) => {
         const rawValue = formattedValue.replace(/[₹,]/g, '');
         const rawValuecrday = formattedValue.replace(/[₹,]/g, '');
@@ -660,6 +758,65 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         flatVerifyListRefYPO.current?.scrollToOffset({ offset: 0, animated: true });
     };
 
+    const sendmailorder = async (selectedItem) => {
+        try {
+            setIsLoadingYPO(true);
+
+            const yno = await AsyncStorage.getItem('yno');
+
+            const removed1 = { ...selectedItem };
+
+            const today = new Date().toISOString().split('T')[0];
+
+            const authItem = {
+                UId: selectedItemYPO?.UId,
+                IsAuth: selectedItemYPO?.IsAuth,
+                ParName: selectedItemYPO?.ParName,
+                Remark: selectedItemYPO?.Remark,
+                SODate: selectedItemYPO?.SODate,
+                SONo: selectedItemYPO?.SONo,
+                sodate_1: selectedItemYPO?.NSODate,
+                mailsent: selectedItemYPO?.mailsent,
+                strcode: selectedItemYPO?.StrCode,
+                CreatedDate: today,
+                ARemark: editableValuesYPO[selectedItemYPO.UId]?.ARemark || selectedItemYPO.ARemark || ''
+            };
+
+            const authArray = [authItem];
+            // delete removed1.d1; // 
+
+            const payload = {
+                prpcode: selectedItem?.PrpCode || '',
+                yearno: yno,
+                strcode: selectedItem?.StrCode || '',
+                sodate: selectedItem?.SODate || '',
+                auth: authArray,
+                txntype: 'sales_order_auth',
+                mailtxntype: 'sales_order_detail'
+            };
+
+            console.log('📤 MAIL PAYLOAD:', payload);
+
+            const response = await axios.post(
+                `${API}/api/send_mail_order`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            console.log('📥 MAIL RESPONSE:', response);
+
+        } catch (error) {
+            console.log('❌ Mail Error:', error);
+            Alert.alert('Error', 'Mail API failed');
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    };
 
 
     const handleConfirmAction = async () => {
@@ -710,6 +867,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             action: 'edit'
         };
         const payload = selectedActionYPO === 'accept' ? updatedItemAccept : selectedActionYPO === 'pending' ? updatedItemVerifyPending : selectedActionYPO === 'reject' ? updatedItemReject : selectedActionYPO === 'verifyreject' ? updatedItemVerifyReject : 'null';
+        const prptype = await AsyncStorage.getItem('user_prptype');
 
         console.log('✅ payload', payload);
 
@@ -724,10 +882,6 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 'X-Requested-with': 'XMLHttpRequest',
             };
             try {
-                // const response = await axios.get(
-                //     `${GetApiLink()}/api/prodorderauthsudo`,
-                //     getRequestConfig({ params: payload })
-                //   );
                 const getRequestConfig = (props: any) => {
                     let params = props.params ? props.params : null;
 
@@ -741,31 +895,38 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     };
                     return requestconfig;
                 };
-                // const response = await axios.get(`https://apig.tms-webapp.com/api/authpo`, getRequestConfig({ params: payload }));
                 const response = await axios.get(`${API}/api/authso`, getRequestConfig({ params: payload }));
                 if (response.data.success) {
                     setresponsemessageYPO(response.data.message || 'Success');
                     setTimeout(() => {
                         setSuccessYPO(false);
                         setShowOverlayYPO(false);
+
+
+                        if (selectedActionYPO === 'accept' && prptype === 'R') {
+                            console.log('✅ Calling Mail API after success message...');
+                            sendmailorder(selectedItemYPO);
+                        }
+
                     }, 2000);
-                    // setProcessedCards(prev => new Set(prev).add(selectedItemYPO.UId));
+
                     setData(prevData => {
                         const newData = prevData.filter(item => item.UId !== selectedItemYPO.UId);
                         newData.push({ ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO });
                         return newData;
                     });
-                    // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+
                     setAllVerifyDataYPO(prevData => {
                         const newData = prevData.filter(item => item.UId !== selectedItemYPO.UId);
                         newData.push({ ...selectedItemYPO, isProcessed: true, actionType: selectedActionYPO });
                         return newData;
                     });
-                    // }
+
                     setTimeout(() => {
                         flatListRefYPO.current?.scrollToEnd({ animated: true });
                         flatVerifyListRefYPO.current?.scrollToEnd({ animated: true });
                     }, 300);
+
 
                 } else {
                     setresponsemessageYPO(response.data.message || 'Success');
@@ -783,6 +944,49 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         }
     };
 
+
+    const handleInfoClick = async (selectedItem) => {
+        try {
+            setIsLoadingYPO(true);
+
+            const yno = await AsyncStorage.getItem('yno');
+
+            const payload = {
+                prpcode: selectedItem?.PrpCode || '',
+                uid: selectedItem?.UId || '',
+                yearno: yno,
+                strcode: selectedItem?.StrCode || '',
+                txntype: 'sales_order_auth',
+            };
+
+            console.log("payload", payload);
+
+            const response = await axios.get(
+                `${API}/api/mailordersentlog`,
+                {
+                    params: payload,
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            console.log("response", response);
+
+            if (response?.data?.success && response.data.data?.length > 0) {
+                setMailLogData(response.data.data);
+                setMailLogModal(true);
+            } else {
+                Alert.alert('Info', 'No Data Found');
+            }
+
+        } catch (error) {
+            console.log('❌ Mail Error:', error);
+            Alert.alert('Error', 'Mail API failed');
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    };
 
 
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
@@ -952,6 +1156,22 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                         {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
                     </View>
                 </TouchableOpacity>
+
+                {prptype === 'R' && item.mailsent === '1' && (
+                    <TouchableOpacity
+                        onPress={() => handleInfoClick(item)}
+                        disabled={!isConnected}
+                    >
+                        <View style={crlimtreq_styles.infoIconContainer}>
+                            <Icon
+                                name="email"
+                                size={34}
+                                color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
+                            />                           
+                        </View>
+                    </TouchableOpacity>
+                )}
+
             </View>
         </View>
     );
@@ -1051,17 +1271,31 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                    <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                    <Icon name="cancel" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
+                        <Icon name="info" size={32} color={!isConnected ? "#ccc" : "#2196F3"} />
                         {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
                     </View>
                 </TouchableOpacity>
+                {prptype === 'R' && item.mailsent === '1' && (
+                    <TouchableOpacity
+                        onPress={() => handleInfoClick(item)}
+                        disabled={!isConnected}
+                    >
+                        <View style={crlimtreq_styles.infoIconContainer}>
+                            <Icon
+                                name="email"
+                                size={32}
+                                color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
+                            />                            
+                        </View>
+                    </TouchableOpacity>
+                )}
             </View>
             {/* <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
@@ -1110,6 +1344,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
         const [designName, itemName] = key.split('_');
         return { key, designName, itemName, items };
     });
+
     const toggleAccordion = (key) => {
 
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
@@ -1487,6 +1722,67 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
 
 
             </View>
+
+            <Modal visible={mailLogModal} animationType="slide" transparent>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+
+                        <Text style={styles.modalTitle}>
+                            {mailLogData.length} Sent Log(s) found
+                        </Text>
+
+                        <FlatList
+                            data={mailLogData}
+                            keyExtractor={(item, index) => index.toString()}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 10 }}
+                            renderItem={({ item }) => (
+                                <View style={styles.logCard}>
+
+                                    <View style={styles.logHeaderBox}>
+                                        <Text style={styles.logHeader}>
+                                            {item.usrname}
+                                        </Text>
+                                    </View>
+
+                                    {[
+                                        { label: 'Sent Date', value: item.sentdt },
+                                        { label: 'From', value: item.from },
+                                        { label: 'To', value: item.to },
+                                        { label: 'Subject', value: item.subject },
+                                        { label: 'Remarks', value: item.remarks },
+                                        { label: 'Sent', value: item.mailsent }
+                                    ].map((row, index) => (
+                                        <View key={index} style={styles.rowBox}>
+                                            <Text style={styles.label}>{row.label}</Text>
+                                            <Text
+                                                style={[
+                                                    styles.value,
+                                                    row.label === 'Sent' && {
+                                                        color: row.value === 'Yes' ? '#4CAF50' : '#F44336'
+                                                    }
+                                                ]}
+                                                numberOfLines={2} // 🔥 wrap control
+                                            >
+                                                {row.value}
+                                            </Text>
+                                        </View>
+                                    ))}
+
+                                </View>
+                            )}
+                        />
+
+                        <TouchableOpacity
+                            style={styles.closeBtn}
+                            onPress={() => setMailLogModal(false)}
+                        >
+                            <Text style={styles.closeText}>Close</Text>
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+            </Modal>
         </>
     );
 };

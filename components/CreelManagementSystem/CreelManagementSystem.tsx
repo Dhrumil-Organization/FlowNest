@@ -1,17 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Button,
-    Modal,
-    FlatList,
-    ActivityIndicator,
-    StyleSheet
+    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
+    Platform
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -29,6 +21,7 @@ import CustomDrawer from './CustomDrawer';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import PartyDropdown from '../Shared/PartyDropdown';
+import SearchableDropdown from '../Shared/SearchableDropdown';
 
 interface Props {
     token: string;
@@ -68,7 +61,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [getDataSaved, setDataSaved] = useState(false)
     const [isCreelModalVisible, setIsCreelModalVisible] = useState(false);
     const [setupDate, setSetupDate] = useState(new Date());
-    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showPicker, setShowPicker] = useState(false);
     const [CartonNo, setCartonNo] = useState('');
     const [designName, setDesignName] = useState('');
     const [gridData, setGridData] = useState<GridItem[]>([]);
@@ -77,12 +70,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [getavgwt, setavgwt] = useState('0');
     const [cartonSummary, setCartonSummary] = useState<any[]>([]);
     const [Remark, setRemark] = useState('');
-    const [showManualSearch, setShowManualSearch] = useState(false);
+    const [showManualSearch, setShowManualSearch] = useState(null);
     const [searchText, setSearchText] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [selectedItem, setSelectedItem] = useState(null);
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const [selectedYear, setSelectedYear] = useState(null);
     const [getAllPropertyData, setAllPropertyData] = useState([]);
 
     const today = new Date();
@@ -92,9 +85,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         values: {
             PrpCode: '',
             YearNo: '',
-            fromdate: formatDate(today),
-            todate: formatDate(today),
-            status: 'C',
+            fromdate: '',
+            todate: '',
+            status: 'P',
             LngName: '',
             YearName: '',
         }
@@ -104,6 +97,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [selectedCreel, setSelectedCreel] = useState(null);
+    const [propertydata, setpropertydata] = useState<ExeData[]>([]);
+    const screenWidth = Dimensions.get('window').width;
+    const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
 
     const styles = StyleSheet.create({
         modalWrapper: {
@@ -115,7 +111,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         modalContainer: {
             width: '100%',
-            height: '100%',   // ✅ responsive height
+            height: '100%',
             backgroundColor: '#f5f7fb',
             borderRadius: 15,
             overflow: 'hidden'
@@ -155,7 +151,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             fontWeight: 'bold',
             marginBottom: 15,
             textAlign: 'center',
-            color: '#000'
+            color: '#000',
         },
 
         inputGroup: {
@@ -262,18 +258,18 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             top: 10,
         },
         sectionHeader: {
-            backgroundColor: '#E3F2FD',   // 👈 light blue highlight
+            backgroundColor: '#E3F2FD',
             paddingVertical: 6,
             paddingHorizontal: 10,
             borderRadius: 6,
             marginBottom: 0,
-            marginTop: 15  // 👈 gap kam kar diya
+            marginTop: 15
         },
 
         sectionTitle: {
             fontSize: 15,
             fontWeight: 'bold',
-            color: '#007EA7',  // 👈 highlight color
+            color: '#007EA7',
         },
 
         smallInput: {
@@ -405,21 +401,65 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             fontWeight: 'bold'
         },
         creelCard: {
-            backgroundColor: '#f5f5f5',
-            borderRadius: 12,
-            padding: 15,
-            marginBottom: 12,
+            borderRadius: 16,
+            padding: 14,
+            elevation: 3, // Android shadow
+            shadowColor: '#000', // iOS shadow
+            shadowOpacity: 0.1,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 3 },
+            backgroundColor: '#ffffff',
+        },
+
+        rowBetween: {
             flexDirection: 'row',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            elevation: 3
         },
 
         creelTitle: {
             fontSize: 14,
-            fontWeight: 'bold',
-            marginRight: 8,
-            marginBottom: 5
+            fontWeight: 'bold', // 🔥 keep bold
+            color: '#1a1a1a',
         },
+
+        labelSmall: {
+            fontSize: 12,
+            color: '#555',
+            fontWeight: '600',
+        },
+
+        valueSmall: {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: '#222',
+        },
+
+        qtyBig: {
+            fontSize: 11,
+            fontWeight: 'bold',
+            color: '#000',
+        },
+
+        statusBadge: {
+            backgroundColor: '#ffffff90',
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 20,
+        },
+
+        badgeText: {
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: '#333',
+        },
+
+        // creelTitle: {
+        //     fontSize: 14,
+        //     fontWeight: 'bold',
+        //     marginRight: 8,
+        //     marginBottom: 5
+        // },
 
         badge: {
             backgroundColor: '#E3F2FD',
@@ -427,22 +467,22 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             paddingVertical: 2,
             borderRadius: 10
         },
-        badgeText: {
-            fontSize: 12,
-            color: '#007EA7',
-            fontWeight: 'bold'
-        },
-        labelSmall: {
-            fontSize: 13,
-            color: '#777',
-            // marginTop: 5,
-            fontWeight: 'bold'
-        },
-        valueSmall: {
-            fontSize: 13,
-            // fontWeight: '500',
-            flexShrink: 1
-        },
+        // badgeText: {
+        //     fontSize: 12,
+        //     color: '#007EA7',
+        //     fontWeight: 'bold'
+        // },
+        // labelSmall: {
+        //     fontSize: 13,
+        //     color: '#777',
+        //     // marginTop: 5,
+        //     fontWeight: 'bold'
+        // },
+        // valueSmall: {
+        //     fontSize: 13,
+        //     // fontWeight: '500',
+        //     flexShrink: 1
+        // },
         viewBtn: {
             backgroundColor: '#f1f1f1',
             paddingHorizontal: 12,
@@ -479,7 +519,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             width: 55,
             height: 55,
             backgroundColor: '#007EA7',
-            borderTopRightRadius: 20, // nice corner curve
+            borderTopRightRadius: 20,
             justifyContent: 'center',
             alignItems: 'center',
             elevation: 10,
@@ -528,9 +568,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             color: '#fff',
             fontWeight: 'bold'
         },
-        qtyBig: {
-            fontSize: 11,
-        },
+        // qtyBig: {
+        //     fontSize: 11,
+        // },
 
         topSwitchContainer: {
             flexDirection: 'row',
@@ -759,11 +799,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     let cancelToken: any;
 
-    console.log("Carton SUmmary", cartonSummary);
-    console.log("activeCreels", activeCreels)
-    console.log("status", FormState.values.status);
-    console.log("status...", FormState.values);
-    console.log("Stock Types:", getStockTypes);
+    // console.log("Carton SUmmary", cartonSummary);
+    // console.log("activeCreels", activeCreels)
+    // console.log("status", FormState.values.status);
+    // console.log("status...", FormState.values);
+    // console.log("Stock Types:", getStockTypes);
+    console.log("prptype", propertydata);
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -800,6 +841,18 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         requestPermission();
     }, []);
 
+    const parseDate = (dateStr) => {
+        const [year, month, day] = dateStr.split('-');
+        return new Date(year, month - 1, day);
+    };
+
+    const LIGHT_CARD_COLORS = [
+        ["#E3F2FD", "#BBDEFB"],
+        ["#E8F5E9", "#C8E6C9"],
+        ["#FFF3E0", "#FFE0B2"],
+        ["#F3E5F5", "#E1BEE7"],
+        ["#E0F7FA", "#B2EBF2"],
+    ];
 
     const handleLoadPress = () => {
         const { PrpCode, YearNo, fromdate, todate } = FormState.values;
@@ -807,10 +860,48 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             Alert.alert("Validation", "Please select Property and Year");
             return;
         }
+        const yearNo = parseInt(YearNo);
+
+        const startYear = 2000 + yearNo - 1;
+        const endYear = 2000 + yearNo;
+
+        const fyStart = new Date(startYear, 3, 1);
+        const fyEnd = new Date(endYear, 2, 31, 23, 59, 59);
+
+        const from = parseDate(fromdate);
+        const to = parseDate(todate);
+
+        // console.log("from:", from);
+        // console.log("to:", to);
+        // console.log("fyStart:", fyStart);
+        // console.log("fyEnd:", fyEnd);
+
+        if (from < fyStart || to > fyEnd) {
+            Alert.alert(
+                "Validation",
+                `Date must be between ${fyStart.toLocaleDateString()} and ${fyEnd.toLocaleDateString()}`
+            );
+            return;
+        }
+
+        if (from > to) {
+            Alert.alert("Validation", "From Date cannot be greater than To Date");
+            return;
+        }
         fetchBrowseData();
-        console.log("Selected 👉", FormState.values);
+        // console.log("Selected 👉", FormState.values);
         setIsDrawerVisible(false);
     };
+
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2);
+    };
+
 
     const fetchBrowseData = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -821,21 +912,34 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             'Content-Type': 'application/json',
             'X-Requested-with': 'XMLHttpRequest',
         };
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        // const selectedProperty = await AsyncStorage.getItem('selected_property');
+        // let finalPrptype = userPtype;
+        // if (selectedProperty === 'sudamo_knits') {
+        //     finalPrptype = 'S';
+        // } else if (selectedProperty === 'rayons') {
+        //     finalPrptype = 'R';
+        // }
+
         try {
             const params = {
-                prpcode: FormState.values.PrpCode,
+                prpcode: FormState.values.PrpCode || '',
+                prptype: userPtype,
                 strcode: '002',
                 txntype: 'creel_yarn_issue',
-                yearno: FormState.values.YearNo,
-                fromdate: FormState.values.fromdate,
-                todate: FormState.values.todate,
-                status: FormState.values.status
+                // yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                yearno: '26',
+                fromdate: FormState.values.fromdate || '',
+                todate: FormState.values.todate || '',
+                status: FormState.values.status || '',
+
             };
 
             const response = await axios.post(`${API}/api/get_yarn_issue_browse`, params, { headers });
 
-            console.log("response", response)
-            console.log("payload", params)
+            console.log("browse response", response)
+            console.log("browse payload", params)
 
             const apiData = response?.data?.response?.data || [];
             if (response?.data?.success) {
@@ -863,10 +967,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         } catch (error) {
             if (axios.isCancel(error)) {
                 setActiveCreels([]);
-                console.log("Request cancelled");
+                // console.log("Request cancelled");
             } else {
                 console.log("API Error:", error);
-                Alert.alert('Error while searching');
+                // Alert.alert('Error while searching');
             }
         } finally {
             setIsLoading(false);
@@ -875,8 +979,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     const getStatusFromQty = (qty) => {
         const parsedQty = parseFloat(qty || 0);
-        return parsedQty === 0 ? 'Complete' : 'Running';
+        return parsedQty === 0 ? 'Complete' : 'Pending';
     };
+
+
 
     const handleViewClick = async (item = null) => {
         if (!item) return; // safety
@@ -900,14 +1006,14 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 yearno: FormState.values.YearNo,
                 txntype: 'creel_yarn_issue',
             };
-            console.log("Payload:", payload);
+            console.log("show Payload:", payload);
             const response = await axios.post(
                 `${API}/api/get_yarn_issue_show`,
                 payload,
                 { headers }
             );
 
-            console.log("response", response);
+            console.log("show response", response);
 
             if (response?.data?.success) {
 
@@ -916,21 +1022,34 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 const d1 = resData.d1 || [];
                 const d2 = resData.d2 || [];
 
-                // 🔥 MERGE DATA
+                const mainData = resData.main || [];
+                if (mainData.length > 0) {
+                    setCreelId(mainData[0].BatchNo || '');
+                }
+
                 const mappedData = d2.map(d2Item => {
-                    const d1Item = d1.find(
-                        x => x.SrNo === d2Item.SrNo
-                    );
+                    const d1Item = d1.find(x => x.SrNo === d2Item.SrNo) || {};
 
                     return {
-                        cartonNo: d2Item.CartNo,
-                        qty: d2Item.Qty,
-                        chees: d2Item.Chees,
+                        cartonNo: d2Item.CartNo || '',
+                        qty: d2Item.Qty || '',
+                        chees: d2Item.Chees || '',
 
-                        ItmName: d1Item?.ItmName || '',
-                        MerName: d1Item?.MerName || '',
-                        GrdName: d1Item?.GrdName || '',
-                        ShdName: d1Item?.ShdName || '',
+                        PUId: d2Item.PUId || '',
+                        PSrNo: d2Item.PSrNo || '',
+                        PSubSr: d2Item.PSubSr || '',
+                        TranType: d2Item.TranType || '',
+
+                        ItmCode: d1Item.ItmCode || '',
+                        ItmName: d1Item.ItmName || '',
+                        MerCode: d1Item.MerCode || '',
+                        MerName: d1Item.MerName || '',
+                        GrdCode: d1Item.GrdCode || '',
+                        GrdName: d1Item.GrdName || '',
+                        ShdCode: d1Item.ShdCode || '',
+                        ShdName: d1Item.ShdName || '',
+                        Denier: d1Item.Denier || '',   // ✅ FIXED
+                        yearNo: FormState.values.YearNo || '' // ✅ IMPORTANT
                     };
                 });
                 setCartonSummary(mappedData);
@@ -944,10 +1063,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         } catch (error) {
             if (axios.isCancel(error)) {
-                console.log("Request cancelled");
+                // console.log("Request cancelled");
             } else {
                 console.log("API Error:", error);
-                Alert.alert("Error while processing");
+                // Alert.alert("Error while processing");
             }
         } finally {
             setIsLoading(false);
@@ -958,7 +1077,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         codeTypes: ['qr'],
         onCodeScanned: (codes) => {
             const value = codes[0]?.value || '';
-            console.log("📦 Raw QR Value 👉", value);
+            // console.log("📦 Raw QR Value 👉", value);
             try {
                 const parts = value.split("~");
                 if (parts.length < 17) {
@@ -983,7 +1102,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     Chees: parts[15],
                     yearNo: parts[16]
                 };
-                console.log("✅ Parsed 👉", parsed);
+                // console.log("✅ Parsed 👉", parsed);
                 setScannedObj(parsed);
                 setCartonNo(parsed.CartNo || '');
                 setYearNo(parsed.yearNo || '');
@@ -1013,7 +1132,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 strcode: '002',
                 searchcarton: searchText.trim()
             };
-            console.log("Payload:", payload);
+            // console.log("Payload:", payload);
             const response = await axios.post(
                 `${API}/api/get_carton_search`,
                 payload,
@@ -1026,7 +1145,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     cancelToken: cancelToken.token
                 }
             );
-            console.log("Search Response:", response);
+            // console.log("Search Response:", response);
             const data = response?.data?.response?.data || [];
             if (response?.data?.success && data.length > 0) {
                 setSearchResults(data);
@@ -1037,9 +1156,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         } catch (error) {
             if (axios.isCancel(error)) {
-                console.log("Request cancelled");
+                // console.log("Request cancelled");
             } else {
-                console.log("API Error:", error);
+                // console.log("API Error:", error);
                 Alert.alert('Error while searching');
             }
         } finally {
@@ -1136,13 +1255,14 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
             const historyPayload = {
                 // text: parcode,
-                txntype: 'beam_checking_tablet',
-                referrer: 'dashboard',
+                txntype: 'creel_yarn_issue',
+                // referrer: 'dashboard',
                 fetch: 'shift',
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo
 
             };
+            console.log("historyPayload", historyPayload);
             const response = await axios.get(
                 `${API}/api/get_criterion`, getRequestConfig(
                     {
@@ -1157,47 +1277,19 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 setShiftData([]);
             }
         } catch (error) {
-            console.log("API getshifts error:", error);
+            // console.log("API getshifts error:", error);
         } finally {
             setIsLoading(false);
         }
     }
 
-    const getdesign = async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
-        try {
-            let yno = await AsyncStorage.getItem('yno');
-            const historyPayload = {
-                prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
-                strcode: '012',
-                itmcode: '',
-                dsncode: '',
-                shdcode: '',
-                page: '',
-                limit: '',
-                txntype: 'production_order_sudo'
-            };
-            const response = await axios.get(
-                `${API}/api/getdesign`, getRequestConfig(
-                    {
-                        params: { ...historyPayload }
-                    }
-                )
-            );
-            console.log("response", response);
-            if (response.data.success && response.data.response.data.length > 0) {
-                setData(response.data.response.data);
-            } else {
-                setData([]);
-            }
-        } catch (error) {
-            console.log("API getshifts error:", error);
-        } finally {
-            setIsLoading(false);
+    useEffect(() => {
+        const { PrpCode, YearNo } = FormState.values;
+        if (PrpCode && YearNo) {
+            getShifts();
         }
-    }
+    }, [FormState.values.PrpCode, FormState.values.YearNo]);
+
 
     useEffect(() => {
         if (isCreelModalVisible) {
@@ -1298,6 +1390,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
                     yearno: item.yearNo || '',
+                    Qty: ''
                 }))
             };
 
@@ -1319,9 +1412,65 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 setShowSuccess(true);
 
             }
+            // else if (response.data.success === false) {
+            //     setIsLoading(false);
+            //     setDataSaved(false);
+
+            //     Snackbar.show({
+            //         text: response.data.message,
+            //         duration: Snackbar.LENGTH_LONG,
+            //         backgroundColor: '#000',
+            //         textColor: '#fff',
+            //         action: { text: 'OK', textColor: 'yellow' },
+            //     });
+            // } else {
+            //     setIsLoading(false);
+            //     setDataSaved(false);
+            //     Snackbar.show({
+            //         text: response.data.message,
+            //         duration: Snackbar.LENGTH_LONG,
+            //         backgroundColor: '#000',
+            //         textColor: '#fff',
+            //         action: { text: 'OK', textColor: 'red' },
+            //     });
+            // }
+
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+            //     setSuccessMessage('Data Saved Successfully ✅');
+            //     setShowSuccess(true);
+            //     setIsScanModalVisible(false);
+            //     setIsCreelModalVisible(false);
+            //     setCreelId('');
+            //     setShift('');
+            //     setRemark('');
+            //     setstocktype('');
+            //     setSetupDate(new Date());
+
+            //     setFormState({
+            //         values: {
+            //             PrpCode: '',
+            //             YearNo: '',
+            //             LngName: '',
+            //             YearName: ''
+            //         }
+            //     });
+            //     setCartonSummary([]);
+            //     setCartonNo('');
+            //     setchees('');
+            //     setavgwt('');
+            //     setScannedObj({});
+            //     setSearchText('');
+            //     setSearchResults([]);
+            //     setSelectedItem(null);
+            //     setShowManualSearch(null);
+            //     setIsScanning(false);
+            // }
+
             else if (response.data.success === false) {
                 setIsLoading(false);
                 setDataSaved(false);
+
                 Snackbar.show({
                     text: response.data.message,
                     duration: Snackbar.LENGTH_LONG,
@@ -1329,9 +1478,11 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     textColor: '#fff',
                     action: { text: 'OK', textColor: 'yellow' },
                 });
-            } else {
+            }
+            else {
                 setIsLoading(false);
                 setDataSaved(false);
+
                 Snackbar.show({
                     text: response.data.message,
                     duration: Snackbar.LENGTH_LONG,
@@ -1350,69 +1501,11 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     }
 
-    // const handleSubmitScan = async () => {
-    //     setIsLoading(true);
-
-    //     try {
-    //         // 👉 Yaha pe sirf local processing (agar kuch karna ho)
-    //         let yno = await AsyncStorage.getItem('yno');
-
-    //         const payloadObj = {
-    //             PrpCode: FormState.values.PrpCode,
-    //             YearNo: FormState.values.YearNo,
-    //             txntype: 'creel_yarn_issue',
-    //             CreelId: creelId,
-    //             SetupDate: setupDate.toISOString().split('T')[0],
-    //             Shift: shift,
-    //             Remark: Remark || '',
-    //             StkType: stocktype || '',
-    //             Cartons: cartonSummary.map(item => ({
-    //                 CartNo: item.cartonNo || '',
-    //                 Chees: item.chees || '',
-    //                 Wt: item.qty || '',
-    //                 PUId: item.PUId || '',
-    //                 PSrNo: item.PSrNo || '',
-    //                 PSubSr: item.PSubSr || '',
-    //                 TranType: item.TranType || '',
-    //                 ItmCode: item.ItmCode || '',
-    //                 ItmName: item.ItmName || '',
-    //                 MerCode: item.MerCode || '',
-    //                 MerName: item.MerName || '',
-    //                 GrdCode: item.GrdCode || '',
-    //                 GrdName: item.GrdName || '',
-    //                 ShdCode: item.ShdCode || '',
-    //                 ShdName: item.ShdName || '',
-    //                 Denier: item.Denier || '',
-    //                 yearno: item.yearNo || ''
-    //             }))
-    //         };
-
-    //         console.log("payload (local only)", payloadObj);
-
-    //         // ✅ Direct success show karo (API nahi call karni)
-    //         setDataSaved(true);
-    //         setSuccessMessage('Data Saved Successfully ✅');
-    //         setShowSuccess(true);
-
-    //     } catch (error) {
-    //         console.log("handleSubmitScan error:", error);
-    //         setDataSaved(false);
-
-    //         Snackbar.show({
-    //             text: 'Something went wrong',
-    //             duration: Snackbar.LENGTH_LONG,
-    //             backgroundColor: '#000',
-    //             textColor: '#fff',
-    //         });
-    //     } finally {
-    //         setIsLoading(false);
-    //     }
-    // };
-
-
     useEffect(() => {
-        setIsDrawerVisible(true);
-    }, []);
+        if (!isScanModalVisible) {
+            fetchBrowseData();
+        }
+    }, [isScanModalVisible]);
 
     const shiftOptions = useMemo(() => {
         return getShiftData.map((item, index) => (
@@ -1434,6 +1527,17 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         ));
     }, [getStockTypes]);
 
+    const onChange = (event, selectedDate) => {
+        setShowPicker(false);
+        if (selectedDate) {
+            setSetupDate(selectedDate);
+        }
+    };
+
+    const selectedYearObj = getAllYearData?.find(
+        (y) => y.YearNo == FormState.values.YearNo
+    ) || null;
+
     return (
         <>
             {isLoading && <FullScreenLoader />}
@@ -1443,7 +1547,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             />
             <View style={checkingScannerStyles.flexContainer}>
 
-
+                {/* creel modal show staert here */}
                 <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => setIsCreelModalVisible(true)}
@@ -1454,23 +1558,21 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                         paddingHorizontal: 10,
                         paddingVertical: 7,
                         borderRadius: 6,
+                        marginTop: 0,
                     }}
                 >
                     <Icon
                         name="add"
                         size={18}
                         color="#fff"
-                        style={{ marginRight: 6 }}
+                        style={{ marginRight: 0 }}
                     />
 
                     <Text style={{ color: '#fff', fontWeight: 'bold' }}>
                         Create New Creel
                     </Text>
                 </TouchableOpacity>
-
-
             </View>
-
             <View style={checkingScannerStyles.flexContainer}>
                 <TouchableOpacity
                     activeOpacity={0.8}
@@ -1481,6 +1583,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                         paddingHorizontal: 10,
                         paddingVertical: 7,
                         borderRadius: 6,
+                        marginTop: 0,
                     }}
                 >
                     <Text style={{ color: '#070000', fontWeight: 'bold' }}>
@@ -1488,12 +1591,11 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     </Text>
                 </TouchableOpacity>
             </View>
-
-            <View style={{ paddingHorizontal: 10, marginTop: 0, flex: 1 }}>
+            {/* <View style={{ paddingHorizontal: 10, marginTop: 0, flex: 1 }}>
                 <FlatList
                     data={activeCreels}
                     keyExtractor={(item, index) => index.toString()}
-                    showsVerticalScrollIndicator={true} // scrollbar ON
+                    showsVerticalScrollIndicator={true}
                     contentContainerStyle={{ paddingBottom: 20 }}
                     renderItem={({ item }) => (
                         <View style={styles.creelCard}>
@@ -1503,15 +1605,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={styles.creelTitle}>Creel ID : </Text>
                                     <Text style={styles.creelTitle}>{item.CreelId}</Text>
-
-                                    {/* Status next to ID */}
                                     <View style={{ marginLeft: 10 }}>
                                         <Text style={styles.badgeText}>
                                             {getStatusFromQty(item.CreelQty)}
                                         </Text>
                                     </View>
                                 </View>
-
                                 <View style={{ flexDirection: 'row', marginTop: 8 }}>
                                     <View style={{ flex: 2 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }}>
@@ -1521,7 +1620,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                             </Text>
                                         </View>
                                     </View>
-
                                     <View style={{ flex: 1 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }}>
                                             <Text style={styles.labelSmall}>Shift : </Text>
@@ -1531,7 +1629,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         </View>
                                     </View>
                                 </View>
-
                                 <View style={{ marginTop: 10 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' }}>
                                         <Text style={styles.labelSmall}>Creel Qty : </Text>
@@ -1541,7 +1638,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                     </View>
                                 </View>
                             </View>
-
                             <TouchableOpacity
                                 style={styles.viewBtn}
                                 onPress={() => handleViewClick(item)}
@@ -1551,8 +1647,139 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                         </View>
                     )}
                 />
-            </View>
+            </View> */}
+            <View style={{ paddingHorizontal: 10, flex: 1 }}>
+                <FlatList
+                    data={activeCreels}
+                    keyExtractor={(item, index) => index.toString()}
+                    showsVerticalScrollIndicator={true}
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                    renderItem={({ item }) => {
 
+                        const status = getStatusFromQty(item.CreelQty);
+
+                        return (
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                onPress={() => handleViewClick(item)}
+                                style={{ marginBottom: 12 }}
+                            >
+                                <View style={styles.creelCard}>
+
+                                    {/* HEADER */}
+                                    <View style={styles.rowBetween}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Text style={styles.creelTitle}>Creel ID : </Text>
+                                            <Text style={styles.creelTitle}>{item.CreelId}</Text>
+                                        </View>
+
+                                        <View style={[
+                                            styles.statusBadge,
+                                            {
+                                                backgroundColor: status === 'Pending' ? '#FFF3E0' : '#E8F5E9',
+                                                borderColor: status === 'Pending' ? '#F57C00' : '#2E7D32',
+                                                borderWidth: 1,
+                                            },
+                                        ]}>
+                                            <Text style={[
+                                                styles.badgeText,
+                                                {
+                                                    color: status === 'Pending' ? '#F57C00' : '#2E7D32',
+                                                },
+                                            ]}>
+                                                {/* {getStatusFromQty(item.CreelQty)} */}
+                                                {status}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* DATE + SHIFT */}
+                                    {/* <View style={[styles.rowBetween, { marginTop: 8 }]}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.labelSmall}>Date :</Text>
+                                            <Text style={styles.valueSmall} numberOfLines={1}>
+                                                {item.IssDate}
+                                            </Text>
+                                        </View>
+
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.labelSmall}>Shift :</Text>
+                                            <Text style={styles.valueSmall}>
+                                                {item.Shift}
+                                            </Text>
+                                        </View>
+                                    </View> */}
+
+                                    {/* QTY */}
+                                    {/* <View style={{ marginTop: 12 }}>
+                                        <Text style={styles.labelSmall}>Creel Qty :</Text>
+                                        <Text style={[
+                                            styles.qtyBig,
+                                            {
+                                                backgroundColor: '#E3F2FD',
+                                                color: '#1565C0',
+                                                paddingVertical: 6,
+                                                paddingHorizontal: 12,
+                                                borderRadius: 10,
+                                                overflow: 'hidden',
+                                                alignSelf: 'flex-start',
+                                                marginTop: 4,
+                                            },
+                                        ]}>
+                                            {item.CreelQty}
+                                        </Text>
+                                    </View> */}
+
+                                    <View style={{ marginTop: 8 }}>
+
+                                        {/* DATE */}
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                            <Text style={styles.labelSmall}>Date : </Text>
+                                            <Text style={styles.valueSmall} numberOfLines={1}>
+                                                {item.IssDate}
+                                            </Text>
+                                        </View>
+
+                                        {/* SHIFT */}
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Text style={styles.labelSmall}>Shift : </Text>
+                                            <Text style={styles.valueSmall}>
+                                                {item.Shift}
+                                            </Text>
+                                        </View>
+
+                                    </View>
+
+                                    {/* QTY */}
+                                    <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.labelSmall}>Creel Qty : </Text>
+
+                                        <Text
+                                            style={[
+                                                styles.qtyBig,
+                                                {
+                                                    backgroundColor: '#E3F2FD',
+                                                    color: '#1565C0',
+                                                    paddingVertical: 4,
+                                                    paddingHorizontal: 10,
+                                                    borderRadius: 8,
+                                                    overflow: 'hidden',
+                                                },
+                                            ]}
+                                        >
+                                            {item.CreelQty}
+                                        </Text>
+                                    </View>
+
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }}
+                />
+            </View>
+            {/* creel modal show over */}
+
+            {/* creel add modal start here */}
             <Modal
                 visible={isCreelModalVisible}
                 transparent={true}
@@ -1577,15 +1804,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                         }}
                     >
                         <View style={styles.container}>
-                            <View style={styles.headerBox}>
-                                <Text style={styles.headerTitle}>
-                                    📍 {FormState.values.LngName || 'Property'}
-                                </Text>
-                                <Text style={styles.headerSub}>
-                                    📅 {FormState.values.YearName || 'Year'}
-                                </Text>
-                            </View>
-
                             <FlatList
                                 data={[1]}
                                 keyExtractor={(item, index) => index.toString()}
@@ -1598,6 +1816,56 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         <Text style={styles.title}>
                                             Create New Creel
                                         </Text>
+
+                                        <View style={styles.inputGroup}>
+                                            <Text style={styles.label}>Property <Text style={{ color: 'red' }}> *</Text></Text>
+                                            <SearchableDropdown
+                                                key={FormState.values.PrpCode}
+                                                data={getAllPropertyData || []}
+                                                labelKey="LngName"
+                                                valueKey="PrpCode"
+                                                placeholder="Choose property..."
+                                                pageSize={10}
+                                                initialValue={selectedProperty}
+                                                onSelect={(item) => {
+                                                    setFormState(prev => ({
+                                                        ...prev,
+                                                        values: {
+                                                            ...prev.values,
+                                                            PrpCode: item?.PrpCode || '',
+                                                            LngName: item?.LngName || ''
+                                                        }
+                                                    }));
+                                                }}
+                                                multiple={false}
+                                                emptyMessage="No properties available"
+                                            />
+                                        </View>
+
+                                        <View style={styles.inputGroup}>
+                                            <Text style={styles.label}>Year No <Text style={{ color: 'red' }}> *</Text></Text>
+                                            <SearchableDropdown
+                                                key={FormState.values.YearNo}
+                                                data={getAllYearData || []}
+                                                labelKey="YearName"
+                                                valueKey="YearNo"
+                                                placeholder="Choose year..."
+                                                pageSize={10}
+                                                initialValue={selectedYearObj}
+                                                onSelect={(item) => {
+                                                    setFormState(prev => ({
+                                                        ...prev,
+                                                        values: {
+                                                            ...prev.values,
+                                                            YearNo: item?.YearNo || '',
+                                                            YearName: item?.YearName || ''
+                                                        }
+                                                    }));
+                                                }}
+                                                multiple={false}
+                                                emptyMessage="No years data available"
+                                            />
+                                        </View>
 
                                         {/* Creel ID */}
                                         <View style={styles.inputGroup}>
@@ -1618,12 +1886,20 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 <Text style={styles.label}>Setup Date <Text style={{ color: 'red' }}> *</Text></Text>
                                                 <TouchableOpacity
                                                     style={styles.input}
-                                                    onPress={() => setShowDatePicker(true)}
+                                                    onPress={() => setShowPicker(true)}
                                                 >
                                                     <Text>
                                                         {setupDate ? setupDate.toLocaleDateString() : 'Select Date'}
                                                     </Text>
                                                 </TouchableOpacity>
+                                                {showPicker && (
+                                                    <DateTimePicker
+                                                        value={setupDate || new Date()}
+                                                        mode="date"
+                                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                        onChange={onChange}
+                                                    />
+                                                )}
                                             </View>
 
                                             <View style={styles.col}>
@@ -1790,7 +2066,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                                 ListFooterComponent={
                                     <View style={styles.footer}>
-
                                         <TouchableOpacity
                                             style={styles.saveBtn}
                                             onPress={() => {
@@ -1810,12 +2085,33 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     Alert.alert("Validation", "Select Stock Type");
                                                     return;
                                                 }
+                                                const yearNo = FormState.values.YearNo;
+                                                const startYear = "20" + (parseInt(yearNo) - 1);
+                                                const endYear = "20" + yearNo;
+                                                const selectedDate = setupDate.toISOString().split('T')[0];
+                                                const fyStart = `${startYear}-04-01`;
+                                                const fyEnd = `${endYear}-03-31`;
+                                                if (selectedDate < fyStart || selectedDate > fyEnd) {
+                                                    Alert.alert(
+                                                        " ",
+                                                        "⚠️ Date could not be less than current financial year.",
+                                                        [
+                                                            {
+                                                                text: "OK",
+                                                                style: "default"
+                                                            }
+                                                        ],
+                                                        { cancelable: true }
+                                                    );
+                                                    return;
+                                                }
                                                 setIsCreelModalVisible(false);
                                                 setIsScanModalVisible(true);
                                             }}
                                         >
                                             <Text style={styles.btnText}>Save & Next</Text>
                                         </TouchableOpacity>
+
                                         <TouchableOpacity
                                             style={styles.cancelBtn}
                                             onPress={() => setIsCreelModalVisible(false)}
@@ -1826,11 +2122,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 }
                             />
                         </View>
-
                     </TouchableOpacity>
                 </TouchableOpacity>
-            </Modal>
+            </Modal >
+            {/* creel add modal end over */}
 
+            {/* cartons modal start over */}
             <Modal
                 visible={isScanModalVisible}
                 animationType="slide"
@@ -1851,36 +2148,32 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             }
                         />
                         <View style={styles.topSwitchContainer}>
-
-                            {/* Scan */}
                             <TouchableOpacity
                                 style={[
                                     styles.switchCard,
-                                    !showManualSearch && styles.activeCard
+                                    showManualSearch === false && styles.activeCard
                                 ]}
                                 onPress={() => setShowManualSearch(false)}
                             >
-                                <Icon name="camera" size={22} color={!showManualSearch ? "#fff" : "#007EA7"} />
+                                <Icon name="camera" size={22} color={showManualSearch === false ? "#fff" : "#007EA7"} />
                                 <Text style={[
                                     styles.switchText,
-                                    !showManualSearch && styles.activeText
+                                    showManualSearch === false && styles.activeText
                                 ]}>
                                     Scan Carton
                                 </Text>
                             </TouchableOpacity>
-
-                            {/* Manual */}
                             <TouchableOpacity
                                 style={[
                                     styles.switchCard,
-                                    showManualSearch && styles.activeCard
+                                    showManualSearch === true && styles.activeCard
                                 ]}
                                 onPress={() => setShowManualSearch(true)}
                             >
-                                <Icon name="search" size={20} color={showManualSearch ? "#fff" : "#007EA7"} />
+                                <Icon name="search" size={20} color={showManualSearch === true ? "#fff" : "#007EA7"} />
                                 <Text style={[
                                     styles.switchText,
-                                    showManualSearch && styles.activeText
+                                    showManualSearch === true && styles.activeText
                                 ]}>
                                     Manual Search
                                 </Text>
@@ -1888,7 +2181,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                         </View>
 
-                        {showManualSearch && (
+                        {showManualSearch === true && (
                             <View style={styles.manualCard}>
 
                                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1981,7 +2274,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                             </View>
                         )}
-                        {!showManualSearch && (
+                        {showManualSearch === false && (
                             <View style={styles.scannerCard}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     <Icon name="camera" size={20} color="#007EA7" />
@@ -1997,7 +2290,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 </TouchableOpacity>
                             </View>
                         )}
-                        {isScanning && !showManualSearch && (
+                        {isScanning && showManualSearch === false && (
                             <View style={styles.cameraContainer}>
                                 {device && hasPermission && (
                                     <Camera
@@ -2132,7 +2425,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 style={styles.secondaryBtn}
                                                 onPress={() => {
                                                     setIsScanModalVisible(false);
-                                                    setIsCreelModalVisible(true);
+                                                    // setIsCreelModalVisible(true);
                                                 }}
                                             >
                                                 <Text style={styles.btnText}>Close</Text>
@@ -2140,7 +2433,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         </View>
 
                                     </View>
-                                    <View style={styles.summaryCard}>
+                                    {/* <View style={styles.summaryCard}>
                                         <Text style={styles.summaryTitle}>
                                             Yarn Issuance Summary
                                         </Text>
@@ -2149,13 +2442,13 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                             {cartonSummary.length} carton(s)
                                         </Text>
 
-                                        <View style={{ height: 180 }}>
+                                        <View style={{ height: 200 }}>
                                             <ScrollView
                                                 horizontal
-                                                showsHorizontalScrollIndicator={true}
+                                                showsHorizontalScrollIndicator
                                                 nestedScrollEnabled={true}
                                             >
-                                                <View style={{ minWidth: 910 }}>
+                                                <View style={{ minWidth: screenWidth + 300 }}>
                                                     <View style={styles.headerRow}>
                                                         <Text style={[styles.header, { width: 120 }]}>Carton</Text>
                                                         <Text style={[styles.header, { width: 150 }]}>Item</Text>
@@ -2169,8 +2462,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     <FlatList
                                                         data={cartonSummary}
                                                         keyExtractor={(item, index) => index.toString()}
-                                                        showsVerticalScrollIndicator={true}
-                                                        nestedScrollEnabled={true}
+                                                        showsVerticalScrollIndicator
+                                                        nestedScrollEnabled
 
                                                         renderItem={({ item, index }) => (
                                                             <View style={styles.row1}>
@@ -2195,75 +2488,74 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                             </View>
                                                         )}
 
-                                                        style={{ height: 150 }}
+                                                        style={{ maxHeight: 100 }}
+                                                        contentContainerStyle={{ paddingBottom: 10 }}
                                                     />
-
                                                 </View>
                                             </ScrollView>
                                         </View>
-                                    </View>
-                                    {/* 
-                                    <View style={styles.summaryCard}>
-                                        <Text style={styles.summaryTitle}>Yarn Issuance Summary</Text>
-
-                                        <Text style={styles.summarySub}>
-                                            {cartonSummary.length} carton(s)
-                                        </Text>
-
-                                        <ScrollView
-                                            horizontal
-                                            showsHorizontalScrollIndicator={true}
-                                            nestedScrollEnabled={true}
-                                            scrollEventThrottle={16}
-                                            keyboardShouldPersistTaps="handled"
-                                        >
-                                            <View style={{ minWidth: '100%' }}>
-                                                <View style={styles.headerRow}>
-                                                    <Text style={[styles.header, { width: 120 }]}>Carton</Text>
-                                                    <Text style={[styles.header, { width: 150 }]}>Item</Text>
-                                                    <Text style={[styles.header, { width: 120 }]}>Merge</Text>
-                                                    <Text style={[styles.header, { width: 120 }]}>Grade</Text>
-                                                    <Text style={[styles.header, { width: 120 }]}>Shade</Text>
-                                                    <Text style={[styles.header, { width: 80 }]}>Qty</Text>
-                                                    <Text style={[styles.header, { width: 80 }]}>Chees</Text>
-                                                    <Text style={[styles.header, { width: 80 }]}>Action</Text>
-                                                </View>
-
-                                                <FlatList
-                                                    data={cartonSummary}
-                                                    keyExtractor={(item, index) => index.toString()}
-                                                    nestedScrollEnabled={true}
-                                                    style={{ height: 150 }}
-                                                    removeClippedSubviews={true}
-                                                    initialNumToRender={10}
-                                                    maxToRenderPerBatch={10}
-                                                    windowSize={5}
-                                                    renderItem={({ item, index }) => (
-                                                        <View style={styles.row1}>
-                                                            <Text style={[styles.cell, { width: 120 }]}>{item.cartonNo}</Text>
-                                                            <Text style={[styles.cell, { width: 150 }]}>{item.ItmName}</Text>
-                                                            <Text style={[styles.cell, { width: 120 }]}>{item.MerName}</Text>
-                                                            <Text style={[styles.cell, { width: 120 }]}>{item.GrdName}</Text>
-                                                            <Text style={[styles.cell, { width: 120 }]}>{item.ShdName}</Text>
-                                                            <Text style={[styles.cell, { width: 80 }]}>{item.qty}</Text>
-                                                            <Text style={[styles.cell, { width: 80 }]}>{item.chees}</Text>
-
-                                                            <TouchableOpacity
-                                                                style={[styles.cellView, { width: 80, alignItems: 'center' }]}
-                                                                onPress={() => {
-                                                                    setCartonSummary(prev =>
-                                                                        prev.filter((_, i) => i !== index)
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Icon name="delete" size={18} color="#ff4d4f" />
-                                                            </TouchableOpacity>
-                                                        </View>
-                                                    )}
-                                                />
-                                            </View>
-                                        </ScrollView>
                                     </View> */}
+                                    {cartonSummary.length > 0 && (
+                                        <View style={styles.summaryCard}>
+                                            <Text style={styles.summaryTitle}>
+                                                Yarn Issuance Summary
+                                            </Text>
+
+                                            <Text style={styles.summarySub}>
+                                                {cartonSummary.length} carton(s)
+                                            </Text>
+
+                                            <View style={{ height: 200 }}>
+                                                <ScrollView
+                                                    horizontal
+                                                    showsHorizontalScrollIndicator
+                                                    nestedScrollEnabled={true}
+                                                >
+                                                    <View style={{ minWidth: screenWidth + 300 }}>
+                                                        <View style={styles.headerRow}>
+                                                            <Text style={[styles.header, { width: 120 }]}>Carton</Text>
+                                                            <Text style={[styles.header, { width: 150 }]}>Item</Text>
+                                                            <Text style={[styles.header, { width: 120 }]}>Merge</Text>
+                                                            <Text style={[styles.header, { width: 120 }]}>Grade</Text>
+                                                            <Text style={[styles.header, { width: 120 }]}>Shade</Text>
+                                                            <Text style={[styles.header, { width: 80 }]}>Qty</Text>
+                                                            <Text style={[styles.header, { width: 80 }]}>Chees</Text>
+                                                            <Text style={[styles.header, { width: 80 }]}>Action</Text>
+                                                        </View>
+
+                                                        <FlatList
+                                                            data={cartonSummary}
+                                                            keyExtractor={(item, index) => index.toString()}
+                                                            renderItem={({ item, index }) => (
+                                                                <View style={styles.row1}>
+                                                                    <Text style={[styles.cell, { width: 120 }]}>{item.cartonNo}</Text>
+                                                                    <Text style={[styles.cell, { width: 150 }]}>{item.ItmName}</Text>
+                                                                    <Text style={[styles.cell, { width: 120 }]}>{item.MerName}</Text>
+                                                                    <Text style={[styles.cell, { width: 120 }]}>{item.GrdName}</Text>
+                                                                    <Text style={[styles.cell, { width: 120 }]}>{item.ShdName}</Text>
+                                                                    <Text style={[styles.cell, { width: 80 }]}>{item.qty}</Text>
+                                                                    <Text style={[styles.cell, { width: 80 }]}>{item.chees}</Text>
+
+                                                                    <TouchableOpacity
+                                                                        style={[styles.cell, { width: 80, alignItems: 'center' }]}
+                                                                        onPress={() => {
+                                                                            setCartonSummary(prev =>
+                                                                                prev.filter((_, i) => i !== index)
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Icon name="delete" size={18} color="#ff4d4f" />
+                                                                    </TouchableOpacity>
+                                                                </View>
+                                                            )}
+                                                            style={{ maxHeight: 100 }}
+                                                        />
+                                                    </View>
+                                                </ScrollView>
+                                            </View>
+                                        </View>
+                                    )}
+
                                 </>
                             )}
                         />
@@ -2272,6 +2564,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                 </View>
             </Modal >
+            {/* cartons modal end over */}
 
             <TouchableOpacity style={styles.fab} onPress={openDrawer}>
                 <Icon name="read-more" size={20} color="#fff" />
@@ -2289,13 +2582,48 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             {successMessage}
                         </Text>
 
-                        <TouchableOpacity
+                        {/* <TouchableOpacity
                             style={styles.okButton}
                             onPress={() => {
                                 setShowSuccess(false);
 
                                 // 🔥 IMPORTANT
                                 setCartonSummary([]);   // list clear
+                            }}
+                        >
+                            <Text style={styles.okText}>OK....</Text>
+                        </TouchableOpacity> */}
+
+                        <TouchableOpacity
+                            style={styles.okButton}
+                            onPress={() => {
+                                setShowSuccess(false);
+                                setIsScanModalVisible(false);
+                                setIsCreelModalVisible(false);
+                                setCartonSummary([]);
+                                setCartonNo('');
+                                setchees('');
+                                setavgwt('');
+                                setScannedObj({});
+                                setSearchText('');
+                                setSearchResults([]);
+                                setSelectedItem(null);
+                                setShowManualSearch(null);
+                                setIsScanning(false);
+                                setCreelId('');
+                                setShift('');
+                                setRemark('');
+                                setstocktype('');
+                                setSetupDate(new Date());
+                                // setFormState({
+                                //     values: {
+                                //         PrpCode: '',
+                                //         YearNo: '',
+                                //         LngName: '',
+                                //         YearName: ''
+                                //     }
+                                // });
+                                fetchBrowseData();
                             }}
                         >
                             <Text style={styles.okText}>OK</Text>

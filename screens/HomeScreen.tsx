@@ -230,7 +230,7 @@ const APP_SECTIONS = [
     {
         title: 'D',
         data: [
-            { id: '27', name: 'Beam Close', screen: 'Beam Close', icon: 'all-out', iconColor: '#05010d' },
+            { id: '27', name: 'Beam Close', screen: 'Beam Close', icon: 'assignment-turned-in', iconColor: '#0ceebd' },
         ],
     },
     {
@@ -249,6 +249,12 @@ const APP_SECTIONS = [
         title: 'B',
         data: [
             { id: '29', name: 'Yarn Stock', screen: 'Yarn Stock', icon: 'autorenew', iconColor: '#008080' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor:  '#4B0082'  },
         ],
     },
 ];
@@ -506,7 +512,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Taka Checking Entry",
                 //                         "href": "/"
-                //                     },                                
+                //                     },    
+                //                     {
+                //                         "title": "Yarn Management System",
+                //                         "href": "/"
+                //                     },                                                                        
                 //                 ]
                 //             }
                 //         ]

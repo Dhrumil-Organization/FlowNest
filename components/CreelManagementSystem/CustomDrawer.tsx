@@ -87,7 +87,7 @@ const CustomDrawer = (props) => {
     return (
         <>
             <Modal visible={isVisible} transparent animationType="none"
-            // onRequestClose={onClose}
+            onRequestClose={onClose}
             >
                 <View style={styles.modalOverlay}>
                     {isLoadingMore && <FullScreenLoader />}
@@ -97,9 +97,9 @@ const CustomDrawer = (props) => {
                             style={styles.gradientBackground}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}>
-                            {/* <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                                 <Icon name="close" size={28} color="#fff" />
-                            </TouchableOpacity> */}
+                            </TouchableOpacity>
                             <ScrollView
                                 style={styles.scrollableFormContainer}
                                 contentContainerStyle={styles.scrollableFormContent}
@@ -239,14 +239,14 @@ const CustomDrawer = (props) => {
                                                 borderRadius: 8,
                                                 marginRight: 5,
                                                 alignItems: 'center',
-                                                backgroundColor: FormState.values.status === 'R' ? '#007bff' : '#eee'
+                                                backgroundColor: FormState.values.status === 'P' ? '#007bff' : '#eee'
                                             }}
                                         >
                                             <Text style={{
-                                                color: FormState.values.status === 'R' ? '#fff' : '#000',
+                                                color: FormState.values.status === 'P' ? '#fff' : '#000',
                                                 fontWeight: 'bold'
                                             }}>
-                                                Running
+                                                Pending
                                             </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity

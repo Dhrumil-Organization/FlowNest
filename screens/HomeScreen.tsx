@@ -89,13 +89,13 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
-            { id: '5', name: 'Yarn Purchase Order', screen: 'Yarn Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
+            { id: '5', name: 'Purchase Order', screen: 'Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
         ],
     },
     {
         title: 'G',
         data: [
-            { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
+            // { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
             { id: '7', name: 'Sales Order', screen: 'Sales Order', icon: 'point-of-sale', iconColor: '#20BEC1' },
         ],
     },

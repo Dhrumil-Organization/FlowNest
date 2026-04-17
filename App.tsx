@@ -68,6 +68,8 @@ import DesignAuthorization from './components/DesignAuthorization/DesignAuthoriz
 import CreelManagementSystem from './components/CreelManagementSystem/CreelManagementSystem';
 import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
+import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -94,6 +96,8 @@ export default function App() {
     initDatabase();
     initAPI();
   }, []);
+
+  console.log("getUserPrptype", getUserPrptype)
 
   useEffect(() => {
     async function getToken() {
@@ -175,6 +179,9 @@ export default function App() {
         const token = await AsyncStorage.getItem('access_token');
         const user_details = await AsyncStorage.getItem('user_details');
         const user_prptype = await AsyncStorage.getItem('user_prptype');
+
+
+        console.log("user_prptype", user_prptype);
 
         setDeviceId(deviceId);
         setToken(token);
@@ -692,6 +699,13 @@ export default function App() {
                         </GestureHandlerRootView>
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="Yarn Management System">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <YarnManagementSystem {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>                    
                   </Stack.Navigator>
 
                 </NavigationContainer>

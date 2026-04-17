@@ -251,6 +251,12 @@ const APP_SECTIONS = [
             { id: '29', name: 'Yarn Stock', screen: 'Yarn Stock', icon: 'autorenew', iconColor: '#008080' },
         ],
     },
+    // {
+    //     title: 'B',
+    //     data: [
+    //         { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+    //     ],
+    // },
 ];
 
 interface Props {

@@ -1761,6 +1761,7 @@ const Collection: React.FC<Props> = ({
                 userName={username}
                 header={'Taka Checking Entry'}
                 subHeader={'Manage your taka'}
+                backNavigateScreen={'Home'}
             />
             <CheckingForm
                 token={token}

@@ -68,6 +68,7 @@ import DesignAuthorization from './components/DesignAuthorization/DesignAuthoriz
 import CreelManagementSystem from './components/CreelManagementSystem/CreelManagementSystem';
 import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
+import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 
 const Stack = createNativeStackNavigator();
 
@@ -690,6 +691,12 @@ export default function App() {
                         <GestureHandlerRootView style={{ flex: 1 }}>
                           <YarnStock {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
                         </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Party Dashboard">{(props) =>
+                      <>
+                        <PartyDashboard {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> 
+
                       </>
                     }</Stack.Screen>
                   </Stack.Navigator>

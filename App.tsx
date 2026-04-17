@@ -69,6 +69,7 @@ import CreelManagementSystem from './components/CreelManagementSystem/CreelManag
 import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
 import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
+import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 
 
 const Stack = createNativeStackNavigator();
@@ -705,7 +706,13 @@ export default function App() {
                           <YarnManagementSystem {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
                         </GestureHandlerRootView>
                       </>
-                    }</Stack.Screen>                    
+                    }</Stack.Screen>
+                    <Stack.Screen name="Party Dashboard">{(props) =>
+                      <>
+                        <PartyDashboard {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                      </>
+                    }</Stack.Screen>
                   </Stack.Navigator>
 
                 </NavigationContainer>

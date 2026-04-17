@@ -257,6 +257,12 @@ const APP_SECTIONS = [
             { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor:  '#4B0082'  },
         ],
     },
+    // {
+    //     title: 'B',
+    //     data: [
+    //         { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+    //     ],
+    // },
 ];
 
 interface Props {

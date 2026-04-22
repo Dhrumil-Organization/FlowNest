@@ -101,7 +101,7 @@ const APP_SECTIONS = [
     {
         title: 'G',
         data: [
-            // { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
+            { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
             { id: '7', name: 'Sales Order', screen: 'Sales Order', icon: 'point-of-sale', iconColor: '#20BEC1' },
         ],
     },
@@ -263,12 +263,26 @@ const APP_SECTIONS = [
             { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor: '#4B0082' },
         ],
     },
+    {
+        title: 'B',
+        data: [
+            { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+        ],
+    },
+    {
+        title: 'I',
+        data: [
+            { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
     // {
-    //     title: 'B',
+    //     title: 'P',
     //     data: [
-    //         { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+    //         { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
     //     ],
     // },
+
+
 ];
 
 interface Props {
@@ -524,15 +538,21 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Taka Checking Entry",
                 //                         "href": "/"
-                //                     },    
+                //                     },
                 //                     {
                 //                         "title": "Yarn Management System",
                 //                         "href": "/"
-                //                     },  
+                //                     },
                 //                     {
                 //                         "title": "Party Dashboard",
                 //                         "href": "/"
-                //                     },                                                                        
+                //                     },
+                //                     {
+
+                //                         "title": "Weft Issue",
+                //                         "href": "/"
+                //                     },
+                                    
                 //                 ]
                 //             }
                 //         ]

@@ -120,6 +120,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
     const [selectedfilamentblend, setselectedfilamentblend] = useState([]);
     const [countdata, setcountdata] = useState([]);
     const [selectedcount, setselectedcount] = useState([]);
+    const [selectedsubcount, setselectedsubcount] = useState([]);
     const [selectedfilamentcount, setselectedfilamentcount] = useState([]);
     const [plydata, setplydata] = useState([]);
     const [selectedply, setselectedply] = useState([]);
@@ -138,6 +139,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
     const [selectedmitem, setselectedmitem] = useState([]);
     const [selectedfilamentitem, setselectedfilamentitem] = useState([]);
     const [showSubItemCard, setShowSubItemCard] = useState(false);
+    const [selectedsubply, setselectedsubply] = useState([]);
 
     const cancelToken = useRef(null);
 
@@ -182,9 +184,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
 
-    useEffect(() => {
-        requestPermission();
-    }, []);
+    // useEffect(() => {
+    //     requestPermission();
+    // }, []);
 
     const soshow = async () => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
@@ -260,7 +262,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                 txntype: 'yarn_creation_item_master',
             };
 
-            // console.log("historyPayload:", historyPayload);
+            console.log("historyPayload:", historyPayload);
 
             const response = await axios.get(
                 `${API}/api/yarnblend`,
@@ -269,7 +271,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                     cancelToken: cancelToken.token
                 })
             );
-            // console.log("blend API Response:", response);
+            console.log("blend API Response:", response);
 
             const data = response?.data?.data?.data || [];
             if (response?.data?.success && response?.data?.data?.data?.length > 0) {
@@ -1106,6 +1108,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                 setselectedmitem([]);
                                 setselectedothers([]);
                                 setselectedsubitem([]);
+                                setselectedsubply([]);
+                                setselectedsubcount([]);
                                 setShowSubItemCard(false);
                                 fetchbrowse(activeTab);
                             }
@@ -1354,11 +1358,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                 labelKey={["count", "id"]}
                                 valueKey="id"
                                 pageSize={12}
-                                initialValue={selectedcount ?? null}
-                                selected={selectedcount ?? null}
+                                initialValue={selectedsubcount ?? null}
+                                selected={selectedsubcount ?? null}
                                 type="count"
                                 onSelect={(item) => {
-                                    setselectedcount(item);
+                                    setselectedsubcount(item);
                                     setsubitemform(prev => {
                                         const updated = {
                                             ...prev,
@@ -1386,11 +1390,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                 labelKey={["ply", "id"]}
                                 valueKey="id"
                                 pageSize={12}
-                                initialValue={selectedply ?? null}
-                                selected={selectedply ?? null}
+                                initialValue={selectedsubply ?? null}
+                                selected={selectedsubply ?? null}
                                 type="ply"
                                 onSelect={(item) => {
-                                    setselectedply(item);
+                                    setselectedsubply(item);
                                     setsubitemform(prev => {
                                         const updated = {
                                             ...prev,
@@ -1479,6 +1483,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                             linkitmcode: text
                                         }));
                                     }}
+                                    style={{
+                                        color: '#000',
+                                        opacity: 1,
+                                        height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                    }}
                                 />
                             </View>
                         </View>
@@ -1492,6 +1501,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                     placeholder="Denier..."
                                     value={subitemform.denier}
                                     editable={false}
+                                    style={{
+                                        color: '#000',
+                                        opacity: 1,
+                                        height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                    }}
                                 />
                             </View>
                         </View>
@@ -2047,6 +2061,12 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                 ...prev,
                                                                 linkitmcode: text
                                                             }));
+
+                                                        }}
+                                                        style={{
+                                                            color: '#000',
+                                                            opacity: 1,
+                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
                                                         }}
                                                     />
                                                 </View>
@@ -2063,6 +2083,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                         placeholder="Denier..."
                                                         value={spunForm.denier}
                                                         editable={false}
+                                                        style={{
+                                                            color: '#000',
+                                                            opacity: 1,
+                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                        }}
                                                     />
                                                 </View>
                                             </View>
@@ -2581,6 +2606,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                 linkitmcode: text
                                                             }))
                                                         }
+                                                        style={{
+                                                            color: '#000',
+                                                            opacity: 1,
+                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                        }}
                                                     />
                                                 </View>
                                             </View>
@@ -2596,6 +2626,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                         placeholder="Denier..."
                                                         value={filamentForm.denier}
                                                         editable={false}
+                                                        style={{
+                                                            color: '#000',
+                                                            opacity: 1,
+                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                        }}
                                                     />
                                                 </View>
                                             </View>

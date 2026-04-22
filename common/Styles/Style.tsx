@@ -2689,7 +2689,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         height: 45,
         justifyContent: 'center',
         paddingHorizontal: 10,
-        color:'#000'
+        color: '#000000'
     },
     inputBoxDisabled: {
         backgroundColor: '#f1f3f6',   // light grey
@@ -2702,7 +2702,8 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
 
     inputTextDisabled: {
         color: '#080808',        // 🔥 dark text (important)
-        fontSize: 14
+        fontSize: 14,
+
     },
     cardWrapper: {
         marginTop: 12,
@@ -2724,7 +2725,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
     itmCode: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#222',
+        color: '#000000',
         flexShrink: 1   // 🔥 long text break nahi karega layout
     },
 
@@ -2885,6 +2886,44 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         color: '#fff',
         fontSize: 13,
         fontWeight: '600'
-    }
+    },
+    loader: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        zIndex: 9999,
+        elevation: 10
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 25,
+        left: 20,
+        backgroundColor: '#007EA7',
+        width: 45,
+        height: 45,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+        elevation: 10
+    },
+    fabAdd: {
+        position: 'absolute',
+        bottom: 75,
+        left: 20,
+        backgroundColor: '#007EA7',
+        width: 45,
+        height: 45,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+        elevation: 10
+    },
 });
 

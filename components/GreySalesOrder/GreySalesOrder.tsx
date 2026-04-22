@@ -1054,6 +1054,17 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                         </Text>
                     </View>
                 </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
+                    </View>
+                </View>
 
             </View>
             <View style={crlimtreq_styles.cardActions}>
@@ -1142,6 +1153,17 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                         <Text style={crlimtreq_styles.value}>
                             {item.AuthStatus || ''}
                         </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
                     </View>
                 </View>
 
@@ -1268,6 +1290,17 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                         <Text style={crlimtreq_styles.value}>
                             {item.AuthStatus || ''}
                         </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
                     </View>
                 </View>
 

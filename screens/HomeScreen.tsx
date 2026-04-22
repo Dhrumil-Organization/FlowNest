@@ -89,13 +89,13 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
-            { id: '5', name: 'Purchase Order', screen: 'Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
+            { id: '5', name: 'Yarn Purchase Order', screen: 'Yarn Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
         ],
     },
     {
         title: 'G',
         data: [
-            // { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
+            { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
             { id: '7', name: 'Sales Order', screen: 'Sales Order', icon: 'point-of-sale', iconColor: '#20BEC1' },
         ],
     },
@@ -254,9 +254,23 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
-            { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor:  '#4B0082'  },
+            { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor: '#4B0082' },
         ],
     },
+    {
+        title: 'I',
+        data: [
+            { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
+    {
+        title: 'P',
+        data: [
+            { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
+
+
 ];
 
 interface Props {
@@ -512,11 +526,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     {
                 //                         "title": "Taka Checking Entry",
                 //                         "href": "/"
-                //                     },    
+                //                     },
                 //                     {
                 //                         "title": "Yarn Management System",
                 //                         "href": "/"
-                //                     },                                                                        
+                //                     },
+                //                     {
+                //                         "title": "Weft Issue",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Party Dashboard",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

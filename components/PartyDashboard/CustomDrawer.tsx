@@ -35,6 +35,7 @@ import {
     isBefore,
     isAfter
 } from 'date-fns';
+import SearchableDropdown from '../Shared/SearchableDropdown';
 import { CustomDrawerProps, CustomDrawerReceiveableProps, DashAccount, DashParty, DashPrp, DashSexe, DashSubHead, DesignData, ItemData, ItemStatus } from './Modal';
 import theme from '../../android/app/src/theme';
 
@@ -104,7 +105,10 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     selectedDashAccount,
     getdashAccountLoading,
     setAccountLoading,
-    yearOptions
+    yearOptions,
+    getPropertyData,
+    setSelectedProperty,
+    selectedProperty
     // hideprpGroup
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -280,9 +284,14 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
         setHasMoreItem(filtereditem.length > 10);
     }, [searchQuery, searchQueryParty, searchQuerySexe, searchQueryAccount, searchQuerySubHead, getdashPrp, getdashParty, getdashSexe, getdashAccount, getdashSubHead, searchQueryItem, itemData]);
 
-    console.log("getdashPrp:", getdashPrp, "getdashParty:", getdashParty, "getdashSexe:", getdashSexe, "getdashAccount:", getdashAccount, "getdashSubHead:", getdashSubHead, "itemData:", itemData);
-    console.log("Sexe Data:", displayedDashSexe);
-    console.log("Account Data:", displayedDashAccount);
+    console.log("1 getdashPrp:", getdashPrp);
+    console.log("2 getdashParty:", getdashParty);
+    console.log("3 getdashSexe:", getdashSexe);
+    console.log("4 getdashAccount:", getdashAccount);
+    console.log("5 getdashSubHead:", getdashSubHead);
+    console.log("6 itemData:", itemData)
+    console.log("7 Sexe Data:", displayedDashSexe);
+    console.log("8 Account Data:", displayedDashAccount);
 
 
     React.useEffect(() => {
@@ -596,7 +605,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
         // onDashSexeSelect(selectedDashSexe);
         // onDashSubHeadSelect(selectedDashSubHead);
         // onItemSelectItem(selectedItems);
-        handleConfirmAction(selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount);
+        handleConfirmAction(selectedProperty);
         // dashAccount(selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedPrpgrp, selectedInternal);
     };
 
@@ -864,6 +873,8 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     // console.log("aaa Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
     // console.log("aaa Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
+        console.log("<<<<<<<<+++++  selectedProperty ====>>> ", selectedProperty)
+
     return (
         <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
@@ -918,9 +929,28 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                 )}
                             </View>
 
+                            <View style={{ marginBottom: 10 }} >
+                            <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
+
+                            <SearchableDropdown
+                                data={getPropertyData}
+                                labelKey="LngName"
+                                valueKey="PrpCode"
+                                placeholder="Choose property..."
+                                pageSize={10}
+                                initialValue={selectedProperty ?? null}
+                                onSelect={(item) => {
+                                    // setForm(prev => ({ ...prev, PrpCode: item.PrpCode, AccCode: "", BankName: "", BankBr: "" }));
+                                    setSelectedProperty(item);
+                                }}
+                                multiple={false}
+                                emptyMessage="No properties available"
+                            />
+                        </View>
+
                             {/* Property Group Dropdown */}
 
-                            <View style={styles.inputGroup}>
+                            {/* <View style={styles.inputGroup}>
                                 <Text style={styles.label}>Select Property Group</Text>
                                 <TouchableOpacity
                                     style={styles.dropdownButton}
@@ -962,20 +992,13 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             </View>
 
 
-                            {/* Accordion for Design Selection */}
                             {getdashPropertyLoading ? (<>
                                 <TouchableOpacity
                                     style={styles.accordionHeader}
-                                // onPress={toggleDesignAccordion}
                                 >
                                     <Text style={styles.accordionHeaderText}>
                                         {'Loading...'}
                                     </Text>
-                                    {/* <Icon
-                                        name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    /> */}
 
                                     <ActivityIndicator size={24} color="#fff" />
                                 </TouchableOpacity></>) : (<>
@@ -996,7 +1019,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
                             {isDashPrpAccordionOpen && (
                                 <>
-                                    {/* Search Bar */}
                                     <View style={styles.searchContainer}>
                                         <TextInput
                                             style={styles.searchInput}
@@ -1007,7 +1029,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         />
                                         <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
                                     </View>
-                                    {/* Select All & Remove All Buttons */}
                                     <View style={styles.selectAllContainer}>
                                         <TouchableOpacity
                                             style={styles.selectAllButton}
@@ -1032,12 +1053,10 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         )}
                                     </View>
 
-                                    {/* Selected Designs (Chips) */}
                                     <ScrollView horizontal style={styles.selectedDesignsContainer}>
                                         {selectedDashPrp.map((prp) => (
                                             <View key={prp.PrpCode} style={styles.selectedDesignChip}>
                                                 <Text style={styles.selectedDesignText}>
-                                                    {/* {prp.PrpName} ({prp.PrpCode}) */}
                                                     {prp.PrpName}
                                                 </Text>
                                             </View>
@@ -1045,12 +1064,11 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
                                     </ScrollView>
 
-                                    {/* Design List (with Lazy Loading) */}
                                     <ScrollView
                                         ref={scrollViewRef}
                                         style={styles.designListContainer}
                                         contentContainerStyle={styles.designListContent}
-                                        nestedScrollEnabled={true} // Enable nested scrolling
+                                        nestedScrollEnabled={true}
                                         onScroll={({ nativeEvent }) => {
                                             const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
                                             const paddingToBottom = 20;
@@ -1074,7 +1092,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                                 onPress={() => toggleDashPrp(prp)}
                                             >
                                                 <Text style={styles.designName}>{prp.PrpName}</Text>
-                                                {/* <Text style={styles.designCode}>{prp.PrpCode}</Text> */}
                                             </TouchableOpacity>
                                         ))}
                                         {isLoadingMorePrpGrp && (
@@ -1087,22 +1104,15 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                     </ScrollView>
 
                                 </>
-                            )}
+                            )} */}
 
-                            {/* Accordion for Party Selection */}
-                            {getdashPartyLoading ? (<>
+                            {/* {getdashPartyLoading ? (<>
                                 <TouchableOpacity
                                     style={styles.accordionHeader}
-                                // onPress={toggleDesignAccordion}
                                 >
                                     <Text style={styles.accordionHeaderText}>
                                         {'Loading...'}
                                     </Text>
-                                    {/* <Icon
-                                        name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                                        size={24}
-                                        color="#fff"
-                                    /> */}
 
                                     <ActivityIndicator size={24} color="#fff" />
                                 </TouchableOpacity></>) : (<><TouchableOpacity
@@ -1123,7 +1133,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
                             {isDashPartyAccordionOpen && (
                                 <>
-                                    {/* Search Bar */}
                                     <View style={styles.searchContainer}>
                                         <TextInput
                                             style={styles.searchInput}
@@ -1135,7 +1144,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         <Icon name="search" size={24} color="#fff" style={styles.searchIcon} />
                                     </View>
 
-                                    {/* Remove "Select All" button and keep only "Remove All" if needed */}
                                     <View style={styles.selectAllContainer}>
                                         <TouchableOpacity
                                             style={styles.selectAllButton}
@@ -1161,7 +1169,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         )}
                                     </View>
 
-                                    {/* Selected Party (Chip) */}
                                     <ScrollView horizontal style={styles.selectedDesignsContainer}>
                                         {selectedDashParty.map((party) => (
                                             <View key={party.acccode} style={styles.selectedDesignChip}>
@@ -1172,7 +1179,6 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         ))}
                                     </ScrollView>
 
-                                    {/* Party List (with Lazy Loading) */}
                                     <ScrollView
                                         ref={scrollViewRefParty}
                                         style={styles.designListContainer}
@@ -1198,7 +1204,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                                     selectedDashParty.some((d) => d.acccode === party.acccode) &&
                                                     styles.selectedDesignItem,
                                                 ]}
-                                                onPress={() => toggleDashParty(party)} // Updated to single select
+                                                onPress={() => toggleDashParty(party)}
                                             >
                                                 <Text style={styles.designName}>{party.accname}</Text>
                                                 <Text style={styles.designCode}>{party.acccode}</Text>
@@ -1213,7 +1219,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                                         )}
                                     </ScrollView>
                                 </>
-                            )}
+                            )} */}
 
 
 

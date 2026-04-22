@@ -170,7 +170,40 @@ interface blend {
     name: string;
     sh_name: string;
     count: string;
+    ply: string;
+    type: string;
+    lustre: string;
 }
+interface Item {
+    ItmCode: string,
+    ItmName: string,
+    UOM: string,
+    Denier: string,
+    tag: string,
+    Rate: string,
+    HsnCode: string,
+    GSTGrpCode: string
+
+}
+interface SubItem {
+    WBlend: string
+    WBlendPer: string
+    WCount: string
+    WDenier: string
+    WLustre: string
+    WNameCode: string
+    WOther: string
+    WPly: string
+    WType: string
+    WYarnType: string
+    itmcode: string
+    mitmcode: string
+    name: string
+    sh_name: string
+    strcode: string
+}
+
+
 
 const extractLocation = (addr?: string) => {
     if (!addr) return '';
@@ -593,9 +626,9 @@ const PartyDropdown: React.FC<Props> = ({
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.name || '—'}
                     </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.id || '—'}
-                    </Text>
+                    </Text> */}
                 </View>
             </View>
         );
@@ -612,9 +645,104 @@ const PartyDropdown: React.FC<Props> = ({
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.count || '—'}
                     </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.id || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentply = (item: blend, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.ply)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.ply || '—'}
                     </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.id || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContenttype = (item: blend, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.type)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.type || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.id || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentlustre = (item: blend, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.lustre)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.lustre || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.id || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentItem1 = (item: Item, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.ItmName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.ItmName || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.ItmCode || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentSubItem = (item: SubItem, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.WNameCode)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.WNameCode || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.itmcode || '—'}
+                    </Text> */}
                 </View>
             </View>
         );
@@ -664,7 +792,12 @@ const PartyDropdown: React.FC<Props> = ({
                                                                                 : type == 'supervisior' ? renderRowContentsupervisior
                                                                                     : type == 'blend' ? renderRowContentblend
                                                                                         : type == 'count' ? renderRowContentcount
-                                                                                            : renderRowContentEmpty}
+                                                                                            : type == 'ply' ? renderRowContentply
+                                                                                                : type == 'type' ? renderRowContenttype
+                                                                                                    : type == 'lustre' ? renderRowContentlustre
+                                                                                                        : type == 'Item1' ? renderRowContentItem1                                                                                                       
+                                                                                                        : type == 'SubItem' ? renderRowContentSubItem
+                                                                                                            : renderRowContentEmpty}
                 />
             )}
 

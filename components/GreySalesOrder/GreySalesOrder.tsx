@@ -344,11 +344,13 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 atype: 'B',
                 strtype: strtypeFromApi
             };
+            console.log("payload", payload);
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/sosortbrowse`,
                 `${API}/api/sosortbrowse`,
                 getRequestConfig({ params: { ...payload } })
             );
+            console.log("response", response);
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => {
                     const itemNames = item.d1.map(d => d.ItmName).join(', ');
@@ -1167,7 +1169,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                                 name="email"
                                 size={34}
                                 color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-                            />                           
+                            />
                         </View>
                     </TouchableOpacity>
                 )}
@@ -1292,7 +1294,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                                 name="email"
                                 size={32}
                                 color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-                            />                            
+                            />
                         </View>
                     </TouchableOpacity>
                 )}

@@ -229,7 +229,7 @@ const CustomDrawer = (props) => {
                                                     ...prev,
                                                     values: {
                                                         ...prev.values,
-                                                        status: 'R'
+                                                        status: 'P'
                                                     }
                                                 }));
                                             }}

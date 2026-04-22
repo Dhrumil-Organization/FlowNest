@@ -462,12 +462,12 @@ export default function App() {
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
                     }</Stack.Screen>
-                    <Stack.Screen name="Grey Purchase Order">{(props) =>
+                    {/* <Stack.Screen name="Grey Purchase Order">{(props) =>
                       <>
                         <GreyPurchaseOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
-                    }</Stack.Screen>
+                    }</Stack.Screen> */}
                     <Stack.Screen name="Sales Order">{(props) =>
                       <>
                         <GreySalesOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -526,11 +526,13 @@ export default function App() {
                   }</Stack.Screen> */}
                     <Stack.Screen name="Inquiry">{(props) =>
                       <>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                          <InquiryList {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} />
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
+                          <GestureHandlerRootView style={{ flex: 1 }}>
+                            <InquiryList {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </GestureHandlerRootView>
                           {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </GestureHandlerRootView>
-                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                        </ErrorBoundary>
                       </>
                     }</Stack.Screen>
                     <Stack.Screen name="InquiryAdd">{(props) =>

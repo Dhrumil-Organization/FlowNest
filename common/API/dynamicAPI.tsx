@@ -19,11 +19,15 @@ export const initAPI = async (): Promise<string> => {
     const selected_property = await AsyncStorage.getItem("selected_property");    
     
     if (IS_LOCAL) {
+
         API = "http://192.168.13.100:4008";
+
     } else {
+
         API = selected_property === "rayons"
             ? "https://apiy.tms-webapp.com"
-            : "https://apig.tms-webapp.com";        
+            : "https://apig.tms-webapp.com"; 
+
     }
     
     return API;

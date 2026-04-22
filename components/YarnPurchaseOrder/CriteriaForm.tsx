@@ -49,16 +49,16 @@ const CriteriaForm = (props) => {
     const handleLoaddata = async () => {
         if (isLoading) return;
 
-        if (!FormState.values.StrCode) {
-            Snackbar.show({
-                text: 'Please select store',
-                duration: Snackbar.LENGTH_LONG,
-                backgroundColor: 'red',
-                textColor: '#fff',
-                action: { text: 'OK', textColor: 'white' },
-            });
-            return;
-        }
+        // if (!FormState.values.StrCode) {
+        //     Snackbar.show({
+        //         text: 'Please select store',
+        //         duration: Snackbar.LENGTH_LONG,
+        //         backgroundColor: 'red',
+        //         textColor: '#fff',
+        //         action: { text: 'OK', textColor: 'white' },
+        //     });
+        //     return;
+        // }
 
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();

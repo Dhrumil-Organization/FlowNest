@@ -86,10 +86,16 @@ const APP_SECTIONS = [
             { id: '4', name: 'Sudamo Production Order', screen: 'Sudamo Production Order', icon: 'production-quantity-limits', iconColor: '#F2D43D' },
         ],
     },
+    // {
+    //     title: 'P',
+    //     data: [
+    //         { id: '5', name: 'Purchase Order', screen: 'Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
+    //     ],
+    // },
     {
         title: 'Y',
         data: [
-            { id: '5', name: 'Yarn Purchase Order', screen: 'Yarn Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
+            { id: '5', name: 'Purchase Order', screen: 'Yarn Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
         ],
     },
     {
@@ -255,6 +261,12 @@ const APP_SECTIONS = [
         title: 'Y',
         data: [
             { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor: '#4B0082' },
+        ],
+    },
+    {
+        title: 'B',
+        data: [
+            { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
         ],
     },
     {
@@ -431,7 +443,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Yarn Purchase Order",
+                //                         "title": "Purchase Order",
                 //                         "href": "/"
                 //                     },
                 //                     {
@@ -532,19 +544,22 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Weft Issue",
-                //                         "href": "/"
-                //                     },
-                //                     {
                 //                         "title": "Party Dashboard",
                 //                         "href": "/"
                 //                     },
+                //                     {
+
+                //                         "title": "Weft Issue",
+                //                         "href": "/"
+                //                     },
+                                    
                 //                 ]
                 //             }
                 //         ]
                 //     }
                 // ];
-                //console.log('Decoded getMenuApps:', parsedValue);
+                console.log('Decoded getMenuApps:', parsedValue);
+
                 setDecodedMenuApps(parsedValue);
 
                 const mobileApp = parsedValue.find((item: any) => item.pages && item.pages.some((page: any) => page.title === "Mobile App"));
@@ -558,12 +573,23 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                         });
 
                         // Extract children titles
-                        const allowedTitles = mobileAppPage.children.map((child: any) => child.title);
+                        // const allowedTitles = mobileAppPage.children.map((child: any) => child.title);
+                        const allowedTitles = mobileAppPage.children.map((child: any) => {
+                            // Normalize the title: if it's "Yarn Purchase Order", treat it as "Purchase Order"
+                            return child.title.replace('Yarn ', '');
+                        });
 
                         // Filter APP_SECTIONS to only include apps whose name is in allowedTitles
+                        // const newSections = APP_SECTIONS.map(section => {
+                        //     const newData = section.data.filter(app =>
+                        //         allowedTitles.includes(app.name)
+                        //     );
+                        //     return { ...section, data: newData };
+                        // }).filter(section => section.data.length > 0);
+
                         const newSections = APP_SECTIONS.map(section => {
                             const newData = section.data.filter(app =>
-                                allowedTitles.includes(app.name)
+                                allowedTitles.includes(app.name.replace('Yarn ', ''))
                             );
                             return { ...section, data: newData };
                         }).filter(section => section.data.length > 0);
@@ -678,7 +704,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                         await AsyncStorage.removeItem('sales_order_tracking_card_press_');
                         // await AsyncStorage.removeItem('sales_order_tracking_recently_viewed');
                     }
-                    navigation.navigate(item.screen);
+                    if (item.name === 'Purchase Order') {
+                        navigation.navigate('Yarn Purchase Order');
+                    } else {
+                        navigation.navigate(item.screen);
+                    }
                 }}
                 disabled={disabled}
                 activeOpacity={0.85}

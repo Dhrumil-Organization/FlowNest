@@ -59,6 +59,9 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [FormState, setFormState] = useState({
         values: {}
     });
+    const [activeTab, setActiveTab] = useState('manual');
+    const [showManual, setShowManual] = useState(true); // true = manual, false = scanner
+    // const [isScanning, setIsScanning] = useState(false);
 
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
@@ -623,12 +626,13 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     };
 
     const fetchmachine = async () => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
             setIsLoading(true);
             if (cancelToken?.cancel) cancelToken.cancel();
             cancelToken = axios.CancelToken.source();
             const historyPayload = {
-                prptype: 'S',
+                prptype: userPtype,
                 yearno: getCurrentFinancialYear(),
                 txntype: 'manual_checking',
                 fetch: 'manual_checking_machine_help',
@@ -660,10 +664,11 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     };
 
     const soshow = async () => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
         setIsLoading(true);
         try {
             const historyPayload = {
-                prptype: 'S',
+                prptype: userPtype,
                 yearno: getCurrentFinancialYear(),
                 txntype: 'manual_checking',
                 MacCode: '',
@@ -776,6 +781,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     };
 
     const handlesave = async () => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
         const isValid = await validateForm();
         if (!isValid) return;
 
@@ -785,7 +791,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         try {
             const payloadObj = {
                 ...FormState.values,
-                prptype: "S",
+                prptype: userPtype,
                 txntype: "manual_checking",
                 yearno: getCurrentFinancialYear(),
             };
@@ -861,7 +867,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 header={'Checking scanner'}
                 subHeader={'scan with QR code'}
             />
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-start', margin: 10 }}>
+            {/* <View style={{ flexDirection: 'row', justifyContent: 'flex-start', margin: 10 }}>
                 <TouchableOpacity
                     style={{
                         backgroundColor: '#007EA7',
@@ -884,7 +890,97 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     color={'#007EA7'}
                     onPress={() => setIsScanning(!isScanning)}
                 />
+            </View> */}
+
+            <View style={{
+                flexDirection: 'row',
+                margin: 10,
+                backgroundColor: '#eee',
+                borderRadius: 25,
+                padding: 4
+            }}>
+                <TouchableOpacity
+                    style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: showManual ? '#007EA7' : 'transparent',
+                        paddingVertical: 10,
+                        borderRadius: 20
+                    }}
+                    onPress={() => {
+                        setShowManual(true);
+                        setIsScanning(false);
+                        soshow();
+                    }}
+                >
+                    <Icon name="create" size={18} color={showManual ? "#fff" : "#007EA7"} />
+                    <Text style={{
+                        color: showManual ? '#fff' : '#000',
+                        fontWeight: 'bold'
+                    }}>
+                        Manual Entry
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: !showManual ? '#007EA7' : 'transparent',
+                        paddingVertical: 10,
+                        borderRadius: 20
+                    }}
+                    onPress={() => {
+                        setShowManual(false);
+                    }}
+                >
+                    <Icon name="camera" size={18} color={!showManual ? "#fff" : "#007EA7"} />
+                    <Text style={{
+                        color: !showManual ? '#fff' : '#000',
+                        fontWeight: 'bold'
+                    }}>
+                        QR Scanner
+                    </Text>
+                </TouchableOpacity>
             </View>
+            {/* {showManual && (
+                <View style={{ margin: 10 }}>
+                    <TouchableOpacity
+                        style={{
+                            backgroundColor: '#007EA7',
+                            paddingVertical: 5,
+                            paddingHorizontal: 10,
+                            borderRadius: 20
+                        }}
+                        onPress={soshow}
+                    >
+                        <Text style={{ color: '#fff', fontSize: 14 }}>
+                            Manual Entry
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )} */}
+            {!showManual && (
+                <View style={checkingScannerStyles.flexContainer}>
+
+                    <Icon name="camera" style={checkingScannerStyles.cameraIcon} />
+
+                    <Text style={checkingScannerStyles.titleTextWithIcon}>
+                        QR Scanner
+                    </Text>
+                    <Button
+                        title={isScanning ? "Stop scan" : "Start scan"}
+                        color={'#007EA7'}
+                        onPress={() => setIsScanning(prev => !prev)}
+                    />
+
+                </View>
+            )}
 
             {/* <ScrollView
                 style={checkingScannerStyles.container}
@@ -1370,7 +1466,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     </View>
                     <Text style={checkingScannerStyles.label}>Checker <Text style={{ color: 'red' }}> *</Text></Text>
                     {/* <View style={checkingScannerStyles.dropdown}> */}
-                        {/* <Picker
+                    {/* <Picker
                             selectedValue={checker}
                             onValueChange={(val) => {
                                 setChecker(val);
@@ -1382,29 +1478,29 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                 <Picker.Item key={i} label={item.EmpName} value={item.EmpCode} />
                             ))}
                         </Picker> */}
-                        <View style={checkingScannerStyles.dropdown}>
-                            <PartyDropdown
-                                data={getCheckerData}
-                                placeholder="Choose checker..."
-                                labelKey={["EmpName", "EmpCode"]}
-                                valueKey="EmpCode"
-                                pageSize={12}
-                                initialValue={null}
-                                selected={null}
-                                loading={false}
-                                type="checker"
-                                onSelect={(item) => {
-                                    setChecker(item.EmpCode);
-                                }}
-                                setSelected={(val) => {
-                                    if (!val) {
-                                        setChecker('');
-                                    } else {
-                                        setChecker(val.EmpCode);
-                                    }
-                                }}
-                            />
-                        </View>
+                    <View style={checkingScannerStyles.dropdown}>
+                        <PartyDropdown
+                            data={getCheckerData}
+                            placeholder="Choose checker..."
+                            labelKey={["EmpName", "EmpCode"]}
+                            valueKey="EmpCode"
+                            pageSize={12}
+                            initialValue={null}
+                            selected={null}
+                            loading={false}
+                            type="checker"
+                            onSelect={(item) => {
+                                setChecker(item.EmpCode);
+                            }}
+                            setSelected={(val) => {
+                                if (!val) {
+                                    setChecker('');
+                                } else {
+                                    setChecker(val.EmpCode);
+                                }
+                            }}
+                        />
+                    </View>
                     {/* </View> */}
                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}> *</Text></Text>
                     <View style={checkingScannerStyles.dropdown}>

@@ -89,13 +89,13 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
-            { id: '5', name: 'Yarn Purchase Order', screen: 'Yarn Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
+            { id: '5', name: 'Purchase Order', screen: 'Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
         ],
     },
     {
         title: 'G',
         data: [
-            { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
+            // { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
             { id: '7', name: 'Sales Order', screen: 'Sales Order', icon: 'point-of-sale', iconColor: '#20BEC1' },
         ],
     },
@@ -254,15 +254,15 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
-            { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor: '#4B0082' },
+            { id: '30', name: 'Yarn Management System', screen: 'Yarn Management System', icon: 'inventory', iconColor:  '#4B0082'  },
         ],
     },
-    {
-        title: 'Y',
-        data: [
-            { id: '31', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
-        ],
-    },
+    // {
+    //     title: 'B',
+    //     data: [
+    //         { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+    //     ],
+    // },
 ];
 
 interface Props {
@@ -492,46 +492,42 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                                     },
                                     {
 
-                                        "title": "Purchase Order Tracking",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Sales Order Tracking",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Beam Close",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Creel Management System",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Yarn Stock",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Beam Gaiting",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Taka Checking Entry",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Yarn Management System",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Party Dashboard",
-                                        "href": "/"
-                                    },
-                                ]
-                            }
-                        ]
-                    }
-                ];
+                //                         "title": "Purchase Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Beam Close",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Creel Management System",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Yarn Stock",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Beam Gaiting",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Taka Checking Entry",
+                //                         "href": "/"
+                //                     },    
+                //                     {
+                //                         "title": "Yarn Management System",
+                //                         "href": "/"
+                //                     },                                                                        
+                //                 ]
+                //             }
+                //         ]
+                //     }
+                // ];
                 //console.log('Decoded getMenuApps:', parsedValue);
                 setDecodedMenuApps(parsedValue);
 

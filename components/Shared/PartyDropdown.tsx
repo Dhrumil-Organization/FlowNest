@@ -106,6 +106,72 @@ interface BranchData {
     BankBr?: string;
 }
 
+
+interface BeamData {
+    BeamUId: string;
+    BeamNo: string;
+    UBeamNo: string;
+    TranDate: string;
+    NTranDate: string;
+    RollNo: string;
+    GTexNo: string;
+    WarpLen: string;
+    PrpCode: string;
+    LngName: string;
+    DsnCode: string | null;
+    DsnName: string;
+    BeamWt: string;
+    PipeWt: string;
+    YarnWt: string;
+    Ends: string;
+    Reeds: string;
+    IsJobOut: string;
+    ischecked: string;
+    reason: string;
+}
+interface Operator {
+    EmpCode: string;
+    EmpName: string;
+    id: string;
+    label: string;
+    OprCode: string;
+    OprName: string
+
+}
+interface Employee {
+    PrpCode: string;
+    EmpName: string;
+    EmpCode: string;
+    ShtName: string;
+    DptCode: string;
+    DptName: string;
+    DsgCode: string;
+    DsgName: string;
+    PPrpCode: string;
+    PEmpCode: string
+
+}
+interface Supervisor {
+    PRPCODE: string;
+    SupName: string;
+    SupCode: string;
+    ShtName: string;
+    DptCode: string;
+    DptName: string;
+    DsgCode: string;
+    DsgName: string;
+    PPrpCode: string;
+    PEmpCode: string;
+
+}
+interface blend {
+    category: string;
+    id: string;
+    name: string;
+    sh_name: string;
+    count: string;
+}
+
 const extractLocation = (addr?: string) => {
     if (!addr) return '';
     const parts = addr.split(',').map(s => s.trim()).filter(Boolean);
@@ -226,6 +292,113 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+    const renderRowContentMachine1 = (item: Party, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.MacName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Machine : {item.MacName || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {item.MacCode || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        PrpCode : {item.PrpCode || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Location : {item.Location || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentBeamData = (item: BeamData, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.BeamNo)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamNo : {item.BeamNo || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        UBeamNo : {item.UBeamNo || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        WarpLen : {item.WarpLen || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        PrpCode : {item.PrpCode || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentperson = (item: Employee, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.EmpName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.EmpName || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.EmpCode || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentoperator = (item: Operator, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.OprName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.OprName || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.OprCode || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentsupervisior = (item: Supervisor, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.SupName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.SupCode || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.SupName || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
     const renderRowContentDesign = (item: DesignData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -250,6 +423,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentChecker = (item: CheckerData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -268,6 +442,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentGrd = (item: GrdData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -286,6 +461,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentShift = (item: ShiftData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -305,7 +481,6 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
-
 
     const renderRowContentAdj = (item: AdjData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
@@ -355,6 +530,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentBank = (item: BankData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
         return (
@@ -371,6 +547,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentPayment = (item: PaymentData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
         return (
@@ -387,6 +564,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentBranch = (item: BranchData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
         return (
@@ -398,6 +576,44 @@ const PartyDropdown: React.FC<Props> = ({
                 <View style={rowStyles.main}>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.BankBr || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentblend = (item: blend, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.name)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.name || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.id || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentcount = (item: blend, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.count)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.count || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.id || '—'}
                     </Text>
                 </View>
             </View>
@@ -430,7 +646,25 @@ const PartyDropdown: React.FC<Props> = ({
                     initialValue={selected ?? initialValue}
                     multiple={multiple}
                     emptyMessage={type == 'bank' ? 'No banks!' : type == 'party' ? "No parties!" : type == 'branch' ? "No branches!" : type == 'payment' ? "No payments!" : type == 'adj' ? "No adjustments!" : 'No items'}
-                    renderRowContent={type == 'bank' ? renderRowContentBank : type == 'party' ? renderRowContent : type == 'branch' ? renderRowContentBranch : type == 'payment' ? renderRowContentPayment : type == 'adj' ? renderRowContentAdj : type == 'machine' ? renderRowContentMachine : type == 'design' ? renderRowContentDesign : type == 'checker' ? renderRowContentChecker : type == 'grd' ? renderRowContentGrd : type == 'shift' ? renderRowContentShift : type == 'item' ? renderRowContentItem : renderRowContentEmpty}
+                    renderRowContent={type == 'bank' ? renderRowContentBank
+                        : type == 'party' ? renderRowContent
+                            : type == 'branch' ? renderRowContentBranch
+                                : type == 'payment' ? renderRowContentPayment
+                                    : type == 'adj' ? renderRowContentAdj
+                                        : type == 'machine' ? renderRowContentMachine
+                                            : type == 'design' ? renderRowContentDesign
+                                                : type == 'checker' ? renderRowContentChecker
+                                                    : type == 'grd' ? renderRowContentGrd
+                                                        : type == 'shift' ? renderRowContentShift
+                                                            : type == 'item' ? renderRowContentItem
+                                                                : type == 'machine1' ? renderRowContentMachine1
+                                                                    : type == 'beam' ? renderRowContentBeamData
+                                                                        : type == 'employee' ? renderRowContentperson
+                                                                            : type == 'operator' ? renderRowContentoperator
+                                                                                : type == 'supervisior' ? renderRowContentsupervisior
+                                                                                    : type == 'blend' ? renderRowContentblend
+                                                                                        : type == 'count' ? renderRowContentcount
+                                                                                            : renderRowContentEmpty}
                 />
             )}
 

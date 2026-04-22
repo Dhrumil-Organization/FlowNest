@@ -923,7 +923,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             {/* Property Group Dropdown */}
                             {hineidePrp === false ? (<>
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.label}>Sales Property Group</Text>
+                                    <Text style={styles.label}>Select Property Group</Text>
                                     <TouchableOpacity
                                         style={styles.dropdownButton}
                                         onPress={() => setIsExeDropdownOpen(!isExeDropdownOpen)}

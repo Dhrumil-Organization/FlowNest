@@ -19,10 +19,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import Ticker from '../../common/Ticker';
 import { TableData } from './data';
 import { API } from '../../common/API/dynamicAPI';
-import { fetchPropertyData,getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
+import { getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
 import SummaryTable from './SummaryTable';
-import PartyOverlay from './PartyOverlay';
-import LedgerOverlay from './LedgerOverlay';
 
 const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -38,17 +36,11 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [searchQueryPOTCard, setSearchQueryPOTCard] = useState('');
     const [searchQueryPOTDetails, setSearchQueryPOTDetail] = useState('');
     const [receivables_sync_date, setreceivables_sync_date] = useState('');
-    const [action, setAction] = useState('');
-    const [activeParty, setActiveParty] = useState('');
     const [receivables_prpgroup, setreceivables_prpgroup] = useState<ReceivablesPrpgroup[]>([]);
     const [getOutCardData, setOutCardData] = useState([]);
     const [getOutDetails, setOutDetails] = useState<ReceivablesDetails[]>([]);
     const [getOutSummary, setOutSummary] = useState<ReceivablesSummary[]>([]);
     const [filteredCards, setFilteredCards] = useState([]);
-    const [ledgerOverlayVisible, setLedgerOverlayVisible] = useState(false);
-    const [ledgerData, setLedgerData] = useState([]);
-    const [outstandingData, setOutstandingData] = useState([]);
-    const [CustomerRateData, setCustomerRateData] = useState([]);
     const [getCardData, setCardData] = useState(TableData);
     const [internal_dropdown, setInternalDropdown] = useState<InternalDropdown[]>(
         [{
@@ -58,7 +50,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         {
             lable: 'External',
             value: '0'
-        },
+        }, 
         {
             lable: 'Both',
             value: '-1'
@@ -98,8 +90,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [containerWidth, setContainerWidth] = useState(0);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedAccCode, setSelectedAccCode] = useState(null);
-    const [selectedParties, setSelectedParties] = useState({});
-    const [mianPaylaod, setMianPaylaod] = useState({});
     const [filteredData, setFilteredData] = useState([]);
     const [filteredDataDetails, setFilteredDataDetails] = useState([]);
     const [detailSearchQuery, setDetailSearchQuery] = useState('');
@@ -117,9 +107,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const searchRef = useRef(searchQueryPOT);
     const searchRefDetails = useRef(searchQueryPOTDetails);
     const ROW_HEIGHT = 52;
-    const [partyOverlayVisible, setPartyOverlayVisible] = useState(false);
-    const [getPropertyData, setPropertyData] = useState<PropertyData[]>([]);
-    const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
+
     // useEffect(() => {
     //     const initializeApp = async () => {
     //         try {
@@ -596,15 +584,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         setToDate(today);
     }, []);
 
-    useEffect(() => {
-        const loadProperty = async () => {
-            const getdata = await fetchPropertyData(token);
-            setPropertyData(getdata);
-            console.log("prp & year", getdata);
-        };
-        loadProperty();
-    }, [token]);
-
     const getCurrentFinancialYear = () => {
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
@@ -800,46 +779,39 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         return `${day}-${month}-${year}`;
     };
 
-    const handleConfirmAction = useCallback(async ( selectedProperty) => {
+    const handleConfirmAction = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0) => {
         setIsLoading(true);
 
         console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 selectedProperty', selectedProperty, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
+        console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
         if (
             !selectedPrpgrp
         ) {
             console.log('⚠️ Required selections are missing. Skipping Table call.');
             return;
         }
-        // const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
-        const prpCodesArray = selectedProperty ? [selectedProperty.PrpCode] : [];
-        const prptype = selectedProperty ? selectedProperty.PrpOf : "";
-
-        console.log('🔵 🔵prpCodesArray ======>>>>>>> ',prpCodesArray);
-        console.log('🔵 🔵prptype ======>>>>>>> ',prptype);
-        console.log('🔵 🔵selectedProperty ======>>>>>>> ',selectedProperty);
-
+        const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
         const partyCodesArray = selectedDashParty.map(item => item.acccode);
+        const subHeadArray = selectedDashSubHead.map(item => item.SHead);
+        const sexeArray = selectedDashSexe.map(item => item.Code);
+        const accountArray = selectedDashAccount.map(item => item.AccCode);
         console.log('🔵 🔵I am Callin2 Table');
+        const fdate = fromDate ? format(fromDate, 'yyyy-MM-dd') : null;
+        const tdate = toDate ? format(toDate, 'yyyy-MM-dd') : null;
         try {
             console.log('🔵 🔵I am Calling3 Table');
             const payloadParty = {
-                prptype: prptype, // ✅ from selectedProperty
-                prpcodes: prpCodesArray, // ✅ ["PSD"]
-                // prptype: selectedPrpgrp?.PrpTypeCode, 
-                // prpcodes: prpCodesArray && prpCodesArray,
+                prptype: selectedPrpgrp?.PrpTypeCode,
+                prpcodes: prpCodesArray && prpCodesArray,
                 year: selectedYear,
-                // yearno: selectedYear?.slice(0, 4).slice(-2),
-                yearno: selectedYear?.slice(-2),
+                yearno: selectedYear?.slice(0, 4).slice(-2),
                 // parcode: selectedDashParty && selectedDashParty[0]?.ParCode,
                 parcode: partyCodesArray && partyCodesArray,
                 fetch: 'dr',
                 dashview: 'outstanding',
                 txntype: '/receivables-view'
             }
-            
-            
-            
+            console.log('🔵 Table party API Payload:', payloadParty);
             const responseparty = await axios.get(
                 // 'https://apig.tms-webapp.com/api/get_criterion',
                 `${API}/api/get_criterion`,
@@ -854,14 +826,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     }
                 }
             );
-
-            setMianPaylaod(payloadParty)
-
-            console.log('🔵 mianPaylaod:', mianPaylaod);
-            console.log('🔵 Table party API Payload:', payloadParty);
-
-            console.log('I am Calling4 Table', payloadParty, responseparty);
-            console.log('responseparty', responseparty);
+            console.log('🔵 🔵I am Calling4 Table', payloadParty, responseparty);
             const data = responseparty.data.response.data || [];
 
 
@@ -878,6 +843,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             setIsLoading(false);
         }
     }, [selectedPrpgrp]);
+
 
     const handleConfirmActionNew = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0, card) => {
         setIsLoading(true);
@@ -984,95 +950,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             setIsLoading(false);
         }
     }, [selectedPrpgrp, selectedInternal]);
-
-    console.log("getPropertyData -----", getPropertyData)
-
-    const handleReportClick = useCallback(async (action, party, mianPaylaod,selectedProperty) => {
-        setIsLoading(true);
-        console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 handleReport Click', action, party, mianPaylaod);
-        console.log("------getPropertyData -----", getPropertyData)
-        console.log("👉 getPropertyData FULL:", getPropertyData);
-        
-        const PrpOf = selectedProperty?.PrpOf || "";
-        const PrpCode = selectedProperty?.PrpCode || "";
-
-        console.log("👉 Selected Property:", selectedProperty);
-        console.log("👉 PrpOf:", PrpOf);
-        console.log("👉 PrpCode:", PrpCode);
-
-        try {
-            console.log('🔵 🔵I am Calling3 Table');
-            const payloadLedger = {
-                prptype: PrpOf,
-                prpcodes: PrpCode,
-                parcodes: [party.ParCode],
-                yearno: mianPaylaod.yearno,
-                mheads: [],
-                sheads: [],
-                contras: [],
-                inverse: [],
-                // rptaction: 'get_collection_comman_rpt',
-                fromdate: "",
-                todate: "",
-                reportytype: 0,
-                showopening: 1,
-                display: 1,
-                showinternal: -1,
-                txntype: "mob_party_dashboard",
-                rptid: 1635,
-                rptaction: "get_collection_comman_rpt",
-                export: "",
-                grpby: "party"
-            }
-            // setMianPaylaod(payloadParty)
-            console.log('------- Table party API Payload: --------', payloadLedger);
-            const headers = {
-                Authorization: `Bearer ${getToken()}`,
-                'Content-Type': 'application/json',
-                'X-Requested-with': 'XMLHttpRequest',
-            };
-            const responseledger = await axios.post(`${API}/api/get_report`, payloadLedger, { headers });
-            console.log('++++++++++I am Calling4 Table', payloadLedger, responseledger);
-            const data = responseledger.data.response.data.get_ledger_data || [];
-            const out_data = responseledger.data.response.data.get_outstanding_data || [];
-            const customer_rate_data = responseledger.data.response.data.get_customer_rate || [];
-
-            console.log("customer_rate_data ---", customer_rate_data)
-
-            if (responseledger.data.success == true) {
-
-               if (action == "Ledger") {
-
-                    setLedgerData(data);
-                    setLedgerOverlayVisible(true);
-                    setAction(action);
-                    setActiveParty(party.ParName);
-
-               } else if (action == "Outstanding") {
-
-                    setOutstandingData(out_data);
-                    setLedgerOverlayVisible(true);
-                    setActiveParty(party.ParName);
-                    setAction(action);
-
-               } else if (action == "Rates") {
-
-                    setCustomerRateData(customer_rate_data);
-                    setLedgerOverlayVisible(true);
-                    setActiveParty(party.ParName);
-                    setAction(action);
-               }
-            }
-        } catch (error) {
-            setIsLoading(false);
-            console.error("Error in dashAccount:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [selectedPrpgrp, getPropertyData]);
-
-    console.log("ledgerData:", ledgerData);
 
     useEffect(() => {
         if (fromDate && toDate && selectedYear) {
@@ -2192,8 +2069,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     console.log("aaa parent Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
     console.log("aaa parent Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
-    console.log("selectedProperty ====>>> ", selectedProperty)
-
     return (
         <>
             {/* Narration bar */}
@@ -2260,24 +2135,15 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     <SummaryTable
                         data={filteredData}   // tumhara API / filtered data
                         searchQuery={searchQueryPOT}
-                        // onRowPress={(row) => {
-                        //     console.log("Clicked Row JSON:", row);
-
-
-                        //     setSelectedParties(row.acccode);
-
-                        // }}
                         onRowPress={(row) => {
                             console.log("Clicked Row JSON:", row);
 
-                            setSelectedParties(row);
+                            // yaha modal open kar sakte ho
                             setSelectedAccCode(row.acccode);
-
-                            setPartyOverlayVisible(true); // 👈 ADD THIS
+                            setModalVisible(true);
                         }}
-                    // styles={styles}
+                        styles={styles}
                     />
-
                 </View>
 
             </View></>) : (<>
@@ -2382,29 +2248,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 getdashAccountLoading={getdashAccountLoading}
                 setAccountLoading={setAccountLoading}
                 yearOptions={yearOptions}
-                getPropertyData={getPropertyData}
-                setSelectedProperty={setSelectedProperty}
-                selectedProperty={selectedProperty}
             // hideprpGroup={hideprpGroup}
             // 
-            />
-            <PartyOverlay
-                visible={partyOverlayVisible}
-                onClose={() => setPartyOverlayVisible(false)}
-                party={selectedParties}
-                mianPaylaod={mianPaylaod}
-                selectedProperty={selectedProperty}
-                handleReportClick={handleReportClick}
-            />
-            <LedgerOverlay
-                visible={ledgerOverlayVisible}
-                onClose={() => setLedgerOverlayVisible(false)}
-                data={ledgerData}
-                styles={styles}
-                activeParty={activeParty}
-                out_data={outstandingData}
-                customer_rate_data={CustomerRateData}
-                action={action}
             />
         </>
     );
@@ -2445,7 +2290,7 @@ const styles = StyleSheet.create({
         fontSize: 10,
         textAlign: 'center',
     },
-    tableWrapper: {
+        tableWrapper: {
         flex: 1,
         // marginTop: 5,
         maxHeight: 550,

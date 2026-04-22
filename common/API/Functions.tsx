@@ -1146,13 +1146,14 @@ export const debugChunkedFiles = async (prptype: string) => {
 export const fetchAllPropertyData = async (token: string) => {
     try {
         const userPtype = await AsyncStorage.getItem('user_prptype');
+        // console.log("userPtype", userPtype);
 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
 
         let params = null;
         const response = await axios.get(
-            `${API}/api/get_criterion?prptype=${'S'}&txntype=''&fetch=prp`,
+            `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -1162,7 +1163,7 @@ export const fetchAllPropertyData = async (token: string) => {
                 params
             }
         );
-        console.log("Api response",response)
+        console.log("Api response", response)
 
         if (response.data.success && response.data.response.data.length > 0) {
             const propertyGroupData = response.data.response.data;

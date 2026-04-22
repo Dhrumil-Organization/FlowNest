@@ -207,7 +207,6 @@ const SelectBeam = ({ visible, onClose, FormState, token, txntype, setFormState 
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
-
         </View>
     );
 

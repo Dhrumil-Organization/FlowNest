@@ -298,14 +298,15 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             Accept: 'application/json',
+            'x-platform': 'mob'
         },
         params: props.params,
         cancelToken: cancelToken?.token,
     });
 
     const fetchData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
-        if (!FormState.values.StrCode) return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (!FormState.values.StrCode) return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -366,7 +367,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -375,7 +376,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
 
     const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -409,7 +410,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -418,7 +419,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
 
     const fetchAllHistoryData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -465,7 +466,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -473,7 +474,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     }, [FormState.values.StrCode, token]);
 
     const fetchAllVerifyData = useCallback(async () => {
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
         // setActiveTabYPO('allhistory');
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -534,7 +535,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -542,10 +543,10 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
     }, [FormState.values.StrCode, token]);
 
     useEffect(() => {
-        if (!didInitialFetch.current) {
-            didInitialFetch.current = true;
-            return;
-        }
+        // if (!didInitialFetch.current) {
+        //     didInitialFetch.current = true;
+        //     return;
+        // }
 
 
         if (activeTab1YPO === 'history') {
@@ -592,7 +593,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -1379,9 +1380,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             <View style={crlimtreq_styles.container}>
                 {isLoadingYPO && <FullScreenLoader message={activeTab1YPO === 'history' ? "Loading History..." : activeTab1YPO === 'verify' ? "Loading Verify..." : "Loading Request..."} />}
                 <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
+                {/* <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
                     <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
                         ref={flatListRefYPO}
@@ -1705,7 +1706,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     </View>
                 </Modal>
 
-                <CriteriaForm
+                {/* <CriteriaForm
                     isVisible={criteriaFormOpen}
                     onClose={handleCriteriaFormClose}
                     isLoading={isLoadingYPO}
@@ -1718,7 +1719,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     fetchAllHistoryData={fetchAllHistoryData}
                     fetchAllVerifyData={fetchAllVerifyData}
                     activeTab1YPO={activeTab1YPO}
-                />
+                /> */}
 
 
             </View>

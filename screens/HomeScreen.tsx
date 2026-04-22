@@ -275,12 +275,12 @@ const APP_SECTIONS = [
             { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
-    {
-        title: 'P',
-        data: [
-            { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
-        ],
-    },
+    // {
+    //     title: 'P',
+    //     data: [
+    //         { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+    //     ],
+    // },
 
 
 ];

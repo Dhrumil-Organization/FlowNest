@@ -44,7 +44,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setSelectedDesigns,
     selectedDesigns,
     setSelectedItems,
-    selectedItems
+    selectedItems,
+    yearOptions
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
@@ -71,7 +72,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
     const [step, setStep] = useState(1);
 
-    const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
+    // const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
 
     console.log("designData:", designData, "itemData:", itemData);
 

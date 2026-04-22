@@ -53,7 +53,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     propertydata,
     setpropertydata,
     selectedProperty,
-    onPropertySelect
+    onPropertySelect,
+    yearOptions
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
@@ -87,7 +88,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
     const [step, setStep] = useState(1);
 
-    const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
+    // const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
 
 
     useEffect(() => {
@@ -317,7 +318,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         let year = rawDate.getFullYear() || '';
         return `${day}-${month}-${year}`;
     };
-
+    console.log("yearOptions", yearOptions)
 
     return (
         <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
@@ -427,7 +428,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                         </ScrollView>
                                     </View>
                                 )}
-                            </View>
+                            </View> 
 
                             {/* Sales Executive Dropdown */}
                             {/* <View style={styles.inputGroup}>

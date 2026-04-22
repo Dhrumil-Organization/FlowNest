@@ -13,6 +13,7 @@ import data from './data.json';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
+import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 import { get } from 'lodash';
 
 const { width } = Dimensions.get('window');
@@ -66,7 +67,10 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [filteredData, setFilteredData] = useState<Party[]>([]);
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [toDate, setToDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [selectedExe, setSelectedExe] = useState<ExeData | null>(null);
     const [exeData, setExeData] = useState<ExeData[]>([]);
     const [propertydata, setpropertydata] = useState<ExeData[]>([]);
@@ -526,6 +530,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                 selectedParty={selectedParty}
                 selectedProperty={selectedProperty}
                 onPropertySelect={setSelectedProperty}
+                yearOptions={yearOptions}
             />
 
 

@@ -64,6 +64,10 @@ import ReceivablesSudamo from './components/ReceivablesSudamo/ReceivablesSudamo'
 import FebricStock from './components/FebricStock/FebricStock';
 import DailyPaymentReport from './components/DailyPaymentReport/DailyPaymentReport';
 import BeamClose from './components/BeamClose/BeamClose';
+import DesignAuthorization from './components/DesignAuthorization/DesignAuthorization';
+import CreelManagementSystem from './components/CreelManagementSystem/CreelManagementSystem';
+import BeamGaiting from './components/BeamGaiting/BeamGaiting';
+import YarnStock from './components/YarnStock/YarnStock';
 
 const Stack = createNativeStackNavigator();
 
@@ -97,6 +101,7 @@ export default function App() {
       console.log('🔥 REAL FCM TOKEN:', n_token);
       if (n_token) {
         const notification_token = await AsyncStorage.setItem('notification_token', n_token);
+        return notification_token;
       }
     }
     getToken();
@@ -604,7 +609,7 @@ export default function App() {
                         (props) =>
                           <>
                             <CheckingScanner {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-                            <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                           </>
                       }
                     </Stack.Screen>
@@ -658,7 +663,37 @@ export default function App() {
                           </>
                       }
                     </Stack.Screen>
+                    <Stack.Screen name="Design Authorization">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <DesignAuthorization {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Creel Management System">{(props) =>
+                      <>
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
+                          <CreelManagementSystem {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </ErrorBoundary>
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="Beam Gaiting">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <BeamGaiting {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
+
+                    <Stack.Screen name="Yarn Stock">{(props) =>
+                      <>
+                        <GestureHandlerRootView style={{ flex: 1 }}>
+                          <YarnStock {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
+                        </GestureHandlerRootView>
+                      </>
+                    }</Stack.Screen>
                   </Stack.Navigator>
+
                 </NavigationContainer>
               ) : (
                 isConnected === false ? <OfflineFallback /> : (

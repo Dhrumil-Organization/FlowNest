@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import FullScreenLoader from '../FullScreenLoader/FullScreenLoader';
+import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
 
@@ -46,6 +47,10 @@ const formatNumber = (value: string) => {
     return parseFloat(value).toLocaleString('en-IN');
 };
 
+
+
+
+
 const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: string }> = ({ token, navigation, username }) => {
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
@@ -62,7 +67,10 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [filteredData, setFilteredData] = useState<Party[]>([]);
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [delDate, setDelDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [selectedExe, setSelectedExe] = useState<ExeData | null>(null);
     const [getDData, setDData] = useState(null);
     const [exeData, setExeData] = useState<ExeData[]>([]);
@@ -72,8 +80,6 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [selectedItems, setSelectedItems] = useState<ItemData[]>([]);
     const [selectedParty, setSelectedParty] = useState([]);
     const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
-    const [gePOTData, setPOTData] = useState<POTData[]>([]);
-    const [getpayload, setPayload] = useState<CardPayload[]>([]);
     const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(null);
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
     const [isAll, setisALL] = useState(false);
@@ -111,6 +117,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             setsubDesignPage(subdesignPage + 1);
         }
     };
+
+
 
     useEffect(() => {
         if (selectedDesignData) {
@@ -459,22 +467,22 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     };
 
     // Load cached data on focus
-    useFocusEffect(
-        useCallback(() => {
-            const loadAllCachedData = async () => {
-                const cachedConfirmAction = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
-                const lastViewed = await loadLastViewedFromCache();
-                if (cachedConfirmAction) {
-                    setsalesdata(cachedConfirmAction.response.data.salesdata);
-                    setsalesdataTotal(cachedConfirmAction.response.data.salesdata.length);
-                    setsalessumdata(cachedConfirmAction.response.data.salessumdata);
-                }
-                setLastViewedParcode(lastViewed);
-                setHasAutoScrolled(false);
-            };
-            loadAllCachedData();
-        }, [])
-    );
+    // useFocusEffect(
+    //     useCallback(() => {
+    //         const loadAllCachedData = async () => {
+    //             const cachedConfirmAction = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
+    //             const lastViewed = await loadLastViewedFromCache();
+    //             if (cachedConfirmAction) {
+    //                 setsalesdata(cachedConfirmAction.response.data.salesdata);
+    //                 setsalesdataTotal(cachedConfirmAction.response.data.salesdata.length);
+    //                 setsalessumdata(cachedConfirmAction.response.data.salessumdata);
+    //             }
+    //             setLastViewedParcode(lastViewed);
+    //             setHasAutoScrolled(false);
+    //         };
+    //         loadAllCachedData();
+    //     }, [])
+    // );
 
     // Auto-scroll to last viewed only once and only if lastViewedParcode exists
     useEffect(() => {
@@ -579,6 +587,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
 
     const handleConfirmAction = async () => {
         setIsLoading(true);
+        setsalesdata([]);
+        setsalessumdata([]);
         const yearValue = selectedYear.split('-')[1].substring(2);
         const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
         const partyCodes = selectedParty.map((item: any) => item.acccode);
@@ -595,6 +605,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             prptype: 'S',
             txntype: 'prodorderlist'
         };
+        console.log("payload", payload);
 
         // Check cache first
         // const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
@@ -618,12 +629,17 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             const response = await axios.post(`${API}/api/salesordertracking`, payload, { headers });
             console.log("🔵 response", payload, response)
             if (response.data.success === true && response.data.data.salesdata.length > 0) {
+                closeDrawer();
                 setsalesdata(response.data.data.salesdata);
                 setsalesdataTotal(response.data.data.salesdata.length);
                 setsalessumdata(response.data.data.salessumdata);
-                await saveToCache(CACHE_KEY_CONFIRM_ACTION, { payload, response: response.data });
+                // await saveToCache(CACHE_KEY_CONFIRM_ACTION, { payload, response: response.data });
             } else if (response.data.success === false) {
                 Alert.alert(`${response.data.message}`);
+                setsalesdata([]);
+                setsalessumdata([]);
+            } else {
+                Alert.alert('No Data Found!');
                 setsalesdata([]);
                 setsalessumdata([]);
             }
@@ -633,7 +649,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             setsalessumdata([]);
         } finally {
             setIsLoading(false);
-            closeDrawer();
+            // closeDrawer();
         }
     };
 
@@ -920,8 +936,9 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 onItemStatusChange={setSelectedItemStatus}
                 setSelectedParty={setSelectedParty}
                 selectedParty={selectedParty}
+                yearOptions={yearOptions}
             />
-            {salessumdata.length > 0 && (
+            {salessumdata.length > 0 ? (
                 <View style={styles.container}>
                     <View style={styles.summaryContainer}>
                         <View style={[styles.summaryBox, { backgroundColor: '#E3F2FD' }]}>
@@ -970,7 +987,11 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                     />
 
                 </View>
-            )}
+            ) : (<>
+                <View style={crlimtreq_styles.emptyContainer}>
+                    <Text style={crlimtreq_styles.emptyText}>No data found!</Text>
+                </View>
+            </>)}
             <Modal
                 visible={isDesignModalVisible}
                 animationType="slide"
@@ -1464,6 +1485,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         marginBottom: 10,
         backgroundColor: '#fff',
+        color: '#000',
     },
     designValues: {
         marginTop: 8,

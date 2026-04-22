@@ -13,7 +13,7 @@ import HeaderBar from '../HeaderBar/HeaderBar';
 import theme from '../../android/app/src/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fetchPropertyData, fetchCurrentYearData, fetchPropertyGroupDataDCR, fetchPropertyDataDCR } from '../../common/API/Functions';
+import { fetchPropertyData, fetchCurrentYearData, fetchPropertyGroupDataDCR, fetchPropertyDataDCR, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';
 import CollectionCard from './CollectionCard';
 import Footer from '../Footer/Footer';
@@ -141,7 +141,10 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     const [searchQueryPOT, setSearchQueryPOT] = useState('');
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [toDate, setToDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear12 = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear12);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [selectedExeCRT, setSelectedExeCRT] = useState(null);
     const [exeDataCRT, setExeDataCRT] = useState([]);
     const [exeData, setExeData] = useState([]);
@@ -285,7 +288,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const fetchBrowseData = async (payload: any) => {
-        // console.log("Browse API running");
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         setIsLoading(true);
@@ -300,6 +302,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             setPayload(params as any);
             const response = await axios.post(`${API}/api/collection_crud`, params, { headers });
             console.log("response", response)
+            console.log("payload", payload)
+
             if (response?.data?.success && response?.data?.data?.data) {
                 // console.log("Browse API running");
                 let apiData = response.data.data.data;

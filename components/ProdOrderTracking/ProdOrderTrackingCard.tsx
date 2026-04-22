@@ -388,7 +388,7 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     const renderCard = ({ item }: { item: any }) => (
         <TouchableOpacity style={styles.card}>
             <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{item.accname}</Text>
+                <Text style={styles.cardTitle}>{item.dsnname}</Text>
                 <TouchableOpacity onPress={() => handleCardPress(item)}>
                     {isStageLoading && selectedCardId === item.uid ? (
                         <ActivityIndicator size={21} color="rgb(86, 156, 214)" />

@@ -44,7 +44,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setSelectedDesigns,
     selectedDesigns,
     setSelectedItems,
-    selectedItems
+    selectedItems,
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);

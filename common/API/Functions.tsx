@@ -97,11 +97,11 @@ export const fetchPropertyData = async (token: string) => {
     try {
         // 1. Pehle cache check karo
         const cached = await AsyncStorage.getItem('get_property');
-        if (cached) {
-            console.log('✅ Property from cache');
-            const parsed = JSON.parse(cached);
-            return Array.isArray(parsed) ? parsed : [];
-        }
+        // if (cached) {
+        //     console.log('✅ Property from cache');
+        //     const parsed = JSON.parse(cached);
+        //     return Array.isArray(parsed) ? parsed : [];
+        // }
 
         // 2. Cache nahi mila toh API call
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -146,12 +146,12 @@ export const fetchCurrentYearData = async (token: string) => {
     try {
         // 1. Pehle cache check karo
         const cached = await AsyncStorage.getItem('current_year');
-        if (cached) {
-            console.log('✅ Year from cache');
-            const parsed = JSON.parse(cached);
-            console.log('parsed year', parsed.data);
-            return parsed ? parsed : null;
-        }
+        // if (cached) {
+        //     console.log('✅ Year from cache');
+        //     const parsed = JSON.parse(cached);
+        //     console.log('parsed year', parsed.data);
+        //     return parsed ? parsed : null;
+        // }
 
         // 2. Cache nahi mila toh API call
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -1152,7 +1152,7 @@ export const fetchAllPropertyData = async (token: string) => {
 
         let params = null;
         const response = await axios.get(
-            `${API}/api/get_criterion?prptype=${userPtype}&txntype=''&fetch=prp`,
+            `${API}/api/get_criterion?prptype=${'S'}&txntype=''&fetch=prp`,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -1162,6 +1162,7 @@ export const fetchAllPropertyData = async (token: string) => {
                 params
             }
         );
+        console.log("Api response",response)
 
         if (response.data.success && response.data.response.data.length > 0) {
             const propertyGroupData = response.data.response.data;
@@ -1220,7 +1221,7 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
 
         let params = {
             prpcode: prp, yearno: yrno, txntype: txn,
-             prptype: userPtype
+            prptype: userPtype
             // prptype: 'R'
         };
         const response = await axios.get(
@@ -1249,3 +1250,46 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
         return [];
     }
 }
+
+export const getCurrentFinancialYearMain = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+    // Financial year starts in April
+    const financialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+    const financialYearEnd = financialYearStart + 1;
+
+    return `${financialYearStart}-${financialYearEnd}`;
+};
+
+// Fot future year
+// const generateFinancialYearOptions = (currentYear: number, range: number = 4) => {
+//     const years = [];
+//     const currentFinancialYearStart = currentYear - (new Date().getMonth() + 1 >= 4 ? 0 : 1);
+
+//     for (let i = -range; i <= range; i++) {
+//         const startYear = currentFinancialYearStart + i;
+//         const endYear = startYear + 1;
+//         years.push(`${startYear}-${endYear}`);
+//     }
+
+//     return years;
+// };
+
+// without Not future
+export const generateFinancialYearOptions = (currentYear: number, range: number = 4) => {
+    const years = [];
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+    const currentFinancialYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+
+    // Generate the last 'range' financial years including the current financial year
+    for (let i = 0; i <= range; i++) {
+        const startYear = currentFinancialYearStart - i;
+        const endYear = startYear + 1;
+        years.push(`${startYear}-${endYear}`);
+    }
+
+    return years;
+};

@@ -25,7 +25,8 @@ import {
     loadAllPrptypeCaches,
     normalizePrptype,
     readPrptypeCache,
-    saveLargeData
+    saveLargeData,
+    generateFinancialYearOptions
 } from '../../common/API/Functions';
 import { SuccessModal } from '../Shared/SuccessModal';
 import { API } from '../../common/API/dynamicAPI';
@@ -414,8 +415,19 @@ const InquiryAdd: React.FC<Props> = ({
     const faultsCacheRef = useRef<{ [key: string]: Fault[] }>({});
     const [isCacheLoading, setIsCacheLoading] = useState(false);
     const [cacheError, setCacheError] = useState<string | null>(null);
+    const currentDate = new Date();
+    const currentYear12 = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear12);
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
 
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
 
     let currentYear = getYearData?.data;
 
@@ -1304,7 +1316,7 @@ const InquiryAdd: React.FC<Props> = ({
             action: "view",
             prpcpde: "SIP",
             prptype: "S",
-            yearno: "26",
+            yearno: getCurrentFinancialYear(),
             fromdate: "",
             todate: "",
             txntype: "mob_collection"
@@ -1378,7 +1390,7 @@ const InquiryAdd: React.FC<Props> = ({
             id: "0",
             prpcode: "MT",
             prptype: "R",
-            yearno: "26", // Fixed or dynamic as per your logic
+            yearno: getCurrentFinancialYear(), // Fixed or dynamic as per your logic
             createdAt: formatDate(new Date().toISOString()).formatted,
             ncreatedAt: formatDate(new Date().toISOString()).numeric,
             data: [

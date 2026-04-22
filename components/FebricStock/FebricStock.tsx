@@ -8,6 +8,7 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import { CardPayload } from './Modal';
+import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 interface Party {
     parcode: string;
     partyname: string;
@@ -32,7 +33,10 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [filteredData, setFilteredData] = useState<Party[]>([]);
     const [fromDate, setFromDate] = useState<Date>(new Date());
     const [toDate, setToDate] = useState<Date>(new Date());
-    const [selectedYear, setSelectedYear] = useState<string>('2025-2026');
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const yearOptions = generateFinancialYearOptions(currentYear);
+    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [PrpCodeList, setPrpCodeList] = useState([]);
     const [getpayload, setPayload] = useState<CardPayload[]>([]);
     const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(null);
@@ -68,7 +72,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
                 setPrpCodeList(response.data.response.data);
 
-            }).catch(error => { console.log('Hook Property Get Error: ', error) });
+            }).catch(error => {});
     };
 
     useEffect(() => { isDrawerVisible && PrpCodeList.length === 0 && fetchPrpCode() }, [isDrawerVisible]);
@@ -152,8 +156,15 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
         setIsLoading(true);
 
+        console.log("selectedPrpCode :", selectedPrpCode)
+        let pcodes = [];
+        let pcodesCntr = 0;
+        selectedPrpCode && selectedPrpCode.filter((el, ind) => {
+            pcodes[pcodesCntr] = el.PrpCode
+        });
+
         const payload = {
-            prpcode: selectedPrpCode.PrpCode,
+            prpcodes: pcodes,
             prptype: "S",
             txntype: "mob_fabric_stock"
         };
@@ -166,6 +177,9 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             'X-Requested-with': 'XMLHttpRequest',
         };
 
+        console.log("appgreyinstockdata API payload :", payload )
+        console.log("appgreyinstockdata API URL :", `${API}/api/appgreyinstockdata` )
+
         try {
             const response = await axios.get(`${API}/api/appgreyinstockdata`, {
                 params: payload,
@@ -173,18 +187,25 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             });
 
             const responseData = response?.data?.response?.data || [];
+            console.log("appgreyinstockdata API responseData", responseData)
 
             if (response.data.success === true) {
 
                 if (responseData.length > 0) {
 
                     const prData = responseData.filter(item => item.dptcode == 'PR')
-                    const nonPrData = responseData.filter(item => item.dptcode !== 'PR')
+                    const nonPrData = responseData.filter(item => item.dptcode !== 'PR');
 
-                    const prSummary = getItemWiseSummary(prData);
-                    const nonPrSummary = getItemWiseSummary(nonPrData);
+                    //console.log("nonPrData", nonPrData);
+
+                    const prSummary = getItemWiseSummary(prData, true, true);
+                    const nonPrSummary = getItemWiseSummary(nonPrData, false, false);
+
+                    //console.log("getItemWiseSummary", getItemWiseSummary);
 
                     setGreyStockData(prSummary);
+                    //console.log("prSummary :", prSummary)
+                    //console.log("nonPrSummary :", nonPrSummary)
                     setFinishStockData(nonPrSummary);
                     setsalesdata(responseData);
                     setsalessumdata(responseData);
@@ -213,25 +234,69 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }
     };
 
-    const getItemWiseSummary = (data) => {
+    // const getItemWiseSummary = (data) => {
 
-        const summary = data.reduce((acc, item) => {
+    //     const summary = data.reduce((acc, item) => {
 
+    //         const key = item.ITMCODE;
+
+    //         if (!acc[key]) {
+
+    //             acc[key] = { ITMCODE: item.ITMCODE, ITMNAME: item.ITMNAME, TOTQTY: 0 };
+    //         }
+
+    //         const qty = parseFloat(item.TOTQTY) || 0;
+    //         acc[key].TOTQTY += qty;
+
+    //         return acc;
+
+    //     }, {});
+
+    //     return Object.values(summary);
+    // };
+
+    const getItemWiseSummary = (data = [], filter1 = true, filter2 = true, order = 'asc') => {
+
+        if (!data || data.length === 0) return [];
+
+        // 🔽 FILTER (2 conditions)
+        const filtered = data.filter(item =>
+            (filter1 ? item.dptcode == 'PR' : item.dptcode != 'PR') //&& (filter2 ? item.TOTQTY > 0 : true) 
+        );
+
+        // 🔽 GROUP + SUM
+        const summary = filtered.reduce((acc, item) => {
             const key = item.ITMCODE;
 
             if (!acc[key]) {
-
-                acc[key] = { ITMCODE: item.ITMCODE, ITMNAME: item.ITMNAME, TOTQTY: 0 };
+                acc[key] = {
+                    ITMCODE: item.ITMCODE,
+                    ITMNAME: item.ITMNAME,
+                    TOTQTY: 0
+                };
             }
 
             const qty = parseFloat(item.TOTQTY) || 0;
             acc[key].TOTQTY += qty;
 
             return acc;
-
         }, {});
 
-        return Object.values(summary);
+        let result = Object.values(summary);
+
+        // 🔽 NAME se sorting
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.ITMNAME || '').localeCompare(b.ITMNAME || '')
+                : (b.ITMNAME || '').localeCompare(a.ITMNAME || '')
+        );
+
+        //console.log("===== ITEM WISE TOTAL QTY =====");
+        // result.forEach(item => {
+        //     console.log(`ITMCODE: ${item.ITMCODE} | TOTAL QTY: ${item.TOTQTY}`);
+        // });
+
+        return result;
     };
 
     const getDesignWiseSummary = (data) => {
@@ -254,7 +319,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         return Object.values(summary);
     };
 
-    const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes') => {
+    const getShadeWiseSummary = (mainItm = {}, data = [], flag = 'yes', order = 'asc') => {
 
         let filtered = [];
 
@@ -288,6 +353,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }, {});
 
         const result = Object.values(grouped);
+
+        result.sort((a, b) => order === 'asc'
+                ? (a.SHDNAME || '').localeCompare(b.SHDNAME || '')
+                : (b.SHDNAME || '').localeCompare(a.SHDNAME || '')
+        );
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -402,15 +472,66 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
     }, [selectedItem, salesdata]);
 
-    const getAllDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+    // const getAllDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+
+    //     if (!data || data.length === 0) return [];
+
+    //     let filtered = [];
+
+    //     if (mainItm && mainItm.ITMCODE == 'ALL' && mainItm.ITMNAME == 'ALL [ ITEMS ]') {
+
+    //         filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+
+    //     } else {
+    //         filtered = data.filter(item =>
+    //             item.ITMCODE == mainItm?.ITMCODE &&
+    //             (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //         );
+    //     }
+
+    //     const grouped = filtered.reduce((acc, item) => {
+    //         const key = item.MDSNNAME || 'UNKNOWN';
+
+    //         if (!acc[key]) {
+    //             acc[key] = {
+    //                 MDSNCODE: item.MDSNCODE,
+    //                 MDSNNAME: key,
+    //                 TOTQTY: 0
+    //             };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+    //     }, {});
+
+    //     const result = Object.values(grouped);
+
+
+
+    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
+
+    //     const allItem = {
+    //         MDSNCODE: 'ALL',
+    //         MDSNNAME: 'ALL [ DESIGNS ]',
+    //         TOTQTY: total
+    //     };
+
+    //     return [allItem, ...result];
+    // };
+
+    const getAllDesignData = (mainItm = {}, data = [], flag = 'yes', order = 'asc') => {
 
         if (!data || data.length === 0) return [];
 
         let filtered = [];
 
+        // 🔽 FILTER
         if (mainItm && mainItm.ITMCODE == 'ALL' && mainItm.ITMNAME == 'ALL [ ITEMS ]') {
 
-            filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+            filtered = data.filter(item =>
+                flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'
+            );
 
         } else {
             filtered = data.filter(item =>
@@ -419,6 +540,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             );
         }
 
+        // 🔽 GROUP + SUM
         const grouped = filtered.reduce((acc, item) => {
             const key = item.MDSNNAME || 'UNKNOWN';
 
@@ -435,8 +557,16 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        const result = Object.values(grouped);
+        let result = Object.values(grouped);
 
+        // 🔽 NAME se sorting
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.MDSNNAME || '').localeCompare(b.MDSNNAME || '')
+                : (b.MDSNNAME || '').localeCompare(a.MDSNNAME || '')
+        );
+
+        // 🔽 TOTAL
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
         const allItem = {
@@ -464,14 +594,68 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }, [selectedItem, salesdata, finishStockData]
     )
 
-    const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+    // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
+
+    //     let filtered = [];
+    //     if (!data || data.length === 0) return [];
+
+    //     if (mainItm && mainItm.MDSNCODE == 'ALL' && mainItm.MDSNNAME == 'ALL [ DESIGNS ]') {
+
+    //         filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+
+    //     } else {
+    //         filtered = data.filter(item =>
+    //             item.MDSNCODE == mainItm?.MDSNCODE &&
+    //             (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR')
+    //         );
+    //     }
+
+    //     const grouped = filtered.reduce((acc, item) => {
+    //         const key = item.SDSNNAME || 'UNKNOWN';
+
+    //         if (!acc[key]) {
+    //             acc[key] = {
+    //                 SDSNCODE: item.SDSNCODE,
+    //                 SDSNNAME: key,
+    //                 TOTQTY: 0
+    //             };
+    //         }
+
+    //         acc[key].TOTQTY += Number(item.TOTQTY || 0);
+
+    //         return acc;
+    //     }, {});
+
+    //     const result = Object.values(grouped);
+
+    //     result.sort((a, b) =>
+    //         order === 'asc'
+    //             ? (a.SDSNNAME || '').localeCompare(b.SDSNNAME || '')
+    //             : (b.SDSNNAME || '').localeCompare(a.SDSNNAME || '')
+    //     );
+
+    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
+
+    //     const allItem = {
+    //         SDSNCODE: 'ALL',
+    //         SDSNNAME: 'ALL [ SUB DESIGNS ]',
+    //         TOTQTY: total
+    //     };
+
+    //     return [allItem, ...result];
+    // };
+
+    const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes', order = 'asc') => {
 
         let filtered = [];
         if (!data || data.length === 0) return [];
 
+        // 🔽 FILTER
         if (mainItm && mainItm.MDSNCODE == 'ALL' && mainItm.MDSNNAME == 'ALL [ DESIGNS ]') {
 
-            filtered = data.filter(item => (flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'));
+            filtered = data.filter(item =>
+                flag === 'yes' ? item.dptcode == 'PR' : item.dptcode != 'PR'
+            );
 
         } else {
             filtered = data.filter(item =>
@@ -480,6 +664,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             );
         }
 
+        // 🔽 GROUP
         const grouped = filtered.reduce((acc, item) => {
             const key = item.SDSNNAME || 'UNKNOWN';
 
@@ -496,7 +681,14 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             return acc;
         }, {});
 
-        const result = Object.values(grouped);
+        let result = Object.values(grouped);
+
+        // 🔽 SORT (ab error nahi aayega)
+        result.sort((a, b) =>
+            order === 'asc'
+                ? (a.SDSNNAME || '').localeCompare(b.SDSNNAME || '')
+                : (b.SDSNNAME || '').localeCompare(a.SDSNNAME || '')
+        );
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
 
@@ -583,15 +775,18 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                     shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                 }}>
-                                <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
+                                <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}>
                                     {item.ITMNAME}
                                 </Text>
-                                <View style={{
+                                {/* <View style={{
                                     backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center',
                                     alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10
                                 }}>
                                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
-                                </View>
+                                </View> */}
+                                <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                    {Number(item.TOTQTY || 0).toFixed(3)}
+                                </Text>
                             </TouchableOpacity>
                         )
                     }
@@ -641,14 +836,17 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1,
                                         shadowRadius: 4, elevation: 3
                                     }}>
-                                    <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MDSNNAME} </Text>
-                                    <View
+                                    <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.MDSNNAME} </Text>
+                                    {/* <View
                                         style={{
                                             backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center',
                                             alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10
                                         }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
-                                    </View>
+                                    </View> */}
+                                    <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                    </Text>
                                 </TouchableOpacity>
                             )}
                     />
@@ -702,11 +900,14 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                     }}>
-                                    <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SDSNNAME} </Text>
-                                    <View
+                                    <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SDSNNAME} </Text>
+                                    {/* <View
                                         style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
-                                    </View>
+                                    </View> */}
+                                    <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                    </Text>
                                 </TouchableOpacity>
                             )
                         }
@@ -726,6 +927,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     </View>
                 </View>
             </Modal>
+
             {/** shade */}
             <Modal visible={isShadeVisible} animationType="slide">
                 <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
@@ -752,11 +954,14 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#000',
                                         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3
                                     }} >
-                                    <Text numberOfLines={1} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
-                                    <View
+                                    <Text numberOfLines={2} style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1 }}> {item.SHDNAME} </Text>
+                                    {/* <View
                                         style={{ backgroundColor: theme.BRAND_GRADIENT_END, height: 28, justifyContent: 'center', alignItems: 'center', borderRadius: 6, paddingTop: 0, paddingBottom: 0, paddingLeft: 10, paddingRight: 10 }} >
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
-                                    </View>
+                                    </View> */}
+                                    <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                    </Text>
                                 </View>
                             )
                         }

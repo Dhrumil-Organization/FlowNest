@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const IS_LOCAL = false; //true = local apis url , false = live api url
+const IS_LOCAL = true; //true = local apis url , false = live api url
 
 export let API: string = IS_LOCAL 
         ? "http://192.168.13.100:4007" 

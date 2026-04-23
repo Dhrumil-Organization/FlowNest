@@ -266,23 +266,9 @@ const APP_SECTIONS = [
     {
         title: 'B',
         data: [
-            { id: '30', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+            { id: '31', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
         ],
     },
-    {
-        title: 'I',
-        data: [
-            { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'precision-manufacturing', iconColor: '#4169E1' },
-        ],
-    },
-    // {
-    //     title: 'P',
-    //     data: [
-    //         { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
-    //     ],
-    // },
-
-
 ];
 
 interface Props {
@@ -547,12 +533,6 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Party Dashboard",
                 //                         "href": "/"
                 //                     },
-                //                     {
-
-                //                         "title": "Weft Issue",
-                //                         "href": "/"
-                //                     },
-                                    
                 //                 ]
                 //             }
                 //         ]

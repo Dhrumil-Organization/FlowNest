@@ -2591,11 +2591,11 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
     tab: {
         flex: 1,
         paddingVertical: 10,
-        alignItems: 'center'
+        alignItems: 'center',
     },
 
     activeTab: {
-        backgroundColor: theme.BRAND_GRADIENT_END
+        backgroundColor: '#555'
     },
 
     tabText: {
@@ -2624,15 +2624,19 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         fontWeight: '600'
     },
 
+    // emptyBox: {
+    //     marginTop: 15,
+    //     padding: 20,
+    //     borderRadius: 10,
+    //     borderWidth: 0,
+    //     borderColor: '#ddd',
+    //     alignItems: 'center'
+    // },
     emptyBox: {
-        marginTop: 15,
-        padding: 20,
-        borderRadius: 10,
-        borderWidth: 0,
-        borderColor: '#ddd',
-        alignItems: 'center'
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 50
     },
-
     emptyText: {
         fontSize: 13,
         color: '#555'
@@ -2684,7 +2688,242 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         borderRadius: 8,
         height: 45,
         justifyContent: 'center',
-        paddingHorizontal: 10
+        paddingHorizontal: 10,
+        color: '#000000'
+    },
+    inputBoxDisabled: {
+        backgroundColor: '#f1f3f6',   // light grey
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: '#d0d5dd'
+    },
+
+    inputTextDisabled: {
+        color: '#080808',        // 🔥 dark text (important)
+        fontSize: 14,
+
+    },
+    cardWrapper: {
+        marginTop: 12,
+    },
+
+    itemCard: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 16,
+        elevation: 4,
+    },
+
+    rowBetween: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    itmCode: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#000000',
+        flexShrink: 1   // 🔥 long text break nahi karega layout
+    },
+
+    badge: {
+        backgroundColor: '#E8F0FE',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        marginLeft: 10
+    },
+
+    badgeText: {
+        fontSize: 12,
+        color: '#1A73E8',
+        fontWeight: '600'
+    },
+
+    itmName: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#444',
+        fontWeight: '500'
+    },
+
+    categoryText: {
+        marginTop: 4,
+        fontSize: 12,
+        color: '#777'
+    },
+
+    subItemBtn: {
+        marginTop: 14,
+        backgroundColor: '#1976D2',
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        width: '100%'   // 🔥 responsive button
+    },
+
+    subItemBtnText: {
+        color: '#fff',
+        fontWeight: '600'
+    },
+
+    buttonRow: {
+        marginTop: 0,
+        flexDirection: 'row',
+        justifyContent: 'flex-end'   // 🔥 RIGHT ALIGN
+    },
+
+    subItemBtnSmall: {
+        backgroundColor: '#007EA7',
+        paddingVertical: 6,
+        paddingHorizontal: 14,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+    formHeader: {
+        marginBottom: 15,
+        marginTop: 0,
+        backgroundColor: '#007EA7',
+        width: '100%',
+        height: 80,
+        paddingVertical: 10,   // 🔥 height badhega
+        paddingHorizontal: 10,
+        borderRadius: 10,      // 🔥 smooth corners
+    },
+
+    formTitleNew: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#ffffff'
+    },
+
+    formSubTitle: {
+        fontSize: 12,
+        color: '#ffffff',
+        marginTop: 3
+    },
+    // cardWrapper: {
+    //     marginBottom: 12
+    // },
+
+    itemCard1: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 15,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 6
+    },
+
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    itmTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#ffffff',
+        flex: 1
+    },
+
+    divider: {
+        height: 1,
+        backgroundColor: '#eee',
+        marginVertical: 10
+    },
+
+    infoText: {
+        fontSize: 13,
+        color: '#ffffff',
+        marginBottom: 4
+    },
+
+    infoValue: {
+        fontWeight: '600',
+        color: '#ffffff'
+    },
+
+    /* 🔥 CATEGORY BADGE */
+    categoryBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20
+    },
+
+    spunBadge: {
+        backgroundColor: '#ffffff'
+    },
+
+    filamentBadge: {
+        backgroundColor: '#E8F8F0'
+    },
+
+    categoryBadgeText: {
+        fontSize: 12,
+        fontWeight: '600'
+    },
+
+    /* 🔥 BUTTON */
+    buttonRowRight: {
+        alignItems: 'flex-end',
+        marginTop: 10
+    },
+
+    smallButton: {
+        backgroundColor: '#007EA7',
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 20
+    },
+
+    smallButtonText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600'
+    },
+    loader: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        zIndex: 9999,
+        elevation: 10
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 25,
+        left: 20,
+        backgroundColor: '#007EA7',
+        width: 45,
+        height: 45,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+        elevation: 10
+    },
+    fabAdd: {
+        position: 'absolute',
+        bottom: 75,
+        left: 20,
+        backgroundColor: '#007EA7',
+        width: 45,
+        height: 45,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+        elevation: 10
     },
 });
 

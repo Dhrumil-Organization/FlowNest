@@ -670,7 +670,7 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
             };
 
             const response = await axios.post(`${API}/api/inquiry_crud`, payload, { headers, cancelToken: cancelToken.token });
-            console.log('🔵 response', response);
+            console.log('🔵 response', response, payload);
 
             if (response.data?.success) {
                 const inquiries = response.data.data.inquires.map(inquiry => {
@@ -690,6 +690,7 @@ const InquiryList: React.FC<Props> = ({ token, navigation, isConnected, username
                         yearno: inquiry.yearno,
                         createdAt: inquiry.createdAt,
                         // Do NOT set status here; it will be determined per-shade in the UI
+                        // deliveryDate: inquiry.data[0].items[0].shades[0].deliverydate, // or use a common delivery date logic
                         deliveryDate: inquiry.data[0].items[0].shades[0].deliverydate, // or use a common delivery date logic
                         party: {
                             partyname: partyData.partyname,

@@ -284,6 +284,16 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         getType();
     }, []);
 
+    useEffect(() => {
+        if (activeTab1YPO === 'history') {
+            fetchAllHistoryData();
+        } else if (activeTab1YPO === 'requests') {
+            fetchData();
+        } else if (activeTab1YPO === 'verify') {
+            fetchAllVerifyData();
+        }
+    }, [activeTab1YPO]);
+
     const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
 
@@ -366,7 +376,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     */
     const fetchData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -402,6 +412,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
+                    'x-platform': 'mob'
                 },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
@@ -422,7 +433,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -476,7 +487,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     */
     const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -513,7 +524,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -565,7 +576,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     */
     const fetchAllHistoryData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -595,20 +606,20 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 strtype: strtypeFromApi
             };
 
-            console.log("payload", payload);
+
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}`, 'x-platform': 'mob' },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
-
+            console.log("payloadAllHistory", payload, response);
             setAllHistoryDataYPO(response?.data?.response?.data || []);
             setData([]);
             setAllVerifyDataYPO([]);
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -662,7 +673,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     */
     const fetchAllVerifyData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -694,7 +705,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
             console.log("payload", payload);
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}`, 'x-platform': 'mob' },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
@@ -705,7 +716,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -714,10 +725,10 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     }, [FormState.values.StrCode, token]);
 
     useEffect(() => {
-        if (!didInitialFetch.current) {
-            didInitialFetch.current = true;
-            return;
-        }
+        // if (!didInitialFetch.current) {
+        //     didInitialFetch.current = true;
+        //     return;
+        // }
 
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();
@@ -761,7 +772,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -1338,6 +1349,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
                     </View>
                 </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
+                    </View>
+                </View>
 
 
 
@@ -1535,6 +1557,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         <Text style={crlimtreq_styles.value}>
                             {item.AuthStatus || ''}
                         </Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
                     </View>
                 </View>
             </View>
@@ -1753,6 +1786,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         </Text>
                     </View>
                 </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
+                    </View>
+                </View>
             </View>
             <View style={crlimtreq_styles.expandRow}>
                 <TouchableOpacity
@@ -1863,7 +1907,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                 name="email"
                                 size={32}
                                 color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-                            />                          
+                            />
                         </View>
                     </TouchableOpacity>
                 )}
@@ -1977,9 +2021,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             <View style={crlimtreq_styles.container}>
                 {isLoadingYPO && <FullScreenLoader message={activeTab1YPO === 'history' ? "Loading History..." : activeTab1YPO === 'verify' ? "Loading Verify..." : "Loading Request..."} />}
                 <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
+                {/* <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
                     <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
                         ref={flatListRefYPO}
@@ -2352,7 +2396,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             />
 
 
-            <CriteriaForm
+            {/* <CriteriaForm
                 isVisible={criteriaFormOpen}
                 onClose={handleCriteriaFormClose}
                 isLoading={isLoadingYPO}
@@ -2370,7 +2414,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 fetchAllHistoryData={fetchAllHistoryData}
                 fetchAllVerifyData={fetchAllVerifyData}
                 activeTab1YPO={activeTab1YPO}
-            />
+            /> */}
         </>
     );
 };

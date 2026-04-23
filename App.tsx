@@ -70,7 +70,7 @@ import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
 import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
-
+import WftIssue from './components/WftIssue/WftIssue';
 
 const Stack = createNativeStackNavigator();
 
@@ -462,12 +462,12 @@ export default function App() {
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
                     }</Stack.Screen>
-                    <Stack.Screen name="Grey Purchase Order">{(props) =>
+                    {/* <Stack.Screen name="Grey Purchase Order">{(props) =>
                       <>
                         <GreyPurchaseOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
-                    }</Stack.Screen>
+                    }</Stack.Screen> */}
                     <Stack.Screen name="Sales Order">{(props) =>
                       <>
                         <GreySalesOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -526,11 +526,13 @@ export default function App() {
                   }</Stack.Screen> */}
                     <Stack.Screen name="Inquiry">{(props) =>
                       <>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                          <InquiryList {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} />
+                        <ErrorBoundary FallbackComponent={ErrorFallback}>
+                          <GestureHandlerRootView style={{ flex: 1 }}>
+                            <InquiryList {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </GestureHandlerRootView>
                           {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </GestureHandlerRootView>
-                        {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                        </ErrorBoundary>
                       </>
                     }</Stack.Screen>
                     <Stack.Screen name="InquiryAdd">{(props) =>
@@ -713,6 +715,12 @@ export default function App() {
 
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="Weft Issue">{(props) =>
+                      <>
+                        <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                      </>
+                    }</Stack.Screen>                    
                   </Stack.Navigator>
 
                 </NavigationContainer>

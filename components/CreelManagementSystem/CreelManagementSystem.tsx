@@ -928,8 +928,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 prptype: userPtype,
                 strcode: '002',
                 txntype: 'creel_yarn_issue',
-                // yearno: FormState.values.YearNo || getCurrentFinancialYear(),
-                yearno: '26',
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                // yearno: '26',
                 fromdate: FormState.values.fromdate || '',
                 todate: FormState.values.todate || '',
                 status: FormState.values.status || '',
@@ -1048,7 +1048,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                         GrdName: d1Item.GrdName || '',
                         ShdCode: d1Item.ShdCode || '',
                         ShdName: d1Item.ShdName || '',
-                        Denier: d1Item.Denier || '',   // ✅ FIXED
+                        Denier: d1Item.Denier || '',
+                        UId: d1Item.UId || '',  // ✅ FIXED
                         yearNo: FormState.values.YearNo || '' // ✅ IMPORTANT
                     };
                 });
@@ -1132,7 +1133,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 strcode: '002',
                 searchcarton: searchText.trim()
             };
-            // console.log("Payload:", payload);
+            console.log("Payload:", payload);
             const response = await axios.post(
                 `${API}/api/get_carton_search`,
                 payload,
@@ -1145,7 +1146,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     cancelToken: cancelToken.token
                 }
             );
-            // console.log("Search Response:", response);
+            console.log("Search Response:", response);
             const data = response?.data?.response?.data || [];
             if (response?.data?.success && data.length > 0) {
                 setSearchResults(data);
@@ -1371,27 +1372,28 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 SetupDate: setupDate.toISOString().split('T')[0],
                 Shift: shift,
                 Remark: Remark || '',
-                StkType: stocktype || '',
-                Cartons: cartonSummary.map(item => ({
-                    CartNo: item.cartonNo || '',
-                    Chees: item.chees || '',
-                    Wt: item.qty || '',
-                    PUId: item.PUId || '',
-                    PSrNo: item.PSrNo || '',
-                    PSubSr: item.PSubSr || '',
-                    TranType: item.TranType || '',
-                    ItmCode: item.ItmCode || '',
-                    ItmName: item.ItmName || '',
-                    MerCode: item.MerCode || '',
-                    MerName: item.MerName || '',
-                    GrdCode: item.GrdCode || '',
-                    GrdName: item.GrdName || '',
-                    ShdCode: item.ShdCode || '',
-                    ShdName: item.ShdName || '',
-                    Denier: item.Denier || '',
-                    yearno: item.yearNo || '',
-                    Qty: ''
-                }))
+                StkType: stocktype || '',               
+                    Cartons: cartonSummary.map(item => ({
+                        uid: item.UId || '',
+                        CartNo: item.cartonNo || '',
+                        Chees: item.chees || '',
+                        Wt: item.qty || '',
+                        PUId: item.PUId || '',
+                        PSrNo: item.PSrNo || '',
+                        PSubSr: item.PSubSr || '',
+                        TranType: item.TranType || '',
+                        ItmCode: item.ItmCode || '',
+                        ItmName: item.ItmName || '',
+                        MerCode: item.MerCode || '',
+                        MerName: item.MerName || '',
+                        GrdCode: item.GrdCode || '',
+                        GrdName: item.GrdName || '',
+                        ShdCode: item.ShdCode || '',
+                        ShdName: item.ShdName || '',
+                        Denier: item.Denier || '',
+                        yearno: item.yearNo || '',
+                        Qty: ''
+                    }))
             };
 
             console.log("payload", payloadObj);
@@ -1401,7 +1403,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
-            const response = await axios.post(`${API}/api/add_creel_data`, payloadObj, { headers });
+            const response = await axios.post(`${API}/api/modify_creel_data`, payloadObj, { headers });
             console.log("response", response);
 
             if (response.data.success === true) {

@@ -2623,15 +2623,6 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600'
     },
-
-    // emptyBox: {
-    //     marginTop: 15,
-    //     padding: 20,
-    //     borderRadius: 10,
-    //     borderWidth: 0,
-    //     borderColor: '#ddd',
-    //     alignItems: 'center'
-    // },
     emptyBox: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -2692,7 +2683,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         color: '#000000'
     },
     inputBoxDisabled: {
-        backgroundColor: '#f1f3f6',   // light grey
+        backgroundColor: '#f1f3f6',
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 8,
@@ -2701,7 +2692,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
     },
 
     inputTextDisabled: {
-        color: '#080808',        // 🔥 dark text (important)
+        color: '#080808',
         fontSize: 14,
 
     },
@@ -2726,7 +2717,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         fontSize: 15,
         fontWeight: '700',
         color: '#000000',
-        flexShrink: 1   // 🔥 long text break nahi karega layout
+        flexShrink: 1
     },
 
     badge: {
@@ -2762,7 +2753,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         paddingVertical: 12,
         borderRadius: 10,
         alignItems: 'center',
-        width: '100%'   // 🔥 responsive button
+        width: '100%'
     },
 
     subItemBtnText: {
@@ -2773,7 +2764,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
     buttonRow: {
         marginTop: 0,
         flexDirection: 'row',
-        justifyContent: 'flex-end'   // 🔥 RIGHT ALIGN
+        justifyContent: 'flex-end'
     },
 
     subItemBtnSmall: {
@@ -2789,9 +2780,9 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         backgroundColor: '#007EA7',
         width: '100%',
         height: 80,
-        paddingVertical: 10,   // 🔥 height badhega
+        paddingVertical: 10,
         paddingHorizontal: 10,
-        borderRadius: 10,      // 🔥 smooth corners
+        borderRadius: 10,
     },
 
     formTitleNew: {
@@ -2805,14 +2796,11 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         color: '#ffffff',
         marginTop: 3
     },
-    // cardWrapper: {
-    //     marginBottom: 12
-    // },
-
     itemCard1: {
         backgroundColor: '#fff',
         borderRadius: 14,
-        padding: 15,
+        padding: 14,
+        marginBottom: 10,
         elevation: 4,
         shadowColor: '#000',
         shadowOpacity: 0.1,
@@ -2834,22 +2822,21 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
 
     divider: {
         height: 1,
-        backgroundColor: '#eee',
-        marginVertical: 10
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        marginVertical: 8
     },
 
     infoText: {
         fontSize: 13,
         color: '#ffffff',
-        marginBottom: 4
+        marginBottom: 4,
+        fontWeight: '600',
     },
 
     infoValue: {
         fontWeight: '600',
         color: '#ffffff'
     },
-
-    /* 🔥 CATEGORY BADGE */
     categoryBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -2866,26 +2853,27 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
 
     categoryBadgeText: {
         fontSize: 12,
-        fontWeight: '600'
+        fontWeight: '600',
+        color: '#000'
     },
-
-    /* 🔥 BUTTON */
     buttonRowRight: {
-        alignItems: 'flex-end',
-        marginTop: 10
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 12
     },
-
     smallButton: {
-        backgroundColor: '#007EA7',
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 20
+        width: '48%',
+        backgroundColor: '#0E7490',
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center'
     },
-
     smallButtonText: {
         color: '#fff',
         fontSize: 13,
-        fontWeight: '600'
+        fontWeight: '600',
+        letterSpacing: 0.3
     },
     loader: {
         position: 'absolute',
@@ -2925,5 +2913,167 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
         zIndex: 999,
         elevation: 10
     },
+    topHeader: {
+        backgroundColor: '#0e7490',
+        paddingTop: 30,
+        paddingBottom: 15,
+        paddingHorizontal: 15,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    topHeaderTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600'
+    },
+
+    browseCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 26,   // 👈 height badha diya
+        paddingHorizontal: 14,
+        borderRadius: 14,
+        marginBottom: 12
+    },
+
+    browseText: {
+        fontSize: 14,
+        color: '#fff',
+        fontWeight: '700'
+    },
+
+    subText: {
+        fontSize: 12,
+        color: '#fff',
+        marginTop: 4
+    },
+
+    selectBtn: {
+        // backgroundColor: '#fff',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8
+    },
+
+    selectText: {
+        color: '#000',
+        fontSize: 12,
+        fontWeight: '600'
+    },
+    noDataBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 50
+    },
+    noDataText: {
+        fontSize: 14,
+        color: '#999',
+        fontWeight: '500'
+    },
+    selectedItemBox: {
+        backgroundColor: '#fff',
+        padding: 12,
+        marginHorizontal: 15,
+        marginTop: 10,
+        borderRadius: 12,
+        elevation: 3,
+    },
+
+    selectedRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    selectedValue: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#222',
+        marginRight: 10
+    },
+
+    codeBadge: {
+        backgroundColor: '#4A6FA5',
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 20
+    },
+
+    // codeText: {
+    //     color: '#fff',
+    //     fontSize: 12,
+    //     fontWeight: '600'
+    // },
+    inlineRow: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    codeText: {
+        backgroundColor: '#4A6FA5',
+        color: '#fff',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        marginRight: 8
+    },
+    addBtnInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#007EA7',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10
+    },
+
+    cancelBtnInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#007EA7',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10,
+        marginRight: 10
+    },
+
+    addBtnText: {
+        color: '#fff',
+        fontWeight: '600',
+        marginLeft: 5
+    },
+
+    cancelBtnText: {
+        color: '#fff',
+        fontWeight: '600',
+        marginLeft: 5
+    },
+
+    listBox: {
+        marginTop: 15,
+        borderTopWidth: 1,
+        borderColor: '#eee'
+    },
+
+    listRow: {
+        flexDirection: 'row',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderColor: '#f0f0f0'
+    },
+
+    listCode: {
+        fontWeight: '600',
+        color: '#007EA7',
+        marginRight: 10
+    },
+
+    listName: {
+        flex: 1,
+        color: '#333'
+    }
+
 });
 

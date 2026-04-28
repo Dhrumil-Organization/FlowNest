@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    ScrollView,
-    TextInput,
-    Dimensions
-} from 'react-native';
+import { View, Text, FlatList, ScrollView, TextInput, Dimensions } from 'react-native';
 
 const ROW_HEIGHT = 52;
 const PAGE_SIZE = 20;
@@ -24,19 +17,28 @@ const FinalTableRates = ({ data = [], styles }) => {
 
     const debounceRef = useRef(null);
 
+    const screenWidth = Dimensions.get('window').width;
+
+    const isMobile = screenWidth < 600;
+    const isTablet = screenWidth >= 600;
+
     const columns = [
         { key: 'srno', label: '#', width: 60, align: 'center' },
-        { key: 'TranDate', label: 'Date', width: 120, align: 'center' },
-        { key: 'VouNo', label: 'Vou No', width: 120, align: 'center' },
-        { key: 'DrAmt', label: 'Debit', width: 120, align: 'right', type: 'number', color: 'red' },
-        { key: 'CrAmt', label: 'Credit', width: 120, align: 'right', type: 'number', color: 'green' },
-        { key: 'Outstanding', label: 'Outstanding', width: 120, align: 'right', type: 'number', color: 'green' },
-        { key: 'Paid', label: 'Paid', width: 140, align: 'right', type: 'number' },
+        { key: 'QgName', label: 'Grp Name ', width: 100, align: 'center' },
+        { key: 'Qltname', label: 'Quality Name', width: 130, align: 'center' },
+        { key: 'Rate', label: 'Rate', width: 100, align: 'right', type: 'number', color: 'red' },
     ];
 
-    const totalKeys = ['DrAmt', 'CrAmt', 'Outstanding', 'Paid'];
+    // {
+    //     "AccCode": "55411",
+    //     "Party": "ALLOL CREATION PVT. LTD. [JOB]",
+    //     "Qltname": "CRAPE SILK",
+    //     "QgName": "ONLY BRUMING",
+    //     "Rate": "10.00"
+    // }
 
-    // INIT
+    const totalKeys = ['Rate'];
+
     useEffect(() => {
         setFullData(data);
         setFilteredFullData(data);
@@ -44,7 +46,6 @@ const FinalTableRates = ({ data = [], styles }) => {
         setPage(1);
     }, [data]);
 
-    // 🔍 FILTER + RESET LAZY
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -68,7 +69,6 @@ const FinalTableRates = ({ data = [], styles }) => {
 
     }, [search, fullData]);
 
-    // ⚡ LOAD MORE
     const loadMore = () => {
         const nextPage = page + 1;
         const start = (nextPage - 1) * PAGE_SIZE;
@@ -82,14 +82,12 @@ const FinalTableRates = ({ data = [], styles }) => {
         }
     };
 
-    // 🇮🇳 FORMAT
     const formatIndian = (val) => {
         if (!val && val !== 0) return "0";
         const num = parseFloat(String(val).replace(/,/g, ''));
         return isNaN(num) ? val : Math.floor(num).toLocaleString('en-IN');
     };
 
-    // 📊 TOTAL (filtered full data pe)
     const totals = {};
     totalKeys.forEach(key => {
         totals[key] = filteredFullData.reduce((sum, item) => {
@@ -99,7 +97,6 @@ const FinalTableRates = ({ data = [], styles }) => {
 
     const totalWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
-    // 🔥 VALUE FORMAT
     const formatValue = (col, value) => {
 
         if (col.key === 'srno') return value;
@@ -122,66 +119,47 @@ const FinalTableRates = ({ data = [], styles }) => {
         return '#000';
     };
 
-    // 🔥 HEADER
-    const Header = () => (
-        <View style={styles.tableHeader}>
-            {columns.map(col => (
-                <Text
-                    key={col.key}
-                    style={[
-                        styles.headerText,
-                        { width: col.width, textAlign: col.align, padding: 5 }
-                    ]}
-                >
-                    {col.label}
+    const CardRow = ({ item, index }) => (
+        <View style={{
+            backgroundColor: '#fff', marginVertical: 6, marginHorizontal: 6, padding: 12,
+            borderRadius: 10, elevation: 2
+        }}>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontWeight: 'bold', fontSize: 16, flex: 1 }}>
+                    #{index + 1} - {item.Qltname}
                 </Text>
-            ))}
+
+                <Text style={{ color: 'green', fontSize: 20, fontWeight: 'bold', textAlign: 'right' }}>
+                    {/* ₹  */}
+                    {formatIndian(item.Rate)}
+                </Text>
+
+            </View>
+
+            <Text style={{ marginTop: 4, color: '#a3a3a3' }}>
+                Group: {item.QgName}
+            </Text>
+
         </View>
     );
 
-    // 🔥 FOOTER (ALWAYS FIXED)
-    const Footer = () => (
-        <View style={styles.tableHeader}>
-            <Text style={[
-                styles.headerText,
-                { width: 60, textAlign: 'center', padding: 5 },
-            ]}>Total</Text>
-            <Text style={{ width: 120 }} />
-            <Text style={{ width: 120 }} />
-
-            {columns.slice(3).map(col => (
-                <Text
-                    key={col.key}
-                    style={[
-                        styles.headerText,
-                        { width: col.width, textAlign: col.align, padding: 5 },
-                    ]}
-                >
-                    {formatIndian(totals[col.key])}
-                </Text>
-            ))}
-        </View>
-    );
-
-    // 🔥 ROW
-    const Row = ({ item, index }) => (
+    const TableRow = ({ item, index }) => (
         <View style={styles.tableRow}>
             {columns.map(col => {
-
-                let value =
-                    col.key === 'srno'
-                        ? index + 1
-                        : item[col.key];
+                let value = col.key === 'srno'
+                    ? index + 1
+                    : item[col.key];
 
                 return (
                     <Text
                         key={col.key}
+                        numberOfLines={2}
                         style={[
                             styles.rowText,
                             {
-                                width: col.width,
+                                flex: 1,
                                 textAlign: col.align,
-                                color: getColor(col),
                                 padding: 5
                             }
                         ]}
@@ -193,54 +171,57 @@ const FinalTableRates = ({ data = [], styles }) => {
         </View>
     );
 
+    const Header = () => (
+        <View style={styles.tableHeader}>
+            {columns.map(col => (
+                <Text
+                    key={col.key}
+                    style={[
+                        styles.headerText,
+                        { flex: 1, textAlign: col.align, padding: 5 }
+                    ]}
+                >
+                    {col.label}
+                </Text>
+            ))}
+        </View>
+    );
+
     return (
         <View style={{ flex: 1 }}>
 
-            {/* 🔍 SEARCH */}
             <TextInput
                 placeholder="Search..."
                 value={search}
                 onChangeText={setSearch}
-                style={{
-                    backgroundColor: '#fff',
-                    padding: 8,
-                    borderWidth: 1,
-                    marginBottom: 5,
-                    borderColor: 'rgba(0, 0, 0, 0.1)',
-                }}
+                style={{ backgroundColor: '#fff', padding: 8, borderWidth: 1, marginBottom: 5, borderColor: 'rgba(0, 0, 0, 0.1)', }}
             />
 
-            <ScrollView horizontal>
-                <View style={{ minWidth: totalWidth, flex: 1 }}>
-
+            {isMobile ? (
+                <FlatList
+                    data={visibleData}
+                    renderItem={({ item, index }) => (
+                        <CardRow item={item} index={index} />
+                    )}
+                    keyExtractor={(_, i) => i.toString()}
+                    onEndReached={loadMore}
+                    onEndReachedThreshold={0.5}
+                />
+            ) : (
+                <View style={{ flex: 1 }}>
                     <Header />
 
-                    {/* 📏 TABLE HEIGHT AUTO */}
                     <FlatList
                         data={visibleData}
                         renderItem={({ item, index }) => (
-                            <Row item={item} index={index} />
+                            <TableRow item={item} index={index} />
                         )}
                         keyExtractor={(_, i) => i.toString()}
-                        getItemLayout={(_, index) => ({
-                            length: ROW_HEIGHT,
-                            offset: ROW_HEIGHT * index,
-                            index,
-                        })}
                         onEndReached={loadMore}
                         onEndReachedThreshold={0.5}
-                        style={{ height: screenHeight * 0.6 }} // 👈 AUTO HEIGHT
-                        initialNumToRender={20}
-                        maxToRenderPerBatch={20}
-                        windowSize={10}
-                        removeClippedSubviews
                     />
-
-                    <Footer />
-
                 </View>
-            </ScrollView>
-
+            )}
         </View>
     );
 };

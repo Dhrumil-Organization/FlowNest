@@ -108,7 +108,8 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     yearOptions,
     getPropertyData,
     setSelectedProperty,
-    selectedProperty
+    selectedProperty,
+    dashParty
     // hideprpGroup
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -201,7 +202,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
     // const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026'];
 
-    console.log("designData:", designData, "itemData:", itemData);
+    // console.log("designData:", designData, "itemData:", itemData);
 
     // useEffect(() => {
     //     if (hideprpGroup) {
@@ -284,14 +285,14 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
         setHasMoreItem(filtereditem.length > 10);
     }, [searchQuery, searchQueryParty, searchQuerySexe, searchQueryAccount, searchQuerySubHead, getdashPrp, getdashParty, getdashSexe, getdashAccount, getdashSubHead, searchQueryItem, itemData]);
 
-    console.log("1 getdashPrp:", getdashPrp);
-    console.log("2 getdashParty:", getdashParty);
-    console.log("3 getdashSexe:", getdashSexe);
-    console.log("4 getdashAccount:", getdashAccount);
-    console.log("5 getdashSubHead:", getdashSubHead);
-    console.log("6 itemData:", itemData)
-    console.log("7 Sexe Data:", displayedDashSexe);
-    console.log("8 Account Data:", displayedDashAccount);
+    // console.log("1 getdashPrp:", getdashPrp);
+    // console.log("2 getdashParty:", getdashParty);
+    // console.log("3 getdashSexe:", getdashSexe);
+    // console.log("4 getdashAccount:", getdashAccount);
+    // console.log("5 getdashSubHead:", getdashSubHead);
+    // console.log("6 itemData:", itemData)
+    // console.log("7 Sexe Data:", displayedDashSexe);
+    // console.log("8 Account Data:", displayedDashAccount);
 
 
     React.useEffect(() => {
@@ -605,9 +606,14 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
         // onDashSexeSelect(selectedDashSexe);
         // onDashSubHeadSelect(selectedDashSubHead);
         // onItemSelectItem(selectedItems);
-        handleConfirmAction(selectedProperty);
+        // setAccountLoading(true);
+        // dashAccount(selectedDashPrp, selectedDashParty || [], selectedDashSexe || [], selectedDashSubHead || [], selectedPrpgrp, selectedInternal);
+        // handleConfirmAction(selectedProperty, selectedYear);
+        handleConfirmAction(selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount)
         // dashAccount(selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedPrpgrp, selectedInternal);
     };
+
+    // console.log("🎯 UI Party Data:", getdashParty);
 
     const formatDate = (rawDate: Date) => {
         let day = rawDate.getDate().toString().padStart(2, '0');
@@ -873,8 +879,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     // console.log("aaa Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
     // console.log("aaa Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
 
-        console.log("<<<<<<<<+++++  selectedProperty ====>>> ", selectedProperty)
-
+    // console.log("<<<<<<<<+++++  selectedProperty ====>>> ", selectedProperty)
     return (
         <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
             <View style={styles.modalOverlay}>
@@ -930,23 +935,23 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             </View>
 
                             <View style={{ marginBottom: 10 }} >
-                            <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
+                                <Text style={styles.label}>Select Property <Text style={{ color: 'red' }}>*</Text></Text>
 
-                            <SearchableDropdown
-                                data={getPropertyData}
-                                labelKey="LngName"
-                                valueKey="PrpCode"
-                                placeholder="Choose property..."
-                                pageSize={10}
-                                initialValue={selectedProperty ?? null}
-                                onSelect={(item) => {
-                                    // setForm(prev => ({ ...prev, PrpCode: item.PrpCode, AccCode: "", BankName: "", BankBr: "" }));
-                                    setSelectedProperty(item);
-                                }}
-                                multiple={false}
-                                emptyMessage="No properties available"
-                            />
-                        </View>
+                                <SearchableDropdown
+                                    data={getPropertyData}
+                                    labelKey="LngName"
+                                    valueKey="PrpCode"
+                                    placeholder="Choose property..."
+                                    pageSize={10}
+                                    initialValue={selectedProperty ?? null}
+                                    onSelect={(item) => {
+                                        // setForm(prev => ({ ...prev, PrpCode: item.PrpCode, AccCode: "", BankName: "", BankBr: "" }));
+                                        setSelectedProperty(item);
+                                    }}
+                                    multiple={false}
+                                    emptyMessage="No properties available"
+                                />
+                            </View>
 
                             {/* Property Group Dropdown */}
 

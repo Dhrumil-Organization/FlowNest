@@ -108,9 +108,12 @@ export const fetchPropertyData = async (token: string) => {
         cancelToken = axios.CancelToken.source();
 
         console.log('🔵 Property calling (API)...');
+
+        console.log("fetchPropertyData function API name getproperty url : ", `${API}/api/getproperty`)
         let params = null;
         const response = await axios.get(
             // 'https://apig.tms-webapp.com/api/getproperty',
+
             `${API}/api/getproperty`,
             {
                 headers: {
@@ -122,7 +125,7 @@ export const fetchPropertyData = async (token: string) => {
             }
         );
 
-        console.log('🔵 api property response', response);
+        console.log('🔵 fetchPropertyData function getproperty api property response', response);
 
         if (response.data.success && response.data.response.data.length > 0) {
             const propertyData = response.data.response.data;
@@ -1163,8 +1166,7 @@ export const fetchAllPropertyData = async (token: string) => {
                 params
             }
         );
-        console.log("Api response", response)
-
+        
         if (response.data.success && response.data.response.data.length > 0) {
             const propertyGroupData = response.data.response.data;
             return propertyGroupData;
@@ -1185,7 +1187,6 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
         cancelToken = axios.CancelToken.source();
 
         let params = { prpcode: prpcd };
-        console.log("`${API}/api/getyear` :", `${API}/api/getyear`);
         const response = await axios.get(
             `${API}/api/getyear`,
             {
@@ -1197,7 +1198,6 @@ export const fetchAllYeardata = async (token: string, prpcd = '') => {
                 params
             }
         );
-        console.log("response :", response);
 
         if (response.data.response.data && response.data.response.data.length > 0) {
             const appYdata = response.data.response.data;
@@ -1246,7 +1246,7 @@ export const fetchAllStoredata = async (token: string, prp = '', yrno = '', txn 
         }
     } catch (error) {
         if (!axios.isCancel(error)) {
-            console.log('fetchAllStoredata error', error);
+            //console.log('fetchAllStoredata error', error);
         }
         return [];
     }

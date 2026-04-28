@@ -17,6 +17,8 @@ const COLORS = [
 
 const SummaryTable = ({ data = [], searchQuery = '', onRowPress, }) => {
 
+    
+
     const [fullData, setFullData] = useState([]);
     const [visibleData, setVisibleData] = useState([]);
     const [page, setPage] = useState(1);
@@ -114,6 +116,7 @@ const SummaryTable = ({ data = [], searchQuery = '', onRowPress, }) => {
         <View style={{ flex: 1 }}>
 
             <View style={{ padding: 10, backgroundColor: '#111', alignItems: 'center' }}>
+                
                 <Text style={{ color: '#fff' }}>
                     {`Total: ${visibleData.length} / ${fullData.length}`}
                 </Text>

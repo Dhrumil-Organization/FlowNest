@@ -1,0 +1,42 @@
+plugins {
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "com.google.gms.google-services"
+    id "com.facebook.react"
+}
+
+android {
+    namespace "com.flownest"
+
+    compileSdkVersion 36   // ✅ match with root
+
+    defaultConfig {
+        applicationId "com.flownest"
+        minSdkVersion 24
+        targetSdkVersion 36   // ✅ match with root
+        versionCode 1
+        versionName "1.0"
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        debug {}
+
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+
+    // ❌ REMOVE THIS (not needed)
+    // implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
+
+    implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
+    implementation("com.google.firebase:firebase-analytics")
+
+    implementation("androidx.multidex:multidex:2.0.1")
+}

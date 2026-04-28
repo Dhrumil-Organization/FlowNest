@@ -378,7 +378,9 @@ const LoginScreen: React.FC<Props> = ({
       const userof = response.data.response?.userof;
       const yno = response.data.response?.year?.YearNo || '';
       const role1 = response.data.response?.role1;
+
       if (response.data.success === true) {
+        
         if (token && user_details && user_menu_apps) {
           await AsyncStorage.setItem('access_token', token);
           await AsyncStorage.setItem('user_details', user_details);
@@ -388,6 +390,7 @@ const LoginScreen: React.FC<Props> = ({
           await AsyncStorage.setItem('login_user_passwd', password.trim());
           await AsyncStorage.setItem('yno', yno.trim());
           await AsyncStorage.setItem('user_login_role', JSON.stringify(role1));
+          await AsyncStorage.setItem('userObject', JSON.stringify(response.data.response.year));
           setToken(token);
           setUserDetails(user_details);
           setMenuApps(user_menu_apps);

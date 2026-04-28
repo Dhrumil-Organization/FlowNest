@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+
+    <!-- Allow HTTP only for specific domains (recommended) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.1.1</domain>
+        <domain includeSubdomains="true">103.214.226.148:8005</domain>
+        <domain includeSubdomains="true">103.214.226.148</domain>
+        <domain includeSubdomains="true">192.168.13.100</domain>
+        <domain includeSubdomains="true">192.168.13.130</domain>
+        <domain includeSubdomains="true">192.168.0.6</domain>
+        <domain includeSubdomains="true">192.168.13.50</domain>
+        <!-- apna backend IP ya domain yahan daalo -->
+        <!-- <domain>88.xxx.xxx.xxx</domain> -->
+    </domain-config>
+
+</network-security-config>

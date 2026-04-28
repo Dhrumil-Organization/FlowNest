@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated, ScrollView, Modal, FlatList, TextInput, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated, ScrollView, Modal, FlatList, TextInput, Platform, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import qs from 'qs';
 import axios from 'axios';
@@ -16,6 +16,7 @@ import { normalizePrptype, saveLargeData, readPrptypeCache, fetchPropertyData, g
 import SummaryTable from './SummaryTable';
 import PartyOverlay from './PartyOverlay';
 import LedgerOverlay from './LedgerOverlay';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -143,6 +144,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
     useEffect(() => {
         if (receivables_prpgroup.length > 0 && (!selectedPrpgrp || selectedPrpgrp === "")) {
+            console.log("receivables_prpgroup :", receivables_prpgroup)
             setSelectedPrpGrp(receivables_prpgroup[0]);
         }
     }, [receivables_prpgroup, selectedPrpgrp]);
@@ -214,6 +216,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 setSyncLoading(false);
                 const receivables_sync_date_api = responsesync.data.data.dashlastsync || '';
                 const receivables_prpgroup_api = responsesync.data.data.prpgroup || '';
+                console.log("receivables_prpgroup_api :", receivables_prpgroup_api);
 
                 setreceivables_sync_date(receivables_sync_date_api);
                 setreceivables_prpgroup(receivables_prpgroup_api);
@@ -257,9 +260,12 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     }, []);
 
     const dashParty = useCallback(async (selectedPrpgrp) => {
+
+        console.log("aaaa")
         setdashPartyLoading(true);
         setdashSexeLoading(true);
         try {
+            console.log("selectedPrpgrp --->", selectedPrpgrp)
             const payload = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
                 fetch: 'dr',
@@ -267,11 +273,16 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 txntype: '/receivables-view'
             }
 
+
+
             const payloadSexe = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
                 dashview: 'outstanding',
                 fetch: 'salesexe',
             }
+
+
+
             const responseparty = await axios.get(
                 // 'https://apig.tms-webapp.com/api/get_criterion',
                 `${API}/api/get_criterion`,
@@ -286,6 +297,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     }
                 }
             );
+
             const responsesexe = await axios.get(
                 `${API}/api/get_criterion`,
                 {
@@ -299,6 +311,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     }
                 }
             );
+
+
             if (responseparty.data.success === true) {
                 setdashPartyLoading(false);
                 const maindata = responseparty.data.response.data;
@@ -309,6 +323,13 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 const maindataSexe = responsesexe.data.response.data;
                 setdashSexe(maindataSexe);
             }
+
+            console.log("aaaa payload ->", payload);
+            console.log("aaaa payloadSexe ->", payloadSexe);
+            console.log("aaaa responseparty api url ->", `${API}/api/get_criterion`);
+            console.log("aaaa responsesexe api url ->", `${API}/api/get_criterion`);
+            console.log("aaaa maindata ->", responseparty.data);
+            console.log("aaaa maindataSexe ->", responsesexe.data);
         } catch (error) {
             setdashPartyLoading(false);
             setdashSexeLoading(false);
@@ -414,6 +435,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     useEffect(() => {
         if (selectedPrpgrp) {
             dashProperty(selectedPrpgrp);
+            console.log('1-aaaa')
             dashParty(selectedPrpgrp);
         }
     }, [selectedPrpgrp]);
@@ -634,6 +656,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         const fdate = fromDate ? format(fromDate, 'yyyy-MM-dd') : null;
         const tdate = toDate ? format(toDate, 'yyyy-MM-dd') : null;
         try {
+            console.log("---->selectedPrpgrp :", selectedPrpgrp)
+            console.log("prpCodesArray ===", prpCodesArray)
             const payloadParty = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
@@ -662,6 +686,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
             setMianPaylaod(payloadParty);
             const data = responseparty.data.response.data || [];
+            console.log("responseparty.data.response.data ---->", responseparty.data.response.data)
 
 
             if (responseparty.data.success == true) {
@@ -781,6 +806,9 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     };
 
     const fetchpartylist = async (selectedProperty, forceRefresh = false) => {
+
+        console.log("bbbb")
+
         setIsLoading(true);
 
         const prpcode =
@@ -878,6 +906,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
     useEffect(() => {
         if (selectedProperty !== null) {
+            console.log("2-bbbb")
             fetchpartylist(selectedProperty, false);
         } else {
             setSelectedDashParty([]);
@@ -943,27 +972,14 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         }
     }, []);
 
-    const handleDashPrpSelect = (prp: DashPrp[]) => {
-        setSelectedDashPrp(prp);
-    };
-    const handleDashPartySelect = (party: DashParty[]) => {
-        setSelectedDashParty(party);
-    };
-    const handleDashSexeSelect = (sexe: DashSexe[]) => {
-        setSelectedDashSexe(sexe);
-    };
-    const handleDashAccountSelect = (acc: DashAccount[]) => {
-        setSelectedDashAccount(acc);
-    };
-    const handleDashSubHeadSelect = (sub: DashSubHead[]) => {
-        setSelectedDashSubHead(sub);
-    };
-    const handleItemSelect = (items: ItemData[]) => {
-        setSelectedItems(items);
-    };
-    const handleItemStatusChange = (status: ItemStatus) => {
-        setSelectedItemStatus(status);
-    };
+    const handleDashPrpSelect = (prp: DashPrp[]) => setSelectedDashPrp(prp);
+    const handleDashPartySelect = (party: DashParty[]) => setSelectedDashParty(party);
+    const handleDashSexeSelect = (sexe: DashSexe[]) => setSelectedDashSexe(sexe);
+    const handleDashAccountSelect = (acc: DashAccount[]) => setSelectedDashAccount(acc);
+    const handleDashSubHeadSelect = (sub: DashSubHead[]) => setSelectedDashSubHead(sub);
+    const handleItemSelect = (items: ItemData[]) => setSelectedItems(items);
+    const handleItemStatusChange = (status: ItemStatus) => setSelectedItemStatus(status);
+
     const DASHBOARD_COLORS = [
         ['#0F2027', '#203A43'],
         ['#141E30', '#243B55'],
@@ -1816,8 +1832,19 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const closeDrawer = () => setIsDrawerVisible(false);
     const closeDrawer123 = () => setSummaryDrawerVisible(false);
 
+
+
+
     return (
         <>
+            {
+                isLoading &&
+                (
+                    <View style={styles.loaderOverlay}>
+                        {isLoading ? (<ActivityIndicator size="large" color="#fff" />) : null}
+                    </View>
+                )
+            }
             <HeaderBar
                 userName={username}
                 onSearch={setSearchQueryPOT}
@@ -2223,6 +2250,11 @@ const styles = StyleSheet.create({
         borderColor: 'transparent',
         color: '#005F73',
     },
+    loaderOverlay: {
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center', alignItems: 'center', zIndex: 999,
+    },
+    loaderText: { marginTop: 10, color: '#fff', fontSize: 16, fontWeight: '700', },
 });
 
 export default PartyDashboard;

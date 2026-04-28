@@ -264,9 +264,21 @@ const APP_SECTIONS = [
         ],
     },
     {
+        title: 'I',
+        data: [
+            { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
+    {
         title: 'B',
         data: [
             { id: '31', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'space-dashboard', iconColor: '#991070' },
+        ],
+    },
+    {
+        title: 'I',
+        data: [
+            { id: '32', name: 'Creel Issue Return', screen: 'Creel Issue Return', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
 ];
@@ -531,6 +543,16 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                                     },
                                     {
                                         "title": "Party Dashboard",
+                                        "href": "/"
+                                    },
+                                    {
+
+                                        "title": "Weft Issue",
+                                        "href": "/"
+                                    },
+                                    {
+
+                                        "title": "Creel Issue Return",
                                         "href": "/"
                                     },
                                 ]

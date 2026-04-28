@@ -71,6 +71,7 @@ import YarnStock from './components/YarnStock/YarnStock';
 import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 import WftIssue from './components/WftIssue/WftIssue';
+import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
 
 const Stack = createNativeStackNavigator();
 
@@ -720,8 +721,16 @@ export default function App() {
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
+                    }</Stack.Screen> 
+
+                    <Stack.Screen name="Creel Issue Return">{(props) =>
+                      <>
+                        <CreelIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                      </>
                     }</Stack.Screen>                    
                   </Stack.Navigator>
+                  
 
                 </NavigationContainer>
               ) : (

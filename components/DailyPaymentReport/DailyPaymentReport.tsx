@@ -316,7 +316,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     PrpCode: item.prpcode,
                     PrpName: item.grpname,
                     ParName: item.grpname,
-                    ToDaysCollection: item.tranamt,
+                    // ToDaysCollection: item.tranamt,
                     CrInBankAccCollection: item.clramt
                 }));
                 setPOTData(tableData);
@@ -615,7 +615,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 sexename: "Sales Executive",
                 chqno: "Cheque No",
                 chqdate: "Cheque Date",
-                tranamt: "Collection",
+                // tranamt: "Collection",
                 clramt: "Bank Collection",
             };
             const map = {};
@@ -1516,13 +1516,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         // console.log("hiiii")
         const visibleColumns = [
             "PrpName",
-            "ToDaysCollection",
+            // "ToDaysCollection",
             "CrInBankAccCollection"
         ];
 
         const labelMap = {
             PrpName: "Party Name",
-            ToDaysCollection: "Collection",
+            // ToDaysCollection: "Collection",
             CrInBankAccCollection: "Credit in Bank"
         };
 
@@ -1732,7 +1732,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {/* <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
                             <Text style={{
                                 color: "rgba(255,255,255,0.9)",
@@ -1754,7 +1754,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 })}
                             </Text>
 
-                        </View>
+                        </View> */}
 
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
@@ -1984,7 +1984,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                         )}
 
                         {/* Today's Collection */}
-                        <View style={{ marginBottom: 6 }}>
+                        {/* <View style={{ marginBottom: 6 }}>
                             <Text style={{
                                 color: "rgba(255, 255, 255, 0.7)",
                                 fontSize: 11,
@@ -1997,22 +1997,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 fontSize: isAllCard ? 14 : 12,
                                 fontWeight: "bold",
                                 textAlign: 'right',
-                            }}>
-                                {/* ₹{isAllCard
-                                    ? totalToDaysCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })
-                                    : item.ToDaysCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    }) */}
+                            }}>                              
                                 ₹{isAllCard
                                     ? formatAmount(totalToDaysCollection)
                                     : formatAmount(item.ToDaysCollection)
                                 }
                             </Text>
-                        </View>
+                        </View> */}
 
                         {/* Credit in Bank */}
                         <View>
@@ -2147,7 +2138,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                         )}
 
                         {/* Today's Collection */}
-                        <View style={{ marginBottom: 6 }}>
+                        {/* <View style={{ marginBottom: 6 }}>
                             <Text style={{
                                 color: "rgba(255, 255, 255, 0.7)",
                                 fontSize: 11,
@@ -2161,18 +2152,12 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                 fontWeight: "bold",
                                 textAlign: 'right',
                             }}>
-                                {/* ₹{isAllCard
-                                    ? totalToDaysCollection.toLocaleString('en-IN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })
-                                    : item.ToDaysCollection} */}
                                 ₹{isAllCard
                                     ? formatAmount(totalToDaysCollection)
                                     : formatAmount(item.ToDaysCollection)
                                 }
                             </Text>
-                        </View>
+                        </View> */}
 
                         {/* Credit in Bank */}
                         <View>
@@ -2777,7 +2762,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
 
 
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    {/* <View style={{ flexDirection: 'row', alignItems: 'center' }}>
 
                                                         <Text style={{
                                                             color: "rgba(255,255,255,0.9)",
@@ -2802,7 +2787,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                             })}
                                                         </Text>
 
-                                                    </View>
+                                                    </View> */}
 
 
                                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -2965,7 +2950,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
                                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
                                                     {/* ToDaysCollection Total */}
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    {/* <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                                         <Text style={{
                                                             color: "rgba(255,255,255,0.9)",
                                                             fontSize: screenWidth <= 400 ? 10 : 11,
@@ -2986,7 +2971,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                                                 maximumFractionDigits: 2
                                                             })}
                                                         </Text>
-                                                    </View>
+                                                    </View> */}
 
                                                     {/* CrInBankAccCollection Total */}
                                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>

@@ -79,6 +79,10 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
     setForm,
     setSelectedSexe,
     SelectedSexe,
+    internal_dropdown,
+    onExeChangeInternal,
+    selectedInternal,
+
     form
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -88,6 +92,7 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
     const [isExeDropdownOpen, setIsExeDropdownOpen] = useState(false);
     const [checkingDatePickerVisible, setCheckingDatePickerVisible] = useState(false);
     const [checkingDatePickerVisible1, setCheckingDatePickerVisible1] = useState(false);
+    const [isIntDropdownOpen, setIsIntDropdownOpen] = useState(false);
     // 
     const [searchQuery, setSearchQuery] = useState('');
     // const [selectedDesigns, setSelectedDesigns] = useState<DesignData[]>([]);
@@ -105,6 +110,8 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
     const scrollViewRefItem = useRef<ScrollView>(null);
     const [isDesignAccordionOpenItem, setIsDesignAccordionOpenItem] = useState(false);
     const [localItemStatus, setLocalItemStatus] = useState<ItemStatus>(selectedItemStatus || 'All');
+    const isPrpgrpAutoSelected = useRef(false);
+    const isInternalAutoSelected = useRef(false);
 
     const [step, setStep] = useState(1);
 
@@ -255,6 +262,12 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
         return `${day}-${month}-${year}`;
     };
 
+    useEffect(() => {
+        if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "") && !isInternalAutoSelected.current) {
+            onExeChangeInternal(internal_dropdown[0]);
+            isInternalAutoSelected.current = true;
+        }
+    }, [internal_dropdown, selectedInternal, onExeChangeInternal]);
 
     return (
         <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
@@ -405,6 +418,46 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
                                     multiple={true} // Enable multi-select
                                     emptyMessage="No sales executive available"
                                 />
+
+                            </View>
+                            <View style={styles.inputGroup}>
+                                {/* <Text style={styles.label}>Sales Property Group</Text> */}
+                                <TouchableOpacity
+                                    style={styles.dropdownButton}
+                                    onPress={() => setIsIntDropdownOpen(!isIntDropdownOpen)}
+                                >
+                                    <Text style={styles.dropdownText}>{selectedInternal}</Text>
+                                </TouchableOpacity>
+                                {isIntDropdownOpen && (
+                                    <View style={styles.dropdownOptionsContainer}>
+                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
+                                            {/* <TouchableOpacity
+                                                                            style={styles.dropdownOption}
+                                                                            onPress={() => {
+                                                                                onExeChangeInternal(null); // Send empty value
+                                                                                setIsExeDropdownOpen(false);
+                                                                            }}
+                                                                        >
+                                                                            <Text style={styles.dropdownOptionText}>Select</Text>
+                                                                        </TouchableOpacity> */}
+                                            {internal_dropdown.map((internal) => (
+                                                <TouchableOpacity
+                                                    key={internal.value}
+                                                    style={[
+                                                        styles.dropdownOption,
+                                                        selectedInternal === internal.lable && styles.selectedOption,
+                                                    ]}
+                                                    onPress={() => {
+                                                        onExeChangeInternal(internal);
+                                                        setIsIntDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    <Text style={styles.dropdownOptionText}>{internal.lable}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
 
                             </View>
                         </ScrollView>

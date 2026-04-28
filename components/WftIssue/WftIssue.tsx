@@ -15,6 +15,7 @@ import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomDrawer from './CustomDrawer';
 import AddWeftIssueDetail from './AddWeftIssueDetail';
+import WeftIssueItemDrawer from './WeftIssueItemDrawer';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
@@ -96,6 +97,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
     const [data, setdata] = useState([]);
     const [selectedmitem, setselectedmitem] = useState([]);
     const [showSubItemCard, setShowSubItemCard] = useState(false);
+    const [isItemVisible, setIsItemVisible] = useState(false);
 
     console.log("FormState.values", FormState.values);
 
@@ -133,9 +135,13 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
 
-
     const detailopenDrawer = () => setIsDetailVisible(true);
     const detailcloseDrawer = () => setIsDetailVisible(false);
+
+    const openItemDrawer = () => setIsItemVisible(true);
+    const closeItemDrawer = () => setIsItemVisible(false);
+
+
 
     useEffect(() => {
         requestPermission();
@@ -242,178 +248,8 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
         }
     };
 
-
     const handleLoadPress = () => {
         setIsDrawerVisible(false);
-    };
-
-
-    const subitemvalidate = () => {
-        if (!subitemform.WNameCode) {
-            Alert.alert("Validation", "Yarn Main Code required");
-            return false;
-        }
-
-        if (!blendList || blendList.length === 0) {
-            Alert.alert("Validation", "Please select blend");
-            return false;
-        }
-
-        let total = 0;
-
-        for (let i = 0; i < blendList.length; i++) {
-            const per = Number(blendList[i].per);
-
-            if (!per || per <= 0) {
-                Alert.alert("Validation", `Enter valid % for ${blendList[i].name}`);
-                return false;
-            }
-
-            total += per;
-        }
-
-        if (total !== 100) {
-            Alert.alert("Validation", `Total percentage must be 100. Current: ${total}`);
-            return false;
-        }
-
-        if (!subitemform.count_id) {
-            Alert.alert("Validation", "Please select Count");
-            return false;
-        }
-
-        if (!subitemform.ply_id) {
-            Alert.alert("Validation", "Please select Ply");
-            return false;
-        }
-
-        if (!subitemform.others) {
-            Alert.alert("Validation", "Please enter others Value");
-            return false;
-        }
-        if (!subitemform.linkitmcode) {
-            Alert.alert("Validation", "Please enter Sub Item Name");
-            return false;
-        }
-
-        // if (!subitemform.ItmCode) {
-        //     Alert.alert("Validation", "Please select Link Item");
-        //     return false;
-        // }
-
-        return true;  // 🔥 MOST IMPORTANT
-    };
-
-    const handlesubitemadd = async () => {
-        const userPtype = await AsyncStorage.getItem('user_prptype');
-        console.log("yarn type", subitemform.WYarnType)
-        const isValid = subitemvalidate();
-
-        if (!isValid) return;
-        //   if (!subitemvalidate()) return;
-        const finalBlendList = [...blendList];
-        try {
-            setIsLoading(true);
-            const source = axios.CancelToken.source();
-            const Payload = {
-                maincode: subitemform.linkitmcode,
-                denier: subitemform.denier,
-                blendid: subitemform.WBlend,
-                count: subitemform.count_id,
-                ply: subitemform.ply_id,
-                mitmcode: subitemform.mitmcode || '',
-                blend_names: finalBlendList.map(b => ({
-                    id: b.id,
-                    name: b.name,
-                    per: Number(b.per || 0)
-                })),
-                prptype: userPtype,
-                txntype: 'yarn_creation_item_master',
-                yarntype: subitemform.WYarnType,
-                strcode: FormState.values.yarnstrcode,
-                linkitmcode: subitemform.ItmCode || '',
-                other: subitemform.others || ''
-            };
-
-            console.log("Spun Payload:", Payload);
-
-            const response = await axios.post(
-                `${API}/api/modifyyarnsubitem`,
-                Payload,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
-                    cancelToken: source.token
-                }
-            );
-            console.log("spun add response", response);
-            if (response?.data?.success) {
-                const newItemCode = response?.data?.data?.data?.itmcode;
-                Alert.alert(
-                    "Success",
-                    `Item ${newItemCode} Saved successfully.`,
-                    [
-                        {
-                            text: "OK",
-                            onPress: () => {
-                                setIsLoading(true);
-                                setsubitemform({
-                                    blend: '',
-                                    count: '',
-                                    ply: '',
-                                    linkitmcode: '',
-                                    denier: '',
-                                    blend_id: '',
-                                    count_id: '',
-                                    ply_id: '',
-                                    ItmCode: '',
-                                    type_id: '',
-                                    type: '',
-                                    lustre_id: '',
-                                    lustre: '',
-                                    other_id: '',
-                                    name: '',
-                                    Per: '',
-                                    mitmcode: '',
-                                    WBlend: '',
-                                    WYarnType: '',
-                                    WNameCode: '',
-                                    others: ''
-                                });
-                                setBlendList([]);
-                                setselectedcount([]);
-                                setselectedply([]);
-                                setselectedmitem([]);
-                                setselectedothers([]);
-                                setselectedsubitem([]);
-                                setShowSubItemCard(false);
-                                fetchbrowse(activeTab);
-                            }
-                        }
-                    ]
-                );
-            }
-            else if (response?.data?.success === false) {
-                Alert.alert(
-                    "Warning",
-                    response?.data?.message
-                );
-
-            }
-
-        }
-        catch (error) {
-            if (axios.isCancel(error)) {
-                console.log("Request cancelled:", error.message);
-            } else {
-                console.log("API getyarndefault error:", error);
-            }
-        } finally {
-            setIsLoading(false);
-        }
     };
 
     const fetchbrowse = async (tabValue) => {
@@ -460,9 +296,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
         }
     };
 
-    // useEffect(() => {
-    //     soshow();
-    // }, []);
+
 
     return (
         <>
@@ -481,6 +315,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
             <AddWeftIssueDetail
                 isVisible={isDetailVisible}
                 onClose={detailcloseDrawer}
+                onNext={openItemDrawer}
                 selectedYear={selectedYear}
                 onYearChange={setSelectedYear}
                 onLoadPress={handleLoadPress}
@@ -493,6 +328,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 getAllYearData={getAllYearData}
                 setAllYearData={setAllYearData}
                 token={token}
+                navigation={navigation}
             />
 
             <TouchableOpacity style={yarnmanagementsystemstyle.fab} onPress={openDrawer}>
@@ -514,6 +350,12 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 getAllYearData={getAllYearData}
                 setAllYearData={setAllYearData}
                 token={token}
+            />
+
+            <WeftIssueItemDrawer
+                isVisible={isItemVisible}
+                onClose={closeItemDrawer}
+                FormState={FormState}
             />
         </>
     );

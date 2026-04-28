@@ -87,6 +87,11 @@ interface Props {
     rightsMenuApps: Array<string>;
 }
 
+export interface InternalDropdown {
+    lable: string;
+    value: string;
+}
+
 const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected, username, setIsLoggedIn, rightsMenuApps }) => {
     const filterKey = 'all';
     const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +111,21 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     const [activeTab, setActiveTab] = useState<'SalesExecutiveWise'>('SalesExecutiveWise');
     const [activeTab1, setActiveTab1] = useState<'account requests'>('account requests');
     const [selectedProperty, setSelectedProperty] = useState<PropertyData[] | null>(null);
+    const [internal_dropdown, setInternalDropdown] = useState<InternalDropdown[]>(
+        [{
+            lable: 'Internal',
+            value: '1'
+        },
+        {
+            lable: 'External',
+            value: '0'
+        },
+        {
+            lable: 'Both',
+            value: '-1'
+        }
+        ]);
+    const [selectedInternal, setSelectedInternal] = useState<InternalDropdown | "">("");
     const [SelectedSexe, setSelectedSexe] = useState<SexeData[] | null>(null);
     const [selectedPropertyGroup, setSelectedPropertyGroup] = useState<PropertyGroupData | null>(null);
     const [selectedParty, setSelectedParty] = useState<PartyData | null>(null);
@@ -195,6 +215,12 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         setToDate(today);
     }, []);
 
+    useEffect(() => {
+        if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "")) {
+            setSelectedInternal(internal_dropdown[1]);
+        }
+    }, [internal_dropdown, selectedInternal]);
+
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -282,7 +308,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             rpttype: 0,
             sexe: form?.SexeCode || [],
             fromdate: formatDate(form.fromdate),
-            todate: formatDate(form.todate)
+            todate: formatDate(form.todate),
+            internal: selectedInternal?.value || ""
         }
         fetchBrowseData(payload as any);
     };
@@ -298,7 +325,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         };
         try {
             const params = { ...payload };
-            // console.log("🔵 payload browse", params);
+            console.log("🔵 payload browse", params);
             setPayload(params as any);
             const response = await axios.post(`${API}/api/collection_crud`, params, { headers });
             console.log("response", response)
@@ -358,7 +385,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             rpttype: 2,
             txntype: item?.acccode && item.acccode.length > 0
                 ? "collection_acc"
-                : "collection_sexe"
+                : "collection_sexe",
+            internal: selectedInternal?.value || ""
         }
         setSexeLoading(true);
         fetchBrowseDataSEXE(payload as any);
@@ -387,7 +415,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             };
 
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
-            // console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
+            console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
             if (response.data.success) {
                 setSexeLoading(false);
                 const res_data = response.data.data.data.filter(
@@ -437,7 +465,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             fromdate: formatDate(form.fromdate),
             todate: formatDate(form.todate),
             uid: item.uid,
-            srno: item.srno
+            srno: item.srno,
+            internal: selectedInternal?.value || ""
         }
         fetchcarddata(payload);
     };
@@ -454,6 +483,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 "X-Requested-with": "XMLHttpRequest",
             };
 
+            console.log("payload", payload);
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
 
             // console.log("CARD DETAIL RESPONSE:", response?.data);
@@ -2275,9 +2305,10 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 sexe: form?.SexeCode || [],
                 // sexe: payload.sexe,
                 fromdate: detailPayload.fromdate,
-                todate: detailPayload.todate
+                todate: detailPayload.todate,
+                internal: selectedInternal?.value || ""
             };
-            // console.log("Payload", payloadSexe)
+            console.log("Payload", payloadSexe)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
@@ -2400,9 +2431,10 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                 rpttype: 1,
                 sexe: payload?.sexe || [],
                 fromdate: detailPayload.fromdate,
-                todate: detailPayload.todate
+                todate: detailPayload.todate,
+                internal: selectedInternal?.value || ""
             };
-            // console.log("payloadSexe", payloadSexe)
+            console.log("payloadSexe", payloadSexe)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
@@ -3059,6 +3091,10 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     setSelectedSexe={setSelectedSexe}
                     SelectedSexe={SelectedSexe}
                     form={form}
+                    internal_dropdown={internal_dropdown}
+                    selectedInternal={selectedInternal?.lable || 'Select Internal'}
+                    onExeChangeInternal={setSelectedInternal}
+
 
                 // selectedItemStatus={selectedItemStatus}
                 // onItemStatusChange={handleItemStatusChange}

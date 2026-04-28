@@ -163,7 +163,7 @@ const CustomDrawer = (props) => {
                                         <Text style={{ color: '#000' }}>
                                             {FormState.values.fromdate
                                                 ? formatDisplayDate(FormState.values.fromdate)
-                                                : "Select From Date"}
+                                                : formatDisplayDate(new Date())}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -197,7 +197,7 @@ const CustomDrawer = (props) => {
                                         <Text style={{ color: '#000' }}>
                                             {FormState.values.todate
                                                 ? formatDisplayDate(FormState.values.todate)
-                                                : "Select To Date"}
+                                                : formatDisplayDate(new Date())}
                                         </Text>
                                     </TouchableOpacity>
 
@@ -221,6 +221,7 @@ const CustomDrawer = (props) => {
                                         onCancel={() => setCheckingDatePickerVisible1(false)}
                                     />
                                 </View>
+
                                 <View style={{ marginBottom: 10 }}>
                                     <View style={{ flexDirection: 'row' }}>
                                         <TouchableOpacity

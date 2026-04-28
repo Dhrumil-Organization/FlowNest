@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const IS_LOCAL = false; //true = local apis url , false = live api url
 
 export let API: string = IS_LOCAL 
-        ? "http://192.168.13.100:4008" 
+        ? "http://192.168.13.100:4009" 
         : "https://apig.tms-webapp.com";
 
 export let PRINTSTICKER = IS_LOCAL 
@@ -20,7 +20,7 @@ export const initAPI = async (): Promise<string> => {
     
     if (IS_LOCAL) {
 
-        API = "http://192.168.13.100:4008";
+        API = "http://192.168.13.100:4009";
 
     } else {
 

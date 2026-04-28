@@ -12,6 +12,7 @@ import Snackbar from 'react-native-snackbar';
 import FullScreenLoader from '../Loader/Loader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import PartyDropdown from '../Shared/PartyDropdown';
 
 const { height } = Dimensions.get('window');
 
@@ -34,10 +35,20 @@ const AddWeftIssueDetail = (props) => {
     const [getShiftData, setShiftData] = useState([]);
     const [checkingDatePickerVisible, setCheckingDatePickerVisible] = useState(false);
     const [checkingDatePickerVisible1, setCheckingDatePickerVisible1] = useState(false);
+    const [selectedbeam, setSelectedbeam] = useState([]);
+    const [selectedstocktype, setselectedstocktype] = useState([]);
+    const [Beamdata, setBeamdata] = useState([]);
+    const [Designdata, setDesigndata] = useState([]);
+    const [selecteddesign, setselecteddesign] = useState([]);
+    const [getStockTypes, setStockTypes] = useState([
+        { stktypename: 'In house', StkType: 'I' },
+        { stktypename: 'Process house', StkType: 'P' }
+    ]);
+    const [errors, setErrors] = useState({});
+
     let cancelToken: any;
 
     console.log("FormState.values", FormState.values)
-
 
     React.useEffect(() => {
         Animated.timing(slideAnim, {
@@ -59,12 +70,9 @@ const AddWeftIssueDetail = (props) => {
 
     const soshow = async () => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
-
-        // 🔒 guard (important)
         if (!FormState.values.PrpCode || !FormState.values.YearNo) {
             return;
         }
-
         try {
             setIsLoading(true);
 
@@ -121,6 +129,7 @@ const AddWeftIssueDetail = (props) => {
                     values: updatedValues
                 }));
                 checkvoucher(updatedValues);
+                fetchbeam(updatedValues);
             }
         } catch (error) {
             if (axios.isCancel(error)) {
@@ -167,7 +176,7 @@ const AddWeftIssueDetail = (props) => {
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 acccode: '',
-                vouno: values.IssNo,
+                vouno: values.IssNo || '',
                 suffix: values.suffix || '',
                 month: month,
                 uid: values.UId,
@@ -231,6 +240,88 @@ const AddWeftIssueDetail = (props) => {
         }
     };
 
+    const fetchbeam = async (values) => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        try {
+            setIsLoading(true);
+            if (cancelToken?.cancel) cancelToken.cancel();
+            cancelToken = axios.CancelToken.source();
+            const historyPayload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                strcode: values.yarnstrcode,
+                txntype: 'weft_selvedge_issue',
+                date: formatDisplayDate(values.IssDate),
+                uid: values.UId
+            };
+            console.log("beam Payload:", historyPayload);
+            const response = await axios.get(
+                `${API}/api/beam_for_weftissue_help`,
+                getRequestConfig({
+                    params: { ...historyPayload },
+                    cancelToken: cancelToken.token
+                })
+            );
+            console.log("Beam API Response:", response);
+            const data = response?.data?.data || [];
+            if (response?.data?.success && data.length > 0) {
+                setBeamdata(data);
+            } else {
+                setBeamdata([]);
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                console.log("Request cancelled:", error.message);
+            } else {
+                console.log("API beam error:", error);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchDesign = async (values) => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        try {
+            setIsLoading(true);
+            if (cancelToken?.cancel) cancelToken.cancel();
+            cancelToken = axios.CancelToken.source();
+            const historyPayload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                // strcode: values.yarnstrcode,
+                txntype: 'weft_selvedge_issue',
+                date: formatDisplayDate(values.IssDate),
+                uid: values.UId,
+                stktype: values.StkType
+            };
+            console.log("Design Payload:", historyPayload);
+            const response = await axios.get(
+                `${API}/api/orderdesign_for_weftissue_help`,
+                getRequestConfig({
+                    params: { ...historyPayload },
+                    cancelToken: cancelToken.token
+                })
+            );
+            console.log("Design API Response:", response);
+            const data = response?.data?.data || [];
+            if (response?.data?.success && data.length > 0) {
+                setDesigndata(data);
+            } else {
+                setDesigndata([]);
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                console.log("Request cancelled:", error.message);
+            } else {
+                console.log("API beam error:", error);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+
     useEffect(() => {
         if (
             FormState.values.PrpCode &&
@@ -245,19 +336,6 @@ const AddWeftIssueDetail = (props) => {
         onLoadPress();
     }
 
-    // const formatDisplayDate = (d?: Date | string | null) => {
-    //     if (!d) return '';
-    //     const date = typeof d === 'string' ? new Date(d) : d;
-    //     try {
-    //         return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
-    //     } catch {
-    //         const dd = date.getDate().toString().padStart(2, '0');
-    //         const mm = (date.getMonth() + 1).toString().padStart(2, '0');
-    //         const yy = date.getFullYear();
-    //         return `${dd}-${mm}-${yy}`;
-    //     }
-    // };
-
     const formatDisplayDate = (date) => {
         if (!date) return '';
         const d = new Date(date);
@@ -267,11 +345,40 @@ const AddWeftIssueDetail = (props) => {
             }-${d.getFullYear()}`;
     };
 
-    const toISODate = (date) => {
-        return date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const handleSaveNext = () => {
+        const values = FormState.values;
+        let newErrors = {};
+        const validations = [
+            { key: "PrpCode", message: "Please select Property" },
+            { key: "YearNo", message: "Please select Year" },
+            { key: "StkType", message: "Please select Stock Type" },
+            { key: "DsnCode", message: "Please select Design" },
+            { key: "BeamNo", message: "Please select Beam" },
+            { key: "IssNo", message: "Please enter Voucher No" },
+            { key: "month", message: "Invalid Month" }
+        ];
+        validations.forEach(({ key, message }) => {
+            if (!values[key]) {
+                newErrors[key] = message;
+            }
+        });
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            const firstError = Object.values(newErrors)[0];
+            Snackbar.show({
+                text: firstError,
+                duration: Snackbar.LENGTH_SHORT,
+                backgroundColor: "#B00020",
+                textColor: "#fff",
+            });
+            return;
+        }
+        setErrors({});
+        onClose();
+        props.onNext();
     };
 
-    const getToken = () => token
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
 
@@ -284,72 +391,59 @@ const AddWeftIssueDetail = (props) => {
                     {isLoadingMore && <FullScreenLoader />}
                     <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
 
-                        <View style={styles.modalCard}>
+                        <View style={styles.topHeader}>
+                            <TouchableOpacity onPress={onClose}>
+                                <Icon name="arrow-back" size={22} color="#fff" />
+                            </TouchableOpacity>
+                            <Text style={styles.topHeaderTitle}>Weft Issue Detail</Text>
+                            <TouchableOpacity onPress={onClose}>
+                                <Icon name="close" size={22} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
 
-                            <View style={styles.header}>
-                                <Text style={styles.headerTitle}>Weft Issue Detail</Text>
-
-                                <TouchableOpacity onPress={onClose}>
-                                    <Icon name="close" size={22} color="#444" />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* 🔷 HEADER */}
-                            <ScrollView
-                                showsVerticalScrollIndicator={false}
-                                contentContainerStyle={{ paddingBottom: 120 }}
-                            >
-                                {/* PROPERTY */}
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 0 }}
+                        >
+                            <View style={styles.mainCard}>
                                 <View style={styles.field}>
-                                    <Text style={styles.label}>
-                                        Select Property <Text style={{ color: 'red' }}>*</Text>
-                                    </Text>
-
-                                    <View style={{ flex: 1 }}>
-                                        <SearchableDropdown
-                                            data={getAllPropertyData || []}
-                                            labelKey="LngName"
-                                            valueKey="PrpCode"
-                                            placeholder="Choose property..."
-                                            initialValue={selectedProperty}
-                                            onSelect={(item) => {
-                                                setFormState(prev => ({
-                                                    ...prev,
-                                                    values: {
-                                                        ...prev.values,
-                                                        PrpCode: item?.PrpCode || '',
-                                                    }
-                                                }));
-                                            }}
-                                        />
-                                    </View>
+                                    <Text style={styles.label}>Property *</Text>
+                                    <SearchableDropdown
+                                        data={getAllPropertyData || []}
+                                        labelKey="LngName"
+                                        valueKey="PrpCode"
+                                        placeholder="Select Property"
+                                        initialValue={selectedProperty}
+                                        onSelect={(item) => {
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: {
+                                                    ...prev.values,
+                                                    PrpCode: item?.PrpCode || '',
+                                                }
+                                            }));
+                                        }}
+                                    />
                                 </View>
 
-                                {/* YEAR */}
                                 <View style={styles.field}>
-                                    <Text style={styles.label}>
-                                        Select Year <Text style={{ color: 'red' }}>*</Text>
-                                    </Text>
-
-                                    <View style={{ flex: 1 }}>
-                                        <SearchableDropdown
-                                            data={getAllYearData || []}
-                                            labelKey="YearName"
-                                            valueKey="YearNo"
-                                            placeholder="Choose year..."
-                                            initialValue={selectedYear}
-                                            onSelect={(item) => {
-                                                setFormState(prev => ({
-                                                    ...prev,
-                                                    values: {
-                                                        ...prev.values,
-                                                        YearNo: item?.YearNo || '',
-                                                        YearName: item?.YearName || ''
-                                                    }
-                                                }));
-                                            }}
-                                        />
-                                    </View>
+                                    <Text style={styles.label}>Year *</Text>
+                                    <SearchableDropdown
+                                        data={getAllYearData || []}
+                                        labelKey="YearName"
+                                        valueKey="YearNo"
+                                        placeholder="Select Year"
+                                        initialValue={selectedYear}
+                                        onSelect={(item) => {
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: {
+                                                    ...prev.values,
+                                                    YearNo: item?.YearNo || '',
+                                                }
+                                            }));
+                                        }}
+                                    />
                                 </View>
 
                                 <View style={styles.field}>
@@ -387,90 +481,248 @@ const AddWeftIssueDetail = (props) => {
                                             }}
                                             onCancel={() => setCheckingDatePickerVisible(false)}
                                         />
-
-                                        <Icon name="calendar-today" size={18} color="#777" />
+                                        <Icon name="calendar-today" size={18} color="#555" />
                                     </TouchableOpacity>
                                 </View>
 
+                                {/* VOUCHER */}
                                 <View style={styles.field}>
-                                    <Text style={styles.label}>
-                                        Voucher No <Text style={{ color: 'red' }}>*</Text>
-                                    </Text>
+                                    <Text style={styles.label}>Voucher No *</Text>
 
                                     <View style={styles.row3}>
-
                                         <RNTextInput
-                                            style={[styles.input3]}
+                                            style={[styles.input3, { backgroundColor: '#f1f5f9' }]}
                                             value={FormState.values.month || ""}
-                                            placeholder="Month"
                                             editable={false}
                                         />
 
                                         <RNTextInput
-                                            style={[styles.input3]}
+                                            style={styles.input3}
                                             value={FormState.values.IssNo || ""}
-                                            placeholder="Vou No"
+                                            placeholder="No"
                                             onChangeText={(text) => {
-                                                if (text === "" || re.test(text)) {
-                                                    setFormState(prev => ({
-                                                        ...prev,
-                                                        values: {
-                                                            ...prev.values,
-                                                            IssNo: text
-                                                        }
-                                                    }));
-                                                }
+                                                setFormState(prev => ({
+                                                    ...prev,
+                                                    values: {
+                                                        ...prev.values,
+                                                        IssNo: text
+                                                    }
+                                                }));
                                             }}
                                         />
 
                                         <RNTextInput
-                                            style={[styles.input3]}
+                                            style={styles.input3}
                                             value={FormState.values.suffix}
-                                            placeholder="suffix"
+                                            placeholder="Suffix"
                                             onChangeText={(text) => {
-                                                // if (!FormState.values.IssDate) {
-                                                //     Alert.alert("Please select Issue Date first");
-                                                //     return;
-                                                // }
-                                                // if (!FormState.values.IssNo) {
-                                                //     Alert.alert("Please enter Issue No");
-                                                //     return;
-                                                // }
-
                                                 const upperText = text.toUpperCase();
-
-                                                const updatedValues = {
-                                                    ...FormState.values,
-                                                    suffix: upperText
-                                                };
-
                                                 setFormState(prev => ({
                                                     ...prev,
-                                                    values: updatedValues
+                                                    values: {
+                                                        ...prev.values,
+                                                        suffix: upperText
+                                                    }
                                                 }));
-
-                                                checkvoucher(updatedValues);
                                             }}
                                         />
-
                                     </View>
                                 </View>
 
-                            </ScrollView>
+                                {/* BEAM */}
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Beam *</Text>
+                                    <PartyDropdown
+                                        data={Beamdata}
+                                        placeholder="Select Beam"
+                                        labelKey={["BeamNo"]}
+                                        valueKey="BeamNo"
+                                        pageSize={12}
+                                        initialValue={selectedbeam ?? null}
+                                        selected={selectedbeam ?? null}
+                                        type="weftbeam"
+                                        onSelect={(item) => {
+                                            setSelectedbeam(item);
+                                            const updatedValues = {
+                                                ...FormState.values,
+                                                BeamNo: item?.BeamNo || "",
+                                                BeamUId: item?.UId || "",
+                                                WarpLen: item?.WarpLen || "",
+                                                TranDate: item?.TranDate || ""
+                                            };
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: updatedValues
+                                            }));
+                                        }}
+                                        setSelected={(val) => {
+                                            if (!val) {
+                                                setFormState(prev => ({
+                                                    ...prev,
+                                                    values: {
+                                                        ...prev.values,
+                                                        BeamNo: "",
+                                                        BeamUId: "",
+                                                        WarpLen: "",
+                                                        TranDate: ""
+                                                    }
+                                                }));
+                                            } else {
+                                                setFormState(prev => ({
+                                                    ...prev,
+                                                    values: {
+                                                        ...prev.values,
+                                                        BeamNo: val?.BeamNo || "",
+                                                        BeamUId: val?.UId || "",
+                                                        WarpLen: val?.WarpLen || "",
+                                                        TranDate: val?.TranDate || ""
+                                                    }
+                                                }));
+                                            }
+                                        }}
+                                    />
+                                </View>
 
-                            {/* 🔘 BUTTON */}
-                            <TouchableOpacity
-                                style={styles.button}
-                                onPress={handleLoaddata}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator color="#fff" />
-                                ) : (
-                                    <Text style={styles.buttonText}>Load Data</Text>
-                                )}
-                            </TouchableOpacity>
 
-                        </View>
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Warping Date</Text>
+                                    <TouchableOpacity
+                                        style={styles.inputBox}
+                                    // onPress={() => setCheckingDatePickerVisible(true)}
+                                    >
+                                        <Text style={styles.inputText}>
+                                            {FormState?.values?.TranDate}
+                                        </Text>
+                                        {/* <Icon name="calendar-today" size={18} color="#555" /> */}
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Stcok Type *</Text>
+                                    <PartyDropdown
+                                        data={getStockTypes}
+                                        placeholder="Select Stock Type"
+                                        labelKey={["StkType", "stktypename"]}
+                                        valueKey="StkType"
+                                        pageSize={12}
+                                        initialValue={selectedstocktype ?? null}
+                                        selected={selectedstocktype ?? null}
+                                        type="stocktype"
+                                        // onSelect={(item) => {
+                                        //     setselectedstocktype(item);
+                                        //     setFormState(prev => ({
+                                        //         ...prev,
+                                        //         values: {
+                                        //             ...prev.values,
+                                        //             StkType: item?.StkType
+                                        //         }
+                                        //     }));
+                                        // }}
+                                        onSelect={(item) => {
+                                            setselectedstocktype(item);
+
+                                            const updatedValues = {
+                                                ...FormState.values,
+                                                StkType: item?.StkType || ""
+                                            };
+
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: updatedValues
+                                            }));
+
+                                            fetchDesign(updatedValues); // ✅ direct updated values
+                                        }}
+                                        // setSelected={(val) => {
+                                        //     if (!val) {
+                                        //         setFormState(prev => ({
+                                        //             ...prev,
+                                        //             values: {
+                                        //                 ...prev.values,
+                                        //                 StkType: ""
+                                        //             }
+                                        //         }));
+                                        //     } else {
+                                        //         setFormState(prev => ({
+                                        //             ...prev,
+                                        //             values: {
+                                        //                 ...prev.values,
+                                        //                 StkType: val?.StkType || ""
+                                        //             }
+                                        //         }));
+                                        //     }
+                                        // }}
+                                        setSelected={(val) => {
+                                            const updatedValues = {
+                                                ...FormState.values,
+                                                StkType: val?.StkType || ""
+                                            };
+
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: updatedValues
+                                            }));
+
+                                            // if (val) {
+                                            //     fetchDesign(updatedValues); // ✅ call here also
+                                            // }
+                                        }}
+                                    />
+                                </View>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Design *</Text>
+
+                                    <PartyDropdown
+                                        data={Designdata}
+                                        placeholder="Select Beam"
+                                        labelKey={["DsnCode", "DsnName"]}
+                                        valueKey="DsnCode"
+                                        pageSize={12}
+                                        initialValue={selecteddesign ?? null}
+                                        selected={selecteddesign ?? null}
+                                        type="Designdata"
+                                        onSelect={(item) => {
+                                            setselecteddesign(item);
+                                            const updatedValues = {
+                                                ...FormState.values,
+                                                DsnCode: item?.DsnCode || ""
+                                            };
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: updatedValues
+                                            }));
+                                        }}
+                                        setSelected={(val) => {
+                                            if (!val) {
+                                                setFormState(prev => ({
+                                                    ...prev,
+                                                    values: {
+                                                        ...prev.values,
+                                                        DsnCode: ""
+                                                    }
+                                                }));
+                                            } else {
+                                                setFormState(prev => ({
+                                                    ...prev,
+                                                    values: {
+                                                        ...prev.values,
+                                                        DsnCode: val?.DsnCode
+                                                    }
+                                                }));
+                                            }
+                                        }}
+                                    />
+                                </View>
+                            </View>
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={styles.nextButton}
+                            onPress={handleSaveNext}
+                        >
+                            <Text style={styles.nextButtonText}>Save & Next</Text>
+                        </TouchableOpacity>
                     </Animated.View>
                 </View>
             </Modal>
@@ -481,7 +733,7 @@ const AddWeftIssueDetail = (props) => {
 const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: '#e6f0f3',
     },
     drawerContainer: {
         position: 'absolute',
@@ -501,17 +753,12 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-end',
         padding: 10,
     },
-    // label: {
-    //     fontSize: 16,
-    //     marginBottom: 5,
-    //     color: '#000',
-    // },
     scrollableFormContainer: {
         flex: 1,
         padding: 10,
     },
     scrollableFormContent: {
-        paddingBottom: 80, // Extra space for the Load button
+        paddingBottom: 80,
     },
     label1: {
         paddingVertical: 5,
@@ -522,44 +769,22 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         flex: 1,
-        backgroundColor: theme.SURFACE, // 🔥 light grey bg like screenshot
-        // borderTopLeftRadius: 25,
-        // borderTopRightRadius: 25,
-        // paddingHorizontal: 16,
-        // paddingTop: 10
+        backgroundColor: theme.SURFACE,
         borderRadius: 12,
         padding: 12,
         elevation: 2,
         shadowColor: theme.SHADOW,
         marginBottom: 12
     },
-
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 10,
-        borderBottomWidth: 0,
-        // borderColor: '#000'
-    },
-
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#333'
-    },
-
     field: {
         marginTop: 15
     },
-
     label: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#444',
+        color: '#000',
         marginBottom: 6
     },
-
     inputBox: {
         backgroundColor: '#eef0f3', // 🔥 soft grey like your UI
         borderRadius: 14,
@@ -571,28 +796,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#e2e4e8'
     },
-
     inputText: {
-        color: '#333',
+        color: '#000',
         fontSize: 15
-    },
-
-    button: {
-        position: 'absolute',
-        bottom: 20,
-        left: 16,
-        right: 16,
-        backgroundColor: '#0e7490', // 🔥 same theme feel
-        padding: 16,
-        borderRadius: 14,
-        alignItems: 'center',
-        elevation: 5
-    },
-
-    buttonText: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '600'
     },
     dateTrigger: {
         padding: 12,
@@ -601,81 +807,11 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#fafafa'
     },
-
-    loadButton: {
-        position: 'absolute',
-        bottom: 20,
-        left: 20,
-        right: 20,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#007EA7',
-        padding: 14,
-        borderRadius: 10,
-        elevation: 5
-    },
-
-    loadText: {
-        color: '#fff',
-        marginLeft: 8,
-        fontWeight: '600'
-    },
-    cartonTitleContainer: {
-        alignItems: "center",
-        marginBottom: 12
-    },
-    cartonTitle: {
-        backgroundColor: "#E3F2FD",
-        color: "#007EA7",
-        fontSize: 15,
-        fontWeight: "600",
-        paddingVertical: 6,
-        paddingHorizontal: 20,
-        borderRadius: 20,
-        overflow: "hidden"
-    },
-    switchGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "space-between"
-    },
-    switchItem: {
-        width: "48%",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 10,
-        paddingVertical: 6
-    },
-    centerFabButton: {
-        position: "absolute",
-        bottom: 25,
-        alignSelf: "center",
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#17b85a",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 30,
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOpacity: 0.3,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 5
-    },
-    centerFabText: {
-        color: "#fff",
-        fontWeight: "600",
-        fontSize: 14,
-        marginLeft: 6
-    },
     row3: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         gap: 8 // RN new version
     },
-
     input3: {
         flex: 1, // 👈 equal width for all 3
         borderWidth: 1,
@@ -684,8 +820,78 @@ const styles = StyleSheet.create({
         padding: 10,
         backgroundColor: '#fff'
     },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        marginTop: 12,
+        elevation: 2
+    },
+    cardTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 10,
+        color: '#000'
+    },
+    topHeader: {
+        backgroundColor: '#0e7490',
+        paddingTop: 30,
+        paddingBottom: 15,
+        paddingHorizontal: 15,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    topHeaderTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600'
+    },
+    mainCard: {
+        backgroundColor: '#fff',
+        margin: 12,
+        borderRadius: 16,
+        padding: 14,
+        elevation: 3
+    },
+    nextButton: {
+        backgroundColor: '#0e7490',
+        margin: 12,
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center'
+    },
+    nextButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 15
+    },
+    inputWrapper: {
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+        borderRadius: 12,
+        padding: 6,
+        backgroundColor: '#fff'
+    },
+
+    errorBorder: {
+        borderColor: '#ef4444' // red
+    },
+
+    errorText: {
+        color: '#ef4444',
+        fontSize: 12,
+        marginTop: 4,
+        marginLeft: 2
+    },
+    label11: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginBottom: 6,
+        color: '#111827'
+    },
     dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
-    dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    // dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
 });
 
 export default AddWeftIssueDetail;

@@ -128,6 +128,9 @@ interface BeamData {
     IsJobOut: string;
     ischecked: string;
     reason: string;
+    BeamBalance: string;
+    PipeName: string;
+    BeamStatus: string;
 }
 interface Operator {
     EmpCode: string;
@@ -202,7 +205,10 @@ interface SubItem {
     sh_name: string
     strcode: string
 }
-
+interface stock {
+    StkType: string;
+    stktypename: string
+}
 
 
 const extractLocation = (addr?: string) => {
@@ -370,6 +376,33 @@ const PartyDropdown: React.FC<Props> = ({
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         PrpCode : {item.PrpCode || '—'}
                     </Text>
+                </View>
+            </View>
+        );
+    };
+    const renderRowContentWeftBeamData = (item: BeamData, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.BeamNo)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamNo : {item.BeamNo || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        TranDate : {item.TranDate || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamBalance : {item.BeamBalance || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        PipeName : {item.PipeName || '—'}
+                    </Text>
+                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamStatus : {item.BeamStatus || '—'}
+                    </Text> */}
                 </View>
             </View>
         );
@@ -626,9 +659,9 @@ const PartyDropdown: React.FC<Props> = ({
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.name || '—'}
                     </Text>
-                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.id || '—'}
-                    </Text> */}
+                    </Text>
                 </View>
             </View>
         );
@@ -638,12 +671,12 @@ const PartyDropdown: React.FC<Props> = ({
         return (
             <View style={rowStyles.rowInner}>
                 <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.count)}</Text>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.name)}</Text>
                 </View>
 
                 <View style={rowStyles.main}>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.count || '—'}
+                        {item.name || '—'}
                     </Text>
                     {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.id || '—'}
@@ -748,6 +781,64 @@ const PartyDropdown: React.FC<Props> = ({
         );
     };
 
+    const renderRowContentStock = (item: stock, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.stktypename)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.stktypename || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.StkType || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+
+    const renderRowContentWeftDesign = (item: DesignData, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.DsnName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Design : {`${item.DsnName || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.DsnCode || '—'}`}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentpartydata = (item: Party, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.accountname)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Party : {`${item.accountname || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.acccode || '—'}`}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
     return (
         <View>
             {/* If loading: show a disabled trigger with spinner */}
@@ -795,9 +886,13 @@ const PartyDropdown: React.FC<Props> = ({
                                                                                             : type == 'ply' ? renderRowContentply
                                                                                                 : type == 'type' ? renderRowContenttype
                                                                                                     : type == 'lustre' ? renderRowContentlustre
-                                                                                                        : type == 'Item1' ? renderRowContentItem1                                                                                                       
-                                                                                                        : type == 'SubItem' ? renderRowContentSubItem
-                                                                                                            : renderRowContentEmpty}
+                                                                                                        : type == 'Item1' ? renderRowContentItem1
+                                                                                                            : type == 'SubItem' ? renderRowContentSubItem
+                                                                                                                : type == 'stocktype' ? renderRowContentStock
+                                                                                                                    : type == 'weftbeam' ? renderRowContentWeftBeamData
+                                                                                                                        : type == 'Designdata' ? renderRowContentWeftDesign
+                                                                                                                            : type == 'partydata' ? renderRowContentpartydata
+                                                                                                                                : renderRowContentEmpty}
                 />
             )}
 

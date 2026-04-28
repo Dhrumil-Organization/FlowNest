@@ -3,23 +3,16 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated, ScrollView, 
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import qs from 'qs';
 import axios from 'axios';
-import { FlashList } from '@shopify/flash-list';
-import {
-    format,
-
-} from 'date-fns';
+import { format } from 'date-fns';
 import HeaderBar from '../HeaderBar/HeaderBar';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import CustomDrawer from './CustomDrawer';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload, ReceivablesPrpgroup, InternalDropdown, DashPrp, DashParty, DashSubHead, DashSexe, DashAccount, ReceivablesSummary, ReceivablesDetails } from './Modal';
-import ProdOrderTrackingCard from './ProdOrderTrackingCard';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import theme from '../../android/app/src/theme';
 import LinearGradient from 'react-native-linear-gradient';
-import Ticker from '../../common/Ticker';
 import { TableData } from './data';
 import { API } from '../../common/API/dynamicAPI';
-import { fetchPropertyData,getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
+import { normalizePrptype, saveLargeData, readPrptypeCache, fetchPropertyData, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
 import SummaryTable from './SummaryTable';
 import PartyOverlay from './PartyOverlay';
 import LedgerOverlay from './LedgerOverlay';
@@ -49,7 +42,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [ledgerData, setLedgerData] = useState([]);
     const [outstandingData, setOutstandingData] = useState([]);
     const [CustomerRateData, setCustomerRateData] = useState([]);
-    const [getCardData, setCardData] = useState(TableData);
     const [internal_dropdown, setInternalDropdown] = useState<InternalDropdown[]>(
         [{
             lable: 'Internal',
@@ -72,7 +64,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
     const [selectedPrpgrp, setSelectedPrpGrp] = useState<ReceivablesPrpgroup | "">("");
     const [selectedInternal, setSelectedInternal] = useState<InternalDropdown | "">("");
-    // const [selectedInternal, setSelectedInternal] = useState<string>('1');
     const [exeData, setExeData] = useState<ExeData[]>([]);
     const [designData, setDesignData] = useState<DesignData[]>([]);
     const [itemData, setItemData] = useState<ItemData[]>([]);
@@ -87,7 +78,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
     const [gePOTData, setPOTData] = useState<POTData[]>([])
     const [getpayload, setPayload] = useState<CardPayload[]>([])
-    // const [getUserRole, setUserRole] = useState([])
     const [getdashPrp, setdashPrp] = useState<DashPrp[]>([])
     const [getdashParty, setdashParty] = useState<DashParty[]>([])
     const [getdashSexe, setdashSexe] = useState<DashSexe[]>([])
@@ -101,8 +91,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [selectedParties, setSelectedParties] = useState({});
     const [mianPaylaod, setMianPaylaod] = useState({});
     const [filteredData, setFilteredData] = useState([]);
-    const [filteredDataDetails, setFilteredDataDetails] = useState([]);
-    const [detailSearchQuery, setDetailSearchQuery] = useState('');
     const [filteredDetails, setFilteredDetails] = useState([]);
     const [visibleCards, setVisibleCards] = useState(5);
     const [visibleSummaryItems, setVisibleSummaryItems] = useState(5);
@@ -112,7 +100,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [activeCard, setActiveCard] = useState(null);
     const [getActiveCardDetails, setActiveCardDetails] = useState(null);
     const [summaryDrawerVisible, setSummaryDrawerVisible] = useState(false);
-    // const [hideprpGroup, sethideprpGroup] = useState(false);
     const summaryVisibleRef = useRef(false);
     const searchRef = useRef(searchQueryPOT);
     const searchRefDetails = useRef(searchQueryPOTDetails);
@@ -120,38 +107,15 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const [partyOverlayVisible, setPartyOverlayVisible] = useState(false);
     const [getPropertyData, setPropertyData] = useState<PropertyData[]>([]);
     const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
-    // useEffect(() => {
-    //     const initializeApp = async () => {
-    //         try {
-
-    //             const role = await AsyncStorage.getItem('user_details_role');
-
-    //             setUserRole(JSON.parse(role as any));
-
-
-
-    //         } catch (error) {
-    //             console.error("Initialization error:", error);
-
-    //         } finally {
-    //             // setIsLoading(false);
-    //         }
-    //     };
-
-    //     initializeApp();
-    // }, []);
 
     useEffect(() => {
         summaryVisibleRef.current = summaryDrawerVisible;
     }, [summaryDrawerVisible]);
 
-
     useEffect(() => {
         const timeout = setTimeout(() => {
             searchRef.current = searchQueryPOT;
 
-            // const filtered = getCardData[0]?.data?.outsummary?.filter(item =>
-            console.log('getOutSummary:', getOutSummary);
             const filtered = getOutSummary.filter(item =>
                 Object.values(item).some(val =>
                     String(val).toLowerCase().includes(searchQueryPOT.toLowerCase())
@@ -159,12 +123,10 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             );
 
             setFilteredData(filtered || []);
-        }, 250); // 👈 debounce
+        }, 250);
 
         return () => clearTimeout(timeout);
     }, [searchQueryPOT, getOutSummary]);
-
-
 
     useEffect(() => {
         const filtered = getOutCardData.filter(item =>
@@ -173,25 +135,19 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         setFilteredCards(filtered);
     }, [searchQueryPOTCard, getOutCardData]);
 
-
-    // For Internal Dropdown
     useEffect(() => {
         if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "")) {
             setSelectedInternal(internal_dropdown[1]);
         }
     }, [internal_dropdown, selectedInternal]);
 
-    // For Property Group Dropdown
     useEffect(() => {
         if (receivables_prpgroup.length > 0 && (!selectedPrpgrp || selectedPrpgrp === "")) {
             setSelectedPrpGrp(receivables_prpgroup[0]);
         }
     }, [receivables_prpgroup, selectedPrpgrp]);
 
-
-
     useEffect(() => {
-        console.log('ddd:', selectedAccCode, getOutDetails);
         const details = getOutDetails?.filter(
             (detail) => detail.ACCCODE === selectedAccCode
         );
@@ -200,25 +156,12 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 String(val).toLowerCase().includes(searchQueryPOTDetails.toLowerCase())
             )
         );
-        console.log('filtered:', filtered);
         setFilteredDetails(filtered || []);
     }, [searchQueryPOTDetails, selectedAccCode, getOutDetails]);
-
-
-
-    // const onDashboardCardPress = (card) => {
-    //     setActiveCard(card.slab);
-    //     console.log('Card Pressed:', card);
-    //     setActiveCardDetails(card);
-    //     setSummaryDrawerVisible(true);
-    // };
 
     const onDashboardCardPress = (card) => {
         setActiveCard(card.slab);
         setActiveCardDetails(card);
-        // setSummaryDrawerVisible(true);
-
-        // Pass the card's caption as CardName
         handleConfirmActionNew(
             selectedDashPrp,
             selectedDashParty,
@@ -226,30 +169,17 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             selectedDashSubHead,
             selectedDashAccount,
             card?.caption,
-            1, // <-- Pass caption as CardName
+            1,
             card
         );
     };
 
+    const loadMoreSummaryItems = () => { setVisibleSummaryItems((prev) => prev + 5); };
 
+    const loadMoreDetailItems = () => { setVisibleDetailItems((prev) => prev + 5); };
 
+    const loadMoreCards = () => { setVisibleCards((prev) => prev + 5); };
 
-    // Load more summary items
-    const loadMoreSummaryItems = () => {
-        setVisibleSummaryItems((prev) => prev + 5);
-    };
-
-    // Load more detail items
-    const loadMoreDetailItems = () => {
-        setVisibleDetailItems((prev) => prev + 5);
-    };
-
-    // Load more dashboard cards
-    const loadMoreCards = () => {
-        setVisibleCards((prev) => prev + 5);
-    };
-
-    // Generate unique key for table rows
     const generateUniqueKey = (prefix, index, item) => {
         return `${prefix}-${index}-${Math.random().toString(36).substr(2, 9)}`;
     };
@@ -261,17 +191,11 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         }));
     };
 
-    const toggleLastSync = () => {
-        setShowLastSync(!showLastSync);
-    };
-
-
+    const toggleLastSync = () => { setShowLastSync(!showLastSync); };
 
     const chacheData = useCallback(async () => {
         setSyncLoading(true);
         try {
-            // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
-            // const receivables_prpgroup_from_cache = await AsyncStorage.getItem('receivables_prpgroup');
             const responsesync = await axios.get(
                 // 'https://apig.tms-webapp.com/api/dashprpgrp',
                 `${API}/api/dashprpgrp`,
@@ -288,22 +212,17 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             );
             if (responsesync.data.success === true) {
                 setSyncLoading(false);
-                console.log('🔵 Sync API Response:', responsesync.data.data.dashlastsync, '🔵 Sync API Response Prpgroup:', responsesync.data.data.prpgroup);
                 const receivables_sync_date_api = responsesync.data.data.dashlastsync || '';
                 const receivables_prpgroup_api = responsesync.data.data.prpgroup || '';
-                console.log('🔵 receivables_sync_date_api', receivables_sync_date_api, '🔵 receivables_prpgroup_api', receivables_prpgroup_api);
 
                 setreceivables_sync_date(receivables_sync_date_api);
                 setreceivables_prpgroup(receivables_prpgroup_api);
             }
-            // const mastersyncData = await AsyncStorage.getItem('mastersyncData');
-
         } catch (error) {
             setSyncLoading(false);
             console.error("Token check error:", error);
         }
     }, []);
-
 
     const dashProperty = useCallback(async (selectedPrpgrp) => {
 
@@ -313,8 +232,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 prptype: selectedPrpgrp?.PrpTypeCode,
                 txntype: '/receivables-view'
             }
-            // const receivables_sync_date_from_cache = await AsyncStorage.getItem('receivables_sync_date');
-            // const receivables_prpgroup_from_cache = await AsyncStorage.getItem('receivables_prpgroup');
             const responseprp = await axios.get(
                 `${API}/api/dashprp`,
                 {
@@ -330,13 +247,9 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             );
             if (responseprp.data.success === true) {
                 setdashPropertyLoading(false);
-                // setSyncLoading(false);
-                console.log('🔵 dashPrp API Response:', payload, responseprp);
                 const maindata = responseprp.data.data.prp;
                 setdashPrp(maindata);
             }
-
-
         } catch (error) {
             setdashPropertyLoading(false);
             console.error("Token check error:", error);
@@ -388,13 +301,11 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             );
             if (responseparty.data.success === true) {
                 setdashPartyLoading(false);
-                console.log('🔵 dashParty API Response:', payload, responseparty);
                 const maindata = responseparty.data.response.data;
                 setdashParty(maindata);
             }
             if (responsesexe.data.success === true) {
                 setdashSexeLoading(false);
-                console.log('🔵 dashSexe API Response:', payloadSexe, responsesexe);
                 const maindataSexe = responsesexe.data.response.data;
                 setdashSexe(maindataSexe);
             }
@@ -407,7 +318,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
     const dashSubHead = useCallback(async (selectedPrpgrp, selectedDashPrp) => {
         setdashSubHeadLoading(true);
-        console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
 
         const payload = {
             prptype: selectedPrpgrp?.PrpTypeCode,
@@ -422,47 +332,26 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             'X-Requested-with': 'XMLHttpRequest',
         };
         try {
-            // const response = await axios.post(`https://apig.tms-webapp.com/api/get_dashoutshead`, payload, { headers });
             const response = await axios.post(`${API}/api/get_dashoutshead`, payload, { headers });
             if (response.data.success === true) {
                 setdashSubHeadLoading(false);
-                // Alert.alert('No Data Found');
-                console.log('🔵 dashSubHead API Response:', payload, response);
                 const maindata = response.data.data.data;
                 setdashSubHead(maindata);
 
             }
         } catch (error) {
             setdashSubHeadLoading(false);
-            // setIsLoading(false);
-            // Alert.alert('Server Error');
-
         }
-
-
     }, []);
 
-
-
-    // const dashAccount = useCallback(async (selectedPrpgrp, selectedInternal, selectedDashParty, selectedDashPrp, selectedDashSubHead, selectedDashSexe) => {
     const dashAccount = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead) => {
         setAccountLoading(true);
-        console.log('🔵 🔵I am Calling1 dashAccount');
-        console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
-        if (
-            !selectedPrpgrp ||
-            !selectedInternal
-        ) {
-            console.log('⚠️ Required selections are missing. Skipping dashAccount call.');
-            return;
-        }
         const formatDate123 = (rawDate: any) => {
             let day = rawDate.getDate().toString().padStart(2, '0') || '';
-            let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || ''; // Month is 0-indexed
+            let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || '';
             let year = rawDate.getFullYear() || '';
             return `${year}-${month}-${day}`;
         };
-        // setAccountLoading(true);
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const fromdate = formatDate123(firstDayOfMonth);
@@ -471,9 +360,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         const partyCodesArray = selectedDashParty.map(item => item.acccode);
         const subHeadArray = selectedDashSubHead.map(item => item.SHead);
         const sexeArray = selectedDashSexe.map(item => item.Code);
-        console.log('🔵 🔵I am Callin2 dashAccount');
         try {
-            console.log('🔵 🔵I am Calling3 dashAccount');
             const payload = {
                 prptype: selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
@@ -500,22 +387,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 txntype: '/receivables-view'
             };
 
-            // const response = await axios.get(
-            //     'https://apig.tms-webapp.com/api/get_dashparty',
-            //     {
-            //         headers: {
-            //             Authorization: `Bearer ${token}`,
-            //             'Content-Type': 'application/javascript',
-            //             Accept: 'application/json'
-            //         },
-            //         params: payload
-            //     }
-            // );
-
-            // Use qs to stringify the payload
             const queryString = qs.stringify(payload, { arrayFormat: 'brackets' });
 
-            // const response = await axios.get('https://apig.tms-webapp.com/api/get_dashparty', {
             const response = await axios.get(`${API}/api/get_dashparty`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -528,9 +401,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
             if (response.data.success == true) {
                 setAccountLoading(false);
-                console.log('🔵 dashAccount API Response:', response);
                 setdashAccount(response.data.data.data);
-                // Handle response data here
             }
         } catch (error) {
             setAccountLoading(false);
@@ -540,37 +411,28 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         }
     }, [selectedPrpgrp, selectedInternal]);
 
-
-
     useEffect(() => {
-        // const unsubscribe = navigation.addListener('focus', () => {
-        //     chacheData();
-        // })
         if (selectedPrpgrp) {
             dashProperty(selectedPrpgrp);
             dashParty(selectedPrpgrp);
         }
     }, [selectedPrpgrp]);
+
     useEffect(() => {
         if (selectedPrpgrp) {
             dashSubHead(selectedPrpgrp, selectedDashPrp);
         }
     }, [selectedPrpgrp, selectedDashPrp]);
 
-    console.log('🔵 receivables_sync_date', receivables_sync_date);
-    console.log('🔵 receivables_prpgroup', receivables_prpgroup);
-
     useEffect(() => {
         if (contentWidth > 0 && containerWidth > 0) {
             Animated.loop(
                 Animated.sequence([
-                    // Scroll left to right (negative to positive)
                     Animated.timing(scrollPosition, {
-                        toValue: containerWidth, // Scroll full container width
-                        duration: 15000, // 15 seconds for full scroll
+                        toValue: containerWidth,
+                        duration: 15000,
                         useNativeDriver: true,
                     }),
-                    // Instant reset to start position
                     Animated.timing(scrollPosition, {
                         toValue: 0,
                         duration: 0,
@@ -583,12 +445,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
     }, [contentWidth, containerWidth]);
 
-
-
-
     const rowsPerPage = 20;
 
-    // Set default dates
     useEffect(() => {
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -600,7 +458,10 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         const loadProperty = async () => {
             const getdata = await fetchPropertyData(token);
             setPropertyData(getdata);
-            console.log("prp & year", getdata);
+
+            if (getdata && getdata.length > 0) {
+                setSelectedProperty(getdata[0]);
+            }
         };
         loadProperty();
     }, [token]);
@@ -608,11 +469,9 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const getCurrentFinancialYear = () => {
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
-        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
-
-        // Financial year starts in April
+        const currentMonth = currentDate.getMonth() + 1;
         const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
-        return financialYear.toString().substring(2); // Return last two digits of the year
+        return financialYear.toString().substring(2);
     };
 
     let cancelToken: any;
@@ -627,12 +486,9 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         cancelToken: cancelToken?.token,
     });
 
-    console.log("Party - Dashboard selectedYear:", selectedYear);
-
     const fetchData = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        // setIsLoading(true);
         try {
             const payload = {
                 prpcode: 'SIP',
@@ -643,7 +499,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 fetch: 'salesexe'
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/get_criterion`,
                 `${API}/api/get_criterion`,
                 getRequestConfig({
                     params: {
@@ -658,28 +513,20 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             );
             console.log('🔵 payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data Sexe:', response.data.response.data);
                 setExeData(response.data.response.data);
                 fetchDesign();
-                // fetchItem();
-
-                // setAllHistoryData([])
-            } else {
-                // setData([]);
-            }
+            } else { }
         } catch (error) {
             if (!axios.isCancel(error)) {
                 Alert.alert('Error', `Server error: ${error}`);
             }
         } finally {
-            // setIsLoading(false);
         }
     };
 
     const fetchDesign = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        // setIsLoading(true);
         try {
             const payload = {
                 prpcode: 'SIP',
@@ -693,7 +540,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 txntype: 'production_order_track'
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/getdesign`,
                 `${API}/api/getdesign`,
                 getRequestConfig({
                     params: {
@@ -709,40 +555,24 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     }
                 })
             );
-            console.log('🔵 design payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data:', response.data.response.data);
                 setDesignData(response.data.response.data);
                 fetchItem();
-                // setAllHistoryData([])
             } else {
-                // setData([]);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
                 Alert.alert('Error', `Server error: ${error}`);
             }
         } finally {
-            // setIsLoading(false);
         }
     };
 
     const fetchItem = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        // setIsLoading(true);
         try {
             const payload = {
-                // prpcode: 'SIP',
-                // yearno: getCurrentFinancialYear(),
-                // strcode: '012',
-                // itmcode: '',
-                // dsncode: '',
-                // shdcode: '',
-                // page: page + 1,
-                // limit: rowsPerPage,
-                // fetch: 'itm',
-                // txntype: 'production_order_track'
                 prpcode: 'SIP',
                 yearno: getCurrentFinancialYear(),
                 strcode: '012',
@@ -755,7 +585,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 issdate: ''
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/get_criterion`,
                 `${API}/api/get_criterion`,
                 getRequestConfig({
                     params: {
@@ -772,20 +601,14 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     }
                 })
             );
-            console.log('🔵 item payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data:', response.data.response.data);
                 setItemData(response.data.response.data);
-                // setAllHistoryData([])
-            } else {
-                // setData([]);
-            }
+            } else { }
         } catch (error) {
             if (!axios.isCancel(error)) {
                 Alert.alert('Error', `Server error: ${error}`);
             }
         } finally {
-            // setIsLoading(false);
         }
     };
 
@@ -800,46 +623,28 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         return `${day}-${month}-${year}`;
     };
 
-    const handleConfirmAction = useCallback(async ( selectedProperty) => {
+    const handleConfirmAction = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0) => {
         setIsLoading(true);
 
-        console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 selectedProperty', selectedProperty, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
-        if (
-            !selectedPrpgrp
-        ) {
-            console.log('⚠️ Required selections are missing. Skipping Table call.');
-            return;
-        }
-        // const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
-        const prpCodesArray = selectedProperty ? [selectedProperty.PrpCode] : [];
-        const prptype = selectedProperty ? selectedProperty.PrpOf : "";
-
-        console.log('🔵 🔵prpCodesArray ======>>>>>>> ',prpCodesArray);
-        console.log('🔵 🔵prptype ======>>>>>>> ',prptype);
-        console.log('🔵 🔵selectedProperty ======>>>>>>> ',selectedProperty);
-
+        const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
         const partyCodesArray = selectedDashParty.map(item => item.acccode);
-        console.log('🔵 🔵I am Callin2 Table');
+        const subHeadArray = selectedDashSubHead.map(item => item.SHead);
+        const sexeArray = selectedDashSexe.map(item => item.Code);
+        const accountArray = selectedDashAccount.map(item => item.AccCode);
+        const fdate = fromDate ? format(fromDate, 'yyyy-MM-dd') : null;
+        const tdate = toDate ? format(toDate, 'yyyy-MM-dd') : null;
         try {
-            console.log('🔵 🔵I am Calling3 Table');
             const payloadParty = {
-                prptype: prptype, // ✅ from selectedProperty
-                prpcodes: prpCodesArray, // ✅ ["PSD"]
-                // prptype: selectedPrpgrp?.PrpTypeCode, 
-                // prpcodes: prpCodesArray && prpCodesArray,
+                prptype: selectedPrpgrp?.PrpTypeCode,
+                prpcodes: prpCodesArray && prpCodesArray,
                 year: selectedYear,
-                // yearno: selectedYear?.slice(0, 4).slice(-2),
-                yearno: selectedYear?.slice(-2),
-                // parcode: selectedDashParty && selectedDashParty[0]?.ParCode,
+                yearno: selectedYear?.slice(0, 4).slice(-2),
                 parcode: partyCodesArray && partyCodesArray,
                 fetch: 'dr',
                 dashview: 'outstanding',
                 txntype: '/receivables-view'
             }
-            
-            
-            
+            console.log('🔵 Table party API Payload:', payloadParty);
             const responseparty = await axios.get(
                 // 'https://apig.tms-webapp.com/api/get_criterion',
                 `${API}/api/get_criterion`,
@@ -855,18 +660,11 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 }
             );
 
-            setMianPaylaod(payloadParty)
-
-            console.log('🔵 mianPaylaod:', mianPaylaod);
-            console.log('🔵 Table party API Payload:', payloadParty);
-
-            console.log('I am Calling4 Table', payloadParty, responseparty);
-            console.log('responseparty', responseparty);
+            setMianPaylaod(payloadParty);
             const data = responseparty.data.response.data || [];
 
 
             if (responseparty.data.success == true) {
-                console.log('🔵 Table API Response:', responseparty, data);
                 closeDrawer();
                 setSummaryDrawerVisible(true);
                 setOutSummary(data);
@@ -881,24 +679,15 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
     const handleConfirmActionNew = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0, card) => {
         setIsLoading(true);
-        console.log('🔵 CardName:', CardName); // Debug log
-        console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 🔵 Selected Card', card);
-        console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
-        if (
-            !selectedPrpgrp ||
-            !selectedInternal
-        ) {
-            console.log('⚠️ Required selections are missing. Skipping Table call.');
+        if (!selectedPrpgrp || !selectedInternal) {
             return;
         }
         const formatDate123 = (rawDate: any) => {
             let day = rawDate.getDate().toString().padStart(2, '0') || '';
-            let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || ''; // Month is 0-indexed
+            let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || '';
             let year = rawDate.getFullYear() || '';
             return `${year}-${month}-${day}`;
         };
-        // setAccountLoading(true);
         const today = new Date();
         const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const fromdate = formatDate123(firstDayOfMonth);
@@ -907,9 +696,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         const subHeadArray = selectedDashSubHead.map(item => item.SHead);
         const sexeArray = selectedDashSexe.map(item => item.Code);
         const accountArray = selectedDashAccount.map(item => item.AccCode);
-        console.log('🔵 🔵I am Callin2 Table');
         try {
-            console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
                 accounts: accountArray ? accountArray : [],
@@ -940,24 +727,19 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode || "",
                 txntype: '/receivables-view'
             };
-            console.log('🔵 Table API Payload:', payload);
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
 
-            // const response = await axios.post(`https://apig.tms-webapp.com/api/dashdata`, payload, { headers });
             const response = await axios.post(`${API}/api/dashdata`, payload, { headers });
             console.log('🔵 🔵I am Calling4 Table', payload, response);
             const data = response.data.data?.dashoutcards || [];
             const data1 = response.data.data?.outdetail || [];
-            console.log('🔵 ddd', data1);
             const data2 = response.data.data?.outsummary || [];
 
-
             if (response.data.success == true) {
-                console.log('🔵 Table API Response:', response);
                 if (data && data.length > 0 && data1 && data1.length > 0 && data2 && data2.length > 0) {
                     setIsDrawerVisible(false);
                     setIsLoading(false);
@@ -972,10 +754,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     setOutDetails([]);
                     setOutSummary([]);
                 }
-
-
-                // setdashAccount(response.data.data.data);
-                // Handle response data here
             }
         } catch (error) {
             setIsLoading(false);
@@ -985,34 +763,142 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         }
     }, [selectedPrpgrp, selectedInternal]);
 
-    console.log("getPropertyData -----", getPropertyData)
+    const loadDataInBatches = async (
+        data: T[],
+        setState: React.Dispatch<React.SetStateAction<T[]>>,
+        dataType: string,
+        batchSize: number = 200
+    ): Promise<void> => {
+        if (!data || data.length === 0) {
+            return;
+        }
+        setState([]);
+        for (let i = 0; i < data.length; i += batchSize) {
+            const batch = data.slice(i, i + batchSize);
+            setState(prev => [...prev, ...batch]);
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    };
 
-    const handleReportClick = useCallback(async (action, party, mianPaylaod,selectedProperty) => {
+    const fetchpartylist = async (selectedProperty, forceRefresh = false) => {
         setIsLoading(true);
-        console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 handleReport Click', action, party, mianPaylaod);
-        console.log("------getPropertyData -----", getPropertyData)
-        console.log("👉 getPropertyData FULL:", getPropertyData);
-        
+
+        const prpcode =
+            typeof selectedProperty === 'object'
+                ? selectedProperty?.PrpCode
+                : selectedProperty;
+
+        const yearno = selectedYear?.slice(-2);
+
+        const prptypeRaw =
+            typeof selectedProperty === 'object'
+                ? selectedProperty?.PrpOf ?? selectedProperty?.PrpCode
+                : selectedProperty;
+
+        const prptype = normalizePrptype(prptypeRaw);
+
+        const payload = {
+            prpcode,
+            prptype,
+            yearno,
+            strcode: "0",
+            txntype: "sales_order",
+            partytype: "p",
+            type: "s",
+            page: 1,
+            limit: 20,
+            search: "",
+            isceo: 0,
+            partype: 0,
+            grntype: "",
+            fetch: "",
+            acccode: "",
+            billdate: "",
+            strtype: "",
+            isfaint: "",
+            user_id: 1,
+        };
+
+        try {
+            const response = await axios.get(
+                `${API}/api/mobaccountbasic`,
+                getRequestConfig({ params: payload })
+            );
+
+            console.log("✅ mobaccountbasic RESPONSE:", response.data);
+
+            const rawData =
+                response?.data?.response?.data ||
+                response?.data?.data ||
+                [];
+
+            if (response.data?.success && Array.isArray(rawData)) {
+
+                const accounts = rawData.map(item => ({
+                    ...item,
+
+                    acccode: item.acccode || item.AccCode,
+
+                    accname:
+                        item.accountname ||
+                        item.accname ||
+                        item.AccName ||
+                        "",
+
+                    ParCode: item.acccode || item.AccCode,
+                    ParName:
+                        item.accountname ||
+                        item.accname ||
+                        item.AccName ||
+                        ""
+                }));
+
+                setdashParty(accounts);
+
+                if (accounts.length > 0) {
+                    setSelectedDashParty([accounts[0]]);
+                } else {
+                    setSelectedDashParty([]);
+                }
+
+            } else {
+                console.log("⚠️ No data from API");
+                setdashParty([]);
+                setSelectedDashParty([]);
+            }
+
+        } catch (error) {
+            console.error("❌ mobaccountbasic error:", error);
+            setdashParty([]);
+            setSelectedDashParty([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedProperty !== null) {
+            fetchpartylist(selectedProperty, false);
+        } else {
+            setSelectedDashParty([]);
+        }
+    }, [selectedProperty]);
+
+    const handleReportClick = useCallback(async (action, party, mianPaylaod, selectedProperty) => {
+        setIsLoading(true);
         const PrpOf = selectedProperty?.PrpOf || "";
         const PrpCode = selectedProperty?.PrpCode || "";
 
-        console.log("👉 Selected Property:", selectedProperty);
-        console.log("👉 PrpOf:", PrpOf);
-        console.log("👉 PrpCode:", PrpCode);
-
         try {
-            console.log('🔵 🔵I am Calling3 Table');
             const payloadLedger = {
                 prptype: PrpOf,
                 prpcodes: PrpCode,
                 parcodes: [party.ParCode],
-                yearno: mianPaylaod.yearno,
+                yearno: selectedYear?.slice(0, 4).slice(-2),
                 mheads: [],
                 sheads: [],
                 contras: [],
                 inverse: [],
-                // rptaction: 'get_collection_comman_rpt',
                 fromdate: "",
                 todate: "",
                 reportytype: 0,
@@ -1025,126 +911,89 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 export: "",
                 grpby: "party"
             }
-            // setMianPaylaod(payloadParty)
-            console.log('------- Table party API Payload: --------', payloadLedger);
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
+            console.log(`${API}/api/get_report`)
+
             const responseledger = await axios.post(`${API}/api/get_report`, payloadLedger, { headers });
+
             console.log('++++++++++I am Calling4 Table', payloadLedger, responseledger);
-            const data = responseledger.data.response.data.get_ledger_data || [];
-            const out_data = responseledger.data.response.data.get_outstanding_data || [];
-            const customer_rate_data = responseledger.data.response.data.get_customer_rate || [];
 
-            console.log("customer_rate_data ---", customer_rate_data)
+            if (responseledger.data.success) {
 
-            if (responseledger.data.success == true) {
-
-               if (action == "Ledger") {
-
-                    setLedgerData(data);
-                    setLedgerOverlayVisible(true);
-                    setAction(action);
-                    setActiveParty(party.ParName);
-
-               } else if (action == "Outstanding") {
-
-                    setOutstandingData(out_data);
-                    setLedgerOverlayVisible(true);
-                    setActiveParty(party.ParName);
-                    setAction(action);
-
-               } else if (action == "Rates") {
-
-                    setCustomerRateData(customer_rate_data);
-                    setLedgerOverlayVisible(true);
-                    setActiveParty(party.ParName);
-                    setAction(action);
-               }
+                setLedgerData(responseledger.data.response.data.get_ledger_data || []);
+                setOutstandingData(responseledger.data.response.data.get_outstanding_data || []);
+                setCustomerRateData(responseledger.data.response.data.get_customer_rate || []);
             }
+
         } catch (error) {
             setIsLoading(false);
             console.error("Error in dashAccount:", error);
         } finally {
             setIsLoading(false);
         }
-    }, [selectedPrpgrp, getPropertyData]);
-
-    console.log("ledgerData:", ledgerData);
+    }, []);
 
     useEffect(() => {
         if (fromDate && toDate && selectedYear) {
             fetchData();
-            // fetchDesign();
         }
     }, []);
 
     const handleDashPrpSelect = (prp: DashPrp[]) => {
         setSelectedDashPrp(prp);
-        console.log("Selected Dash Prp in Parent:", prp);
     };
     const handleDashPartySelect = (party: DashParty[]) => {
         setSelectedDashParty(party);
-        console.log("Selected Dash Party in Parent:", party);
     };
     const handleDashSexeSelect = (sexe: DashSexe[]) => {
         setSelectedDashSexe(sexe);
-        console.log("Selected Dash Sexe in Parent:", sexe);
     };
     const handleDashAccountSelect = (acc: DashAccount[]) => {
         setSelectedDashAccount(acc);
-        console.log("Selected Dash Account in Parent:", acc);
     };
     const handleDashSubHeadSelect = (sub: DashSubHead[]) => {
         setSelectedDashSubHead(sub);
-        console.log("Selected Dash SubHead in Parent:", sub);
     };
     const handleItemSelect = (items: ItemData[]) => {
         setSelectedItems(items);
-        console.log("Selected Items in Parent:", items);
     };
     const handleItemStatusChange = (status: ItemStatus) => {
         setSelectedItemStatus(status);
     };
     const DASHBOARD_COLORS = [
-        ['#0F2027', '#203A43'], // Deep Teal
-        ['#141E30', '#243B55'], // Navy Blue
-        ['#232526', '#414345'], // Graphite Grey
-        ['#1D2671', '#C33764'], // Indigo → Pink (premium)
-        ['#0B486B', '#3B8686'], // Aqua Teal
-        ['#42275A', '#734B6D'], // Purple Grape
-        ['#283048', '#859398'], // Steel Blue
-        ['#16222A', '#3A6073'], // Dark Cyan
+        ['#0F2027', '#203A43'],
+        ['#141E30', '#243B55'],
+        ['#232526', '#414345'],
+        ['#1D2671', '#C33764'],
+        ['#0B486B', '#3B8686'],
+        ['#42275A', '#734B6D'],
+        ['#283048', '#859398'],
+        ['#16222A', '#3A6073'],
     ];
 
-
-
     const formatIndianNumber = (value: any) => {
-        if (!value && value !== 0) return "0"; // Handle undefined/null
+        if (!value && value !== 0) return "0";
 
-        // Remove all commas and convert to number
         const cleanedValue = typeof value === 'string' ? value.replace(/,/g, '') : value;
         const num = parseFloat(cleanedValue);
 
-        if (isNaN(num)) return "0"; // Handle non-numeric values
+        if (isNaN(num)) return "0";
 
-        // Remove decimal part
         const integerValue = Math.floor(num);
 
-        // Format in Indian number system
         return integerValue.toLocaleString('en-IN');
     };
-
-
 
     const DashboardGrid = ({ cards, onCardPress, activeSlab }) => {
         const numColumns = Platform.isPad ? 4 : 2;
 
         const renderItem = ({ item, index }) => {
             const isActive = activeSlab === item.slab;
-            const isDisabled = parseFloat(item.summary.replace(/,/g, '')) === 0; // Remove commas before checking
+            const isDisabled = parseFloat(item.summary.replace(/,/g, '')) === 0;
             const colors = DASHBOARD_COLORS[index % DASHBOARD_COLORS.length];
 
             return (
@@ -1154,7 +1003,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     style={[
                         styles.dashboardCard,
                         isActive && styles.activeDashboardCard,
-                        // isDisabled && styles.disabledCard,
                     ]}
                     disabled={isDisabled}
                 >
@@ -1163,7 +1011,7 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                             isActive
                                 ? [theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]
                                 : isDisabled
-                                    ? ['#cccccc', '#cccccc'] // Gray color for disabled
+                                    ? ['#cccccc', '#cccccc']
                                     : colors
                         }
                         style={styles.dashboardCardInner}
@@ -1215,7 +1063,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         );
     };
 
-
     const SummaryTable1 = () => {
         const summaryColumns = [
             { key: 'acccode', label: 'Code', width: 160, align: 'left' },
@@ -1228,13 +1075,10 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             { key: 'value', label: '31-60', width: 100, align: 'right' },
         ];
 
-        // Specify which columns to format as Indian comma-separated values
         const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt'];
 
-        // Specify which columns to sum in the footer
         const columnsToSum = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
 
-        // Calculate totals for specified columns
         const calculateTotals = () => {
             const totals = {};
             columnsToSum.forEach(key => {
@@ -1246,7 +1090,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             return totals;
         };
 
-        // Format number as Indian comma-separated value
         const formatIndianNumber = (value) => {
             return value.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
@@ -1370,7 +1213,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                             windowSize={10}
                             removeClippedSubviews
                             showsVerticalScrollIndicator={false}
-                        // ListFooterComponent={<Footer />}
                         />
                         <Footer />
                     </View>
@@ -1381,8 +1223,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     const SummaryAdvanceTable = () => {
         const summaryColumns = [
             { key: 'AccName', label: 'Account Name', width: 160, align: 'left' },
-            { key: 'advance', label: 'Advance', width: 100, align: 'right' }, // Pehle Advance
-            { key: 'Total', label: 'Total', width: 100, align: 'right' }, // Phir Total
+            { key: 'advance', label: 'Advance', width: 100, align: 'right' },
+            { key: 'Total', label: 'Total', width: 100, align: 'right' },
             { key: 'onaccount', label: 'On Account', width: 120, align: 'right' },
             { key: 'nclramt', label: 'NCL Amount', width: 120, align: 'right' },
             { key: 'pdcamt', label: 'PDC Amount', width: 100, align: 'right' },
@@ -1398,22 +1240,18 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
         ];
 
-        // Specify which columns to format as Indian comma-separated values (bina decimal)
         const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
 
-        // Specify which columns to sum in the footer
         const columnsToSum = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
 
-        // Format number as Indian comma-separated value (bina decimal)
         const formatIndianNumber = (value) => {
-            if (!value && value !== 0) return "0"; // Handle undefined/null
+            if (!value && value !== 0) return "0";
             const cleanedValue = typeof value === 'string' ? value.replace(/,/g, '') : value;
             const num = parseFloat(cleanedValue);
-            if (isNaN(num)) return "0"; // Handle non-numeric values
-            return Math.floor(num).toLocaleString('en-IN'); // Remove decimal and format
+            if (isNaN(num)) return "0";
+            return Math.floor(num).toLocaleString('en-IN');
         };
 
-        // Calculate totals for specified columns
         const calculateTotals = () => {
             const totals = {};
             columnsToSum.forEach(key => {
@@ -1565,11 +1403,10 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
     };
 
     const OnAccountSummaryTable = () => {
-        // Define columns with 'AccName', 'amount' (as Total), and an Actions column
         const summaryColumns = [
             { key: 'AccName', label: 'Account Name', width: 160, align: 'center' },
-            { key: 'amount', label: 'Total', width: 100, align: 'right' }, // 'amount' as 'Total'
-            { key: 'actions', label: 'Actions', width: 80, align: 'center' }, // Actions column for the info icon
+            { key: 'amount', label: 'Total', width: 100, align: 'right' },
+            { key: 'actions', label: 'Actions', width: 80, align: 'center' },
             { key: 'crday', label: 'Crday', width: 100, align: 'right' },
             { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
             { key: 'sexename', label: 'Sexename', width: 120, align: 'right' },
@@ -1577,13 +1414,10 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
         ];
 
-        // Specify which columns to format as Indian comma-separated values
         const columnsToFormat = ['amount', 'crlimit'];
 
-        // Specify which columns to sum in the footer
         const columnsToSum = ['amount', 'crlimit'];
 
-        // Calculate totals for specified columns
         const calculateTotals = () => {
             const totals = {};
             columnsToSum.forEach(key => {
@@ -1595,7 +1429,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             return totals;
         };
 
-        // Format number as Indian comma-separated value
         const formatIndianNumber = (value) => {
             return value.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
@@ -1605,10 +1438,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
         const totals = calculateTotals();
 
-        // Calculate total width of the table
         const totalWidth = summaryColumns.reduce((sum, c) => sum + c.width, 0);
 
-        // Header component
         const Header = () => (
             <View style={styles.tableHeader}>
                 {summaryColumns.map(col => (
@@ -1625,7 +1456,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
-        // Footer component
         const Footer = () => (
             <View style={[styles.tableHeader]}>
                 {summaryColumns.map(col => (
@@ -1643,10 +1473,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
-        // Row component
         const Row = React.memo(({ item }) => (
             <View style={styles.tableRow}>
-                {/* Account Name */}
                 <Text
                     style={[styles.rowText, { width: 160, textAlign: 'left' }]}
                     numberOfLines={2}
@@ -1654,7 +1482,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     {item.AccName}
                 </Text>
 
-                {/* Total (amount) */}
                 <Text
                     style={[styles.rowText, { width: 100, textAlign: 'right' }]}
                     numberOfLines={2}
@@ -1662,7 +1489,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     {columnsToFormat.includes('amount') ? formatIndianNumber(parseFloat(item.amount) || 0) : item.amount}
                 </Text>
 
-                {/* Actions column with info icon */}
                 <View style={[styles.actionColumn, { width: 80 }]}>
                     <TouchableOpacity
                         onPress={() => {
@@ -1678,7 +1504,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Rest of the columns */}
                 {summaryColumns.slice(3).map(col => (
                     <Text
                         key={col.key}
@@ -1721,188 +1546,18 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         );
     };
 
-    // const DetailTable = () => {
-    //     console.log("Filtered Details:", filteredDetails);
-
-    //     // Data ko NTRANDATE ke hisaab se ascending order mein sort karo
-    //     const sortedData = [...filteredDetails].sort((a, b) =>
-    //         parseFloat(a.NTRANDATE) - parseFloat(b.NTRANDATE)
-    //     );
-
-    //     console.log("Sorted Data (Ascending by NTRANDATE):", sortedData);
-
-    //     // Cumulative value calculate karo (CUMBAL ko number mein convert karke)
-    //     let cumulativeData = [];
-    //     sortedData.forEach((item, index) => {
-    //         const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
-
-    //         if (index === 0) {
-    //             cumulativeData.push({
-    //                 ...item,
-    //                 Cumulative: currentCUMBAL.toString(), // String format mein rakha
-    //             });
-    //         } else {
-    //             const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
-    //             const newCumulative = prevCumulative + currentCUMBAL;
-    //             cumulativeData.push({
-    //                 ...item,
-    //                 Cumulative: newCumulative.toString(), // String format mein rakha
-    //             });
-    //         }
-    //     });
-
-    //     console.log("Cumulative Data (Ascending by NTRANDATE):", cumulativeData);
-
-    //     // Descending order mein sort karo (NTRANDATE ko number mein convert karke)
-    //     const finalData = cumulativeData.sort((a, b) =>
-    //         parseFloat(b.NTRANDATE) - parseFloat(a.NTRANDATE)
-    //     );
-
-    //     console.log("Final Data (Descending by NTRANDATE):", finalData);
-
-    //     // Columns definition
-    //     const detailColumns = [
-    //         { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
-    //         { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
-    //         { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
-    //         { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
-    //         { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' }, // Naya column
-    //     ];
-
-    //     const columnsToFormat = ['CUMBAL', 'Cumulative'];
-
-    //     // Calculate totals for CUMBAL and Cumulative
-    //     const calculateTotals = () => {
-    //         const totals = { CUMBAL: 0, Cumulative: 0 };
-    //         finalData.forEach(item => {
-    //             totals.CUMBAL += parseFloat(item.CUMBAL) || 0;
-    //             totals.Cumulative += parseFloat(item.Cumulative) || 0;
-    //         });
-    //         return totals;
-    //     };
-
-    //     // Format number as Indian comma-separated value
-    //     const formatIndianNumber = (value) => {
-    //         if (!value && value !== 0) return "0";
-    //         const num = parseFloat(value);
-    //         return num.toLocaleString('en-IN', {
-    //             minimumFractionDigits: 2,
-    //             maximumFractionDigits: 2,
-    //         });
-    //     };
-
-    //     const totals = calculateTotals();
-    //     const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 160;
-
-    //     // Header component
-    //     const Header = () => (
-    //         <View style={styles.tableHeader}>
-    //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-    //                 Type
-    //             </Text>
-    //             {detailColumns.map(col => (
-    //                 <Text
-    //                     key={col.key}
-    //                     style={[
-    //                         styles.headerText,
-    //                         { width: col.width, textAlign: col.align }
-    //                     ]}
-    //                 >
-    //                     {col.label}
-    //                 </Text>
-    //             ))}
-    //         </View>
-    //     );
-
-    //     // Footer component
-    //     const Footer = () => (
-    //         <View style={[styles.tableHeader]}>
-    //             <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-    //                 Totals
-    //             </Text>
-    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-    //             <Text style={[styles.headerText, { width: 120, textAlign: 'right' }]}>
-    //                 {formatIndianNumber(totals.CUMBAL)}
-    //             </Text>
-    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-    //             <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
-    //                 {formatIndianNumber(totals.Cumulative)}
-    //             </Text>
-    //         </View>
-    //     );
-
-    //     // Row component
-    //     const Row = React.memo(({ item }) => (
-    //         <View style={styles.tableRow}>
-    //             <Text
-    //                 style={[styles.rowText, { width: 160, textAlign: 'center' }]}
-    //                 numberOfLines={2}
-    //             >
-    //                 {item.TYPE}
-    //             </Text>
-    //             {detailColumns.map(col => (
-    //                 <Text
-    //                     key={col.key}
-    //                     style={[
-    //                         styles.rowText,
-    //                         { width: col.width, textAlign: col.align }
-    //                     ]}
-    //                     numberOfLines={2}
-    //                 >
-    //                     {columnsToFormat.includes(col.key)
-    //                         ? formatIndianNumber(item[col.key])
-    //                         : item[col.key]}
-    //                 </Text>
-    //             ))}
-    //         </View>
-    //     ));
-
-    //     return (
-    //         <View style={styles.tableWrapper}>
-    //             <ScrollView horizontal showsHorizontalScrollIndicator>
-    //                 <View style={{ minWidth: totalWidth }}>
-    //                     <Header />
-    //                     <FlatList
-    //                         data={finalData} // Use finalData instead of filteredDetails
-    //                         renderItem={({ item }) => <Row item={item} />}
-    //                         keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
-    //                         getItemLayout={(_, index) => ({
-    //                             length: ROW_HEIGHT,
-    //                             offset: ROW_HEIGHT * index,
-    //                             index,
-    //                         })}
-    //                         initialNumToRender={20}
-    //                         maxToRenderPerBatch={20}
-    //                         windowSize={10}
-    //                         removeClippedSubviews
-    //                         showsVerticalScrollIndicator={false}
-    //                     />
-    //                     <Footer />
-    //                 </View>
-    //             </ScrollView>
-    //         </View>
-    //     );
-    // };
-
     const DetailTable = () => {
-        console.log("Filtered Details:", filteredDetails);
 
-        // Helper function to generate a unique key from NTRANDATE + TRANID
         const calcValue = (item) => {
-            return `${item.NTRANDATE}-${item.TRANID}`; // Example: "20231201-12345"
+            return `${item.NTRANDATE}-${item.TRANID}`;
         };
 
-        // Sort by calcValue (ascending)
         const sortedData = [...filteredDetails].sort((a, b) => {
             const keyA = calcValue(a);
             const keyB = calcValue(b);
-            return keyA.localeCompare(keyB); // String comparison for NTRANDATE-TRANID
+            return keyA.localeCompare(keyB);
         });
 
-        console.log("Sorted Data (Ascending by NTRANDATE + TRANID):", sortedData);
-
-        // Calculate cumulative CUMBAL
         let cumulativeData = [];
         sortedData.forEach((item, index) => {
             const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
@@ -1922,14 +1577,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             }
         });
 
-        console.log("Cumulative Data (Ascending by NTRANDATE + TRANID):", cumulativeData);
-
-        // Reverse to descending order (latest first)
         const finalData = [...cumulativeData].reverse();
 
-        console.log("Final Data (Descending by NTRANDATE + TRANID):", finalData);
-
-        // Columns definition
         const detailColumns = [
             { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
             { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
@@ -1940,7 +1589,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
         const columnsToFormat = ['CUMBAL', 'Cumulative'];
 
-        // Calculate totals for CUMBAL and Cumulative
         const calculateTotals = () => {
             const totals = { CUMBAL: 0, Cumulative: 0 };
             finalData.forEach(item => {
@@ -1950,7 +1598,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             return totals;
         };
 
-        // Format number as Indian comma-separated value
         const formatIndianNumber = (value) => {
             if (!value && value !== 0) return "0";
             const num = parseFloat(value);
@@ -1963,7 +1610,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         const totals = calculateTotals();
         const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 160;
 
-        // Header component
         const Header = () => (
             <View style={styles.tableHeader}>
                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
@@ -1983,7 +1629,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
-        // Footer component
         const Footer = () => (
             <View style={[styles.tableHeader]}>
                 <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
@@ -2001,7 +1646,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
-        // Row component
         const Row = React.memo(({ item }) => (
             <View style={styles.tableRow}>
                 <Text
@@ -2054,23 +1698,18 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         );
     };
     const OnAccountDetailTable = () => {
-        // Define all columns, including 'TYPE'
         const detailColumns = [
-            // { key: 'TYPE', label: 'Type', width: 120, align: 'center' },
             { key: 'chqno', label: 'Che.No.', width: 120, align: 'center' },
             { key: 'chqdate', label: 'Chq.Date', width: 120, align: 'left' },
             { key: 'remark', label: 'Remark', width: 120, align: 'right' },
             { key: 'clrdate', label: 'Clr.Date', width: 120, align: 'center' },
-            { key: 'AMOUNT', label: 'Amount', width: 140, align: 'center' }, // Header center-aligned, value right-aligned
+            { key: 'AMOUNT', label: 'Amount', width: 140, align: 'center' },
         ];
 
-        // Specify which columns to format as Indian comma-separated values
         const columnsToFormat = ['AMOUNT'];
 
-        // Specify which columns to sum in the footer
         const columnsToSum = ['AMOUNT'];
 
-        // Calculate totals for specified columns
         const calculateTotals = () => {
             const totals = {};
             columnsToSum.forEach(key => {
@@ -2082,7 +1721,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             return totals;
         };
 
-        // Format number as Indian comma-separated value
         const formatIndianNumber = (value) => {
             return value?.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
@@ -2092,10 +1730,8 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 
         const totals = calculateTotals();
 
-        // Calculate total width of the table
         const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0);
 
-        // Header component
         const Header = () => (
             <View style={styles.tableHeader}>
                 {detailColumns.map(col => (
@@ -2112,7 +1748,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
-        // Footer component
         const Footer = () => (
             <View style={[styles.tableHeader]}>
                 {detailColumns.map(col => (
@@ -2129,7 +1764,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View>
         );
 
-        // Row component
         const Row = React.memo(({ item }) => (
             <View style={styles.tableRow}>
                 {detailColumns.map(col => (
@@ -2178,26 +1812,12 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
         );
     };
 
-
-
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
     const closeDrawer123 = () => setSummaryDrawerVisible(false);
 
-    console.log('🔵 POT Data:', gePOTData);
-    console.log('🔵 selectedPrpgrp', selectedPrpgrp, selectedPrpgrp?.PrpTypeCode, selectedPrpgrp?.PrpTypeOf);
-    console.log('🔵 selectedInternal', selectedInternal, selectedInternal?.lable, selectedInternal?.value);
-
-
-    console.log("aaa parent Formatted From Date:", fromDate ? format(fromDate, 'yyyy-MM-dd') : null);
-    console.log("aaa parent Formatted To Date:", toDate ? format(toDate, 'yyyy-MM-dd') : null);
-
-    console.log("selectedProperty ====>>> ", selectedProperty)
-
     return (
         <>
-            {/* Narration bar */}
-
             <HeaderBar
                 userName={username}
                 onSearch={setSearchQueryPOT}
@@ -2206,76 +1826,20 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
                 <Icon name="list" size={24} color="white" />
             </TouchableOpacity>
-            {/* <TouchableOpacity onPress={toggleLastSync} style={styles.syncToggleContainer}>
-                <LinearGradient
-                    colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.narrationBar}
-                >
-                    <View style={styles.syncToggle}>
-                        <Ticker
-                            text={syncLoading ? 'Last Syncing...' : `Last Synced: ${receivables_sync_date}`}
-                            icon="sync"
-                            textStyle={{ fontFamily: theme.FONT_FAMILY_EXTRABOLD, fontSize: 10 }}
-                        />
-                        
-                    </View>
-                </LinearGradient>
-            </TouchableOpacity> */}
-            {/* <DashboardGrid
-                cards={filteredCards.length > 0 ? filteredCards : getOutCardData}
-                onCardPress={onDashboardCardPress}
-                activeSlab={activeCard}
-            /> */}
 
             {summaryDrawerVisible ? (<><View style={styles.drawerContainer}>
 
-                {/* HEADER */}
-                {/* <View style={styles.drawerHeader}>
-                    <Text style={styles.drawerTitle}>
-                        {`Receivables > ${getActiveCardDetails && getActiveCardDetails?.caption} summary`}
-                    </Text>
-
-                    <TouchableOpacity onPress={closeDrawer123}>
-                     
-                        <Icon name="close" size={26} />
-                    </TouchableOpacity>
-                </View> */}
-
-                {/* SEARCH */}
-                {/* <TextInput
-                    placeholder="Search summary..."
-                    style={styles.drawerSearch}
-                    value={searchQueryPOT}
-                    onChangeText={setSearchQueryPOT}
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    blurOnSubmit={false}
-                    placeholderTextColor={theme.BRAND_GRADIENT_END}
-                /> */}
-
-                {/* CONTENT */}
                 <View style={{ flex: 1, paddingHorizontal: 10, }}>
                     <SummaryTable
-                        data={filteredData}   // tumhara API / filtered data
+                        data={getdashParty}
                         searchQuery={searchQueryPOT}
-                        // onRowPress={(row) => {
-                        //     console.log("Clicked Row JSON:", row);
-
-
-                        //     setSelectedParties(row.acccode);
-
-                        // }}
-                        onRowPress={(row) => {
-                            console.log("Clicked Row JSON:", row);
-
+                        onRowPress={async (row) => {
+                            console.log("CLICKED:", row);
                             setSelectedParties(row);
                             setSelectedAccCode(row.acccode);
-
-                            setPartyOverlayVisible(true); // 👈 ADD THIS
+                            setPartyOverlayVisible(true);
+                            await handleReportClick("INIT", row, mianPaylaod, selectedProperty);
                         }}
-                    // styles={styles}
                     />
 
                 </View>
@@ -2283,8 +1847,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
             </View></>) : (<>
                 <View style={{ alignContent: 'center' }} ><Text>No Party Data Found!</Text></View></>)}
 
-
-            {/* <DetailModal /> */}
             <Modal
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
@@ -2294,7 +1856,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            {/* <Text style={styles.modalTitle}>Account Details</Text> */}
                             <Text style={styles.drawerTitle}>
                                 {`Receivables > ${getActiveCardDetails && getActiveCardDetails?.caption} summary > details`}
                             </Text>
@@ -2355,27 +1916,21 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 getdashPrp={getdashPrp}
                 setSelectedDashPrp={setSelectedDashPrp}
                 selectedDashPrp={selectedDashPrp}
-                // 
                 getdashParty={getdashParty}
                 setSelectedDashParty={setSelectedDashParty}
                 selectedDashParty={selectedDashParty}
-                // 
                 getdashSubHead={getdashSubHead}
                 setSelectedDashSubHead={setSelectedDashSubHead}
                 selectedDashSubHead={selectedDashSubHead}
-                // 
                 getdashSexe={getdashSexe}
                 setSelectedDashSexe={setSelectedDashSexe}
                 selectedDashSexe={selectedDashSexe}
-                // 
                 dashAccount={dashAccount}
                 getAccountLoading={getAccountLoading}
-                // 
                 getdashPropertyLoading={getdashPropertyLoading}
                 getdashPartyLoading={getdashPartyLoading}
                 getdashSubHeadLoading={getdashSubHeadLoading}
                 getdashSexeLoading={getdashSexeLoading}
-                // 
                 getdashAccount={getdashAccount}
                 setSelectedDashAccount={setSelectedDashAccount}
                 selectedDashAccount={selectedDashAccount}
@@ -2385,23 +1940,27 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
                 getPropertyData={getPropertyData}
                 setSelectedProperty={setSelectedProperty}
                 selectedProperty={selectedProperty}
-            // hideprpGroup={hideprpGroup}
-            // 
+                dashParty={dashParty}
             />
+
             <PartyOverlay
                 visible={partyOverlayVisible}
                 onClose={() => setPartyOverlayVisible(false)}
                 party={selectedParties}
-                mianPaylaod={mianPaylaod}
+                onActionClick={(action) => {
+                    setAction(action);
+                    setLedgerOverlayVisible(true);
+                }}
+                loading={isLoading}
                 selectedProperty={selectedProperty}
-                handleReportClick={handleReportClick}
             />
+
             <LedgerOverlay
                 visible={ledgerOverlayVisible}
                 onClose={() => setLedgerOverlayVisible(false)}
                 data={ledgerData}
                 styles={styles}
-                activeParty={activeParty}
+                party={selectedParties}
                 out_data={outstandingData}
                 customer_rate_data={CustomerRateData}
                 action={action}
@@ -2411,7 +1970,6 @@ const PartyDashboard: React.FC<Props> = ({ token, username }) => {
 };
 
 const styles = StyleSheet.create({
-    // 
     accordionContainer: {
         marginBottom: 10,
     },
@@ -2447,7 +2005,6 @@ const styles = StyleSheet.create({
     },
     tableWrapper: {
         flex: 1,
-        // marginTop: 5,
         maxHeight: 550,
     },
     horizontalScroll: {
@@ -2463,13 +2020,11 @@ const styles = StyleSheet.create({
     tableHeader: {
         flexDirection: 'row',
         backgroundColor: theme.BRAND_GRADIENT_END,
-        // paddingVertical: 5,
         minWidth: '100%',
     },
     headerText: {
         color: theme.TEXT_WHITE,
         fontWeight: 'bold',
-        // padding: 5,
         alignItems: 'center',
         alignContent: 'center',
         justifyContent: 'center',
@@ -2485,14 +2040,14 @@ const styles = StyleSheet.create({
         borderBottomColor: '#eee',
         minHeight: 50,
         minWidth: '100%',
-        backgroundColor: '#fff', // ✅ fix row background
+        backgroundColor: '#fff',
     },
     rowText: {
         padding: 5,
         flexWrap: 'wrap',
         minHeight: 40,
         fontSize: 12,
-        color: '#000',   // ✅ ALWAYS black (fix)
+        color: '#000',
     },
     actionColumn: {
         flexDirection: 'row',
@@ -2504,10 +2059,6 @@ const styles = StyleSheet.create({
         padding: 5,
         width: 30,
         alignItems: 'center',
-    },
-    syncToggleContainer: {
-        // marginBottom: 5,
-        marginTop: 3
     },
     syncToggle: {
         flexDirection: 'row',
@@ -2539,26 +2090,6 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
-    // },
-    // carouselContainer: {
-    //     height: 100,
-    //     marginBottom: 20,
-    //     // paddingHorizontal: 10,
-    // },
-    // cardContainer: {
-    //     marginRight: 10,
-    //     borderRadius: 8,
-    //     overflow: 'hidden',
-    //     elevation: 2,
-    //     width: 150,
-    // },
-    // card: {
-    //     padding: 15,
-    //     height: 100,
-    //     justifyContent: 'center',
-    //     alignItems: 'center',
-    //     borderRadius: 8,
-    // },
     cardCaption: {
         color: theme.TEXT_WHITE,
         fontSize: 13,
@@ -2574,51 +2105,6 @@ const styles = StyleSheet.create({
         maxHeight: 400,
         flex: 1,
     },
-    // tableContainer: {
-    //     minWidth: '100%',
-    // },
-    // tableHeader: {
-    //     flexDirection: 'row',
-    //     backgroundColor: theme.BRAND_GRADIENT_END,
-    //     paddingVertical: 10,
-    // },
-    // headerText: {
-    //     color: theme.TEXT_WHITE,
-    //     fontWeight: 'bold',
-    //     textAlign: 'center',
-    //     padding: 5,
-    //     flexWrap: 'wrap',SummaryTable
-    // },
-    // tableRow: {
-    //     flexDirection: 'row',
-    //     paddingVertical: 10,
-    //     borderBottomWidth: 1,
-    //     borderBottomColor: '#eee',
-    // },
-    // rowText: {
-    //     textAlign: 'center',
-    //     padding: 5,
-    //     flexWrap: 'wrap',
-    //     minHeight: 40, // Ensures multi-line text fits
-    // },
-    // searchInput: {
-    //     borderWidth: 1,
-    //     borderColor: '#ccc',
-    //     borderRadius: 5,
-    //     padding: 10,
-    //     marginBottom: 10,
-    // },
-    // modalContainer: {
-    //     flex: 1,
-    //     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    // },
-    // modalContent: {
-    //     backgroundColor: '#fff',
-    //     padding: 20,
-    //     borderRadius: 10,
-    //     width: '100%',
-    //     height: '100%',
-    // },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -2661,22 +2147,6 @@ const styles = StyleSheet.create({
         elevation: 2,
         width: '100%',
     },
-    // 
-    // dashboardCard: {
-    //     flex: 1,
-    //     height: 130,               // ✅ fixed height
-    //     borderRadius: 16,
-    //     overflow: 'hidden',
-    //     borderWidth: 1,
-    //     borderColor: '#e0e0e0',
-
-    //     // shadow
-    //     elevation: 3,
-    //     shadowColor: '#000',
-    //     shadowOpacity: 0.12,
-    //     shadowRadius: 6,
-    //     shadowOffset: { width: 0, height: 3 },
-    // },
     dashboardCard: {
         flex: 1,
         height: 130,
@@ -2691,33 +2161,12 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 6 },
     },
-
-
-    // dashboardCardInner: {
-    //     flex: 1,
-    //     justifyContent: 'center',
-    //     alignItems: 'center',
-    //     padding: 14,
-    // },
     dashboardCardInner: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
     },
-
-
-    // dashboardCaption: {
-    //     fontSize: 12,
-    //     color: '#555',
-    //     marginBottom: 6,
-    // },
-
-    // dashboardValue: {
-    //     fontSize: 20,
-    //     fontWeight: '700',
-    //     color: '#333',
-    // },
     dashboardCaption: {
         fontSize: 12,
         color: 'rgba(255,255,255,0.80)',
@@ -2731,12 +2180,6 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#fff',
     },
-
-
-    // activeDashboardCard: {
-    //     borderWidth: 2,
-    //     borderColor: theme.BRAND_GRADIENT_END,
-    // },
     activeDashboardCard: {
         borderWidth: 2,
         borderColor: theme.BRAND_GRADIENT_END,
@@ -2755,8 +2198,6 @@ const styles = StyleSheet.create({
     activeText: {
         color: '#fff',
     },
-
-
     drawerContainer: {
         flex: 1,
         backgroundColor: '#fff',
@@ -2776,16 +2217,12 @@ const styles = StyleSheet.create({
         color: theme.BRAND_GRADIENT_END,
     },
     drawerSearch: {
-        // margin: 3,
         padding: 10,
         borderRadius: 8,
         borderWidth: 1,
-        // borderColor: '#ddd',
         borderColor: 'transparent',
         color: '#005F73',
     },
-
 });
-
 
 export default PartyDashboard;

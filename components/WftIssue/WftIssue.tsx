@@ -356,6 +356,8 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 isVisible={isItemVisible}
                 onClose={closeItemDrawer}
                 FormState={FormState}
+                setFormState={setFormState}
+                token={token}
             />
         </>
     );

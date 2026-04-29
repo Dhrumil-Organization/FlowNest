@@ -70,7 +70,7 @@ import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
 import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
-// import WftIssue from './components/WftIssue/WftIssue';
+import WftIssue from './components/WftIssue/WftIssue';
 
 const Stack = createNativeStackNavigator();
 
@@ -715,12 +715,12 @@ export default function App() {
 
                       </>
                     }</Stack.Screen>
-                    {/* <Stack.Screen name="Weft Issue">{(props) =>
+                    <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
-                    }</Stack.Screen>                     */}
+                    }</Stack.Screen>                    
                   </Stack.Navigator>
 
                 </NavigationContainer>

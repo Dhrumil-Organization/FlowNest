@@ -2254,7 +2254,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                     <TouchableOpacity
                                         style={yarnmanagementsystemstyle.selectBtn}
                                         onPress={async () => {
-                                            setSelectedBrowseItem(item);   
+                                            setSelectedBrowseItem(item);
                                             await fetchpartydata();
                                             await fetchpartybrowse(activeTab, item.itmcode);
                                             setpartycard(true);
@@ -2671,6 +2671,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                 onPress={async () => {
                                                                     soshow();
                                                                     const mapped = await fetchmitem();
+                                                                    console.log("mapped:", mapped);
                                                                     fetchBlendcount();
                                                                     fetchBlendply();
                                                                     fetchOthresdata();

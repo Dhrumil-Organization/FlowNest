@@ -1,38 +1,524 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Modal, Animated, Dimensions, Alert } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
+    Platform
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useWindowDimensions } from 'react-native';
-import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TextInput } from 'react-native-gesture-handler';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import FullScreenLoader from '../Loader/Loader';
+import { checkingScannerStyles } from '../../common/Styles/Style';
+import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
 import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
+import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
+import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ScrollView } from 'react-native';
+import Snackbar from 'react-native-snackbar';
+import { Switch } from 'react-native';
+import CustomDrawer from './CustomDrawer';
+import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
+import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
+import PartyDropdown from '../Shared/PartyDropdown';
+import SearchableDropdown from '../Shared/SearchableDropdown';
 
-const { height } = Dimensions.get('window');
+interface Props {
+    token: string;
+    navigation: any;
+    isConnected: boolean | null;
+    username: string;
+}
+
+type GridItem = {
+    srNo: number;
+    CartonNo: string;
+    design: string;
+};
 
 const WeftIssueItemDrawer = ({
     isVisible,
     onClose,
     FormState,
+    setFormState,
     token
 }) => {
-    const slideAnim = useRef(new Animated.Value(height)).current;
     const device = useCameraDevice('back');
-    const [items, setItems] = useState([]);
-    const [showManualSearch, setShowManualSearch] = useState(null);
-    const [searchResults, setSearchResults] = useState([]);
-    const [searchText, setSearchText] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null);
-    const [CartonNo, setCartonNo] = useState('');
-    const [yearNo, setYearNo] = useState('');
-    const [getavgwt, setavgwt] = useState('0');
-    const [getchees, setchees] = useState('0');
-    const [getScannedObj, setScannedObj] = useState({})
-    const { width } = useWindowDimensions();
+    const scanLock = useRef(false);
     const [isScanning, setIsScanning] = useState(false);
     const { hasPermission, requestPermission } = useCameraPermission();
-    const isSmallDevice = width < 360;
+    const [scannedValue, setScannedValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [getData, setData] = useState([]);
+    const [yearNo, setYearNo] = useState('');
+    const [design, setDesign] = useState('');
+    const [getWarpLen, setWarpLen] = useState('0');
+    const [getchees, setchees] = useState('0');
+    const [checker, setChecker] = useState('');
+    const [getScannedObj, setScannedObj] = useState({})
+    const [shift, setShift] = useState('')
+    const [stocktype, setstocktype] = useState('')
+    const [getShiftData, setShiftData] = useState([]);
+    const [getStockTypes, setStockTypes] = useState([
+        { stktypename: 'In house', StkType: 'I' },
+        { stktypename: 'Process house', StkType: 'P' }
+    ]);
+    const [getDataSaved, setDataSaved] = useState(false)
+    const [isCreelModalVisible, setIsCreelModalVisible] = useState(false);
+    const [setupDate, setSetupDate] = useState(new Date());
+    const [showPicker, setShowPicker] = useState(false);
+    const [CartonNo, setCartonNo] = useState('');
+    const [designName, setDesignName] = useState('');
+    const [gridData, setGridData] = useState<GridItem[]>([]);
+    const [isScanModalVisible, setIsScanModalVisible] = useState(false);
+    const [creelId, setCreelId] = useState('');
+    const [getavgwt, setavgwt] = useState('0');
+    const [cartonSummary, setCartonSummary] = useState<any[]>([]);
+    const [showList, setShowList] = useState(false);
+    const [Remark, setRemark] = useState('');
+    const [showManualSearch, setShowManualSearch] = useState(null);
+    const [searchText, setSearchText] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+    const [selectedYear, setSelectedYear] = useState(null);
+    const [getAllPropertyData, setAllPropertyData] = useState([]);
+
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const formatDate = (date) => date.toISOString().split('T')[0];
+    const [getAllYearData, setAllYearData] = useState([]);
+    const [selectedstocktype, setselectedstocktype] = useState([]);
+    const [activeCreels, setActiveCreels] = useState([]);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [selectedCreel, setSelectedCreel] = useState(null);
+    const [mainUId, setMainUId] = useState(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [propertydata, setpropertydata] = useState<ExeData[]>([]);
+    const screenWidth = Dimensions.get('window').width;
+    const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
+
+    console.log("Formstate.values", FormState.values);
+
+    const styles = StyleSheet.create({
+        container: { flex: 1, backgroundColor: '#f4f6f8' },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingTop: Platform.OS === 'android' ? 40 : 50,
+            paddingBottom: 14,
+            paddingHorizontal: 16,
+            backgroundColor: '#0e7490',
+        },
+        backBtn: {
+            width: 38,
+            height: 38,
+            borderRadius: 8,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 10
+        },
+        headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+        headerSub: { color: '#d0eef2', fontSize: 12 },
+        segment: {
+            flexDirection: 'row',
+            marginHorizontal: 0,
+            // marginTop: -20,
+            backgroundColor: '#fff',
+            borderRadius: 0,
+            padding: 4,
+            elevation: 5,
+        },
+        segmentBtn: { flex: 1, padding: 10, alignItems: 'center', borderRadius: 30 },
+        segmentActive: { backgroundColor: '#0e7490', },
+        segmentText: { color: '#64748b', fontWeight: '600' },
+        segmentTextActive: { color: '#fff', fontWeight: '700' },
+        scanRow: {
+            margin: 12,
+            backgroundColor: '#fff',
+            padding: 12,
+            borderRadius: 10,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+        scanTitle: { fontWeight: '600' },
+        scanSub: { fontSize: 11, color: '#666' },
+        scanBtn: {
+            backgroundColor: '#0e7490',
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            borderRadius: 8
+        },
+
+        scanBtnText: { color: '#fff', fontWeight: '600' },
+        card: {
+            backgroundColor: '#fff',
+            margin: 10,
+            padding: 16,
+            borderRadius: 16,
+            elevation: 5,
+        },
+        cardTitle: { fontWeight: '700', marginBottom: 10, color: '#000' },
+        label: { fontSize: 12, color: '#000', marginBottom: 6 },
+        searchRow: { flexDirection: 'row', alignItems: 'center' },
+        searchInput: {
+            flex: 1,
+            height: 50,
+            borderRadius: 12,
+            backgroundColor: '#f8fafc',
+            paddingHorizontal: 12,
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+        },
+        searchBtn: {
+            marginLeft: 10,
+            width: 50,
+            height: 50,
+            borderRadius: 12,
+            backgroundColor: '#0e7490',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        scanCard: {
+            margin: 10,
+            backgroundColor: '#0e7490',
+            borderRadius: 16,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            alignItems: 'center',
+        },
+        scanText: {
+            color: '#fff',
+            marginTop: 10,
+            fontWeight: '600',
+        },
+        field: {
+            marginBottom: 12
+        },
+        input: {
+            backgroundColor: '#f1f3f6',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            height: 42,
+            borderWidth: 1,
+            borderColor: '#ddd'
+        },
+        inputDisabled: {
+            backgroundColor: '#e9ecef',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            height: 42,
+            borderWidth: 1,
+            borderColor: '#ddd',
+            color: '#000'
+        },
+        fieldFlex: {
+            flex: 1,
+            marginRight: 8
+        },
+        row: {
+            flexDirection: 'row',
+            gap: 10,   // 👈 cleaner spacing (RN 0.71+)
+            marginBottom: 12
+        },
+
+        fieldHalf: {
+            flex: 1
+        },
+        inputFlex: {
+            flex: 1,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: '#f8fafc',
+            paddingHorizontal: 12,
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+        },
+        bottomBar: {
+            flexDirection: 'row',
+            padding: 15,
+            backgroundColor: '#fff',
+            borderTopWidth: 1,
+            borderColor: '#eee',
+        },
+
+        primaryBtn: {
+            flex: 1,
+            backgroundColor: '#0e7490',
+            padding: 14,
+            borderRadius: 25,
+            alignItems: 'center',
+            marginLeft: 10,
+        },
+
+        secondaryBtn: {
+            flex: 1,
+            backgroundColor: '#e5e7eb',
+            padding: 14,
+            borderRadius: 25,
+            alignItems: 'center',
+        },
+
+        primaryText: { color: '#fff', fontWeight: '700' },
+        secondaryText: { color: '#333', fontWeight: '600' },
+        btnContainer: {
+            flexDirection: 'row',
+            marginHorizontal: 12,
+            marginTop: 8,
+            gap: 10
+        },
+
+        resultItem: {
+            padding: 8,
+            borderBottomWidth: 1,
+            borderColor: '#eee'
+        },
+
+        cameraHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 40,
+            paddingBottom: 10,
+            backgroundColor: '#000'
+        },
+
+        cameraTitle: {
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: '600'
+        },
+
+        cameraContainer: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        camera: {
+            ...StyleSheet.absoluteFillObject
+        },
+
+        overlay: {
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        scanBox: {
+            width: 220,
+            height: 220,
+            borderWidth: 2,
+            borderColor: '#0e7490',
+            borderRadius: 14
+        },
+
+        cameraFooter: {
+            padding: 20,
+            backgroundColor: '#000'
+        },
+
+        closeScanBtn: {
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 10,
+            alignItems: 'center'
+        },
+
+        closeScanText: {
+            color: '#fff',
+            fontWeight: '600'
+        },
+        resultCard: {
+            backgroundColor: '#fff',
+            marginHorizontal: 20,
+            marginTop: 10,
+            borderRadius: 14,
+            paddingVertical: 6,
+            elevation: 4,
+            maxHeight: 220,
+        },
+
+        resultTitle: {
+            fontWeight: '700',
+            color: '#0f172a',
+        },
+
+        resultSub: {
+            fontSize: 12,
+            color: '#64748b',
+            marginTop: 2,
+        },
+        segmentInner: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6   // 👈 spacing between icon & text
+        },
+        listCard: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            backgroundColor: '#fff',
+            padding: 14,
+            borderRadius: 14,
+            marginBottom: 12,
+            elevation: 3
+        },
+
+        leftSection: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+
+        indexCircle: {
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            backgroundColor: '#0e7490',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10
+        },
+
+        indexText: {
+            color: '#fff',
+            fontWeight: 'bold'
+        },
+
+        cartonNo: {
+            fontSize: 15,
+            fontWeight: 'bold',
+            color: '#0e7490'
+        },
+
+        subText: {
+            fontSize: 12,
+            color: '#666',
+            marginTop: 2
+        },
+
+        rightSection: {
+            alignItems: 'flex-end',
+            justifyContent: 'center'
+        },
+
+        qtyText: {
+            fontSize: 13,
+            color: '#444'
+        },
+
+        cheesText: {
+            fontSize: 13,
+            color: '#0e7490',
+            marginTop: 4,
+            fontWeight: '600'
+        },
+
+        addMoreBtn: {
+            backgroundColor: '#0e7490',
+            paddingVertical: 14,
+            borderRadius: 20,   
+            alignItems: 'center',
+            marginTop: 0,
+
+            elevation: 4,       
+            shadowColor: '#000',
+            shadowOpacity: 0.15,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 3 }
+        },
+
+        addMoreText: {
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: '500',
+            letterSpacing: 0.5
+        },
+        bottomRow: {
+            flexDirection: 'row',
+            marginTop: 10,
+            justifyContent: 'space-between'
+        },
+
+        backBtn1: {
+            flex: 1,
+            backgroundColor: '#e5e7eb',
+            paddingVertical: 12,      
+            borderRadius: 20,        
+            alignItems: 'center',
+            marginRight: 6
+        },
+
+        submitBtn: {
+            flex: 1,
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,     
+            borderRadius: 20,
+            alignItems: 'center',
+            marginLeft: 6
+        },
+
+        backText: {
+            color: '#333',
+            fontWeight: '600',
+            fontSize: 13            
+        },
+
+        submitText: {
+            color: '#fff',
+            fontWeight: '600',
+            fontSize: 13            
+        },
+        deleteIcon: {
+            alignSelf: 'flex-end',
+            marginBottom: 6
+        },
+        viewListBtn: {
+            margin: 10,
+            backgroundColor: '#e0f2f1',
+            padding: 12,
+            borderRadius: 12,
+            alignItems: 'center'
+        },
+
+        viewListText: {
+            color: '#0e7490',
+            fontWeight: '700'
+        },
+        summaryBar: {
+            flexDirection: 'row',
+            backgroundColor: '#f1f5f9',
+            borderRadius: 8,         
+            paddingVertical: 6,     
+            marginTop: 8,            
+            alignItems: 'center'
+        },
+
+        summaryItem: {
+            flex: 1,
+            alignItems: 'center'
+        },
+
+        summaryLabel: {
+            fontSize: 10,             
+            color: '#64748b'
+        },
+
+        summaryValue: {
+            fontSize: 14,             
+            fontWeight: '700',
+            color: '#0f172a',
+            marginTop: 1              
+        },
+
+        divider: {
+            width: 1,
+            height: 20,              
+            backgroundColor: '#e2e8f0'
+        }
+    });
 
     let cancelToken: any;
 
@@ -46,17 +532,279 @@ const WeftIssueItemDrawer = ({
         cancelToken: cancelToken?.token,
     });
 
-    const getToken = () => {
-        return token;
-    };
+    useEffect(() => {
+        if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
+            const testFinct = async () => {
+                const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
+                setAllYearData(allyeardata)
+            }
+            testFinct();
+        }
+    }, [FormState.values.PrpCode])
+
+    const openDrawer = () => setIsDrawerVisible(true);
+    const closeDrawer = () => setIsDrawerVisible(false);
 
     useEffect(() => {
-        Animated.timing(slideAnim, {
-            toValue: isVisible ? 0 : height,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
-    }, [isVisible]);
+        requestPermission();
+    }, []);
+
+    const parseDate = (dateStr) => {
+        const [year, month, day] = dateStr.split('-');
+        return new Date(year, month - 1, day);
+    };
+
+    const LIGHT_CARD_COLORS = [
+        ["#E3F2FD", "#BBDEFB"],
+        ["#E8F5E9", "#C8E6C9"],
+        ["#FFF3E0", "#FFE0B2"],
+        ["#F3E5F5", "#E1BEE7"],
+        ["#E0F7FA", "#B2EBF2"],
+    ];
+
+    const handleLoadPress = () => {
+        const { PrpCode, YearNo, fromdate, todate } = FormState.values;
+        if (!PrpCode || !YearNo) {
+            Alert.alert("Validation", "Please select Property and Year");
+            return;
+        }
+        const yearNo = parseInt(YearNo);
+
+        const startYear = 2000 + yearNo - 1;
+        const endYear = 2000 + yearNo;
+
+        const fyStart = new Date(startYear, 3, 1);
+        const fyEnd = new Date(endYear, 2, 31, 23, 59, 59);
+
+        const from = parseDate(fromdate);
+        const to = parseDate(todate);
+
+        // console.log("from:", from);
+        // console.log("to:", to);
+        // console.log("fyStart:", fyStart);
+        // console.log("fyEnd:", fyEnd);
+
+        if (from < fyStart || to > fyEnd) {
+            Alert.alert(
+                "Validation",
+                `Date must be between ${fyStart.toLocaleDateString()} and ${fyEnd.toLocaleDateString()}`
+            );
+            return;
+        }
+
+        if (from > to) {
+            Alert.alert("Validation", "From Date cannot be greater than To Date");
+            return;
+        }
+        fetchBrowseData();
+        // console.log("Selected 👉", FormState.values);
+        setIsDrawerVisible(false);
+    };
+
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2);
+    };
+
+
+    const fetchBrowseData = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        const headers = {
+            Authorization: `Bearer ${getToken()}`,
+            'Content-Type': 'application/json',
+            'X-Requested-with': 'XMLHttpRequest',
+        };
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        // const selectedProperty = await AsyncStorage.getItem('selected_property');
+        // let finalPrptype = userPtype;
+        // if (selectedProperty === 'sudamo_knits') {
+        //     finalPrptype = 'S';
+        // } else if (selectedProperty === 'rayons') {
+        //     finalPrptype = 'R';
+        // }
+
+        try {
+            const params = {
+                prpcode: FormState.values.PrpCode || '',
+                prptype: userPtype,
+                strcode: '002',
+                txntype: 'creel_yarn_issue',
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                // yearno: '26',
+                fromdate: FormState.values.fromdate || '',
+                todate: FormState.values.todate || '',
+                status: FormState.values.status || '',
+
+            };
+
+            const response = await axios.post(`${API}/api/get_yarn_issue_browse`, params, { headers });
+
+            console.log("browse response", response)
+            console.log("browse payload", params)
+
+            const apiData = response?.data?.response?.data || [];
+            if (response?.data?.success) {
+                let finalData = apiData || [];
+                if (FormState.values.status === 'C') {
+                    finalData = finalData.filter(item => {
+                        const qty = parseFloat(item.CreelQty || 0);
+                        return qty === 0;
+                    });
+                } else {
+                    finalData = finalData.filter(item => {
+                        const qty = parseFloat(item.CreelQty || 0);
+                        return qty !== 0;
+                    });
+                }
+
+                if (finalData.length > 0) {
+                    setActiveCreels(finalData);
+                    closeDrawer();
+                } else {
+                    setActiveCreels([]);
+                    Alert.alert("No Record Found", "No data available");
+                }
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                setActiveCreels([]);
+                // console.log("Request cancelled");
+            } else {
+                console.log("API Error:", error);
+                // Alert.alert('Error while searching');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const getStatusFromQty = (qty) => {
+        const parsedQty = parseFloat(qty || 0);
+        return parsedQty === 0 ? 'Complete' : 'Pending';
+    };
+
+
+
+    const handleViewClick = async (item = null) => {
+        if (!item) return; // safety
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        setIsLoading(true);
+
+        const headers = {
+            Authorization: `Bearer ${getToken()}`,
+            'Content-Type': 'application/json',
+            'X-Requested-with': 'XMLHttpRequest',
+        };
+
+        try {
+            const payload = {
+                uid: item.UId,
+                prpcode: FormState.values.PrpCode,
+                strcode: '002',
+                yearno: FormState.values.YearNo,
+                txntype: 'creel_yarn_issue',
+            };
+            console.log("show Payload:", payload);
+            const response = await axios.post(
+                `${API}/api/get_yarn_issue_show`,
+                payload,
+                { headers }
+            );
+
+            console.log("show response", response);
+
+            if (response?.data?.success) {
+
+                const resData = response.data.response;
+
+                const d1 = resData.d1 || [];
+                const d2 = resData.d2 || [];
+
+                const mainData = resData.main || [];
+                if (mainData.length > 0) {
+                    setCreelId(mainData[0].BatchNo || '');
+                }
+
+                // const mappedData = d2.map(d2Item => {
+                //     const d1Item = d1.find(
+                //         x => String(x.SrNo) === String(d2Item.SrNo)
+                //     ) || {};
+
+                const d1Map = {};
+                d1.forEach(item => {
+                    d1Map[String(item.SrNo)] = item;
+                });
+
+                const mappedData = d2
+                    .filter(d2Item => d1Map[String(d2Item.SrNo)])
+                    .map(d2Item => {
+                        const d1Item = d1Map[String(d2Item.SrNo)];
+
+                        return {
+                            cartonNo: d2Item.CartNo || '',
+                            qty: d2Item.Qty || '',
+                            chees: d2Item.Chees || '',
+
+                            PUId: d2Item.PUId || '',
+                            PSrNo: d2Item.PSrNo || '',
+                            PSubSr: d2Item.PSubSr || '',
+                            TranType: d2Item.TranType || '',
+                            d2SrNo: String(d2Item.SrNo || ''),
+
+                            ItmCode: d1Item.ItmCode || '',
+                            ItmName: d1Item.ItmName || '',
+                            MerCode: d1Item.MerCode || '',
+                            MerName: d1Item.MerName || '',
+                            GrdCode: d1Item.GrdCode || '',
+                            GrdName: d1Item.GrdName || '',
+                            ShdCode: d1Item.ShdCode || '',
+                            ShdName: d1Item.ShdName || '',
+                            Denier: d1Item.Denier || '',
+                            d1SrNo: String(d1Item.SrNo || ''),
+                            UId: d1Item.UId || '',
+                            yearNo: FormState.values.YearNo || ''
+                        };
+                    });
+
+                setCartonSummary(mappedData);
+
+                console.log("mappedData", mappedData, cartonSummary);
+
+                // setCartonSummary(mappedData);
+                setSelectedCreel(payload);
+                // setSelectedCreel({
+                //     UId: item.UId
+                // });
+                setIsEditMode(true);
+                setMainUId(item.UId);
+                setIsCreelModalVisible(false);
+                setIsScanModalVisible(true);
+
+            } else {
+                Alert.alert("Error", "No data found");
+            }
+
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                // console.log("Request cancelled");
+            } else {
+                console.log("API Error:", error);
+                // Alert.alert("Error while processing");
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const codeScanner = useCodeScanner({
         codeTypes: ['qr'],
@@ -93,7 +841,7 @@ const WeftIssueItemDrawer = ({
                 setYearNo(parsed.yearNo || '');
                 setchees(parsed.Chees || '');
                 setavgwt(parsed.Wt || '');
-                // sendScannedValue(value);
+                sendScannedValue(value);
             } catch (err) {
                 Alert.alert("Invalid QR", "QR format not valid");
             }
@@ -114,7 +862,7 @@ const WeftIssueItemDrawer = ({
             const payload = {
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
-                strcode: '002',
+                strcode: FormState.values.yarnstrcode,
                 searchcarton: searchText.trim()
             };
             console.log("Payload:", payload);
@@ -151,6 +899,81 @@ const WeftIssueItemDrawer = ({
         }
     };
 
+    const handleAddCarton = () => {
+        if (!CartonNo || !getchees || !getavgwt) {
+            Alert.alert("Error", "Please scan carton first");
+            return;
+        }
+
+        const isDuplicate = cartonSummary.some(
+            item => item.cartonNo === CartonNo
+        );
+
+        if (isDuplicate) {
+            Alert.alert("Duplicate Error", `Carton No ${CartonNo} already added.`);
+            return;
+        }
+
+        const enteredChees = parseFloat(getchees);
+        const enteredQty = parseFloat(getavgwt);
+        const availableChees = parseFloat(getScannedObj?.Chees || 0);
+        const availableQty = parseFloat(getScannedObj?.Wt || 0);
+
+        if (enteredChees > availableChees) {
+            Alert.alert(
+                "Validation Error",
+                `Entered Chees (${enteredChees}) Cannot not be greater than Available Chees (${availableChees}).`
+            );
+            return;
+        }
+
+        if (enteredQty > availableQty) {
+            Alert.alert(
+                "Validation Error",
+                `Entered Quantity (${enteredQty}) Cannot not be greater than Available Quantity (${availableQty}).`
+            );
+            return;
+        }
+
+        if (enteredChees <= 0) {
+            Alert.alert("Validation Error", "Chees must be greater than 0.");
+            return;
+        }
+
+        if (enteredQty <= 0) {
+            Alert.alert("Validation Error", "Qty must be greater than 0.");
+            return;
+        }
+
+        const newCarton = {
+            cartonNo: CartonNo,
+            chees: getchees,
+            qty: getavgwt,
+            PUId: getScannedObj?.PUId,
+            PSrNo: getScannedObj?.PSrNo,
+            PSubSr: getScannedObj?.PSubSr,
+            TranType: getScannedObj?.TranType,
+            ItmCode: getScannedObj?.ItmCode,
+            ItmName: getScannedObj?.ItmName,
+            MerCode: getScannedObj?.MerCode,
+            MerName: getScannedObj?.MerName,
+            GrdCode: getScannedObj?.GrdCode,
+            GrdName: getScannedObj?.GrdName,
+            ShdCode: getScannedObj?.ShdCode,
+            ShdName: getScannedObj?.ShdName,
+            Denier: getScannedObj?.Denier,
+            yearNo: getScannedObj?.yearNo,
+            SrNo: getScannedObj.SrNo,
+            UId: mainUId?.UId,
+        };
+        setCartonSummary(prev => [...prev, newCarton]);
+        setCartonNo('');
+        setchees('');
+        setavgwt('');
+        setSearchResults({});
+        setScannedObj({});
+        setShowList(true);
+    };
 
     {
         (!device || !hasPermission) && (
@@ -160,394 +983,869 @@ const WeftIssueItemDrawer = ({
         )
     }
 
-    return (
-        <Modal visible={isVisible} transparent animationType="none">
-            <View style={styles.overlay}>
+    const handleFinalSubmit = () => {
+        console.log("isEditMode:", isEditMode);
+        console.log("mainUId:", mainUId);
 
-                <Animated.View style={[
-                    styles.container,
-                    { transform: [{ translateY: slideAnim }] }
-                ]}>
+        if (isEditMode && mainUId !== null) {
+            handleSubmitScan();   // MODIFY
+        } else {
+            handleaddCreel();     // ADD
+        }
+    };
+
+    const getToken = () => {
+        return token;
+    };
+
+    const getShifts = async () => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+
+            const historyPayload = {
+                // text: parcode,
+                txntype: 'creel_yarn_issue',
+                // referrer: 'dashboard',
+                fetch: 'shift',
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo
+
+            };
+            console.log("historyPayload", historyPayload);
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+            console.log("response", response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                setShiftData(response.data.response.data);
+            } else {
+                setShiftData([]);
+            }
+        } catch (error) {
+            // console.log("API getshifts error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        const { PrpCode, YearNo } = FormState.values;
+        if (PrpCode && YearNo) {
+            getShifts();
+        }
+    }, [FormState.values.PrpCode, FormState.values.YearNo]);
+
+
+    useEffect(() => {
+        if (isCreelModalVisible) {
+            getShifts();
+            // getdesign();
+        }
+    }, [isCreelModalVisible]);
+
+    const handleAdd = () => {
+        if (!design) {
+            Alert.alert('Please select Design');
+            return;
+        }
+
+        const selectedRow = getData.find(el => el.DsnCode === design);
+
+        const newRow = {
+            srNo: gridData.length + 1,
+            CartonNo: CartonNo,
+            design: selectedRow?.DsnName || ''
+        };
+        setGridData(prev => [...prev, newRow]);
+        setBeamNo(prev => prev + 1);
+        setDesign('');
+        setDesignName('');
+    };
+
+    const sendScannedValue = async (qrValue: string) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+
+        try {
+            let temp = JSON.parse(qrValue)
+            let yno = await AsyncStorage.getItem('yno');
+
+            let infoPyload = {
+                txntype: 'chekingScanner',
+                referrer: 'dashboard',
+                scannedString: temp,
+                prpcode: temp.prpcode,
+                yearno: yno
+            };
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
+
+            if (response.data.success && response.data.response.data) {
+                setData(response.data.response.data);
+                setIsLoading(false);
+            } else {
+                setIsLoading(false);
+                console.error('Unexpected response structure:', response.data);
+                Alert.alert(`${response.data}`);
+            }
+        } catch (error) {
+            //console.log("API sendScannedValue error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSubmitScan = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                txntype: 'creel_yarn_issue',
+                CreelId: creelId,
+                // setupDate: setupDate,
+                SetupDate: setupDate.toISOString().split('T')[0],
+                Shift: shift,
+                Remark: Remark || '',
+                StkType: FormState.values.StkType || stocktype || '',
+                uid: mainUId || '',
+                Cartons: cartonSummary.map(item => ({
+                    uid: item.UId || mainUId,
+                    CartNo: item.cartonNo || '',
+                    Chees: item.chees || '',
+                    Wt: item.qty || '',
+                    PUId: item.PUId || '',
+                    PSrNo: item.PSrNo || '',
+                    PSubSr: item.PSubSr || '',
+                    TranType: item.TranType || '',
+                    ItmCode: item.ItmCode || '',
+                    ItmName: item.ItmName || '',
+                    MerCode: item.MerCode || '',
+                    MerName: item.MerName || '',
+                    GrdCode: item.GrdCode || '',
+                    GrdName: item.GrdName || '',
+                    ShdCode: item.ShdCode || '',
+                    ShdName: item.ShdName || '',
+                    Denier: item.Denier || '',
+                    yearno: item.yearNo || '',
+                }))
+            };
+
+            console.log("edit payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/modify_creel_data`, payloadObj, { headers });
+            console.log("edit response", response);
+
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+
+            //     // ✅ Snackbar REMOVE → Modal use karo
+            //     setSuccessMessage('Data Updated Successfully ✅');
+            //     setShowSuccess(true);
+
+            // }
+            if (response.data.success === true) {
+                setDataSaved(true);
+
+                setSuccessMessage('Data Updated Successfully ✅');
+                setShowSuccess(true);
+
+                // ✅ RESET + CLOSE
+                resetAllFields();
+                setIsScanModalVisible(false);
+
+            }
+            else if (response.data.success === false) {
+                setIsLoading(false);
+                setDataSaved(false);
+
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'yellow' },
+                });
+            }
+            else {
+                setIsLoading(false);
+                setDataSaved(false);
+
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+    const formatDisplayDate = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        if (isNaN(d)) return '';
+
+        return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')
+            }-${d.getFullYear()}`;
+    };
+
+    const handleaddCreel = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                // PrpCode: FormState.values.PrpCode,
+                // YearNo: FormState.values.YearNo,
+                // txntype: 'creel_yarn_issue',
+                // CreelId: creelId,
+                // // setupDate: setupDate,
+                // SetupDate: setupDate.toISOString().split('T')[0],
+                // Shift: shift,
+                // Remark: Remark || '',
+                // StkType: FormState.values.StkType || stocktype || '',
+                // uid: mainUId || '',
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                BeamNo: FormState.values.BeamNo,
+                BeamUId: FormState.values.BeamUId,
+                StkType: FormState.values.StkType,
+                IssNo: FormState.values.IssNo,
+                WarpLen: FormState.values.WarpLen,
+                Issdate: formatDisplayDate(FormState.values.Issdate),
+                uid: FormState.values.UId,
+                month: FormState.values.monthno,
+                suffix: FormState.values.suffix,
+                strcode: FormState.values.yarnstrcode,
+                txntype: 'beam_weft_issue',
+                DsnCode: FormState.values.DsnCode,
+                Cartons: cartonSummary.map(item => ({
+                    uid: item.UId || mainUId || '',
+                    CartNo: item.cartonNo || '',
+                    Chees: item.chees || '',
+                    Wt: item.qty || '',
+                    PUId: item.PUId || '',
+                    PSrNo: item.PSrNo || '',
+                    PSubSr: item.PSubSr || '',
+                    TranType: item.TranType || '',
+                    ItmCode: item.ItmCode || '',
+                    ItmName: item.ItmName || '',
+                    MerCode: item.MerCode || '',
+                    MerName: item.MerName || '',
+                    GrdCode: item.GrdCode || '',
+                    GrdName: item.GrdName || '',
+                    ShdCode: item.ShdCode || '',
+                    ShdName: item.ShdName || '',
+                    Denier: item.Denier || '',
+                    yearno: item.yearNo || '',
+                }))
+            };
+
+            console.log("add payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/add_creel_data`, payloadObj, { headers });
+            console.log("add response", response);
+
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+
+            //     // ✅ Snackbar REMOVE → Modal use karo
+            //     setSuccessMessage('Data Saved Successfully ✅');
+            //     setShowSuccess(true);
+
+            // }
+            if (response.data.success === true) {
+                setDataSaved(true);
+                setSuccessMessage('Data Updated Successfully ✅');
+                setShowSuccess(true);
+                resetAllFields();
+                setIsScanModalVisible(false);
+
+            }
+            else if (response.data.success === false) {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'yellow' },
+                });
+            } else {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+
+    const resetAllFields = () => {
+        setIsEditMode(false);   // 🔥 VERY IMPORTANT
+        setMainUId(null);
+        // Creel modal fields
+        setCreelId('');
+        setShift('');
+        setstocktype('');
+        setRemark('');
+        setShowPicker(false);
+        // setSetupDate(null);
+
+        setFormState(prev => ({
+            ...prev,
+            values: {
+                ...prev.values,
+                // PrpCode: '',
+                // LngName: '',
+                // YearNo: '',
+                // YearName: '',
+                Shift: '',
+                ShiftName: '',
+                stocktype: '',
+                StockTypeName: ''
+            }
+        }));
+
+        // Scan modal fields
+        setCartonNo('');
+        setchees('');
+        setavgwt('');
+        setScannedObj({});
+        setCartonSummary([]);
+        setSearchText('');
+        setSearchResults([]);
+        setSelectedItem(null);
+        setShowManualSearch(null);
+        setIsScanning(false);
+    };
+
+    const d1 = FormState?.values?.d1 || [];
+    const d2 = FormState?.values?.d2 || [];
+
+    console.log("d1", d1);
+
+    const handleDelete = (index) => {
+        Alert.alert(
+            "Delete",
+            "Are you sure you want to remove this carton?",
+            [
+                { text: "Cancel" },
+                {
+                    text: "Delete",
+                    onPress: () => {
+                        const updatedList = [...cartonSummary];
+                        updatedList.splice(index, 1);
+                        setCartonSummary(updatedList);
+                    },
+                    style: "destructive"
+                }
+            ]
+        );
+    };
+
+
+    return (
+        <>
+            <Modal visible={isVisible} animationType="slide">
+                <View style={styles.container}>
+
+                    {/* HEADER */}
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={onClose}>
+                        <TouchableOpacity style={styles.backBtn} onPress={onClose}>
                             <Icon name="arrow-back" size={22} color="#fff" />
                         </TouchableOpacity>
 
-                        <Text style={styles.headerTitle}>Weft Issue Carton Detail</Text>
+                        <View>
+                            <Text style={styles.headerTitle}>Weft Issue Entry</Text>
+                            <Text style={styles.headerSub}>Scan / Search Carton</Text>
+                        </View>
+                    </View>
 
+                    {/* SEGMENT */}
+                    <View style={styles.segment}>
+                        <TouchableOpacity
+                            style={[styles.segmentBtn, !showManualSearch && styles.segmentActive]}
+                            onPress={() => {
+                                setShowManualSearch(false);
+                                setIsScanning(true); // 🔥 direct camera open
+                            }}
+                        >
+                            <View style={styles.segmentInner}>
+                                <Icon
+                                    name="qr-code-scanner"
+                                    size={18}
+                                    color={!showManualSearch ? "#fff" : "#007EA7"}
+                                />
+                                <Text style={[
+                                    styles.segmentText,
+                                    !showManualSearch && styles.segmentTextActive
+                                ]}>
+                                    Scan
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
 
-                        <TouchableOpacity onPress={onClose}>
-                            {/* <Icon name="close" size={22} color="#fff" /> */}
+                        <TouchableOpacity
+                            style={[styles.segmentBtn, showManualSearch && styles.segmentActive]}
+                            onPress={() => setShowManualSearch(true)}
+                        >
+                            <View style={styles.segmentInner}>
+                                <Icon
+                                    name="search"
+                                    size={18}
+                                    color={showManualSearch ? "#fff" : "#007EA7"}
+                                />
+                                <Text style={[
+                                    styles.segmentText,
+                                    showManualSearch && styles.segmentTextActive
+                                ]}>
+                                    Manual
+                                </Text>
+                            </View>
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.topSwitchContainer}>
+                    {/* MANUAL SEARCH */}
+                    {showManualSearch && (
+                        <View style={styles.card}>
+                            <Text style={styles.label}>Search Carton</Text>
 
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={[
-                                styles.switchCard,
-                                !showManualSearch && styles.activeCard
-                            ]}
-                            onPress={() => setShowManualSearch(false)}
-                        >
-                            <Icon
-                                name="qr-code-scanner"
-                                size={isSmallDevice ? 18 : 22}
-                                color={!showManualSearch ? "#fff" : "#007EA7"}
-                            />
-                            <Text
-                                numberOfLines={1}
-                                style={[
-                                    styles.switchText,
-                                    isSmallDevice && { fontSize: 12 },
-                                    !showManualSearch && styles.activeText
-                                ]}
-                            >
-                                Scan Carton
-                            </Text>
+                            {/* SEARCH INPUT */}
+                            <View style={styles.searchRow}>
+                                <TextInput
+                                    placeholder="Enter carton no"
+                                    value={searchText}
+                                    onChangeText={setSearchText}
+                                    style={styles.searchInput}
+                                />
+
+                                <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                                    <Icon name="search" size={20} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* LOADING */}
+                            {isLoading && (
+                                <ActivityIndicator
+                                    style={{ marginTop: 10 }}
+                                    size="small"
+                                    color="#0f766e"
+                                />
+                            )}
+
+                            {/* RESULTS (INSIDE SAME CARD) */}
+                            {searchResults.length > 0 && (
+                                <FlatList
+                                    data={searchResults}
+                                    keyExtractor={(item, index) => index.toString()}
+                                    style={{ marginTop: 10, maxHeight: 200 }}
+                                    showsVerticalScrollIndicator={false}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.resultItem}
+                                            onPress={() => {
+                                                setSelectedItem(item);
+                                                setCartonNo(item.CartNo);
+                                                setchees(item.Chees || '0');
+                                                setavgwt(item.Wt || '0');
+                                            }}
+                                        >
+                                            <View>
+                                                <Text style={styles.resultTitle}>{item.CartNo}</Text>
+                                                <Text style={styles.resultSub}>
+                                                    Chees: {item.Chees}
+                                                </Text>
+                                                <Text style={styles.resultSub}>
+                                                    {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                </Text>
+                                            </View>
+
+                                            {/* <Icon name="chevron-right" size={22} color="#94a3b8" /> */}
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            )}
+
+                            {selectedItem && (
+                                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+
+                                    <TouchableOpacity
+                                        style={[styles.primaryBtn, { flex: 1 }]}
+                                        onPress={() => {
+                                            if (!selectedItem) {
+                                                Alert.alert("Select carton first");
+                                                return;
+                                            }
+
+                                            const data = {
+                                                CartNo: selectedItem.CartNo,
+                                                ItmName: selectedItem.ItmName,
+                                                MerName: selectedItem.MerName,
+                                                ShdName: selectedItem.ShdName,
+                                                GrdName: selectedItem.GrdName,
+                                                Chees: selectedItem.Chees,
+                                                Wt: selectedItem.Wt,
+                                                PUId: selectedItem.PUId,
+                                                PSrNo: selectedItem.PSrNo,
+                                                PSubSr: selectedItem.PSubSr,
+                                                TranType: selectedItem.TranType,
+                                                ItmCode: selectedItem.ItmCode,
+                                                MerCode: selectedItem.MerCode,
+                                                GrdCode: selectedItem.GrdCode,
+                                                ShdCode: selectedItem.ShdCode,
+                                                Denier: selectedItem.Denier,
+                                                yearNo: selectedItem.yearno,
+                                                SrNo: selectedItem.SrNo,
+                                            };
+
+                                            setCartonNo(data.CartNo || '');
+                                            setchees(data.Chees || '');
+                                            setavgwt(data.Wt || '');
+                                            setScannedObj(data);
+
+                                            setShowManualSearch(null);
+                                            setSearchText('');
+                                            setSearchResults([]);
+                                            setSelectedItem(null);
+                                        }}
+                                    >
+                                        <Text style={styles.primaryText}>OK</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.secondaryBtn, { flex: 1 }]}
+                                        onPress={() => {
+                                            setSelectedItem(null);
+                                            setSearchResults([]);
+                                            setSearchText('');
+                                            setShowManualSearch(null);
+                                        }}
+                                    >
+                                        <Text style={styles.secondaryText}>Close</Text>
+                                    </TouchableOpacity>
+
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {/* SCANNER */}
+                    {/* {!showManualSearch && (
+                        <TouchableOpacity style={styles.scanCard} onPress={() => setIsScanning(true)}>
+                            <Icon name="qr-code-scanner" size={18} color="#fff" />
+                            <Text style={styles.scanText}>Tap to Scan Carton</Text>
                         </TouchableOpacity>
+                    )} */}
 
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            style={[
-                                styles.switchCard,
-                                showManualSearch && styles.activeCard
-                            ]}
-                            onPress={() => setShowManualSearch(true)}
+                    {/* CAMERA MODAL */}
+                    {isScanning && (
+                        <Modal animationType="fade">
+                            <View style={{ flex: 1, backgroundColor: '#000' }}>
+
+                                {/* 🔝 TOP BAR */}
+                                <View style={styles.cameraHeader}>
+                                    {/* <TouchableOpacity onPress={() => setIsScanning(false)}>
+                                        <Icon name="arrow-back" size={26} color="#fff" />
+                                    </TouchableOpacity> */}
+
+                                    <Text style={styles.cameraTitle}>Scan QR Code</Text>
+
+                                    <View style={{ width: 26 }} />
+                                </View>
+
+                                {/* 📷 CAMERA */}
+                                <View style={styles.cameraContainer}>
+                                    {device && hasPermission && (
+                                        <Camera
+                                            style={styles.camera}
+                                            device={device}
+                                            isActive={true}
+                                            codeScanner={codeScanner}
+                                        />
+                                    )}
+
+                                    {/* 🔲 SCAN BOX */}
+                                    <View style={styles.overlay}>
+                                        <View style={styles.scanBox} />
+                                    </View>
+                                </View>
+
+                                {/* 🔻 BOTTOM BUTTON */}
+                                <View style={styles.cameraFooter}>
+                                    <TouchableOpacity
+                                        style={styles.closeScanBtn}
+                                        onPress={() => setIsScanning(false)}
+                                    >
+                                        <Text style={styles.closeScanText}>Close Scanner</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                            </View>
+                        </Modal>
+                    )}
+
+                    {!showList ? (
+                        <ScrollView
+                            showsVerticalScrollIndicator={true}
+                            contentContainerStyle={{ paddingBottom: 20 }}
                         >
-                            <Icon
-                                name="search"
-                                size={isSmallDevice ? 18 : 20}
-                                color={showManualSearch ? "#fff" : "#007EA7"}
-                            />
-                            <Text
-                                numberOfLines={1}
-                                style={[
-                                    styles.switchText,
-                                    isSmallDevice && { fontSize: 12 },
-                                    showManualSearch && styles.activeText
-                                ]}
-                            >
-                                Manual Search
-                            </Text>
-                        </TouchableOpacity>
 
-                    </View>                   
-                </Animated.View>
-            </View>
-        </Modal>
+                            {cartonSummary.length > 0 && (
+                                <TouchableOpacity
+                                    style={styles.viewListBtn}
+                                    onPress={() => setShowList(true)}
+                                >
+                                    <Text style={styles.viewListText}>
+                                        📋 View Cartons ({cartonSummary.length})
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+
+                            <View style={styles.card}>
+                                <Text style={styles.cardTitle}>Carton Details</Text>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Carton Number</Text>
+                                    <TextInput
+                                        style={styles.inputDisabled}
+                                        value={CartonNo}
+                                        editable={false}
+                                    />
+                                </View>
+
+                                <View style={styles.row}>
+                                    <View style={styles.fieldHalf}>
+                                        <Text style={styles.label}>Chees</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={getchees}
+                                            onChangeText={setchees}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+
+                                    <View style={styles.fieldHalf}>
+                                        <Text style={styles.label}>Quantity</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={getavgwt}
+                                            onChangeText={setavgwt}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Item</Text>
+                                    <TextInput
+                                        style={styles.inputDisabled}
+                                        value={getScannedObj?.ItmName || ''}
+                                        editable={false}
+                                    />
+                                </View>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Merge</Text>
+                                    <TextInput
+                                        style={styles.inputDisabled}
+                                        value={getScannedObj?.MerName || ''}
+                                        editable={false}
+                                    />
+                                </View>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Shade</Text>
+                                    <TextInput
+                                        style={styles.inputDisabled}
+                                        value={getScannedObj?.ShdName || ''}
+                                        editable={false}
+                                    />
+                                </View>
+
+                                <View style={styles.field}>
+                                    <Text style={styles.label}>Grade</Text>
+                                    <TextInput
+                                        style={styles.inputDisabled}
+                                        value={getScannedObj?.GrdName || ''}
+                                        editable={false}
+                                    />
+                                </View>
+
+                            </View>
+
+
+                            <View style={styles.bottomBar}>
+                                <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
+                                    <Text style={styles.secondaryText}>Close</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.primaryBtn} onPress={handleAddCarton}>
+                                    <Text style={styles.primaryText}>Submit</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                        </ScrollView>
+                    ) : (
+
+                        <View style={styles.card}>
+
+                            <Text style={styles.cardTitle}>
+                                Yarn Issuance Summary ({cartonSummary.length})
+                            </Text>
+
+                            <FlatList
+                                data={cartonSummary}
+                                keyExtractor={(item, index) => index.toString()}
+                                contentContainerStyle={{ paddingBottom: 10 }}
+                                renderItem={({ item, index }) => (
+
+                                    <View style={styles.listCard}>
+
+                                        {/* LEFT SIDE */}
+                                        <View style={styles.leftSection}>
+
+                                            <View style={styles.indexCircle}>
+                                                <Text style={styles.indexText}>{index + 1}</Text>
+                                            </View>
+
+                                            <View>
+                                                <Text style={styles.cartonNo}>
+                                                    {item.cartonNo}
+                                                </Text>
+
+                                                <Text style={styles.subText}>
+                                                    {item.ItmName} / {item.MerName}
+                                                </Text>
+
+                                                <Text style={styles.subText}>
+                                                    {item.ShdName} / {item.GrdName}
+                                                </Text>
+
+                                            </View>
+
+                                        </View>
+
+                                        {/* RIGHT SIDE */}
+                                        <View style={styles.rightSection}>
+                                            <TouchableOpacity
+                                                style={styles.deleteIcon}
+                                                onPress={() => handleDelete(index)}
+                                            >
+                                                <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.qtyText}>
+                                                Qty: {item.qty}
+                                            </Text>
+
+                                            <Text style={styles.cheesText}>
+                                                Chees: {item.chees}
+                                            </Text>
+                                        </View>
+
+                                    </View>
+
+                                )}
+                            />
+
+                            <View style={styles.summaryBar}>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Items</Text>
+                                    <Text style={styles.summaryValue}>
+                                        {cartonSummary.length}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.divider} />
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Total Qty</Text>
+                                    <Text style={styles.summaryValue}>
+                                        {cartonSummary.reduce((sum, item) => sum + Number(item.qty || 0), 0)}
+                                    </Text>
+                                </View>
+
+                            </View>
+
+                            {/* <TouchableOpacity style={styles.addMoreBtn} onPress={() => setShowList(false)}>
+                                <Text style={styles.addMoreText}>＋ Add More</Text>
+                            </TouchableOpacity> */}
+
+
+                            <View style={styles.bottomRow}>
+                                <TouchableOpacity
+                                    style={styles.backBtn1}
+                                    onPress={() => setShowList(false)}
+                                >
+                                    <Text style={styles.backText}>＋ Add More</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.submitBtn}
+                                    // onPress={() => handleFinalSubmit
+                                    onPress={handleaddCreel}
+                                >
+                                    <Text style={styles.submitText}>✈ Submit All</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                        </View>
+
+                    )}
+
+                </View>
+            </Modal >
+
+        </>
     );
 };
 
+
+
 export default WeftIssueItemDrawer;
-
-const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)'
-    },
-    container: {
-        flex: 1,
-        backgroundColor: '#f4f6f8'
-    },
-
-    header: {
-        backgroundColor: '#0e7490',
-        paddingTop: 40,
-        paddingBottom: 15,
-        paddingHorizontal: 15,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    headerTitle: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600'
-    },
-
-    // 🔘 Toggle
-    switchWrapper: {
-        flexDirection: 'row',
-        backgroundColor: '#e6f4f8',
-        margin: 12,
-        borderRadius: 10,
-        overflow: 'hidden'
-    },
-    switchBtn: {
-        flex: 1,
-        padding: 12,
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center'
-    },
-    activeBtn: {
-        backgroundColor: '#007EA7'
-    },
-    // switchText: {
-    //     marginLeft: 6,
-    //     color: '#007EA7',
-    //     fontWeight: '600'
-    // },
-    // activeText: {
-    //     color: '#fff'
-    // },
-
-    // 📋 Items
-    itemCard: {
-        backgroundColor: '#fff',
-        marginHorizontal: 12,
-        marginBottom: 10,
-        padding: 12,
-        borderRadius: 10,
-        elevation: 2
-    },
-    itemName: {
-        fontWeight: '600',
-        fontSize: 14
-    },
-    itemCode: {
-        color: '#666',
-        marginTop: 4
-    },
-    emptyText: {
-        textAlign: 'center',
-        marginTop: 30,
-        color: '#999'
-    },
-
-    // 🔳 Scan Button
-    scanBtn: {
-        position: 'absolute',
-        bottom: 20,
-        right: 20,
-        backgroundColor: '#17b85a',
-        padding: 14,
-        borderRadius: 30,
-        flexDirection: 'row',
-        alignItems: 'center',
-        elevation: 5
-    },
-    scanText: {
-        color: '#fff',
-        marginLeft: 6,
-        fontWeight: '600'
-    },
-    topSwitchContainer: {
-        flexDirection: 'row',
-        marginHorizontal: 10,
-        marginTop: 10,
-    },
-
-    switchCard: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        marginHorizontal: 4,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#007EA7',
-        backgroundColor: '#fff',
-        minHeight: 48,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-
-    activeCard: {
-        backgroundColor: '#007EA7',
-        borderColor: '#007EA7',
-
-        elevation: 4,
-        shadowOpacity: 0.15,
-    },
-
-    switchText: {
-        marginLeft: 6,
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#007EA7',
-        flexShrink: 1,
-    },
-
-    activeText: {
-        color: '#fff',
-    },
-
-    commonBtn: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-
-        // shadow
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-
-    btnText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    btnPrimary: {
-        backgroundColor: '#007EA7',
-    },
-
-    btnSuccess: {
-        backgroundColor: '#22c55e',
-    },
-
-    btnDanger: {
-        backgroundColor: '#ef4444',
-    },
-
-    buttonRow: {
-        flexDirection: 'row',
-        marginTop: 10,
-    },
-
-    btnHalf: {
-        flex: 1,
-        marginHorizontal: 4,
-    },
-
-    btnOutline: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#007EA7',
-    },
-    card: {
-        backgroundColor: '#fff',
-        marginHorizontal: 12,
-        marginTop: 10,
-        padding: 12,
-        borderRadius: 12,
-
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-
-    input: {
-        flex: 1,
-        height: 45,
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        fontSize: 14,
-        backgroundColor: '#f9f9f9',
-    },
-
-    iconBtn: {
-        width: 45,
-        height: 45,
-        borderRadius: 10,
-        backgroundColor: '#007EA7',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-
-    item: {
-        padding: 10,
-        borderRadius: 8,
-        backgroundColor: '#f7f7f7',
-        marginBottom: 6,
-    },
-
-    itemSelected: {
-        backgroundColor: '#007EA7',
-    },
-
-    text1: {
-        fontWeight: '600',
-        fontSize: 14,
-        color: '#222',
-    },
-
-    text2: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 2,
-    },
-
-    textWhite: {
-        color: '#fff',
-    },
-
-    btn: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-
-    btnOk: {
-        backgroundColor: '#22c55e',
-        marginRight: 5,
-    },
-
-    btnClose: {
-        backgroundColor: '#ef4444',
-        marginLeft: 5,
-    },
-
-    btnPrimary: {
-        backgroundColor: '#007EA7',
-    },
-
-    btnText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-
-    scanTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#007EA7',
-    },
-
-    cameraContainer: {
-        marginTop: 15,
-        height: 260,
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-
-    camera: {
-        flex: 1,
-    },
-
-    // overlay: {
-    //     ...StyleSheet.absoluteFillObject,
-    //     justifyContent: 'center',
-    //     alignItems: 'center',
-    // },
-
-    scanBox: {
-        width: '70%',
-        height: '40%',
-        borderWidth: 2,
-        borderColor: '#00ffcc',
-        borderRadius: 10,
-    },
-});

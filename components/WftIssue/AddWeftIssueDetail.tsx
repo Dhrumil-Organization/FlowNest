@@ -675,7 +675,7 @@ const AddWeftIssueDetail = (props) => {
 
                                     <PartyDropdown
                                         data={Designdata}
-                                        placeholder="Select Beam"
+                                        placeholder="Select Design"
                                         labelKey={["DsnCode", "DsnName"]}
                                         valueKey="DsnCode"
                                         pageSize={12}

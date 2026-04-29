@@ -68,6 +68,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
     const [getChallanPayload, setChallanPayload] = useState({});
     const [getPartyName, setPartyName] = useState("");
     const [filteredOrders, setFilteredOrders] = useState<PartyDetail[]>([]);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const itemsPerPage = 50;
 
     useEffect(() => {
@@ -118,18 +119,38 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     order.noofchallan.toLowerCase().includes(query) ||
                     order.status.toLowerCase().includes(query)
             );
-            setFilteredOrders(filtered);
-            setRenderedOrders(filtered.slice(0, itemsPerPage));
-            setPage(1); // Reset pagination on search
+            const sorted = [...filtered].sort((a, b) => {
+                const dateA = new Date(a.sodate).getTime();
+                const dateB = new Date(b.sodate).getTime();
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            });
+            setFilteredOrders(sorted);
+            setRenderedOrders(sorted.slice(0, itemsPerPage));
+            setPage(1);
         }, 300);
 
         debouncedSearch();
         return () => debouncedSearch.cancel();
-    }, [searchQuery, getDetailData]);
+    }, [searchQuery, getDetailData, sortOrder]);
 
+    // const loadMoreOrders = useCallback(() => {
+    //     if (loading || !getDetailData || renderedOrders.length >= filteredOrders.length) return;
+
+    //     setLoading(true);
+    //     setTimeout(() => {
+    //         const nextPage = page + 1;
+    //         const startIndex = page * itemsPerPage;
+    //         const endIndex = startIndex + itemsPerPage;
+    //         setRenderedOrders(prev => [
+    //             ...prev,
+    //             ...filteredOrders.slice(startIndex, endIndex)
+    //         ]);
+    //         setPage(nextPage);
+    //         setLoading(false);
+    //     }, 500);
+    // }, [page, loading, filteredOrders, renderedOrders]);
     const loadMoreOrders = useCallback(() => {
         if (loading || !getDetailData || renderedOrders.length >= filteredOrders.length) return;
-
         setLoading(true);
         setTimeout(() => {
             const nextPage = page + 1;
@@ -163,6 +184,10 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
 
     const summary = getDetailData.party_summary[0];
     const deliveryPercentage = Math.min(parseFloat(summary.linebar), 100);
+
+    const toggleSortOrder = () => {
+        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    };
 
     const getStatusColor = (status: string) => {
         switch (status.toUpperCase()) {
@@ -669,7 +694,14 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     </>
                 )}
 
-                <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text>
+                {/* <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text> */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text>
+                    <TouchableOpacity onPress={toggleSortOrder} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Icon name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'} size={16} color="#333" />
+                        <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>Sort by Date</Text>
+                    </TouchableOpacity>
+                </View>
                 <View style={styles.deliveryContainer123}>
                     <FlatList
                         data={renderedOrders}

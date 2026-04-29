@@ -70,6 +70,8 @@ import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
 import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
+import PartyDetailScreen from './components/PartyDashboard/PartyDetailScreen';
+import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
 // import WftIssue from './components/WftIssue/WftIssue';
 
 const Stack = createNativeStackNavigator();
@@ -462,6 +464,7 @@ export default function App() {
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="ChartScreen" component={ChartScreen} />
                     {/* <Stack.Screen name="Grey Purchase Order">{(props) =>
                       <>
                         <GreyPurchaseOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -715,6 +718,7 @@ export default function App() {
 
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="PartyDetailScreen" component={PartyDetailScreen} />
                     {/* <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />

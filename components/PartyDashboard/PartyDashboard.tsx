@@ -1,2260 +1,971 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated, ScrollView, Modal, FlatList, TextInput, Platform, ActivityIndicator } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import qs from 'qs';
-import axios from 'axios';
-import { format } from 'date-fns';
-import HeaderBar from '../HeaderBar/HeaderBar';
-import { crlimtreq_styles } from '../../common/Styles/Style';
-import CustomDrawer from './CustomDrawer';
-import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload, ReceivablesPrpgroup, InternalDropdown, DashPrp, DashParty, DashSubHead, DashSexe, DashAccount, ReceivablesSummary, ReceivablesDetails } from './Modal';
-import theme from '../../android/app/src/theme';
-import LinearGradient from 'react-native-linear-gradient';
-import { TableData } from './data';
-import { API } from '../../common/API/dynamicAPI';
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  Modal,
+  Dimensions,
+  ActivityIndicator,
+  Animated
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
+import LinearGradient from "react-native-linear-gradient";
+import axios from "axios";
+import { API } from "../../common/API/dynamicAPI";
+//import { fetchPropertyData } from "../../common/API/Functions";
 import { normalizePrptype, saveLargeData, readPrptypeCache, fetchPropertyData, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
-import SummaryTable from './SummaryTable';
-import PartyOverlay from './PartyOverlay';
-import LedgerOverlay from './LedgerOverlay';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+const SkeletonCard = () => (
+  <View style={styles.card}>
+    <View style={[styles.avatar, { backgroundColor: "#ddd" }]} />
 
-const PartyDashboard: React.FC<Props> = ({ token, username }) => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [syncLoading, setSyncLoading] = useState(false);
-    const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-    const [getAccountLoading, setAccountLoading] = useState(false);
-    const [getdashPartyLoading, setdashPartyLoading] = useState(false);
-    const [getdashSubHeadLoading, setdashSubHeadLoading] = useState(false);
-    const [getdashSexeLoading, setdashSexeLoading] = useState(false);
-    const [getdashAccountLoading, setdashAccountLoading] = useState(false);
-    const [getdashPropertyLoading, setdashPropertyLoading] = useState(false);
-    const [searchQueryPOT, setSearchQueryPOT] = useState('');
-    const [searchQueryPOTCard, setSearchQueryPOTCard] = useState('');
-    const [searchQueryPOTDetails, setSearchQueryPOTDetail] = useState('');
-    const [receivables_sync_date, setreceivables_sync_date] = useState('');
-    const [action, setAction] = useState('');
-    const [activeParty, setActiveParty] = useState('');
-    const [receivables_prpgroup, setreceivables_prpgroup] = useState<ReceivablesPrpgroup[]>([]);
-    const [getOutCardData, setOutCardData] = useState([]);
-    const [getOutDetails, setOutDetails] = useState<ReceivablesDetails[]>([]);
-    const [getOutSummary, setOutSummary] = useState<ReceivablesSummary[]>([]);
-    const [filteredCards, setFilteredCards] = useState([]);
-    const [ledgerOverlayVisible, setLedgerOverlayVisible] = useState(false);
-    const [ledgerData, setLedgerData] = useState([]);
-    const [outstandingData, setOutstandingData] = useState([]);
-    const [CustomerRateData, setCustomerRateData] = useState([]);
-    const [internal_dropdown, setInternalDropdown] = useState<InternalDropdown[]>(
-        [{
-            lable: 'Internal',
-            value: '1'
-        },
-        {
-            lable: 'External',
-            value: '0'
-        },
-        {
-            lable: 'Both',
-            value: '-1'
-        }
-        ]);
-    const [fromDate, setFromDate] = useState<Date>(new Date());
-    const [toDate, setToDate] = useState<Date>(new Date());
-    const currentDate = new Date();
-    const currentYear12 = currentDate.getFullYear();
-    const yearOptions = generateFinancialYearOptions(currentYear12);
-    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
-    const [selectedPrpgrp, setSelectedPrpGrp] = useState<ReceivablesPrpgroup | "">("");
-    const [selectedInternal, setSelectedInternal] = useState<InternalDropdown | "">("");
-    const [exeData, setExeData] = useState<ExeData[]>([]);
-    const [designData, setDesignData] = useState<DesignData[]>([]);
-    const [itemData, setItemData] = useState<ItemData[]>([]);
-    const [page, setpage] = useState(0);
-    const [selectedDesigns, setSelectedDesigns] = useState<DesignData[]>([])
-    const [selectedDashPrp, setSelectedDashPrp] = useState<DashPrp[]>([])
-    const [selectedDashParty, setSelectedDashParty] = useState<DashParty[]>([])
-    const [selectedDashSexe, setSelectedDashSexe] = useState<DashSexe[]>([])
-    const [selectedDashAccount, setSelectedDashAccount] = useState<DashAccount[]>([])
-    const [selectedDashSubHead, setSelectedDashSubHead] = useState<DashSubHead[]>([])
-    const [selectedItems, setSelectedItems] = useState<ItemData[]>([])
-    const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
-    const [gePOTData, setPOTData] = useState<POTData[]>([])
-    const [getpayload, setPayload] = useState<CardPayload[]>([])
-    const [getdashPrp, setdashPrp] = useState<DashPrp[]>([])
-    const [getdashParty, setdashParty] = useState<DashParty[]>([])
-    const [getdashSexe, setdashSexe] = useState<DashSexe[]>([])
-    const [getdashAccount, setdashAccount] = useState<DashAccount[]>([])
-    const [getdashSubHead, setdashSubHead] = useState<DashSubHead[]>([])
-    const [scrollPosition] = useState(new Animated.Value(0));
-    const [contentWidth, setContentWidth] = useState(0);
-    const [containerWidth, setContainerWidth] = useState(0);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [selectedAccCode, setSelectedAccCode] = useState(null);
-    const [selectedParties, setSelectedParties] = useState({});
-    const [mianPaylaod, setMianPaylaod] = useState({});
-    const [filteredData, setFilteredData] = useState([]);
-    const [filteredDetails, setFilteredDetails] = useState([]);
-    const [visibleCards, setVisibleCards] = useState(5);
-    const [visibleSummaryItems, setVisibleSummaryItems] = useState(5);
-    const [visibleDetailItems, setVisibleDetailItems] = useState(5);
-    const [expandedCards, setExpandedCards] = useState({});
-    const [showLastSync, setShowLastSync] = useState(true);
-    const [activeCard, setActiveCard] = useState(null);
-    const [getActiveCardDetails, setActiveCardDetails] = useState(null);
-    const [summaryDrawerVisible, setSummaryDrawerVisible] = useState(false);
-    const summaryVisibleRef = useRef(false);
-    const searchRef = useRef(searchQueryPOT);
-    const searchRefDetails = useRef(searchQueryPOTDetails);
-    const ROW_HEIGHT = 52;
-    const [partyOverlayVisible, setPartyOverlayVisible] = useState(false);
-    const [getPropertyData, setPropertyData] = useState<PropertyData[]>([]);
-    const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null);
+    <View style={{ flex: 1 }}>
+      <View style={styles.skelLineShort} />
+      <View style={styles.skelLineLong} />
+      <View style={styles.skelLineMid} />
+    </View>
+  </View>
+);
+const PartyDashboard = ({ navigation, token }) => {
+  const [search, setSearch] = useState("");
+  const [partyData, setPartyData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        summaryVisibleRef.current = summaryDrawerVisible;
-    }, [summaryDrawerVisible]);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
+  const [yearPickerVisible, setYearPickerVisible] = useState(false);
+  const [yearOptions, setYearOptions] = useState([]);
+  const [selectedYear, setSelectedYear] = useState("");
 
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            searchRef.current = searchQueryPOT;
+  const [propertyData, setPropertyData] = useState([]);
+  const [selectedProperty, setSelectedProperty] = useState(null);
 
-            const filtered = getOutSummary.filter(item =>
-                Object.values(item).some(val =>
-                    String(val).toLowerCase().includes(searchQueryPOT.toLowerCase())
-                )
-            );
+  const [propertySearch, setPropertySearch] = useState("");
+  const [recentProps, setRecentProps] = useState([]);
+  const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+  // YEAR
+  useEffect(() => {
+    const y = new Date().getFullYear();
+    const arr = [];
+    for (let i = 0; i < 5; i++) {
+      arr.push(`${y - i}-${y - i + 1}`);
+    }
+    setYearOptions(arr);
+    setSelectedYear(arr[0]);
+  }, []);
 
-            setFilteredData(filtered || []);
-        }, 250);
-
-        return () => clearTimeout(timeout);
-    }, [searchQueryPOT, getOutSummary]);
-
-    useEffect(() => {
-        const filtered = getOutCardData.filter(item =>
-            item.caption.toLowerCase().includes(searchQueryPOTCard.toLowerCase())
-        );
-        setFilteredCards(filtered);
-    }, [searchQueryPOTCard, getOutCardData]);
-
-    useEffect(() => {
-        if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "")) {
-            setSelectedInternal(internal_dropdown[1]);
-        }
-    }, [internal_dropdown, selectedInternal]);
-
-    useEffect(() => {
-        if (receivables_prpgroup.length > 0 && (!selectedPrpgrp || selectedPrpgrp === "")) {
-            console.log("receivables_prpgroup :", receivables_prpgroup)
-            setSelectedPrpGrp(receivables_prpgroup[0]);
-        }
-    }, [receivables_prpgroup, selectedPrpgrp]);
-
-    useEffect(() => {
-        const details = getOutDetails?.filter(
-            (detail) => detail.ACCCODE === selectedAccCode
-        );
-        const filtered = details?.filter((item) =>
-            Object.values(item).some((val) =>
-                String(val).toLowerCase().includes(searchQueryPOTDetails.toLowerCase())
-            )
-        );
-        setFilteredDetails(filtered || []);
-    }, [searchQueryPOTDetails, selectedAccCode, getOutDetails]);
-
-    const onDashboardCardPress = (card) => {
-        setActiveCard(card.slab);
-        setActiveCardDetails(card);
-        handleConfirmActionNew(
-            selectedDashPrp,
-            selectedDashParty,
-            selectedDashSexe,
-            selectedDashSubHead,
-            selectedDashAccount,
-            card?.caption,
-            1,
-            card
-        );
+  // PROPERTY
+  useEffect(() => {
+    const load = async () => {
+      const data = await fetchPropertyData(token);
+      setPropertyData(data || []);
+      if (data?.length) setSelectedProperty(data[0]);
     };
+    load();
+  }, []);
 
-    const loadMoreSummaryItems = () => { setVisibleSummaryItems((prev) => prev + 5); };
+  // API CALL
+  const fetchpartylist = async () => {
+    if (!selectedProperty) return;
 
-    const loadMoreDetailItems = () => { setVisibleDetailItems((prev) => prev + 5); };
+    setLoading(true);
 
-    const loadMoreCards = () => { setVisibleCards((prev) => prev + 5); };
+    try {
+      const prpcode =
+        typeof selectedProperty === "object"
+          ? selectedProperty?.PrpCode
+          : selectedProperty;
 
-    const generateUniqueKey = (prefix, index, item) => {
-        return `${prefix}-${index}-${Math.random().toString(36).substr(2, 9)}`;
-    };
+      const prptype =
+        typeof selectedProperty === "object"
+          ? selectedProperty?.PrpOf
+          : selectedProperty;
 
-    const toggleCard = (slab) => {
-        setExpandedCards(prev => ({
-            ...prev,
-            [slab]: !prev[slab]
-        }));
-    };
+      const yearno = selectedYear?.slice(-2); // ✅ YOU WANT "27"
 
-    const toggleLastSync = () => { setShowLastSync(!showLastSync); };
+      // ✅ MINIMAL PAYLOAD FIRST
+      const payload = {
+        prpcode,
+        prptype,
+        yearno,
+        strcode: "0",
+        txntype: "mob_party_dashboard",
+        partytype: "p",
+        type: "s",
+        page: 1,
+        limit: 20,
+        search: "",
+        isceo: 0,
+        partype: 0,
+        grntype: "",
+        fetch: "",
+        acccode: "",
+        billdate: "",
+        strtype: "",
+        isfaint: "",
+        user_id: 1,
 
-    const chacheData = useCallback(async () => {
-        setSyncLoading(true);
-        try {
-            const responsesync = await axios.get(
-                // 'https://apig.tms-webapp.com/api/dashprpgrp',
-                `${API}/api/dashprpgrp`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
-                    },
-                    params: {
-                        txntype: '/receivables-view'
-                    }
-                }
-            );
-            if (responsesync.data.success === true) {
-                setSyncLoading(false);
-                const receivables_sync_date_api = responsesync.data.data.dashlastsync || '';
-                const receivables_prpgroup_api = responsesync.data.data.prpgroup || '';
-                console.log("receivables_prpgroup_api :", receivables_prpgroup_api);
+      };
 
-                setreceivables_sync_date(receivables_sync_date_api);
-                setreceivables_prpgroup(receivables_prpgroup_api);
-            }
-        } catch (error) {
-            setSyncLoading(false);
-            console.error("Token check error:", error);
-        }
-    }, []);
+      console.log("🚀 FINAL PAYLOAD:", payload);
+      console.log(`${API}`);
 
-    const dashProperty = useCallback(async (selectedPrpgrp) => {
-
-        setdashPropertyLoading(true);
-        try {
-            const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
-                txntype: '/receivables-view'
-            }
-            const responseprp = await axios.get(
-                `${API}/api/dashprp`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
-                    },
-                    params: {
-                        ...payload
-                    }
-                }
-            );
-            if (responseprp.data.success === true) {
-                setdashPropertyLoading(false);
-                const maindata = responseprp.data.data.prp;
-                setdashPrp(maindata);
-            }
-        } catch (error) {
-            setdashPropertyLoading(false);
-            console.error("Token check error:", error);
-        }
-    }, []);
-
-    const dashParty = useCallback(async (selectedPrpgrp) => {
-
-        console.log("aaaa")
-        setdashPartyLoading(true);
-        setdashSexeLoading(true);
-        try {
-            console.log("selectedPrpgrp --->", selectedPrpgrp)
-            const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
-                fetch: 'dr',
-                dashview: 'outstanding',
-                txntype: '/receivables-view'
-            }
-
-
-
-            const payloadSexe = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
-                dashview: 'outstanding',
-                fetch: 'salesexe',
-            }
-
-
-
-            const responseparty = await axios.get(
-                // 'https://apig.tms-webapp.com/api/get_criterion',
-                `${API}/api/get_criterion`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
-                    },
-                    params: {
-                        ...payload
-                    }
-                }
-            );
-
-            const responsesexe = await axios.get(
-                `${API}/api/get_criterion`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
-                    },
-                    params: {
-                        ...payloadSexe
-                    }
-                }
-            );
-
-
-            if (responseparty.data.success === true) {
-                setdashPartyLoading(false);
-                const maindata = responseparty.data.response.data;
-                setdashParty(maindata);
-            }
-            if (responsesexe.data.success === true) {
-                setdashSexeLoading(false);
-                const maindataSexe = responsesexe.data.response.data;
-                setdashSexe(maindataSexe);
-            }
-
-            console.log("aaaa payload ->", payload);
-            console.log("aaaa payloadSexe ->", payloadSexe);
-            console.log("aaaa responseparty api url ->", `${API}/api/get_criterion`);
-            console.log("aaaa responsesexe api url ->", `${API}/api/get_criterion`);
-            console.log("aaaa maindata ->", responseparty.data);
-            console.log("aaaa maindataSexe ->", responsesexe.data);
-        } catch (error) {
-            setdashPartyLoading(false);
-            setdashSexeLoading(false);
-            console.error("Token check error:", error);
-        }
-    }, []);
-
-    const dashSubHead = useCallback(async (selectedPrpgrp, selectedDashPrp) => {
-        setdashSubHeadLoading(true);
-
-        const payload = {
-            prptype: selectedPrpgrp?.PrpTypeCode,
-            dashview: 'outstanding',
-            prpcodes: Array.isArray(selectedDashPrp)
-                ? selectedDashPrp.map(item => item.PrpCode)
-                : [],
-        };
-        const headers = {
-            Authorization: `Bearer ${getToken()}`,
-            'Content-Type': 'application/json',
-            'X-Requested-with': 'XMLHttpRequest',
-        };
-        try {
-            const response = await axios.post(`${API}/api/get_dashoutshead`, payload, { headers });
-            if (response.data.success === true) {
-                setdashSubHeadLoading(false);
-                const maindata = response.data.data.data;
-                setdashSubHead(maindata);
-
-            }
-        } catch (error) {
-            setdashSubHeadLoading(false);
-        }
-    }, []);
-
-    const dashAccount = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead) => {
-        setAccountLoading(true);
-        const formatDate123 = (rawDate: any) => {
-            let day = rawDate.getDate().toString().padStart(2, '0') || '';
-            let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || '';
-            let year = rawDate.getFullYear() || '';
-            return `${year}-${month}-${day}`;
-        };
-        const today = new Date();
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const fromdate = formatDate123(firstDayOfMonth);
-        const todate = formatDate123(today);
-        const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
-        const partyCodesArray = selectedDashParty.map(item => item.acccode);
-        const subHeadArray = selectedDashSubHead.map(item => item.SHead);
-        const sexeArray = selectedDashSexe.map(item => item.Code);
-        try {
-            const payload = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
-                prpcodes: prpCodesArray && prpCodesArray,
-                sheadcodes: subHeadArray && subHeadArray,
-                fetch: 'summary',
-                dashstyle: '1',
-                dashview: 'outstanding',
-                fromdate: fromdate,
-                todate: todate,
-                for: 'sales',
-                uom: '1',
-                uomname: '',
-                gridid: '0',
-                gridgroup: '',
-                showinternal: selectedInternal && selectedInternal?.value,
-                storecode: '',
-                stockdate: todate,
-                ageing: '30',
-                ageing2: '60',
-                display: '1',
-                export: 'Excel',
-                salesexes: sexeArray ? sexeArray : [],
-                dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode,
-                txntype: '/receivables-view'
-            };
-
-            const queryString = qs.stringify(payload, { arrayFormat: 'brackets' });
-
-            const response = await axios.get(`${API}/api/get_dashparty`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                params: payload,
-                paramsSerializer: params => qs.stringify(params, { arrayFormat: 'brackets' }),
-            });
-            console.log('🔵 🔵I am Calling4 dashAccount', payload, response);
-
-            if (response.data.success == true) {
-                setAccountLoading(false);
-                setdashAccount(response.data.data.data);
-            }
-        } catch (error) {
-            setAccountLoading(false);
-            console.error("Error in dashAccount:", error);
-        } finally {
-            setAccountLoading(false);
-        }
-    }, [selectedPrpgrp, selectedInternal]);
-
-    useEffect(() => {
-        if (selectedPrpgrp) {
-            dashProperty(selectedPrpgrp);
-            console.log('1-aaaa')
-            dashParty(selectedPrpgrp);
-        }
-    }, [selectedPrpgrp]);
-
-    useEffect(() => {
-        if (selectedPrpgrp) {
-            dashSubHead(selectedPrpgrp, selectedDashPrp);
-        }
-    }, [selectedPrpgrp, selectedDashPrp]);
-
-    useEffect(() => {
-        if (contentWidth > 0 && containerWidth > 0) {
-            Animated.loop(
-                Animated.sequence([
-                    Animated.timing(scrollPosition, {
-                        toValue: containerWidth,
-                        duration: 15000,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(scrollPosition, {
-                        toValue: 0,
-                        duration: 0,
-                        useNativeDriver: true,
-                    }),
-                ])
-            ).start();
-        }
-        chacheData();
-
-    }, [contentWidth, containerWidth]);
-
-    const rowsPerPage = 20;
-
-    useEffect(() => {
-        const today = new Date();
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        setFromDate(firstDayOfMonth);
-        setToDate(today);
-    }, []);
-
-    useEffect(() => {
-        const loadProperty = async () => {
-            const getdata = await fetchPropertyData(token);
-            setPropertyData(getdata);
-
-            if (getdata && getdata.length > 0) {
-                setSelectedProperty(getdata[0]);
-            }
-        };
-        loadProperty();
-    }, [token]);
-
-    const getCurrentFinancialYear = () => {
-        const currentDate = new Date();
-        const currentYear = currentDate.getFullYear();
-        const currentMonth = currentDate.getMonth() + 1;
-        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
-        return financialYear.toString().substring(2);
-    };
-
-    let cancelToken: any;
-
-    const getRequestConfig = (props: any) => ({
+      const res = await axios.get(`${API}/api/mobaccountbasic`, {
         headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        params: props.params,
-        cancelToken: cancelToken?.token,
-    });
+        params: payload,
+      });
 
-    const fetchData = async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
-        try {
-            const payload = {
-                prpcode: 'SIP',
-                yearno: selectedYear,
-                strcode: '012',
-                txntype: 'production_order_track',
-                prptype: '',
-                fetch: 'salesexe'
-            };
-            const response = await axios.get(
-                `${API}/api/get_criterion`,
-                getRequestConfig({
-                    params: {
-                        prpcode: 'SIP',
-                        yearno: getCurrentFinancialYear(),
-                        strcode: '012',
-                        txntype: 'production_order_track',
-                        prptype: '',
-                        fetch: 'salesexe'
-                    }
+      console.log("✅ FULL RESPONSE:", res.data);
+
+      // ✅ HANDLE ALL POSSIBLE RESPONSE STRUCTURES
+      const rawData =
+        res?.data?.response?.data ||
+        res?.data?.data ||
+        res?.data?.result ||
+        [];
+
+      if (Array.isArray(rawData) && rawData.length > 0) {
+        const formatted = rawData.map((item) => ({
+          ...item,
+          acccode: item.acccode || item.AccCode,
+          accname:
+            item.accountname ||
+            item.accname ||
+            item.AccName ||
+            "",
+          address:
+            item.address ||
+            item.addr ||
+            item.Address ||
+            "",
+        }));
+
+        setPartyData(formatted);
+      } else {
+        console.log("⚠️ No data returned from API");
+        setPartyData([]);
+      }
+    } catch (error) {
+      console.log("❌ API ERROR:", error?.response?.data || error.message);
+      setPartyData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // SELECT PROPERTY
+  const selectProperty = (item) => {
+    setSelectedProperty(item);
+
+    const updated = [item, ...recentProps.filter(p => p.PrpCode !== item.PrpCode)];
+    setRecentProps(updated.slice(0, 3));
+  };
+
+  const filteredData = partyData.filter((i) =>
+    i.accname?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#F5F7FB" }}>
+
+      {/* HEADER */}
+      <LinearGradient
+        colors={['#0F6C7B', '#13879A']}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Icon name="arrow-back-ios-new" size={18} color="#fff" />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Party Dashboard</Text>
+
+        <TouchableOpacity onPress={() => setFilterVisible(true)}>
+          <Icon name="tune" size={22} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
+
+      {/* SEARCH */}
+      <View style={styles.searchBox}>
+        <Icon name="search" size={20} color="#888" style={{ marginRight: 8 }} />
+
+        <TextInput
+          placeholder="Search parties..."
+          placeholderTextColor="#999"
+          value={search}
+          onChangeText={setSearch}
+          style={styles.searchInput}
+        />
+      </View>
+      {/* 🔥 SELECTED FILTER HEADER */}
+      <View style={styles.chipContainer}>
+
+        {/* PROPERTY CHIP */}
+        <TouchableOpacity
+          style={styles.chip}
+          onPress={() => setFilterVisible(true)}
+        >
+          <Icon name="business" size={14} color="#0F6C7B" />
+
+          <Text
+            style={styles.chipText}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {selectedProperty?.LngName || selectedProperty?.PrpCode || "Select Property"}
+          </Text>
+
+          <Icon name="edit" size={14} color="#0F6C7B" />
+        </TouchableOpacity>
+
+        {/* YEAR CHIP */}
+        <View style={[styles.chip, styles.yearChip]}>
+          <Icon name="event" size={14} color="#0F6C7B" />
+
+          <Text style={styles.chipText}>
+            {selectedYear || "Year"}
+          </Text>
+        </View>
+
+      </View>
+      {/* LIST */}
+      <FlatList
+        data={filteredData}
+        keyExtractor={(i, index) => index.toString()}
+        contentContainerStyle={{ padding: 16 }}
+
+        renderItem={({ item }) => {
+          const scale = new Animated.Value(1);
+
+          const onPressIn = () => {
+            Animated.spring(scale, {
+              toValue: 0.96,
+              useNativeDriver: true,
+            }).start();
+          };
+
+          const onPressOut = () => {
+            Animated.spring(scale, {
+              toValue: 1,
+              useNativeDriver: true,
+            }).start();
+          };
+
+          const fullAddress = [
+            item.Address,
+            item.City,
+            item.State,
+            item.Cnty,
+            item.Zip,
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          return (
+            <AnimatedTouchable
+              style={[styles.card, { transform: [{ scale }] }]}
+              activeOpacity={0.9}
+              onPressIn={onPressIn}
+              onPressOut={onPressOut}
+              onPress={() =>
+                navigation.navigate("PartyDetailScreen", {
+                  party: item,
+                  token: token,
+                  selectedProperty: selectedProperty,   // ✅ ADD THIS
+                  selectedYear: selectedYear           // ✅ ADD THIS
                 })
-            );
-            console.log('🔵 payload', payload, response);
-            if (response.data.success && response.data.response.data.length > 0) {
-                setExeData(response.data.response.data);
-                fetchDesign();
-            } else { }
-        } catch (error) {
-            if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
-            }
-        } finally {
-        }
-    };
+              }
+            >
 
-    const fetchDesign = async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
-        try {
-            const payload = {
-                prpcode: 'SIP',
-                yearno: getCurrentFinancialYear(),
-                strcode: '012',
-                itmcode: '',
-                dsncode: '',
-                shdcode: '',
-                page: page + 1,
-                limit: rowsPerPage,
-                txntype: 'production_order_track'
-            };
-            const response = await axios.get(
-                `${API}/api/getdesign`,
-                getRequestConfig({
-                    params: {
-                        prpcode: 'SIP',
-                        yearno: getCurrentFinancialYear(),
-                        strcode: '012',
-                        itmcode: '',
-                        dsncode: '',
-                        shdcode: '',
-                        page: page + 1,
-                        limit: rowsPerPage,
-                        txntype: 'production_order_track'
-                    }
-                })
-            );
-            if (response.data.success && response.data.response.data.length > 0) {
-                setDesignData(response.data.response.data);
-                fetchItem();
-            } else {
-            }
-        } catch (error) {
-            if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
-            }
-        } finally {
-        }
-    };
-
-    const fetchItem = async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
-        try {
-            const payload = {
-                prpcode: 'SIP',
-                yearno: getCurrentFinancialYear(),
-                strcode: '012',
-                txntype: 'production_order_track',
-                prptype: '',
-                limit: 20,
-                fetch: 'itm',
-                itmcode: '',
-                strcodes: '012',
-                issdate: ''
-            };
-            const response = await axios.get(
-                `${API}/api/get_criterion`,
-                getRequestConfig({
-                    params: {
-                        prpcode: 'SIP',
-                        yearno: getCurrentFinancialYear(),
-                        strcode: '012',
-                        txntype: 'production_order_track',
-                        prptype: '',
-                        limit: 20,
-                        fetch: 'itm',
-                        itmcode: '',
-                        strcodes: '012',
-                        issdate: ''
-                    }
-                })
-            );
-            if (response.data.success && response.data.response.data.length > 0) {
-                setItemData(response.data.response.data);
-            } else { }
-        } catch (error) {
-            if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
-            }
-        } finally {
-        }
-    };
-
-    const getToken = () => {
-        return token;
-    };
-
-    const formatDate = (rawDate: any) => {
-        let day = rawDate.getDate().toString().padStart(2, '0') || '';
-        let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || ''; // Month is 0-indexed
-        let year = rawDate.getFullYear() || '';
-        return `${day}-${month}-${year}`;
-    };
-
-    const handleConfirmAction = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0) => {
-        setIsLoading(true);
-
-        const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
-        const partyCodesArray = selectedDashParty.map(item => item.acccode);
-        const subHeadArray = selectedDashSubHead.map(item => item.SHead);
-        const sexeArray = selectedDashSexe.map(item => item.Code);
-        const accountArray = selectedDashAccount.map(item => item.AccCode);
-        const fdate = fromDate ? format(fromDate, 'yyyy-MM-dd') : null;
-        const tdate = toDate ? format(toDate, 'yyyy-MM-dd') : null;
-        try {
-            console.log("---->selectedPrpgrp :", selectedPrpgrp)
-            console.log("prpCodesArray ===", prpCodesArray)
-            const payloadParty = {
-                prptype: selectedPrpgrp?.PrpTypeCode,
-                prpcodes: prpCodesArray && prpCodesArray,
-                year: selectedYear,
-                yearno: selectedYear?.slice(0, 4).slice(-2),
-                parcode: partyCodesArray && partyCodesArray,
-                fetch: 'dr',
-                dashview: 'outstanding',
-                txntype: '/receivables-view'
-            }
-            console.log('🔵 Table party API Payload:', payloadParty);
-            const responseparty = await axios.get(
-                // 'https://apig.tms-webapp.com/api/get_criterion',
-                `${API}/api/get_criterion`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
-                    },
-                    params: {
-                        ...payloadParty
-                    }
-                }
-            );
-
-            setMianPaylaod(payloadParty);
-            const data = responseparty.data.response.data || [];
-            console.log("responseparty.data.response.data ---->", responseparty.data.response.data)
-
-
-            if (responseparty.data.success == true) {
-                closeDrawer();
-                setSummaryDrawerVisible(true);
-                setOutSummary(data);
-            }
-        } catch (error) {
-            setIsLoading(false);
-            console.error("Error in dashAccount:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [selectedPrpgrp]);
-
-    const handleConfirmActionNew = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0, card) => {
-        setIsLoading(true);
-        if (!selectedPrpgrp || !selectedInternal) {
-            return;
-        }
-        const formatDate123 = (rawDate: any) => {
-            let day = rawDate.getDate().toString().padStart(2, '0') || '';
-            let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || '';
-            let year = rawDate.getFullYear() || '';
-            return `${year}-${month}-${day}`;
-        };
-        const today = new Date();
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const fromdate = formatDate123(firstDayOfMonth);
-        const todate = formatDate123(today);
-        const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
-        const subHeadArray = selectedDashSubHead.map(item => item.SHead);
-        const sexeArray = selectedDashSexe.map(item => item.Code);
-        const accountArray = selectedDashAccount.map(item => item.AccCode);
-        try {
-            const payload = {
-                CardName: CardName.toUpperCase(),
-                accounts: accountArray ? accountArray : [],
-                prptype: selectedPrpgrp?.PrpTypeCode,
-                prpcodes: prpCodesArray && prpCodesArray,
-                sheadcodes: subHeadArray && subHeadArray,
-                fetch: 'slabdetail',
-                dashstyle: '1',
-                dashview: 'outstanding',
-                fromdate: fromdate,
-                todate: todate,
-                for: 'sales',
-                uom: '1',
-                uomname: '',
-                gridid: 0,
-                gridfilter: [],
-                gridgroup: '',
-                showinternal: selectedInternal && selectedInternal?.value,
-                slab: [],
-                storecode: '',
-                stockdate: todate,
-                ageing: 30,
-                ageing2: 0,
-                selecetedslab: card && [card],
-                display: '1',
-                export: 'Excel',
-                salesexes: sexeArray ? sexeArray : [],
-                dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode || "",
-                txntype: '/receivables-view'
-            };
-            const headers = {
-                Authorization: `Bearer ${getToken()}`,
-                'Content-Type': 'application/json',
-                'X-Requested-with': 'XMLHttpRequest',
-            };
-
-            const response = await axios.post(`${API}/api/dashdata`, payload, { headers });
-            console.log('🔵 🔵I am Calling4 Table', payload, response);
-            const data = response.data.data?.dashoutcards || [];
-            const data1 = response.data.data?.outdetail || [];
-            const data2 = response.data.data?.outsummary || [];
-
-            if (response.data.success == true) {
-                if (data && data.length > 0 && data1 && data1.length > 0 && data2 && data2.length > 0) {
-                    setIsDrawerVisible(false);
-                    setIsLoading(false);
-                    setOutCardData(data);
-                    setOutDetails(data1);
-                    setOutSummary(data2);
-                    if (isAcc == 1) {
-                        setSummaryDrawerVisible(true);
-                    }
-                } else {
-                    setOutCardData([]);
-                    setOutDetails([]);
-                    setOutSummary([]);
-                }
-            }
-        } catch (error) {
-            setIsLoading(false);
-            console.error("Error in dashAccount:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [selectedPrpgrp, selectedInternal]);
-
-    const loadDataInBatches = async (
-        data: T[],
-        setState: React.Dispatch<React.SetStateAction<T[]>>,
-        dataType: string,
-        batchSize: number = 200
-    ): Promise<void> => {
-        if (!data || data.length === 0) {
-            return;
-        }
-        setState([]);
-        for (let i = 0; i < data.length; i += batchSize) {
-            const batch = data.slice(i, i + batchSize);
-            setState(prev => [...prev, ...batch]);
-            await new Promise(resolve => setTimeout(resolve, 0));
-        }
-    };
-
-    const fetchpartylist = async (selectedProperty, forceRefresh = false) => {
-
-        console.log("bbbb")
-
-        setIsLoading(true);
-
-        const prpcode =
-            typeof selectedProperty === 'object'
-                ? selectedProperty?.PrpCode
-                : selectedProperty;
-
-        const yearno = selectedYear?.slice(-2);
-
-        const prptypeRaw =
-            typeof selectedProperty === 'object'
-                ? selectedProperty?.PrpOf ?? selectedProperty?.PrpCode
-                : selectedProperty;
-
-        const prptype = normalizePrptype(prptypeRaw);
-
-        const payload = {
-            prpcode,
-            prptype,
-            yearno,
-            strcode: "0",
-            txntype: "sales_order",
-            partytype: "p",
-            type: "s",
-            page: 1,
-            limit: 20,
-            search: "",
-            isceo: 0,
-            partype: 0,
-            grntype: "",
-            fetch: "",
-            acccode: "",
-            billdate: "",
-            strtype: "",
-            isfaint: "",
-            user_id: 1,
-        };
-
-        try {
-            const response = await axios.get(
-                `${API}/api/mobaccountbasic`,
-                getRequestConfig({ params: payload })
-            );
-
-            console.log("✅ mobaccountbasic RESPONSE:", response.data);
-
-            const rawData =
-                response?.data?.response?.data ||
-                response?.data?.data ||
-                [];
-
-            if (response.data?.success && Array.isArray(rawData)) {
-
-                const accounts = rawData.map(item => ({
-                    ...item,
-
-                    acccode: item.acccode || item.AccCode,
-
-                    accname:
-                        item.accountname ||
-                        item.accname ||
-                        item.AccName ||
-                        "",
-
-                    ParCode: item.acccode || item.AccCode,
-                    ParName:
-                        item.accountname ||
-                        item.accname ||
-                        item.AccName ||
-                        ""
-                }));
-
-                setdashParty(accounts);
-
-                if (accounts.length > 0) {
-                    setSelectedDashParty([accounts[0]]);
-                } else {
-                    setSelectedDashParty([]);
-                }
-
-            } else {
-                console.log("⚠️ No data from API");
-                setdashParty([]);
-                setSelectedDashParty([]);
-            }
-
-        } catch (error) {
-            console.error("❌ mobaccountbasic error:", error);
-            setdashParty([]);
-            setSelectedDashParty([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (selectedProperty !== null) {
-            console.log("2-bbbb")
-            fetchpartylist(selectedProperty, false);
-        } else {
-            setSelectedDashParty([]);
-        }
-    }, [selectedProperty]);
-
-    const handleReportClick = useCallback(async (action, party, mianPaylaod, selectedProperty) => {
-        setIsLoading(true);
-        const PrpOf = selectedProperty?.PrpOf || "";
-        const PrpCode = selectedProperty?.PrpCode || "";
-
-        try {
-            const payloadLedger = {
-                prptype: PrpOf,
-                prpcodes: PrpCode,
-                parcodes: [party.ParCode],
-                yearno: selectedYear?.slice(0, 4).slice(-2),
-                mheads: [],
-                sheads: [],
-                contras: [],
-                inverse: [],
-                fromdate: "",
-                todate: "",
-                reportytype: 0,
-                showopening: 1,
-                display: 1,
-                showinternal: -1,
-                txntype: "mob_party_dashboard",
-                rptid: 1635,
-                rptaction: "get_collection_comman_rpt",
-                export: "",
-                grpby: "party"
-            }
-            const headers = {
-                Authorization: `Bearer ${getToken()}`,
-                'Content-Type': 'application/json',
-                'X-Requested-with': 'XMLHttpRequest',
-            };
-            console.log(`${API}/api/get_report`)
-
-            const responseledger = await axios.post(`${API}/api/get_report`, payloadLedger, { headers });
-
-            console.log('++++++++++I am Calling4 Table', payloadLedger, responseledger);
-
-            if (responseledger.data.success) {
-
-                setLedgerData(responseledger.data.response.data.get_ledger_data || []);
-                setOutstandingData(responseledger.data.response.data.get_outstanding_data || []);
-                setCustomerRateData(responseledger.data.response.data.get_customer_rate || []);
-            }
-
-        } catch (error) {
-            setIsLoading(false);
-            console.error("Error in dashAccount:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (fromDate && toDate && selectedYear) {
-            fetchData();
-        }
-    }, []);
-
-    const handleDashPrpSelect = (prp: DashPrp[]) => setSelectedDashPrp(prp);
-    const handleDashPartySelect = (party: DashParty[]) => setSelectedDashParty(party);
-    const handleDashSexeSelect = (sexe: DashSexe[]) => setSelectedDashSexe(sexe);
-    const handleDashAccountSelect = (acc: DashAccount[]) => setSelectedDashAccount(acc);
-    const handleDashSubHeadSelect = (sub: DashSubHead[]) => setSelectedDashSubHead(sub);
-    const handleItemSelect = (items: ItemData[]) => setSelectedItems(items);
-    const handleItemStatusChange = (status: ItemStatus) => setSelectedItemStatus(status);
-
-    const DASHBOARD_COLORS = [
-        ['#0F2027', '#203A43'],
-        ['#141E30', '#243B55'],
-        ['#232526', '#414345'],
-        ['#1D2671', '#C33764'],
-        ['#0B486B', '#3B8686'],
-        ['#42275A', '#734B6D'],
-        ['#283048', '#859398'],
-        ['#16222A', '#3A6073'],
-    ];
-
-    const formatIndianNumber = (value: any) => {
-        if (!value && value !== 0) return "0";
-
-        const cleanedValue = typeof value === 'string' ? value.replace(/,/g, '') : value;
-        const num = parseFloat(cleanedValue);
-
-        if (isNaN(num)) return "0";
-
-        const integerValue = Math.floor(num);
-
-        return integerValue.toLocaleString('en-IN');
-    };
-
-    const DashboardGrid = ({ cards, onCardPress, activeSlab }) => {
-        const numColumns = Platform.isPad ? 4 : 2;
-
-        const renderItem = ({ item, index }) => {
-            const isActive = activeSlab === item.slab;
-            const isDisabled = parseFloat(item.summary.replace(/,/g, '')) === 0;
-            const colors = DASHBOARD_COLORS[index % DASHBOARD_COLORS.length];
-
-            return (
-                <TouchableOpacity
-                    activeOpacity={isDisabled ? 1 : 0.9}
-                    onPress={isDisabled ? undefined : () => onCardPress(item)}
-                    style={[
-                        styles.dashboardCard,
-                        isActive && styles.activeDashboardCard,
-                    ]}
-                    disabled={isDisabled}
-                >
-                    <LinearGradient
-                        colors={
-                            isActive
-                                ? [theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]
-                                : isDisabled
-                                    ? ['#cccccc', '#cccccc']
-                                    : colors
-                        }
-                        style={styles.dashboardCardInner}
-                    >
-                        <Text
-                            style={[
-                                styles.dashboardCaption,
-                                isActive && styles.activeText,
-                                isDisabled && styles.disabledText,
-                            ]}
-                        >
-                            {isActive && isLoading ? 'Loading...' : item.caption?.toUpperCase()}
-                        </Text>
-                        <Text
-                            style={[
-                                styles.dashboardValue,
-                                isActive && styles.activeText,
-                                isDisabled && styles.disabledText,
-                            ]}
-                        >
-                            ₹ {formatIndianNumber(item.summary)}
-                        </Text>
-                    </LinearGradient>
-                </TouchableOpacity>
-            );
-        };
-
-        return (
-            <FlatList
-                data={cards}
-                renderItem={renderItem}
-                keyExtractor={(item) => item.slab}
-                numColumns={numColumns}
-                columnWrapperStyle={{ gap: 14 }}
-                contentContainerStyle={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 16,
-                    rowGap: 14,
-                }}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                    !isLoading ? (
-                        <View style={crlimtreq_styles.emptyContainer}>
-                            <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
-                        </View>
-                    ) : null
-                }
-            />
-        );
-    };
-
-    const SummaryTable1 = () => {
-        const summaryColumns = [
-            { key: 'acccode', label: 'Code', width: 160, align: 'left' },
-            { key: 'accname', label: 'Name', width: 100, align: 'right' },
-            { key: 'ParType', label: 'Type', width: 100, align: 'right' },
-            { key: 'SHName', label: 'Sh Name', width: 120, align: 'right' },
-            { key: 'Status', label: 'Status', width: 120, align: 'right' },
-            { key: 'bkrcode', label: 'PDC Amount', width: 100, align: 'right' },
-            { key: 'bkrname', label: '0-30', width: 100, align: 'right' },
-            { key: 'value', label: '31-60', width: 100, align: 'right' },
-        ];
-
-        const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt'];
-
-        const columnsToSum = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
-
-        const calculateTotals = () => {
-            const totals = {};
-            columnsToSum.forEach(key => {
-                totals[key] = filteredData.reduce((sum, item) => {
-                    const value = parseFloat(item[key]) || 0;
-                    return sum + value;
-                }, 0);
-            });
-            return totals;
-        };
-
-        const formatIndianNumber = (value) => {
-            return value.toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            });
-        };
-
-        const totals = calculateTotals();
-
-        const totalWidth = summaryColumns.reduce((sum, c) => sum + c.width, 0) + 120;
-
-        const Header = () => (
-            <View style={styles.tableHeader}>
-                <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-                    Account Name
+              {/* AVATAR */}
+              <LinearGradient
+                colors={["#0F2027", "#2C5364"]}
+                style={styles.avatar}
+              >
+                <Text style={styles.avatarText}>
+                  {item.accountname?.charAt(0)}
                 </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
-                    Total
-                </Text>
-                <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
-                    Actions
-                </Text>
-                {summaryColumns.slice(2).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.label}
-                    </Text>
-                ))}
-            </View>
-        );
+              </LinearGradient>
 
-        const Footer = () => (
-            <View style={[styles.tableHeader]}>
-                <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-                    Totals
-                </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'right' }]}>
-                    {formatIndianNumber(totals['Total'])}
-                </Text>
-                <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
-                    {/* Empty cell for Actions column */}
-                </Text>
-                {summaryColumns.slice(2).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
-                    </Text>
-                ))}
-            </View>
-        );
+              {/* CONTENT */}
+              <View style={{ flex: 1 }}>
 
-        const Row = React.memo(({ item }) => (
-            <View style={styles.tableRow}>
-                <Text
-                    style={[styles.rowText, { width: 160, textAlign: 'left' }]}
-                    numberOfLines={2}
-                >
-                    {item.AccName}
-                </Text>
-                <Text
-                    style={[styles.rowText, { width: 100, textAlign: 'right' }]}
-                    numberOfLines={2}
-                >
-                    {columnsToFormat.includes('Total') ? formatIndianNumber(parseFloat(item.Total) || 0) : item.Total}
-                </Text>
-                <View style={[styles.actionColumn, { width: 80 }]}>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSelectedAccCode(item.AccCode);
-                            setModalVisible(true);
-                        }}
-                    >
-                        <Icon
-                            name="info"
-                            size={20}
-                            color={theme.BRAND_GRADIENT_END}
-                        />
-                    </TouchableOpacity>
-                </View>
-                {summaryColumns.slice(2).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.rowText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
-                    </Text>
-                ))}
-            </View>
-        ));
+                {/* TOP ROW */}
+                <View style={styles.topRow}>
+                  <View style={styles.codeBadge}>
+                    <Text style={styles.codeText}>{item.acccode}</Text>
+                  </View>
 
-        return (
-            <View style={styles.tableWrapper}>
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View style={{ minWidth: totalWidth }}>
-                        <Header />
-                        <FlatList
-                            data={filteredData}
-                            renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item) => item.AccCode}
-                            getItemLayout={(_, index) => ({
-                                length: ROW_HEIGHT,
-                                offset: ROW_HEIGHT * index,
-                                index,
-                            })}
-                            initialNumToRender={20}
-                            maxToRenderPerBatch={20}
-                            windowSize={10}
-                            removeClippedSubviews
-                            showsVerticalScrollIndicator={false}
-                        />
-                        <Footer />
-                    </View>
-                </ScrollView>
-            </View>
-        );
-    };
-    const SummaryAdvanceTable = () => {
-        const summaryColumns = [
-            { key: 'AccName', label: 'Account Name', width: 160, align: 'left' },
-            { key: 'advance', label: 'Advance', width: 100, align: 'right' },
-            { key: 'Total', label: 'Total', width: 100, align: 'right' },
-            { key: 'onaccount', label: 'On Account', width: 120, align: 'right' },
-            { key: 'nclramt', label: 'NCL Amount', width: 120, align: 'right' },
-            { key: 'pdcamt', label: 'PDC Amount', width: 100, align: 'right' },
-            { key: 'slab1', label: '0-30', width: 100, align: 'right' },
-            { key: 'slab2', label: '31-60', width: 100, align: 'right' },
-            { key: 'slab3', label: '61-90', width: 100, align: 'right' },
-            { key: 'slab4', label: '91-Above', width: 100, align: 'right' },
-            { key: 'slab5', label: 'Slab5', width: 100, align: 'right' },
-            { key: 'crday', label: 'Crday', width: 100, align: 'center' },
-            { key: 'sename', label: 'Sename', width: 100, align: 'left' },
-            { key: 'AccCode', label: 'Acc Code', width: 120, align: 'center' },
-            { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
-            { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
-        ];
-
-        const columnsToFormat = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
-
-        const columnsToSum = ['Total', 'advance', 'onaccount', 'nclramt', 'pdcamt', 'slab1', 'slab2', 'slab3', 'slab4', 'slab5', 'crlimit'];
-
-        const formatIndianNumber = (value) => {
-            if (!value && value !== 0) return "0";
-            const cleanedValue = typeof value === 'string' ? value.replace(/,/g, '') : value;
-            const num = parseFloat(cleanedValue);
-            if (isNaN(num)) return "0";
-            return Math.floor(num).toLocaleString('en-IN');
-        };
-
-        const calculateTotals = () => {
-            const totals = {};
-            columnsToSum.forEach(key => {
-                totals[key] = filteredData.reduce((sum, item) => {
-                    const value = parseFloat(item[key]) || 0;
-                    return sum + value;
-                }, 0);
-            });
-            return totals;
-        };
-
-        const totals = calculateTotals();
-
-        const totalWidth = summaryColumns.reduce((sum, c) => sum + c.width, 0) + 120;
-
-        const Header = () => (
-            <View style={styles.tableHeader}>
-                <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-                    Account Name
-                </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
-                    Advance
-                </Text>
-                <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
-                    Actions
-                </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'center' }]}>
-                    Total
-                </Text>
-
-                {summaryColumns.slice(3).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.label}
-                    </Text>
-                ))}
-            </View>
-        );
-
-        const Footer = () => (
-            <View style={[styles.tableHeader]}>
-                <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-                    Totals
-                </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'right' }]}>
-                    {formatIndianNumber(totals['advance'])}
-                </Text>
-                <Text style={[styles.headerText, { width: 80, textAlign: 'center' }]}>
-                    {/* Empty cell for Actions column */}
-                </Text>
-                <Text style={[styles.headerText, { width: 100, textAlign: 'right' }]}>
-                    {formatIndianNumber(totals['Total'])}
-                </Text>
-
-                {summaryColumns.slice(3).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
-                    </Text>
-                ))}
-            </View>
-        );
-
-        const Row = React.memo(({ item }) => (
-            <View style={styles.tableRow}>
-                <Text
-                    style={[styles.rowText, { width: 160, textAlign: 'left' }]}
-                    numberOfLines={2}
-                >
-                    {item.AccName}
-                </Text>
-                <Text
-                    style={[styles.rowText, { width: 100, textAlign: 'right' }]}
-                    numberOfLines={2}
-                >
-                    {formatIndianNumber(item.advance)}
-                </Text>
-                <View style={[styles.actionColumn, { width: 80 }]}>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSelectedAccCode(item.AccCode);
-                            setModalVisible(true);
-                        }}
-                    >
-                        <Icon
-                            name="info"
-                            size={20}
-                            color={theme.BRAND_GRADIENT_END}
-                        />
-                    </TouchableOpacity>
-                </View>
-                <Text
-                    style={[styles.rowText, { width: 100, textAlign: 'right' }]}
-                    numberOfLines={2}
-                >
-                    {formatIndianNumber(item.Total)}
-                </Text>
-
-                {summaryColumns.slice(3).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.rowText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {formatIndianNumber(item[col.key])}
-                    </Text>
-                ))}
-            </View>
-        ));
-
-        return (
-            <View style={styles.tableWrapper}>
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View style={{ minWidth: totalWidth }}>
-                        <Header />
-                        <FlatList
-                            data={filteredData}
-                            renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item) => item.AccCode}
-                            getItemLayout={(_, index) => ({
-                                length: ROW_HEIGHT,
-                                offset: ROW_HEIGHT * index,
-                                index,
-                            })}
-                            initialNumToRender={20}
-                            maxToRenderPerBatch={20}
-                            windowSize={10}
-                            removeClippedSubviews
-                            showsVerticalScrollIndicator={false}
-                        />
-                        <Footer />
-                    </View>
-                </ScrollView>
-            </View>
-        );
-    };
-
-    const OnAccountSummaryTable = () => {
-        const summaryColumns = [
-            { key: 'AccName', label: 'Account Name', width: 160, align: 'center' },
-            { key: 'amount', label: 'Total', width: 100, align: 'right' },
-            { key: 'actions', label: 'Actions', width: 80, align: 'center' },
-            { key: 'crday', label: 'Crday', width: 100, align: 'right' },
-            { key: 'crlimit', label: 'Crlimit', width: 120, align: 'right' },
-            { key: 'sexename', label: 'Sexename', width: 120, align: 'right' },
-            { key: 'AccCode', label: 'Acc Code', width: 100, align: 'right' },
-            { key: 'BrkName', label: 'Brk Name', width: 120, align: 'center' },
-        ];
-
-        const columnsToFormat = ['amount', 'crlimit'];
-
-        const columnsToSum = ['amount', 'crlimit'];
-
-        const calculateTotals = () => {
-            const totals = {};
-            columnsToSum.forEach(key => {
-                totals[key] = filteredData.reduce((sum, item) => {
-                    const value = parseFloat(item[key]) || 0;
-                    return sum + value;
-                }, 0);
-            });
-            return totals;
-        };
-
-        const formatIndianNumber = (value) => {
-            return value.toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            });
-        };
-
-        const totals = calculateTotals();
-
-        const totalWidth = summaryColumns.reduce((sum, c) => sum + c.width, 0);
-
-        const Header = () => (
-            <View style={styles.tableHeader}>
-                {summaryColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.label}
-                    </Text>
-                ))}
-            </View>
-        );
-
-        const Footer = () => (
-            <View style={[styles.tableHeader]}>
-                {summaryColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.key === 'AccName' ? 'Totals' :
-                            columnsToSum.includes(col.key) ? formatIndianNumber(totals[col.key]) : ''}
-                    </Text>
-                ))}
-            </View>
-        );
-
-        const Row = React.memo(({ item }) => (
-            <View style={styles.tableRow}>
-                <Text
-                    style={[styles.rowText, { width: 160, textAlign: 'left' }]}
-                    numberOfLines={2}
-                >
-                    {item.AccName}
-                </Text>
-
-                <Text
-                    style={[styles.rowText, { width: 100, textAlign: 'right' }]}
-                    numberOfLines={2}
-                >
-                    {columnsToFormat.includes('amount') ? formatIndianNumber(parseFloat(item.amount) || 0) : item.amount}
-                </Text>
-
-                <View style={[styles.actionColumn, { width: 80 }]}>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setSelectedAccCode(item.AccCode);
-                            setModalVisible(true);
-                        }}
-                    >
-                        <Icon
-                            name="info"
-                            size={20}
-                            color={theme.BRAND_GRADIENT_END}
-                        />
-                    </TouchableOpacity>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusText}>Active</Text>
+                  </View>
                 </View>
 
-                {summaryColumns.slice(3).map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.rowText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
-                    </Text>
-                ))}
-            </View>
-        ));
-
-        return (
-            <View style={styles.tableWrapper}>
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View style={{ minWidth: totalWidth }}>
-                        <Header />
-                        <FlatList
-                            data={filteredData}
-                            renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item) => item.AccCode}
-                            getItemLayout={(_, index) => ({
-                                length: ROW_HEIGHT,
-                                offset: ROW_HEIGHT * index,
-                                index,
-                            })}
-                            initialNumToRender={20}
-                            maxToRenderPerBatch={20}
-                            windowSize={10}
-                            removeClippedSubviews
-                            showsVerticalScrollIndicator={false}
-                        />
-                        <Footer />
-                    </View>
-                </ScrollView>
-            </View>
-        );
-    };
-
-    const DetailTable = () => {
-
-        const calcValue = (item) => {
-            return `${item.NTRANDATE}-${item.TRANID}`;
-        };
-
-        const sortedData = [...filteredDetails].sort((a, b) => {
-            const keyA = calcValue(a);
-            const keyB = calcValue(b);
-            return keyA.localeCompare(keyB);
-        });
-
-        let cumulativeData = [];
-        sortedData.forEach((item, index) => {
-            const currentCUMBAL = parseFloat(item.CUMBAL) || 0;
-
-            if (index === 0) {
-                cumulativeData.push({
-                    ...item,
-                    Cumulative: currentCUMBAL.toString(),
-                });
-            } else {
-                const prevCumulative = parseFloat(cumulativeData[index - 1].Cumulative) || 0;
-                const newCumulative = prevCumulative + currentCUMBAL;
-                cumulativeData.push({
-                    ...item,
-                    Cumulative: newCumulative.toString(),
-                });
-            }
-        });
-
-        const finalData = [...cumulativeData].reverse();
-
-        const detailColumns = [
-            { key: 'TRANDATE', label: 'Date', width: 120, align: 'center' },
-            { key: 'VOUNO', label: 'Vou.No.', width: 120, align: 'left' },
-            { key: 'CUMBAL', label: 'Balance', width: 120, align: 'right' },
-            { key: 'DUEDAY', label: 'Due Days', width: 120, align: 'center' },
-            { key: 'Cumulative', label: 'Cumulative', width: 120, align: 'center' },
-        ];
-
-        const columnsToFormat = ['CUMBAL', 'Cumulative'];
-
-        const calculateTotals = () => {
-            const totals = { CUMBAL: 0, Cumulative: 0 };
-            finalData.forEach(item => {
-                totals.CUMBAL += parseFloat(item.CUMBAL) || 0;
-                totals.Cumulative += parseFloat(item.Cumulative) || 0;
-            });
-            return totals;
-        };
-
-        const formatIndianNumber = (value) => {
-            if (!value && value !== 0) return "0";
-            const num = parseFloat(value);
-            return num.toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            });
-        };
-
-        const totals = calculateTotals();
-        const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0) + 160;
-
-        const Header = () => (
-            <View style={styles.tableHeader}>
-                <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-                    Type
+                {/* NAME */}
+                <Text style={styles.name}>
+                  {item.accountname}
                 </Text>
-                {detailColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.label}
-                    </Text>
-                ))}
-            </View>
-        );
 
-        const Footer = () => (
-            <View style={[styles.tableHeader]}>
-                <Text style={[styles.headerText, { width: 160, textAlign: 'center' }]}>
-                    Totals
+                {/* ADDRESS */}
+                <Text style={styles.address}>
+                  {fullAddress || "No address available"}
                 </Text>
-                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-                <Text style={[styles.headerText, { width: 120, textAlign: 'right' }]}>
-                    {formatIndianNumber(totals.CUMBAL)}
-                </Text>
-                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}></Text>
-                <Text style={[styles.headerText, { width: 120, textAlign: 'center' }]}>
-                    {formatIndianNumber(totals.Cumulative)}
-                </Text>
+
+                {/* 🔥 EXTRA INFO */}
+                <View style={styles.extraRow}>
+                  <Text style={styles.extraText}>
+                    💰 Limit: {parseFloat(item.crlimit).toFixed(2) || "0"}
+                  </Text>
+
+                  <Text style={styles.extraText}>
+                    👤 {item.conname || "-"}
+                  </Text>
+
+                  <Text style={styles.extraText}>
+                    📞 {item.contel || "-"}
+                  </Text>
+                </View>
+
+              </View>
+            </AnimatedTouchable>
+          );
+        }}
+
+        ListEmptyComponent={
+          loading ? (
+            <>
+              {[1, 2, 3, 4].map(i => (
+                <SkeletonCard key={i} />
+              ))}
+            </>
+          ) : (
+            <Text style={{ textAlign: "center", marginTop: 20 }}>
+              No data found
+            </Text>
+          )
+        }
+      />
+
+
+      {/* FILTER MODAL */}
+      <Modal transparent visible={filterVisible} animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.sheet}>
+
+            <View style={styles.modalHeader}>
+              <Text style={styles.title}>Filters</Text>
+              <TouchableOpacity onPress={() => setFilterVisible(false)}>
+                <Icon name="close" size={22} style={{ color: '#000' }} />
+              </TouchableOpacity>
             </View>
-        );
 
-        const Row = React.memo(({ item }) => (
-            <View style={styles.tableRow}>
-                <Text
-                    style={[styles.rowText, { width: 160, textAlign: 'center' }]}
-                    numberOfLines={2}
-                >
-                    {item.TYPE}
-                </Text>
-                {detailColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.rowText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {columnsToFormat.includes(col.key)
-                            ? formatIndianNumber(item[col.key])
-                            : item[col.key]}
-                    </Text>
-                ))}
-            </View>
-        ));
-
-        return (
-            <View style={styles.tableWrapper}>
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View style={{ minWidth: totalWidth }}>
-                        <Header />
-                        <FlatList
-                            data={finalData}
-                            renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item, index) => `${calcValue(item)}-${index}`}
-                            getItemLayout={(_, index) => ({
-                                length: ROW_HEIGHT,
-                                offset: ROW_HEIGHT * index,
-                                index,
-                            })}
-                            initialNumToRender={20}
-                            maxToRenderPerBatch={20}
-                            windowSize={10}
-                            removeClippedSubviews
-                            showsVerticalScrollIndicator={false}
-                        />
-                        <Footer />
-                    </View>
-                </ScrollView>
-            </View>
-        );
-    };
-    const OnAccountDetailTable = () => {
-        const detailColumns = [
-            { key: 'chqno', label: 'Che.No.', width: 120, align: 'center' },
-            { key: 'chqdate', label: 'Chq.Date', width: 120, align: 'left' },
-            { key: 'remark', label: 'Remark', width: 120, align: 'right' },
-            { key: 'clrdate', label: 'Clr.Date', width: 120, align: 'center' },
-            { key: 'AMOUNT', label: 'Amount', width: 140, align: 'center' },
-        ];
-
-        const columnsToFormat = ['AMOUNT'];
-
-        const columnsToSum = ['AMOUNT'];
-
-        const calculateTotals = () => {
-            const totals = {};
-            columnsToSum.forEach(key => {
-                totals[key] = filteredDetails.reduce((sum, item) => {
-                    const value = parseFloat(item[key]) || 0;
-                    return sum + value;
-                }, 0);
-            });
-            return totals;
-        };
-
-        const formatIndianNumber = (value) => {
-            return value?.toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            });
-        };
-
-        const totals = calculateTotals();
-
-        const totalWidth = detailColumns.reduce((sum, c) => sum + c.width, 0);
-
-        const Header = () => (
-            <View style={styles.tableHeader}>
-                {detailColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.label}
-                    </Text>
-                ))}
-            </View>
-        );
-
-        const Footer = () => (
-            <View style={[styles.tableHeader]}>
-                {detailColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.headerText,
-                            { width: col.width, textAlign: col.align }
-                        ]}
-                    >
-                        {col.key === 'AMOUNT' ? formatIndianNumber(totals[col.key]) : ''}
-                    </Text>
-                ))}
-            </View>
-        );
-
-        const Row = React.memo(({ item }) => (
-            <View style={styles.tableRow}>
-                {detailColumns.map(col => (
-                    <Text
-                        key={col.key}
-                        style={[
-                            styles.rowText,
-                            {
-                                width: col.width,
-                                textAlign: col.key === 'AMOUNT' ? 'right' : col.align,
-                                paddingRight: col.key === 'AMOUNT' ? 10 : 0, // Add right padding for AMOUNT
-                            }
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {columnsToFormat.includes(col.key) ? formatIndianNumber(parseFloat(item[col.key]) || 0) : item[col.key]}
-                    </Text>
-                ))}
-            </View>
-        ));
-
-        return (
-            <View style={styles.tableWrapper}>
-                <ScrollView horizontal showsHorizontalScrollIndicator>
-                    <View style={{ minWidth: totalWidth }}>
-                        <Header />
-                        <FlatList
-                            data={filteredDetails}
-                            renderItem={({ item }) => <Row item={item} />}
-                            keyExtractor={(item, index) => `${item.ACCCODE}-${index}`}
-                            getItemLayout={(_, index) => ({
-                                length: ROW_HEIGHT,
-                                offset: ROW_HEIGHT * index,
-                                index,
-                            })}
-                            initialNumToRender={20}
-                            maxToRenderPerBatch={20}
-                            windowSize={10}
-                            removeClippedSubviews
-                            showsVerticalScrollIndicator={false}
-                        />
-                        <Footer />
-                    </View>
-                </ScrollView>
-            </View>
-        );
-    };
-
-    const openDrawer = () => setIsDrawerVisible(true);
-    const closeDrawer = () => setIsDrawerVisible(false);
-    const closeDrawer123 = () => setSummaryDrawerVisible(false);
-
-
-
-
-    return (
-        <>
-            {
-                isLoading &&
-                (
-                    <View style={styles.loaderOverlay}>
-                        {isLoading ? (<ActivityIndicator size="large" color="#fff" />) : null}
-                    </View>
-                )
-            }
-            <HeaderBar
-                userName={username}
-                onSearch={setSearchQueryPOT}
-                placeholder="Search parties..."
-            />
-            <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
-                <Icon name="list" size={24} color="white" />
+            <Text style={styles.label}>Property</Text>
+            <TouchableOpacity
+              style={styles.inputBox}
+              onPress={() => setPropertyPickerVisible(true)}
+            >
+              <Text numberOfLines={1} style={{ color: "#000" }}>
+                {selectedProperty?.LngName || "Select property"}
+              </Text>
+              <Icon name="keyboard-arrow-down" size={24} />
             </TouchableOpacity>
 
-            {summaryDrawerVisible ? (<><View style={styles.drawerContainer}>
+            <Text style={styles.label}>Year</Text>
 
-                <View style={{ flex: 1, paddingHorizontal: 10, }}>
-                    <SummaryTable
-                        data={getdashParty}
-                        searchQuery={searchQueryPOT}
-                        onRowPress={async (row) => {
-                            console.log("CLICKED:", row);
-                            setSelectedParties(row);
-                            setSelectedAccCode(row.acccode);
-                            setPartyOverlayVisible(true);
-                            await handleReportClick("INIT", row, mianPaylaod, selectedProperty);
-                        }}
-                    />
-
-                </View>
-
-            </View></>) : (<>
-                <View style={{ alignContent: 'center' }} ><Text>No Party Data Found!</Text></View></>)}
-
-            <Modal
-                visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}
-                animationType="slide"
-                style={styles.fullScreenModal}
+            <TouchableOpacity
+              style={styles.bigInput}
+              onPress={() => setYearPickerVisible(true)}
             >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.drawerTitle}>
-                                {`Receivables > ${getActiveCardDetails && getActiveCardDetails?.caption} summary > details`}
-                            </Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}>
-                                <Icon name="close" size={24} color={theme.BRAND_GRADIENT_END} />
-                            </TouchableOpacity>
-                        </View>
-                        <TextInput
-                            placeholder="Search details..."
-                            style={styles.drawerSearch}
-                            value={searchQueryPOTDetails}
-                            onChangeText={setSearchQueryPOTDetail}
-                            autoCorrect={false}
-                            autoCapitalize="none"
-                            blurOnSubmit={false}
-                            placeholderTextColor={theme.BRAND_GRADIENT_END}
-                        />
-                        {getActiveCardDetails?.caption == 'On Account' ? <OnAccountDetailTable /> : <DetailTable />}
+              <Text style={styles.inputText}>
+                {selectedYear || "Select Year"}
+              </Text>
 
-                    </View>
-                </View>
-            </Modal>
-            <CustomDrawer
-                isVisible={isDrawerVisible}
-                onClose={closeDrawer}
-                fromDate={fromDate}
-                toDate={toDate}
-                setFromDate={setFromDate}
-                setToDate={setFromDate}
-                selectedYear={selectedYear}
-                onFromDateChange={setFromDate}
-                onToDateChange={setToDate}
-                onYearChange={setSelectedYear}
-                handleConfirmAction={handleConfirmAction}
-                exeData={exeData}
-                onExeChangeReceive={setSelectedPrpGrp}
-                selectedPrpgrp={selectedPrpgrp?.PrpTypeOf || 'Select Property Group'}
-                designData={designData}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                onDashPrpSelect={handleDashPrpSelect}
-                onDashPartySelect={handleDashPartySelect}
-                onDashSexeSelect={handleDashSexeSelect}
-                onDashAccountSelect={handleDashAccountSelect}
-                onDashSubHeadSelect={handleDashSubHeadSelect}
-                onItemSelectItem={handleItemSelect}
-                selectedDesigns={selectedDesigns}
-                setSelectedDesigns={setSelectedDesigns}
-                setSelectedItems={setSelectedItems}
-                selectedItems={selectedItems}
-                itemData={itemData}
-                selectedItemStatus={selectedItemStatus}
-                onItemStatusChange={handleItemStatusChange}
-                receivables_prpgroup={receivables_prpgroup}
-                internal_dropdown={internal_dropdown}
-                selectedInternal={selectedInternal?.lable || 'Select Internal'}
-                onExeChangeInternal={setSelectedInternal}
-                getdashPrp={getdashPrp}
-                setSelectedDashPrp={setSelectedDashPrp}
-                selectedDashPrp={selectedDashPrp}
-                getdashParty={getdashParty}
-                setSelectedDashParty={setSelectedDashParty}
-                selectedDashParty={selectedDashParty}
-                getdashSubHead={getdashSubHead}
-                setSelectedDashSubHead={setSelectedDashSubHead}
-                selectedDashSubHead={selectedDashSubHead}
-                getdashSexe={getdashSexe}
-                setSelectedDashSexe={setSelectedDashSexe}
-                selectedDashSexe={selectedDashSexe}
-                dashAccount={dashAccount}
-                getAccountLoading={getAccountLoading}
-                getdashPropertyLoading={getdashPropertyLoading}
-                getdashPartyLoading={getdashPartyLoading}
-                getdashSubHeadLoading={getdashSubHeadLoading}
-                getdashSexeLoading={getdashSexeLoading}
-                getdashAccount={getdashAccount}
-                setSelectedDashAccount={setSelectedDashAccount}
-                selectedDashAccount={selectedDashAccount}
-                getdashAccountLoading={getdashAccountLoading}
-                setAccountLoading={setAccountLoading}
-                yearOptions={yearOptions}
-                getPropertyData={getPropertyData}
-                setSelectedProperty={setSelectedProperty}
-                selectedProperty={selectedProperty}
-                dashParty={dashParty}
-            />
+              <Icon name="keyboard-arrow-down" size={20} />
+            </TouchableOpacity>
 
-            <PartyOverlay
-                visible={partyOverlayVisible}
-                onClose={() => setPartyOverlayVisible(false)}
-                party={selectedParties}
-                onActionClick={(action) => {
-                    setAction(action);
-                    setLedgerOverlayVisible(true);
+            {/* APPLY */}
+            <TouchableOpacity
+              style={styles.applyBtn}
+              onPress={() => {
+                fetchpartylist();
+                setFilterVisible(false);
+              }}
+            >
+              <Text style={{ color: "#fff" }}>OK</Text>
+            </TouchableOpacity>
+
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={yearPickerVisible} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "#fff" }}>
+
+          {/* HEADER */}
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setYearPickerVisible(false)}>
+              <Icon name="arrow-back-ios" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <Text style={styles.pickerTitle}>Select Year</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          {/* LIST */}
+          <FlatList
+            data={yearOptions}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.pickerItem}
+                onPress={() => {
+                  setSelectedYear(item);
+                  setYearPickerVisible(false);
                 }}
-                loading={isLoading}
-                selectedProperty={selectedProperty}
-            />
+              >
+                <Text style={{ color: "#000" }}>{item}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
 
-            <LedgerOverlay
-                visible={ledgerOverlayVisible}
-                onClose={() => setLedgerOverlayVisible(false)}
-                data={ledgerData}
-                styles={styles}
-                party={selectedParties}
-                out_data={outstandingData}
-                customer_rate_data={CustomerRateData}
-                action={action}
+      {/* PROPERTY PICKER */}
+      <Modal visible={propertyPickerVisible} animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "#fff" }}>
+
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setPropertyPickerVisible(false)}>
+              <Icon name="arrow-back-ios" size={20} style={{ color: "#000" }} />
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Select Property</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <View style={styles.pickerSearch}>
+            <Icon name="search" size={18} color="#777" />
+            <TextInput
+              placeholder="Search property..."
+              placeholderTextColor="#000"
+              value={propertySearch}
+              onChangeText={setPropertySearch}
+              style={{ flex: 1, color: "#000" }}
             />
-        </>
-    );
+          </View>
+
+          {/* RECENT */}
+          {selectedProperty && (
+            <>
+              <Text style={styles.section}>Selected</Text>
+
+              <View style={styles.selectedBox}>
+                <Text style={styles.selectedText}>
+                  {selectedProperty.LngName}
+                </Text>
+
+                <Icon name="check-circle" size={18} color="#0F6C7B" />
+              </View>
+            </>
+          )}
+
+          <FlatList
+            data={propertyData.filter(p =>
+              p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
+            )}
+            keyExtractor={(item) => item.PrpCode}
+            renderItem={({ item }) => {
+              const selected = selectedProperty?.PrpCode === item.PrpCode;
+              return (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    selectProperty(item);
+                    setPropertyPickerVisible(false);
+                  }}
+                >
+                  <Text style={{ flex: 1, color: "#000" }}>{item.LngName}</Text>
+                  {selected && (
+                    <Icon name="check-circle" size={20} color="#0F6C7B" />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </Modal>
+
+    </View>
+  );
 };
 
-const styles = StyleSheet.create({
-    accordionContainer: {
-        marginBottom: 10,
-    },
-    carouselContainer: {
-        height: 70,
-        paddingHorizontal: 10,
-    },
-    cardContainer: {
-        marginRight: 10,
-        borderRadius: 8,
-        overflow: 'hidden',
-        elevation: 2,
-        width: 150,
-        height: 70,
-    },
-    card: {
-        padding: 10,
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    cardDetails: {
-        marginTop: 5,
-        padding: 5,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 5,
-    },
-    cardDetailText: {
-        color: theme.TEXT_WHITE,
-        fontSize: 10,
-        textAlign: 'center',
-    },
-    tableWrapper: {
-        flex: 1,
-        maxHeight: 550,
-    },
-    horizontalScroll: {
-        flex: 1,
-    },
-    tableContainer: {
-        borderRadius: 8,
-        overflow: 'hidden',
-        elevation: 2,
-        backgroundColor: '#fff',
-        minWidth: '100%',
-    },
-    tableHeader: {
-        flexDirection: 'row',
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        minWidth: '100%',
-    },
-    headerText: {
-        color: theme.TEXT_WHITE,
-        fontWeight: 'bold',
-        alignItems: 'center',
-        alignContent: 'center',
-        justifyContent: 'center',
-        textAlignVertical: 'center',
-        minHeight: 40,
-        fontSize: 12,
-        textAlign: 'center',
-    },
-    tableRow: {
-        flexDirection: 'row',
-        paddingVertical: 2,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-        minHeight: 50,
-        minWidth: '100%',
-        backgroundColor: '#fff',
-    },
-    rowText: {
-        padding: 5,
-        flexWrap: 'wrap',
-        minHeight: 40,
-        fontSize: 12,
-        color: '#000',
-    },
-    actionColumn: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        paddingHorizontal: 5,
-    },
-    actionButton: {
-        padding: 5,
-        width: 30,
-        alignItems: 'center',
-    },
-    syncToggle: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 15,
-    },
-    syncDetails: {
-        padding: 10,
-        backgroundColor: '#f5f5f5',
-        marginBottom: 10,
-        borderRadius: 5,
-    },
-    syncDetailsText: {
-        fontSize: 12,
-        color: '#333',
-    },
-    fullScreenModal: {
-        margin: 0,
-    },
-    modalContainer: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    modalContent: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        width: '100%',
-        height: '100%',
-    },
-    cardCaption: {
-        color: theme.TEXT_WHITE,
-        fontSize: 13,
-        fontFamily: theme.FONT_FAMILY_SEMIBOLD_ITALIC,
-    },
-    cardSummary: {
-        color: theme.TEXT_WHITE,
-        fontSize: 12,
-        fontFamily: theme.FONT_FAMILY_EXTRABOLD,
-    },
-    tableScrollContainer: {
-        marginTop: 5,
-        maxHeight: 400,
-        flex: 1,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    closeButton: {
-        marginTop: 20,
-        padding: 10,
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        borderRadius: 5,
-    },
-    closeButtonText: {
-        color: '#fff',
-        textAlign: 'center',
-    },
-    listIconContainer: {
-        position: 'absolute',
-        top: 85,
-        right: 20,
-        zIndex: 1,
-        backgroundColor: theme.BRAND_GRADIENT_END,
-        borderRadius: 3,
-        padding: 4,
-    },
-    narrationBar: {
-        paddingVertical: 0,
-        marginHorizontal: 0,
-        marginTop: 1,
-        // marginBottom: 8,
-        overflow: 'hidden',
-        shadowColor: theme.SHADOW,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-        width: '100%',
-    },
-    dashboardCard: {
-        flex: 1,
-        height: 130,
-        borderRadius: 18,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 6 },
-    },
-    dashboardCardInner: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 16,
-    },
-    dashboardCaption: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.80)',
-        marginBottom: 6,
-        fontWeight: '600',
-        letterSpacing: 0.8,
-    },
-
-    dashboardValue: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#fff',
-    },
-    activeDashboardCard: {
-        borderWidth: 2,
-        borderColor: theme.BRAND_GRADIENT_END,
-        shadowColor: theme.BRAND_GRADIENT_END,
-        shadowOpacity: 0.35,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 0 },
-    },
-    disabledCard: {
-        opacity: 0.6,
-    },
-    disabledText: {
-        color: '#666',
-    },
-
-    activeText: {
-        color: '#fff',
-    },
-    drawerContainer: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    drawerHeader: {
-        height: 60,
-        paddingHorizontal: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderColor: '#eee',
-    },
-    drawerTitle: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: theme.BRAND_GRADIENT_END,
-    },
-    drawerSearch: {
-        padding: 10,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: 'transparent',
-        color: '#005F73',
-    },
-    loaderOverlay: {
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        justifyContent: 'center', alignItems: 'center', zIndex: 999,
-    },
-    loaderText: { marginTop: 10, color: '#fff', fontSize: 16, fontWeight: '700', },
-});
-
 export default PartyDashboard;
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",   // ✅ FIX alignment
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingTop: 40,         // ✅ status bar spacing
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",   // ✅ FIX vertical alignment
+    backgroundColor: "#fff",
+    marginHorizontal: 16,
+    marginTop: 10,         // ✅ floating effect like modern apps
+    paddingHorizontal: 12,
+    height: 48,             // ✅ FIX height
+    borderRadius: 14,
+    elevation: 4,
+  },
+
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#000",
+  },
+
+  badge: {
+    backgroundColor: "#E8F5E9",
+    padding: 5,
+    borderRadius: 10,
+    marginTop: 5
+  },
+
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-end"
+  },
+
+  sheet: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+
+  title: { fontSize: 16, fontWeight: "600", color: '#000' },
+  label: { marginTop: 10, fontWeight: "600", color: '#000' },
+
+  yearRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 5 },
+
+  yearChip: {
+    padding: 8,
+    backgroundColor: "#eee",
+    borderRadius: 8,
+    margin: 4
+  },
+
+  yearSelected: {
+    backgroundColor: "#0F6C7B"
+  },
+
+  inputBox: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    marginTop: 5,
+  },
+
+  applyBtn: {
+    backgroundColor: "#0F2027",
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 15,
+    alignItems: "center"
+  },
+
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 15
+  },
+
+  pickerTitle: { fontSize: 16, fontWeight: "600", color: "#000" },
+
+  // pickerSearch: {
+  //   flexDirection: "row",
+  //   backgroundColor: "#f1f1f1",
+  //   margin: 10,
+  //   padding: 10,
+  //   borderRadius: 10
+  // },
+
+  pickerSearch: {
+    flexDirection: "row",
+    alignItems: "center",   // 🔥 THIS FIX
+    backgroundColor: "#f1f1f1",
+    margin: 10,
+    paddingHorizontal: 10,
+    height: 45,             // 🔥 optional but recommended
+    borderRadius: 10
+  },
+
+  pickerItem: {
+    flexDirection: "row",
+    padding: 15,
+    borderBottomWidth: 1,
+    borderColor: "#eee"
+  },
+
+  section: {
+    marginLeft: 15,
+    marginTop: 10,
+    fontWeight: "600",
+    color: "#000",
+  },
+  card: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#0F2027",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  avatarText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  rowBetween: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  name: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111",
+    flex: 1,
+  },
+
+  code: {
+    fontSize: 12,
+    color: "#888",
+    marginLeft: 8,
+  },
+
+  address: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+
+  limitBox: {
+    marginTop: 8,
+    backgroundColor: "#E8F5E9",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+
+  limitText: {
+    color: "#2E7D32",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  selectedBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#E3F2FD",
+    padding: 10,
+    borderRadius: 10,
+    marginVertical: 8,
+  },
+
+  selectedText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F6C7B",
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  codeBadge: {
+    backgroundColor: "#E3F2FD",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+
+  codeText: {
+    color: "#1565C0",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  statusBadge: {
+    backgroundColor: "#E8F5E9",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+
+  statusText: {
+    color: "#2E7D32",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  name: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 4,
+  },
+
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  icon: {
+    marginRight: 4,
+  },
+
+  address: {
+    fontSize: 12,
+    color: "#666",
+    flex: 1,
+    lineHeight: 16,
+  },
+  card: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 14,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  avatarText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  rightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  codeBadge: {
+    backgroundColor: "#E3F2FD",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+
+  codeText: {
+    color: "#1565C0",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  statusBadge: {
+    backgroundColor: "#E8F5E9",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+
+  statusText: {
+    color: "#2E7D32",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  arrow: {
+    fontSize: 22,
+    color: "#999",
+  },
+
+  name: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+    marginTop: 4,
+  },
+
+  address: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  extraRow: {
+    marginTop: 8,
+  },
+
+  extraText: {
+    fontSize: 12,
+    color: "#444",
+    marginTop: 2,
+  },
+
+  // skeleton styles
+  skelLineShort: {
+    height: 12,
+    backgroundColor: "#eee",
+    width: "40%",
+    marginBottom: 6,
+    borderRadius: 6,
+  },
+
+  skelLineLong: {
+    height: 14,
+    backgroundColor: "#eee",
+    width: "80%",
+    marginBottom: 6,
+    borderRadius: 6,
+  },
+
+  skelLineMid: {
+    height: 12,
+    backgroundColor: "#eee",
+    width: "60%",
+    borderRadius: 6,
+  },
+  filterHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 5,
+  },
+
+  filterBox: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 10,
+    marginRight: 8,
+    elevation: 2,
+  },
+
+  filterLabel: {
+    fontSize: 11,
+    color: "#888",
+  },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  filterValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0F2027",
+    flex: 1,           // 🔥 IMPORTANT (prevents overflow)
+    marginRight: 6,    // space before icon
+  },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F4F6",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    maxWidth: "75%",   // 🔥 important for long property
+  },
+
+  chipText: {
+    marginHorizontal: 6,
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#0F2027",
+    flexShrink: 1,   // 🔥 prevents overflow
+  },
+
+  bigInput: {
+    backgroundColor: "#F3F4F6",
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 6,
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+
+  inputText: { flex: 1, color: "#000" },
+});

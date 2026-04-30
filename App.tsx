@@ -72,7 +72,10 @@ import YarnManagementSystem from './components/YarnManagementSystem/YarnManageme
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 import WftIssue from './components/WftIssue/WftIssue';
 import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
-
+import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
+import LedgerOverlay from './components/PartyDashboard/LedgerOverlay';
+import PartyDetailScreen from './components/PartyDashboard/PartyDetailScreen';
+import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueReturnEntry';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -463,6 +466,7 @@ export default function App() {
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
                     }</Stack.Screen>
+                    <Stack.Screen name="ChartScreen" component={ChartScreen} />
                     {/* <Stack.Screen name="Grey Purchase Order">{(props) =>
                       <>
                         <GreyPurchaseOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -716,19 +720,21 @@ export default function App() {
 
                       </>
                     }</Stack.Screen>
-                    <Stack.Screen name="Weft Issue">{(props) =>
+                    <Stack.Screen name="PartyDetailScreen" component={PartyDetailScreen} />
+                    {/* <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
-                    }</Stack.Screen> 
+                    }</Stack.Screen>  */}
 
                     <Stack.Screen name="Creel Issue Return">{(props) =>
                       <>
                         <CreelIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
-                    }</Stack.Screen>                    
+                    }</Stack.Screen>
+                    <Stack.Screen name="CreelIssueReturnEntry" component={CreelIssueReturnEntry} />
                   </Stack.Navigator>
                   
 

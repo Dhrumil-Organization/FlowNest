@@ -2241,11 +2241,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     <TouchableOpacity
                                         style={styles.chartBtn}
                                         onPress={() => {
-                                            navigation.navigate('ChartScreen', {
-                                                item: item,
-                                                d1Item: d1Item
-                                            });
-                                        }}
+    console.log("NAV TEST", navigation);
+    navigation.navigate('ChartScreen', {
+        item,
+        d1Item,
+        token
+    });
+}}
                                     // onPress={() => {
                                     //     console.log('Chart clicked', d1Item);
                                     //     // handleChartClick(item, d1Item);

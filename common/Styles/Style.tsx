@@ -1252,6 +1252,23 @@ export const crlimtreq_styles = StyleSheet.create({
         color: '#000',
         fontWeight: '600',
     },
+    // SALES ORDER
+    subHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 2, // Adjust spacing between rows
+    },
+    subHeaderLabel: {
+        fontSize: 13,
+        color: '#555', // Subtle color for labels
+        fontWeight: '600',
+        marginRight: 4, // Space between label and value
+    },
+    subHeaderValue: {
+        fontSize: 13,
+        color: '#0a0a0a', // Darker color for values
+        fontWeight: '500',
+    },
     /**yarn purchase order sub card css end */
 });
 

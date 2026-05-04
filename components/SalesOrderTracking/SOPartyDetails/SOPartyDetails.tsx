@@ -546,6 +546,13 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 style={styles.orderCard}
                 onPress={() => handleCardPress(item)}
             >
+                <View style={styles.orderHeadermain}>
+                    <Text style={styles.orderId}>{item.partyname}</Text>
+                    {/* <Text style={[styles.orderStatus, { color: getStatusColor(item.status) }]}>
+                        {item.status}
+                    </Text>
+                    <Icon name="chevron-right" size={20} color="#999" /> */}
+                </View>
                 <View style={styles.orderHeader}>
                     <Text style={styles.orderId}>SO-{item.sono}</Text>
                     <Text style={[styles.orderStatus, { color: getStatusColor(item.status) }]}>
@@ -554,7 +561,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     <Icon name="chevron-right" size={20} color="#999" />
                 </View>
 
-                <Text style={styles.orderDate}>{item.sodate}</Text>
+                <Text style={styles.orderDate}>Sodate: {item.sodate} | Duedate: {item.duedate}</Text>
                 <Text style={styles.designShadeText}>
                     {item.Dsnname} | Shade: {item.shdname}
                 </Text>
@@ -865,6 +872,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 5,
+    },
+    orderHeadermain: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 5,
+        paddingBottom: 4,
+        // borderColor: 'rgba(0,0,0,0.1)',
+        borderColor: theme.BORDER,
+        // borderWidth: 2,
+        borderBottomWidth: 2,
     },
     orderId: {
         fontSize: 14,

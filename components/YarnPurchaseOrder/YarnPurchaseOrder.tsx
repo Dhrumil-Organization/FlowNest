@@ -455,10 +455,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         itemTitle: {
             fontSize: 15,
-            fontWeight: '600',
             color: '#222',
             flex: 1,
             paddingRight: 10,
+            fontWeight: 'bold',
+            marginBottom: 6,
         },
 
         chartBtn: {
@@ -490,12 +491,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             color: '#333',
         },
 
-        itemTitle: {
-            fontWeight: 'bold',
-            fontSize: 14,
-            marginBottom: 6,
-            color: '#222'
-        },
+        // itemTitle: {
+        //     fontWeight: 'bold',
+        //     fontSize: 14,
+        //     marginBottom: 6,
+        //     color: '#222'
+        // },
 
         itemRow: {
             flexDirection: 'row',
@@ -613,8 +614,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         }
     };
     */
-    const fetchData = useCallback(async () => {
 
+    console.log("TESTING 1234123123123")
+
+    const fetchData = useCallback(async () => {
+        console.log("TESTING")
         // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
@@ -1643,206 +1647,26 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         }
     };
 
-    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
+    // const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
 
-        <View style={[
-            crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-            item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
-            {
-                item.isProcessed &&
-                (
-                    <View style={[crlimtreq_styles.stampContainerYOS,]}>
-                        <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                            </Text>
-                        </View>
-                    </View>
-                )
-            }
-            <View style={crlimtreq_styles.dateContainer}><Text style={crlimtreq_styles.dateText}>{item.PODate}</Text></View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}><Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text></View>
-            </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.BAccName || ''}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}> {item.NetAmt || ''}: </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesYPO[item.UId]?.ARemark || ''}
-                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                        />
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.StoreName || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-
-                    </View>
-                </View>
-
-
-
-                <View style={crlimtreq_styles.expandRow}>
-                    <TouchableOpacity
-                        style={crlimtreq_styles.expandButton}
-                        onPress={() => toggleExpandRequest(item.UId, item)}
-                    >
-                        <Text style={crlimtreq_styles.expandText}>
-                            Items: {item.d1?.length || 0}
-                        </Text>
-
-                        <Icon
-                            name={expandedRequestCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                            size={24}
-                            color="#333"
-                        />
-                    </TouchableOpacity>
-                </View>
-                {
-                    expandedRequestCards[item.UId] && item.d1.map((d1Item, index) => (
-                        <View key={index} style={crlimtreq_styles.subCard}>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
-                                </View>
-
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
-                                </View>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
-                                </View>
-
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
-                                </View>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
-                                </View>
-
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
-                                </View>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
-                                </View>
-                            </View>
-                            {
-                                activeTab1YPO === 'requests' &&
-                                (
-                                    <>
-                                        <View style={crlimtreq_styles.subRow1}>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
-                                            </View>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
-                                            </View>
-                                        </View>
-                                        <View style={crlimtreq_styles.subRow1}>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
-                                            </View>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
-                                            </View>
-                                        </View>
-                                    </>
-                                )
-                            }
-                        </View>
-                    ))
-                }
-            </View>
-            <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
-                {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                    </View>
-                </TouchableOpacity> */}
-                <TouchableOpacity
-                    onPress={() => { if (isConnected && !item.isProcessed) handleCallURL(item); }}
-                    disabled={!isConnected || item.isProcessed || getLocationLoading}>
-                    {
-                        getLocationLoading ?
-                            (
-                                <ActivityIndicator size={40} color="#2196F3" />
-                            )
-                            :
-                            (
-                                <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                            )
-                    }
-                </TouchableOpacity>
-            </View>
-        </View >
-    );
-
-    // const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
     //     <View style={[
-    //         crlimtreq_styles.card,
-    //         item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2'
-    //             ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
-    //         { paddingTop: 18 }
-    //     ]}>
-    //         <View style={crlimtreq_styles.dateContainer}>
-    //             <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-    //         </View>
+    //         crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
+    //         item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
+    //         {
+    //             item.isProcessed &&
+    //             (
+    //                 <View style={[crlimtreq_styles.stampContainerYOS,]}>
+    //                     <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
+    //                         <Text style={crlimtreq_styles.stampText}>
+    //                             {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+    //                         </Text>
+    //                     </View>
+    //                 </View>
+    //             )
+    //         }
+    //         <View style={crlimtreq_styles.dateContainer}><Text style={crlimtreq_styles.dateText}>{item.PODate}</Text></View>
     //         <View style={crlimtreq_styles.cardHeaderContainer}>
-    //             <View style={crlimtreq_styles.cardHeader}>
-    //                 <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-    //             </View>
+    //             <View style={crlimtreq_styles.cardHeader}><Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text></View>
     //         </View>
     //         <View style={crlimtreq_styles.cardSubHeader}>
     //             <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
@@ -1851,44 +1675,25 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     //             <View style={crlimtreq_styles.twoColumnRow}>
     //                 <View style={crlimtreq_styles.keyValuePair}>
     //                     <Text style={crlimtreq_styles.key}>Broker:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.BAccName || ''}
-    //                     </Text>
+    //                     <Text style={crlimtreq_styles.value}>{item.BAccName || ''}</Text>
     //                 </View>
     //                 <View style={crlimtreq_styles.keyValuePair}>
     //                     <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.NetAmt || ''}:
-    //                     </Text>
+    //                     <Text style={crlimtreq_styles.value}> {item.NetAmt || ''}: </Text>
     //                 </View>
     //             </View>
     //             <View style={crlimtreq_styles.twoColumnRow}>
     //                 <View style={crlimtreq_styles.keyValuePair}>
     //                     <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-    //                     <Text style={crlimtreq_styles.Authvalue}>
-    //                         {item.ARemark || ''}
-    //                     </Text>
-    //                 </View>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Auth Date:</Text>
-    //                     <Text style={crlimtreq_styles.Authvalue}>
-    //                         {item.AuthorisedDate || 'N/A'}
-    //                     </Text>
-    //                 </View>
-
-    //             </View>
-    //             <View style={crlimtreq_styles.twoColumnRow}>
-    //                 <View style={crlimtreq_styles.keyValuePair}>
-    //                     <Text style={crlimtreq_styles.key}>Auth By:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.AuthorisedBy || 'N/A'}
-    //                     </Text>
+    //                     <RNTextInput
+    //                         style={crlimtreq_styles.editableValueBlack}
+    //                         value={editableValuesYPO[item.UId]?.ARemark || ''}
+    //                         onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+    //                     />
     //                 </View>
     //                 <View style={crlimtreq_styles.keyValuePair}>
     //                     <Text style={crlimtreq_styles.key}>Status:</Text>
-    //                     <Text style={crlimtreq_styles.value}>
-    //                         {item.AuthStatus || ''}
-    //                     </Text>
+    //                     <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
     //                 </View>
     //             </View>
     //             <View style={crlimtreq_styles.twoColumnRow}>
@@ -1901,190 +1706,132 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     //                 <View style={crlimtreq_styles.keyValuePair}>
 
     //                 </View>
+    //             </View>
 
-    //                 {(item.IsAuth === '1' || item.IsAuth === '2') && (
-    //                     <View style={{
-    //                         flex: 1,
-    //                         alignItems: 'flex-end',
-    //                         justifyContent: 'center'
-    //                     }}>
 
-    //                         {/* Wrapper for vertical buttons */}
-    //                         <View style={{ alignItems: 'flex-end' }}>
 
-    //                             {/* AUTH BUTTON */}
-    //                             <View style={{
-    //                                 backgroundColor: item.IsAuth === '1' ? '#4CAF50' : '#F44336',
-    //                                 paddingHorizontal: 10,
-    //                                 paddingVertical: 4,
-    //                                 borderRadius: 6,
-    //                                 minWidth: 100,
-    //                                 alignItems: 'center'
-    //                             }}>
-    //                                 <Text style={{
-    //                                     color: '#fff',
-    //                                     fontWeight: 'bold',
-    //                                     fontSize: 15
-    //                                 }}>
-    //                                     {item.IsAuth === '1' ? 'AUTHORISED' : 'REJECTED'}
-    //                                 </Text>
+    //             <View style={crlimtreq_styles.expandRow}>
+    //                 <TouchableOpacity
+    //                     style={crlimtreq_styles.expandButton}
+    //                     onPress={() => toggleExpandRequest(item.UId, item)}
+    //                 >
+    //                     <Text style={crlimtreq_styles.expandText}>
+    //                         Items: {item.d1?.length || 0}
+    //                     </Text>
+
+    //                     <Icon
+    //                         name={expandedRequestCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+    //                         size={24}
+    //                         color="#333"
+    //                     />
+    //                 </TouchableOpacity>
+    //             </View>
+    //             {
+    //                 expandedRequestCards[item.UId] && item.d1.map((d1Item, index) => (
+    //                     <View key={index} style={crlimtreq_styles.subCard}>
+    //                         <View style={crlimtreq_styles.subRow1}>
+    //                             <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
+    //                         </View>
+    //                         <View style={crlimtreq_styles.subRow1}>
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
     //                             </View>
 
-    //                             <TouchableOpacity
-    //                                 style={{
-    //                                     marginTop: 6,
-    //                                     backgroundColor: '#2196F3',
-    //                                     paddingHorizontal: 10,
-    //                                     paddingVertical: 4,
-    //                                     borderRadius: 6,
-    //                                     minWidth: 100,
-    //                                     alignItems: 'center'
-    //                                 }}
-    //                                 onPress={() => {
-    //                                     console.log('Chart clicked', item);
-    //                                 }}
-    //                             >
-    //                                 <Text style={{
-    //                                     color: '#fff',
-    //                                     fontWeight: 'bold',
-    //                                     fontSize: 14
-    //                                 }}>
-    //                                     CHART
-    //                                 </Text>
-    //                             </TouchableOpacity>
-
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
+    //                             </View>
     //                         </View>
+    //                         <View style={crlimtreq_styles.subRow1}>
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
+    //                             </View>
+
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
+    //                             </View>
+    //                         </View>
+    //                         <View style={crlimtreq_styles.subRow1}>
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
+    //                             </View>
+
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
+    //                             </View>
+    //                         </View>
+    //                         <View style={crlimtreq_styles.subRow1}>
+    //                             <View style={crlimtreq_styles.subCol}>
+    //                                 <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
+    //                                 <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
+    //                             </View>
+    //                         </View>
+    //                         {
+    //                             activeTab1YPO === 'requests' &&
+    //                             (
+    //                                 <>
+    //                                     <View style={crlimtreq_styles.subRow1}>
+    //                                         <View style={crlimtreq_styles.subCol}>
+    //                                             <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
+    //                                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
+    //                                         </View>
+    //                                         <View style={crlimtreq_styles.subCol}>
+    //                                             <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
+    //                                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
+    //                                         </View>
+    //                                     </View>
+    //                                     <View style={crlimtreq_styles.subRow1}>
+    //                                         <View style={crlimtreq_styles.subCol}>
+    //                                             <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
+    //                                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
+    //                                         </View>
+    //                                         <View style={crlimtreq_styles.subCol}>
+    //                                             <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
+    //                                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
+    //                                         </View>
+    //                                     </View>
+    //                                 </>
+    //                             )
+    //                         }
     //                     </View>
-    //                 )}
-
-    //             </View>
+    //                 ))
+    //             }
     //         </View>
-    //         <View style={crlimtreq_styles.expandRow}>
-
-    //             <View style={{ flex: 1, alignItems: 'left' }}>
-
-    //                 {prptype === 'R' && item.mailsent === '1' && (
-    //                     <TouchableOpacity
-    //                         onPress={() => handleInfoClick(item)}
-    //                         disabled={!isConnected}
-    //                     >
-    //                         <View style={crlimtreq_styles.infoIconContainer}>
-    //                             <Icon
-    //                                 name="email"
-    //                                 size={32}
-    //                                 color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-    //                             />
-    //                         </View>
-    //                     </TouchableOpacity>
-    //                 )}
-
-    //             </View>
-
-    //         </View>
-    //         <View style={crlimtreq_styles.expandRow}>
-    //             <TouchableOpacity
-    //                 style={crlimtreq_styles.expandButton}
-    //                 onPress={() => toggleExpandHistory(item.UId, item)}
-    //             >
-    //                 <Text style={crlimtreq_styles.expandText}>
-    //                     Items: {item.d1?.length || 0}
-    //                 </Text>
-
-    //                 <Icon
-    //                     name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-    //                     size={24}
-    //                     color="#333"
-    //                 />
+    //         <View style={crlimtreq_styles.cardActions}>
+    //             <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
+    //                 <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
     //             </TouchableOpacity>
-
-    //         </View>
-    //         {
-    //             expandedHistoryCards[item.UId] && item.d1.map((d1Item, index) => (
-    //                 <View key={index} style={crlimtreq_styles.subCard}>
-    //                     <View style={crlimtreq_styles.subRow1}>
-    //                         <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
-    //                     </View>
-    //                     <View style={crlimtreq_styles.subRow1}>
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
-    //                         </View>
-
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
-    //                         </View>
-    //                     </View>
-    //                     <View style={crlimtreq_styles.subRow1}>
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
-    //                         </View>
-
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
-    //                         </View>
-    //                     </View>
-    //                     <View style={crlimtreq_styles.subRow1}>
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
-    //                         </View>
-
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
-    //                         </View>
-    //                     </View>
-    //                     <View style={crlimtreq_styles.subRow1}>
-    //                         <View style={crlimtreq_styles.subCol}>
-    //                             <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
-    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
-    //                         </View>
-    //                     </View>
-    //                     {
-    //                         activeTab1YPO === 'requests' &&
-    //                         (
-    //                             <>
-    //                                 <View style={crlimtreq_styles.subRow1}>
-    //                                     <View style={crlimtreq_styles.subCol}>
-    //                                         <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
-    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
-    //                                     </View>
-    //                                     <View style={crlimtreq_styles.subCol}>
-    //                                         <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
-    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
-    //                                     </View>
-    //                                 </View>
-    //                                 <View style={crlimtreq_styles.subRow1}>
-    //                                     <View style={crlimtreq_styles.subCol}>
-    //                                         <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
-    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
-    //                                     </View>
-    //                                     <View style={crlimtreq_styles.subCol}>
-    //                                         <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
-    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
-    //                                     </View>
-    //                                 </View>
-    //                             </>
-    //                         )
-    //                     }
-    //                 </View>
-    //             ))
-    //         }
-
-    //         {/* <View style={crlimtreq_styles.cardActions}>
-    //             <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
+    //             <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
+    //                 <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+    //             </TouchableOpacity>
+    //             {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
     //                 <View style={crlimtreq_styles.infoIconContainer}>
     //                     <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
     //                     {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
     //                 </View>
+    //             </TouchableOpacity> */}
+    //             <TouchableOpacity
+    //                 onPress={() => { if (isConnected && !item.isProcessed) handleCallURL(item); }}
+    //                 disabled={!isConnected || item.isProcessed || getLocationLoading}>
+    //                 {
+    //                     getLocationLoading ?
+    //                         (
+    //                             <ActivityIndicator size={40} color="#2196F3" />
+    //                         )
+    //                         :
+    //                         (
+    //                             <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
+    //                         )
+    //                 }
     //             </TouchableOpacity>
-    //         </View> */}
-    //     </View>
+    //         </View>
+    //     </View >
     // );
-
 
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
 
@@ -2241,13 +1988,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     <TouchableOpacity
                                         style={styles.chartBtn}
                                         onPress={() => {
-    console.log("NAV TEST", navigation);
-    navigation.navigate('ChartScreen', {
-        item,
-        d1Item,
-        token
-    });
-}}
+                                            console.log("NAV TEST", navigation);
+                                            navigation.navigate('ChartScreen', {
+                                                item,
+                                                d1Item,
+                                                token
+                                            });
+                                        }}
                                     // onPress={() => {
                                     //     console.log('Chart clicked', d1Item);
                                     //     // handleChartClick(item, d1Item);
@@ -2532,6 +2279,154 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         </View>
     );
 
+    const renderCommonCard = ({ item, type }: { item: any, type: 'history' | 'request' | 'verify' }) => {
+
+        const isApproved = item.IsAuth === '1';
+        const isRejected = item.IsAuth === '2';
+
+        return (
+            <View style={[
+                styles.card,
+                isApproved ? styles.acceptedCard :
+                    isRejected ? styles.rejectedCard : null
+            ]}>
+
+                {/* HEADER */}
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.poNo}>{item.PONo}</Text>
+                        <Text style={styles.date}>{item.PODate}</Text>
+                    </View>
+
+                    {(isApproved || isRejected) && (
+                        <View style={[
+                            styles.statusChip,
+                            { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
+                        ]}>
+                            <Text style={{
+                                color: isApproved ? '#2E7D32' : '#C62828',
+                                fontWeight: '600'
+                            }}>
+                                {isApproved ? 'Approved' : 'Rejected'}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* PARTY */}
+                <Text style={styles.party}>{item.ParName}</Text>
+
+                {/* DETAILS */}
+                <View style={styles.row}>
+                    <Text style={styles.label}>Broker</Text>
+                    <Text style={styles.value}>{item.BAccName || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Net Amount</Text>
+                    <Text style={styles.value}>{item.NetAmt || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Store</Text>
+                    <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Auth By</Text>
+                    <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                </View>
+
+                {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
+                {type === 'verify' && (
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#4CAF50' }]}>
+                            <Icon name="check" size={20} color="#fff" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#F44336' }]}>
+                            <Icon name="close" size={20} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* 🔽 EXPAND */}
+                <TouchableOpacity
+                    style={styles.expandHeader}
+                    onPress={() => toggleExpandHistory(item.UId)}
+                >
+                    <Text style={styles.expandText}>
+                        Items ({item.d1?.length || 0})
+                    </Text>
+
+                    <Icon
+                        name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        size={24}
+                        color="#333"
+                    />
+                </TouchableOpacity>
+
+                {/* 🔽 ITEMS */}
+                {expandedHistoryCards[item.UId] && (
+                    <View style={styles.itemContainer}>
+                        {item.d1?.map((d1Item, index) => (
+
+                            <View key={index} style={styles.itemCard}>
+
+                                <View style={styles.itemHeader}>
+                                    <Text style={styles.itemTitle}>
+                                        {d1Item.ItmName}
+                                    </Text>
+
+                                    {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
+                                    <TouchableOpacity
+                                        style={styles.chartBtn}
+                                        onPress={() => navigation.navigate('ChartScreen', {
+                                            item,
+                                            d1Item,
+                                            token
+                                        })}
+                                    >
+                                        <Icon name="bar-chart" size={18} color="#fff" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={styles.itemGrid}>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Grade</Text>
+                                        <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Shade</Text>
+                                        <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Qty</Text>
+                                        <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Rate</Text>
+                                        <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Amount</Text>
+                                        <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                                    </View>
+
+                                </View>
+
+                            </View>
+                        ))}
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>
@@ -2631,7 +2526,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     <FlatList
                         ref={flatListRefYPO}
                         data={filteredDataSPO}
-                        renderItem={renderCard}
+                        // renderItem={renderCard}
+                        renderItem={({ item }) => renderCommonCard({ item, type: 'request' })}
                         keyExtractor={(item) => item.UId}
                         contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
@@ -2658,6 +2554,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         ref={flatHistoryListRefYPO}
                         data={filteredhistoryDataSPO}
                         renderItem={renderAllCardHistory}
+                        // renderItem={({ item }) => renderCommonCard({ item, type: 'history' })}
                         keyExtractor={(item) => item.UId}
                         contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
@@ -2683,7 +2580,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     <FlatList
                         ref={flatVerifyListRefYPO}
                         data={filteredverifyDataSPO}
-                        renderItem={renderAllCardVerify}
+                        // renderItem={renderAllCardVerify}
+                        renderItem={({ item }) => renderCommonCard({ item, type: 'verify' })}
                         keyExtractor={(item) => item.UId}
                         contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {

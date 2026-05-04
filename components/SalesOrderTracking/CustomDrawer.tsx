@@ -15,7 +15,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from 'react-native-linear-gradient';
-import { CustomDrawerProps, DesignData, ItemData, ItemStatus } from './Modal';
+import { CustomDrawerProps, DesignData, ItemData, ItemStatus, WiseStatus } from './Modal';
 import theme from '../../android/app/src/theme';
 
 const { height } = Dimensions.get('window');
@@ -42,7 +42,9 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     onItemSelectParty,
     itemData,
     selectedItemStatus,
+    selectedItemStatus1,
     onItemStatusChange,
+    onItemStatusChange1,
     setSelectedDesigns,
     selectedDesigns,
     setSelectedItems,
@@ -80,6 +82,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     const [isDesignAccordionOpenItem, setIsDesignAccordionOpenItem] = useState(false);
     const [isDesignAccordionOpenParty, setIsDesignAccordionOpenparty] = useState(false);
     const [localItemStatus, setLocalItemStatus] = useState<ItemStatus>(selectedItemStatus || 'All');
+    const [localItemStatus1, setLocalItemStatus1] = useState<WiseStatus>(selectedItemStatus1 || 'Party Wise');
 
     const [step, setStep] = useState(1);
 
@@ -180,10 +183,19 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
         setLocalItemStatus(selectedItemStatus);
     }, [selectedItemStatus]);
 
+    useEffect(() => {
+        setLocalItemStatus1(selectedItemStatus1);
+    }, [selectedItemStatus1]);
+
     // Handle radio selection
     const handleStatusChange = (status: ItemStatus) => {
         setLocalItemStatus(status);
         onItemStatusChange(status);
+    };
+
+    const handleWiseChange = (wise: WiseStatus) => {
+        setLocalItemStatus1(wise);
+        onItemStatusChange1(wise);
     };
 
     const nextStep = () => setStep(step + 1);
@@ -698,6 +710,21 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                             {localItemStatus === status && <View style={styles.radioInnerCircle} />}
                                         </View>
                                         <Text style={styles.radioLabel}>{status}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <View style={styles.radioGroup}>
+                                {(['Party Wise', 'Design Wise'] as WiseStatus[]).map((wise) => (
+                                    <TouchableOpacity
+                                        key={wise}
+                                        style={styles.radioButton}
+                                        onPress={() => handleWiseChange(wise)}
+                                    >
+                                        <View style={styles.radioCircle}>
+                                            {localItemStatus1 === wise && <View style={styles.radioInnerCircle} />}
+                                        </View>
+                                        <Text style={styles.radioLabel}>{wise}</Text>
                                     </TouchableOpacity>
                                 ))}
                             </View>

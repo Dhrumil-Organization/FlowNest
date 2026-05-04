@@ -7,7 +7,7 @@ export let API: string = IS_LOCAL
         : "https://apig.tms-webapp.com";
 
 export let PRINTSTICKER = IS_LOCAL 
-        ? "http://192.168.13.100:4008/api/print-grey-in-stock" 
+        ? "http://192.168.13.100:4013/api/print-grey-in-stock" 
         : "https://apig.tms-webapp.com/api/print-grey-in-stock";
 
 export let PRINTERSLISTAPI = IS_LOCAL 
@@ -33,7 +33,7 @@ export const initAPI = async (): Promise<string> => {
 
 export const initAPIForSticker = async (): Promise<string> => {    
     PRINTSTICKER = IS_LOCAL 
-    ? "http://192.168.13.100:4008/api/print-grey-in-stock"
+    ? "http://192.168.13.100:4013/api/print-grey-in-stock"
     : "https://apig.tms-webapp.com/api/print-grey-in-stock"; 
     
     return PRINTSTICKER;
@@ -41,7 +41,7 @@ export const initAPIForSticker = async (): Promise<string> => {
 
 export const initAPIForPrinterList = async (): Promise<string> => {    
     PRINTERSLISTAPI = IS_LOCAL
-    ? "http://192.168.13.130:4008/printers"
+    ? "http://192.168.13.130:4013/printers"
     : "http://192.168.0.6:4000/printers"
     
     return PRINTERSLISTAPI;

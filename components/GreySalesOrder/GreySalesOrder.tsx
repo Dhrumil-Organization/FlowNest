@@ -1022,6 +1022,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
             </View>
+
             <View style={crlimtreq_styles.cardContent}>
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
@@ -1066,6 +1067,16 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     </View>
                 </View>
 
+            </View>
+            <View style={crlimtreq_styles.cardSubHeader}>
+                <View style={crlimtreq_styles.subHeaderRow}>
+                    <Text style={crlimtreq_styles.subHeaderLabel}>Entered By:</Text>
+                    <Text style={crlimtreq_styles.subHeaderValue}>{item.username || 'N/A'}</Text>
+                </View>
+                <View style={crlimtreq_styles.subHeaderRow}>
+                    <Text style={crlimtreq_styles.subHeaderLabel}>Delivery Date:</Text>
+                    <Text style={crlimtreq_styles.subHeaderValue}>{item.dduedate || 'N/A'}</Text>
+                </View>
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
@@ -1167,6 +1178,16 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     </View>
                 </View>
 
+            </View>
+            <View style={crlimtreq_styles.cardSubHeader}>
+                <View style={crlimtreq_styles.subHeaderRow}>
+                    <Text style={crlimtreq_styles.subHeaderLabel}>Entered By:</Text>
+                    <Text style={crlimtreq_styles.subHeaderValue}>{item.username || 'N/A'}</Text>
+                </View>
+                <View style={crlimtreq_styles.subHeaderRow}>
+                    <Text style={crlimtreq_styles.subHeaderLabel}>Delivery Date:</Text>
+                    <Text style={crlimtreq_styles.subHeaderValue}>{item.dduedate || 'N/A'}</Text>
+                </View>
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 {/* <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
@@ -1304,6 +1325,16 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     </View>
                 </View>
 
+            </View>
+            <View style={crlimtreq_styles.cardSubHeader}>
+                <View style={crlimtreq_styles.subHeaderRow}>
+                    <Text style={crlimtreq_styles.subHeaderLabel}>Entered By:</Text>
+                    <Text style={crlimtreq_styles.subHeaderValue}>{item.username || 'N/A'}</Text>
+                </View>
+                <View style={crlimtreq_styles.subHeaderRow}>
+                    <Text style={crlimtreq_styles.subHeaderLabel}>Delivery Date:</Text>
+                    <Text style={crlimtreq_styles.subHeaderValue}>{item.dduedate || 'N/A'}</Text>
+                </View>
             </View>
             <View style={crlimtreq_styles.cardActions}>
                 <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>

@@ -80,13 +80,28 @@ const CustomDrawer = (props) => {
         return `${yyyy}-${mm}-${dd}`;
     };
 
+    const handleReset = () => {
+        setFormState(prev => ({
+            ...prev,
+            values: {
+                ...prev.values,
+                PrpCode: '',
+                LngName: '',
+                YearNo: '',
+                YearName: '',
+                fromdate: '',
+                todate: ''
+            }
+        }));
+    };
+
     const getToken = () => token
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
 
     return (
         <>
-            <Modal visible={isVisible} transparent animationType="none"
+            {/* <Modal visible={isVisible} transparent animationType="none"
                 onRequestClose={onClose}
             >
                 <View style={styles.modalOverlay}>
@@ -156,11 +171,6 @@ const CustomDrawer = (props) => {
 
                                 <View style={{ marginBottom: 10 }} >
                                     <Text style={styles.label}>From Date</Text>                                  
-                                        {/* <Text style={{ color: '#000' }}>
-                                            {FormState.values.fromdate
-                                                ? formatDisplayDate(FormState.values.fromdate)
-                                                : "Select From Date"}
-                                        </Text> */}
                                         <TouchableOpacity
                                             style={styles.dateTrigger}
                                             onPress={() => setCheckingDatePickerVisible(true)}
@@ -254,164 +264,276 @@ const CustomDrawer = (props) => {
                         </LinearGradient>
                     </Animated.View>
                 </View>
+            </Modal> */}
+
+            <Modal visible={isVisible} transparent animationType="fade">
+
+                {/* 🔥 DARK BACKGROUND */}
+                <TouchableOpacity style={styles.overlay} onPress={onClose} />
+
+                <Animated.View style={styles.drawerContainer}>
+
+                    {/* 🔥 DRAG BAR */}
+                    <View style={styles.dragBar} />
+
+                    {/* 🔥 HEADER */}
+                    <View style={styles.drawerHeader}>
+
+                        <Text style={styles.title}>Filter Records</Text>
+
+                        <View style={{ flexDirection: 'row', gap: 15 }}>
+                            <TouchableOpacity onPress={handleReset}>
+                                <Text style={{ color: 'red' }}>Reset</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={onClose}>
+                                <Icon name="close" size={22} color="#000" />
+                            </TouchableOpacity>
+                        </View>
+
+                    </View>
+
+                    {/* 🔥 FORM */}
+                    <ScrollView>
+
+                        <Text style={styles.label}>Property</Text>
+                        <View style={styles.inputBox}>
+                            {/* <Text>{FormState.values.PrpCode || "Select Property"}</Text> */}
+                            <SearchableDropdown
+                                key={FormState.values.PrpCode}
+                                data={getAllPropertyData || []}
+                                labelKey="LngName"
+                                valueKey="PrpCode"
+                                placeholder="Choose property..."
+                                pageSize={10}
+                                initialValue={selectedProperty}
+                                onSelect={(item) => {
+                                    setFormState(FormState => ({
+                                        ...FormState,
+                                        values: {
+                                            ...FormState.values,
+                                            PrpCode: item?.PrpCode || '',
+                                            LngName: item?.LngName || ''
+
+                                        }
+                                    }));
+                                }}
+                                multiple={false}
+                                emptyMessage="No properties available" />
+
+                        </View>
+
+                        <Text style={styles.label}>Year</Text>
+                        <View style={styles.inputBox}>
+                            <SearchableDropdown
+                                key={FormState.values.YearNo}
+                                data={getAllYearData || []}
+                                labelKey="YearName"
+                                valueKey="YearNo"
+                                placeholder="Choose year..."
+                                pageSize={10}
+                                initialValue={selectedYear}
+                                onSelect={(item) => {
+                                    setFormState(FormState => ({
+                                        ...FormState,
+                                        values: {
+                                            ...FormState.values,
+                                            YearNo: item?.YearNo || '',
+                                            YearName: item?.YearName || ''
+                                        }
+                                    }));
+                                }}
+                                multiple={false}
+                                emptyMessage="No years data available" />
+
+                            {/* <Text>{FormState.values.YearNo || "Select Year"}</Text> */}
+                        </View>
+
+                        <Text style={styles.label}>From Date</Text>
+                        <View style={styles.inputBox}>
+                            {/* <Text>Select From Date</Text> */}
+                            <TouchableOpacity
+                                style={styles.dateTrigger}
+                                onPress={() => setCheckingDatePickerVisible(true)}
+                            >
+                                <Text style={{ color: '#000' }}>
+                                    {FormState.values.fromdate
+                                        ? formatDisplayDate(FormState.values.fromdate)
+                                        : formatDisplayDate(new Date())}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <DateTimePickerModal
+                                isVisible={checkingDatePickerVisible}
+                                mode="date"
+                                date={
+                                    FormState.values.fromdate
+                                        ? new Date(FormState.values.fromdate)
+                                        : new Date()
+                                }
+                                onConfirm={(date) => {
+                                    const selectedDate = new Date(date);
+                                    selectedDate.setHours(0, 0, 0, 0);
+
+                                    setFormState(prev => ({
+                                        ...prev,
+                                        values: {
+                                            ...prev.values,
+                                            fromdate: toISODate(selectedDate) // ✅ DIRECT
+                                        }
+                                    }));
+
+                                    setCheckingDatePickerVisible(false);
+                                }}
+                                onCancel={() => setCheckingDatePickerVisible(false)}
+                            />
+                        </View>
+
+                        <Text style={styles.label}>To Date</Text>
+                        <View style={styles.inputBox}>
+                            {/* <Text>Select To Date</Text> */}
+                            <TouchableOpacity
+                                style={styles.dateTrigger}
+                                onPress={() => setCheckingDatePickerVisible1(true)}
+                            >
+                                <Text style={{ color: '#000' }}>
+                                    {FormState.values.todate
+                                        ? formatDisplayDate(FormState.values.todate)
+                                        : formatDisplayDate(new Date())}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <DateTimePickerModal
+                                isVisible={checkingDatePickerVisible1}
+                                mode="date"
+                                date={
+                                    FormState.values.todate
+                                        ? new Date(FormState.values.todate)
+                                        : new Date()
+                                }
+                                onConfirm={(date) => {
+                                    const selectedDate = new Date(date);
+                                    selectedDate.setHours(0, 0, 0, 0);
+
+                                    setFormState(prev => ({
+                                        ...prev,
+                                        values: {
+                                            ...prev.values,
+                                            todate: toISODate(selectedDate) // ✅ DIRECT
+                                        }
+                                    }));
+
+                                    setCheckingDatePickerVisible1(false);
+                                }}
+                                onCancel={() => setCheckingDatePickerVisible1(false)}
+                            />
+
+                        </View>
+
+                    </ScrollView>
+
+                    {/* 🔥 APPLY BUTTON */}
+                    <TouchableOpacity style={styles.applyBtn} onPress={onLoadPress}>
+                        <Text style={styles.applyText}>Apply Filters</Text>
+                    </TouchableOpacity>
+
+                </Animated.View>
+
             </Modal>
         </>
     );
 };
 
 const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 40,
+        paddingBottom: 14,
+        paddingHorizontal: 16,
+        backgroundColor: '#0e7490',
     },
+
+    headerTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700'
+    },
+
+    headerSub: {
+        color: '#d0eef2',
+        fontSize: 12
+    },
+
+    /* 🔥 OVERLAY */
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)'
+    },
+
+    /* 🔥 DRAWER */
     drawerContainer: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
         bottom: 0,
-        borderTopLeftRadius: 0,
-        borderTopRightRadius: 0,
-        overflow: 'hidden',
+        width: '100%',
+        height: '65%',
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 15
     },
-    gradientBackground: {
-        flex: 1,
-        padding: 0,
+
+    dragBar: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#ccc',
+        alignSelf: 'center',
+        borderRadius: 2,
+        marginBottom: 10
     },
-    closeButton: {
-        alignSelf: 'flex-end',
-        padding: 10,
+
+    drawerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15
     },
-    label: {
+
+    title: {
         fontSize: 16,
-        marginBottom: 5,
-        color: '#fff',
+        fontWeight: '700',
+        color: '#000'
     },
-    scrollableFormContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    scrollableFormContent: {
-        paddingBottom: 80, // Extra space for the Load button
-    },
-    label1: {
-        paddingVertical: 5,
-        color: '#FFF',
+
+    label: {
         marginTop: 10,
-        fontWeight: "500",
-        marginRight: 20
+        marginBottom: 5,
+        color: '#000'
     },
-    switch: {
-        lineHeight: 1,
+
+    inputBox: {
+        backgroundColor: '#f1f5f9',
+        padding: 0,
+        borderRadius: 10
+    },
+
+    applyBtn: {
+        backgroundColor: '#0e7490',
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center',
         marginTop: 10
     },
-    cartonContainer: {
-        backgroundColor: "#fff",
-        borderRadius: 10,
-        padding: 15,
-        marginVertical: 10,
-        borderWidth: 1,
-        borderColor: "#E5E5E5",
+
+    applyText: {
+        color: '#fff',
+        fontWeight: '600'
     },
-    switchLabelWhite: {
-        fontSize: 13,
-        color: "#444",
-        width: "70%",
-        backgroundColor: "#FFFFFF",
-        padding: 5,
-        borderRadius: 8
-    },
-    switchLabelYellow: {
-        fontSize: 14,
-        color: "#444",
-        width: "70%",
-        backgroundColor: "#F1FA73",
-        padding: 5,
-        borderRadius: 8
-    },
-    switchLabelPurple: {
-        fontSize: 14,
-        color: "#000",
-        width: "70%",
-        backgroundColor: "#B59AE3",
-        padding: 5,
-        borderRadius: 8
-    },
-    switchLabelManual: {
-        fontSize: 14,
-        color: "#000",
-        width: "70%",
-        backgroundColor: "#98FAF3",
-        padding: 5,
-        borderRadius: 8
-    },
-    switchLabelGreen: {
-        fontSize: 14,
-        color: "#000",
-        width: "70%",
-        backgroundColor: "#678F76",
-        padding: 5,
-        borderRadius: 8
-    },
-    switchLabelPink: {
-        fontSize: 14,
-        color: "#000",
-        width: "70%",
-        backgroundColor: "#DBA7D7",
-        padding: 5,
-        borderRadius: 8
-    },
-    cartonTitleContainer: {
-        alignItems: "center",
-        marginBottom: 12
-    },
-    cartonTitle: {
-        backgroundColor: "#E3F2FD",
-        color: "#007EA7",
-        fontSize: 15,
-        fontWeight: "600",
-        paddingVertical: 6,
-        paddingHorizontal: 20,
-        borderRadius: 20,
-        overflow: "hidden"
-    },
-    switchGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "space-between"
-    },
-    switchItem: {
-        width: "48%",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 10,
-        paddingVertical: 6
-    },
-    centerFabButton: {
-        position: "absolute",
-        bottom: 25,
-        alignSelf: "center",
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#17b85a",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 30,
-        elevation: 3,
-        shadowColor: "#000",
-        shadowOpacity: 0.3,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 5
-    },
-    centerFabText: {
-        color: "#fff",
-        fontWeight: "600",
-        fontSize: 14,
-        marginLeft: 6
-    },
+    resetBtn: { backgroundColor: '#ddd', padding: 12, borderRadius: 8, width: '48%', alignItems: 'center' },
     dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
     dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+
 });
 
 export default CustomDrawer;

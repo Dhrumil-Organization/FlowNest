@@ -174,7 +174,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             borderRadius: 8,
             paddingHorizontal: 10,
             justifyContent: 'center',
-            height: 45
+            height: 45,
+            color: '#000'
         },
 
         row: {
@@ -425,7 +426,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         creelTitle: {
             fontSize: 14,
             fontWeight: 'bold', // 🔥 keep bold
-            color: '#1a1a1a',
+            color: '#000',
         },
 
         labelSmall: {
@@ -799,7 +800,69 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         cellView: {
             justifyContent: 'center',
             alignItems: 'center',
-        }
+        },
+        card: {
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 14,
+            shadowColor: '#000',
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+            elevation: 3,
+        },
+
+        header1: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+
+        iconBox: {
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            backgroundColor: '#E3F2FD',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+
+        title: {
+            fontSize: 15,
+            fontWeight: '700',
+        },
+
+        statusBadge: {
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 10,
+        },
+
+        deleteBtn: {
+            marginTop: 6,
+            backgroundColor: '#FFEBEE',
+            padding: 6,
+            borderRadius: 8,
+        },
+
+        bottomRow: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            marginTop: 12,
+            gap: 8,
+        },
+
+        infoBox: {
+            backgroundColor: '#F1F3F6',
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 8,
+        },
+
+        infoText: {
+            fontSize: 12,
+            color: '#555',
+        },
     });
 
     let cancelToken: any;
@@ -1058,7 +1121,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             PSubSr: d2Item.PSubSr || '',
                             TranType: d2Item.TranType || '',
                             d2SrNo: String(d2Item.SrNo || ''),
-
+                            SrNo: d2Item.SrNo,
+                            SubSrNo: d2Item.SubSr,
                             ItmCode: d1Item.ItmCode || '',
                             ItmName: d1Item.ItmName || '',
                             MerCode: d1Item.MerCode || '',
@@ -1111,7 +1175,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             console.log("📦 Raw QR Value 👉", value);
             try {
                 const parts = value.split("~");
-                if (parts.length < 17) {
+                if (parts.length < 13) {
                     throw new Error("Invalid format");
                 }
                 const parsed = {
@@ -1121,24 +1185,24 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     TranType: parts[3],
                     CartNo: parts[4],
                     ItmCode: parts[5],
-                    ItmName: parts[6],
-                    MerCode: parts[7],
-                    MerName: parts[8],
-                    GrdCode: parts[9],
-                    GrdName: parts[10],
-                    ShdCode: parts[11],
-                    ShdName: parts[12],
-                    Denier: parts[13],
-                    Wt: parts[14],
-                    Chees: parts[15],
-                    yearNo: parts[16]
+                    MerCode: parts[6],
+                    GrdCode: parts[7],
+                    ShdCode: parts[8],
+                    Denier: parts[9],
+                    Wt: parts[10],
+                    Chees: parts[11],
+                    yearNo: parts[12]
                 };
+
                 console.log("✅ Parsed 👉", parsed);
                 setScannedObj(parsed);
                 setCartonNo(parsed.CartNo || '');
                 setYearNo(parsed.yearNo || '');
                 setchees(parsed.Chees || '');
                 setavgwt(parsed.Wt || '');
+
+                fetchitmgrdshdname(parsed);
+
                 sendScannedValue(value);
             } catch (err) {
                 Alert.alert("Invalid QR", "QR format not valid");
@@ -1262,6 +1326,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             Denier: getScannedObj?.Denier,
             yearNo: getScannedObj?.yearNo,
             SrNo: getScannedObj.SrNo,
+            SubSr: getScannedObj.SubSr,
             UId: mainUId?.UId,
         };
         setCartonSummary(prev => [...prev, newCarton]);
@@ -1332,6 +1397,96 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             setIsLoading(false);
         }
     }
+
+    // const fetchitmgrdshdname = async (parsedData) => {
+
+    //     if (cancelToken?.cancel) cancelToken.cancel();
+    //     cancelToken = axios.CancelToken.source();
+
+    //     try {
+    //         let yno = await AsyncStorage.getItem('yno');
+
+    //         const payload = {
+    //             // text: parcode,
+    //             // txntype: 'creel_yarn_issue',
+    //             prpcode: FormState.values.PrpCode,
+    //             yearno: FormState.values.YearNo,
+    //             strcode: '002',
+    //             itmcode: parsedData?.ItmCode,
+    //             mercode: parsedData?.MerCode,
+    //             grdcode: parsedData?.GrdCode,
+    //             shdcode: parsedData?.ShdCode,
+    //         };
+    //        // console.log("get_item_detail_from_carton historyPayload", historyPayload);
+    //         // const response = await axios.get(
+    //         //     `${API}/api/get_criterion`, getRequestConfig(
+    //         //         {
+    //         //             params: { ...historyPayload }
+    //         //         }
+    //         //     )
+    //         // );
+    //         const headers = {
+    //             Authorization: `Bearer ${getToken()}`,
+    //             'Content-Type': 'application/json',
+    //             'X-Requested-with': 'XMLHttpRequest',
+    //         };
+    //         const response = await axios.post(`${API}/api/get_item_detail_from_carton`,
+    //             payload, { headers });
+
+    //         console.log("response", response);
+
+    //         if (response.data.success && response.data.response.data.length > 0) {
+    //             // setShiftData(response.data.response.data);
+    //         } else {
+    //             // setShiftData([]);
+    //         }
+    //     } catch (error) {
+    //         // console.log("API getshifts error:", error);
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // }
+    const fetchitmgrdshdname = async (parsedData) => {
+        setIsLoading(true); // ✅ start loader
+        try {
+            const payload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                strcode: '002',
+                itmcode: parsedData?.ItmCode,
+                mercode: parsedData?.MerCode,
+                grdcode: parsedData?.GrdCode,
+                shdcode: parsedData?.ShdCode,
+
+            };
+            const res = await axios.post(`${API}/api/get_item_detail_from_carton`, payload, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                }
+            });
+            console.log(res);
+            if (res.data.success && res.data.response?.data) {
+
+                const data = res.data.response.data;
+                // 🔥 SIRF NAME SET KARNA
+                setScannedObj(prev => ({
+                    ...prev,
+                    ItmName: data.ItmName || '',
+                    MerName: data.MerName || '',
+                    ShdName: data.ShdName || '',
+                    GrdName: data.GrdName || '',
+                }));
+
+            }
+
+        } catch (e) {
+            console.log("API ERROR:", e);
+        } finally {
+            setIsLoading(false); // ✅ stop loader
+        }
+    };
 
     useEffect(() => {
         const { PrpCode, YearNo } = FormState.values;
@@ -1417,12 +1572,16 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 YearNo: FormState.values.YearNo,
                 txntype: 'creel_yarn_issue',
                 CreelId: creelId,
+                BeamNo: 0,
+                BeamUId: 0,
                 // setupDate: setupDate,
                 SetupDate: setupDate.toISOString().split('T')[0],
                 Shift: shift,
                 Remark: Remark || '',
                 StkType: FormState.values.StkType || stocktype || '',
                 uid: mainUId || '',
+                RecipeUId: '1',
+                DsnCode: 0,
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId,
                     CartNo: item.cartonNo || '',
@@ -1442,6 +1601,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
                     yearno: item.yearNo || '',
+                    ExpProdQty: 0,
+                    DsnRcpSrNo: 0,
+                    DsnCode: 0,
+
                 }))
             };
 
@@ -1519,12 +1682,16 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 YearNo: FormState.values.YearNo,
                 txntype: 'creel_yarn_issue',
                 CreelId: creelId,
+                BeamNo: 0,
+                BeamUId: 0,
                 // setupDate: setupDate,
                 SetupDate: setupDate.toISOString().split('T')[0],
                 Shift: shift,
                 Remark: Remark || '',
                 StkType: FormState.values.StkType || stocktype || '',
                 uid: mainUId || '',
+                RecipeUId: '1',
+                DsnCode: 0,
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId || '',
                     CartNo: item.cartonNo || '',
@@ -1544,6 +1711,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
                     yearno: item.yearNo || '',
+                    ExpProdQty: 0,
+                    DsnRcpSrNo: 0,
+                    DsnCode: 0,
                 }))
             };
 
@@ -1584,6 +1754,113 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     action: { text: 'OK', textColor: 'yellow' },
                 });
             } else {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+    const handledeletedata = async (item) => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                // txntype: 'creel_yarn_issue',
+                uid: item.UId,
+            };
+            console.log("delete payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/delete_creel_data`, payloadObj, { headers });
+
+            console.log("delete response", response);
+
+            if (response.data.success === true) {
+                setDataSaved(true);
+                setSuccessMessage('Data deleted Successfully ✅');
+                setShowSuccess(true);
+                resetAllFields();
+
+            }
+            else {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+    const handledeletecarton = async (item) => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                cartonno: item.cartonNo,
+                srno: item.SrNo,
+                subsrno: item.SubSrNo,
+                uid: item.UId,
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                txntype: 'creel_yarn_issue',
+            };
+            console.log("delete payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/delete_creel_single_data`, payloadObj, { headers });
+
+            console.log("delete response", response);
+
+            if (response.data.success === true) {
+                setDataSaved(true);
+                setSuccessMessage('Data deleted Successfully ✅');
+                setShowSuccess(true);
+                resetAllFields();
+
+            }
+            else {
                 setIsLoading(false);
                 setDataSaved(false);
                 Snackbar.show({
@@ -1660,6 +1937,54 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         (y) => y.YearNo == FormState.values.YearNo
     ) || null;
 
+    const confirmDelete = (item) => {
+        Alert.alert(
+            "Delete Creel",
+            `Are you sure you want to delete this Creel ${item.CreelId}?`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => handledeletedata(item)
+                }
+            ]
+        );
+    };
+
+    const confirmcartondelete = (item) => {
+        Alert.alert(
+            "Delete Creel",
+            `Are you sure you want to delete this Carton ${item.cartonNo}?`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => handledeletecarton(item)
+                }
+            ]
+        );
+    };
+
+    const COL = {
+        sr: 50,
+        carton: 120,
+        item: 160,
+        merge: 90,
+        grade: 90,
+        shade: 120,
+        qty: 80,
+        chees: 70,
+        action: 70
+    };
+
     return (
         <>
             {isLoading && <FullScreenLoader />}
@@ -1731,92 +2056,61 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 style={{ marginBottom: 12 }}
                             >
                                 <View style={styles.creelCard}>
-
-                                    {/* HEADER */}
                                     <View style={styles.rowBetween}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                             <Text style={styles.creelTitle}>Creel ID : </Text>
                                             <Text style={styles.creelTitle}>{item.CreelId}</Text>
                                         </View>
 
-                                        <View style={[
-                                            styles.statusBadge,
-                                            {
-                                                backgroundColor: status === 'Pending' ? '#FFF3E0' : '#E8F5E9',
-                                                borderColor: status === 'Pending' ? '#F57C00' : '#2E7D32',
-                                                borderWidth: 1,
-                                            },
-                                        ]}>
-                                            <Text style={[
-                                                styles.badgeText,
+                                        <View style={{ alignItems: 'flex-end' }}>
+                                            <View style={[
+                                                styles.statusBadge,
                                                 {
-                                                    color: status === 'Pending' ? '#F57C00' : '#2E7D32',
+                                                    backgroundColor: status === 'Pending' ? '#FFF3E0' : '#E8F5E9',
+                                                    borderColor: status === 'Pending' ? '#F57C00' : '#2E7D32',
+                                                    borderWidth: 1,
                                                 },
                                             ]}>
-                                                {/* {getStatusFromQty(item.CreelQty)} */}
-                                                {status}
-                                            </Text>
+                                                <Text style={[
+                                                    styles.badgeText,
+                                                    {
+                                                        color: status === 'Pending' ? '#F57C00' : '#2E7D32',
+                                                    },
+                                                ]}>
+                                                    {status}
+                                                </Text>
+                                            </View>
+
+                                            <TouchableOpacity
+                                                onPress={(e) => {
+                                                    e.stopPropagation();
+                                                    confirmDelete(item);
+                                                }}
+                                                style={{
+                                                    marginTop: 6,
+                                                    backgroundColor: '#FFEBEE',
+                                                    padding: 6,
+                                                    borderRadius: 8
+                                                }}
+                                            >
+                                                <Icon name="delete-outline" size={18} color="#D32F2F" />
+                                            </TouchableOpacity>
+
                                         </View>
                                     </View>
-
-                                    {/* DATE + SHIFT */}
-                                    {/* <View style={[styles.rowBetween, { marginTop: 8 }]}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.labelSmall}>Date :</Text>
-                                            <Text style={styles.valueSmall} numberOfLines={1}>
-                                                {item.IssDate}
-                                            </Text>
-                                        </View>
-
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.labelSmall}>Shift :</Text>
-                                            <Text style={styles.valueSmall}>
-                                                {item.Shift}
-                                            </Text>
-                                        </View>
-                                    </View> */}
-
-                                    {/* QTY */}
-                                    {/* <View style={{ marginTop: 12 }}>
-                                        <Text style={styles.labelSmall}>Creel Qty :</Text>
-                                        <Text style={[
-                                            styles.qtyBig,
-                                            {
-                                                backgroundColor: '#E3F2FD',
-                                                color: '#1565C0',
-                                                paddingVertical: 6,
-                                                paddingHorizontal: 12,
-                                                borderRadius: 10,
-                                                overflow: 'hidden',
-                                                alignSelf: 'flex-start',
-                                                marginTop: 4,
-                                            },
-                                        ]}>
-                                            {item.CreelQty}
-                                        </Text>
-                                    </View> */}
 
                                     <View style={{ marginTop: 8 }}>
-
-                                        {/* DATE */}
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
                                             <Text style={styles.labelSmall}>Date : </Text>
-                                            <Text style={styles.valueSmall} numberOfLines={1}>
-                                                {item.IssDate}
-                                            </Text>
+                                            <Text style={styles.valueSmall}>{item.IssDate}</Text>
                                         </View>
 
-                                        {/* SHIFT */}
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{ flexDirection: 'row' }}>
                                             <Text style={styles.labelSmall}>Shift : </Text>
-                                            <Text style={styles.valueSmall}>
-                                                {item.Shift}
-                                            </Text>
+                                            <Text style={styles.valueSmall}>{item.Shift}</Text>
                                         </View>
-
                                     </View>
 
-                                    {/* QTY */}
                                     <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center' }}>
                                         <Text style={styles.labelSmall}>Creel Qty : </Text>
 
@@ -1829,7 +2123,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     paddingVertical: 4,
                                                     paddingHorizontal: 10,
                                                     borderRadius: 8,
-                                                    overflow: 'hidden',
                                                 },
                                             ]}
                                         >
@@ -1843,6 +2136,93 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     }}
                 />
             </View>
+
+            {/* <View style={{ paddingHorizontal: 10, flex: 1 }}>
+                <FlatList
+                    data={activeCreels}
+                    keyExtractor={(item, index) => index.toString()}
+                    showsVerticalScrollIndicator={true}
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                    renderItem={({ item }) => {
+
+                        const status = getStatusFromQty(item.CreelQty);
+
+                        return (
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                onPress={() => handleViewClick(item)}
+                                style={{ marginBottom: 14 }}
+                            >
+                                <View style={styles.card}>
+
+                                    <View style={styles.header}>
+
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                                            <View style={styles.iconBox}>
+                                                <Text>📦</Text>
+                                            </View>
+
+                                            <View style={{ marginLeft: 10 }}>
+                                                <Text style={styles.title}>Creel ID : {item.CreelId}</Text>
+                                            </View>
+
+                                        </View>
+
+                                        <View style={{ alignItems: 'flex-end' }}>
+
+                                            <View style={[
+                                                styles.statusBadge,
+                                                {
+                                                    backgroundColor: status === 'Pending' ? '#E3F2FD' : '#E8F5E9',
+                                                }
+                                            ]}>
+                                                <Text style={{
+                                                    color: status === 'Pending' ? '#1565C0' : '#2E7D32',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {status}
+                                                </Text>
+                                            </View>
+
+                                            <TouchableOpacity
+                                                onPress={(e) => {
+                                                    e.stopPropagation();
+                                                    confirmDelete(item);
+                                                }}
+                                                style={styles.deleteBtn}
+                                            >
+                                                <Text style={{ color: '#D32F2F' }}>🗑️</Text>
+                                            </TouchableOpacity>
+
+                                        </View>
+
+                                    </View>
+
+                                    <View style={styles.bottomRow}>
+
+                                        <View style={styles.infoBox}>
+                                            <Text style={styles.infoText}>📅 {item.IssDate}</Text>
+                                        </View>
+
+                                        <View style={styles.infoBox}>
+                                            <Text style={styles.infoText}>Shift: {item.Shift}</Text>
+                                        </View>
+
+                                        <View style={[styles.infoBox, { backgroundColor: '#E3F2FD' }]}>
+                                            <Text style={{ color: '#1565C0', fontWeight: '600' }}>
+                                                Qty: {item.CreelQty}
+                                            </Text>
+                                        </View>
+
+                                    </View>
+
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }}
+                />
+            </View> */}
             {/* creel modal show over */}
 
             {/* creel add modal start here */}
@@ -1971,19 +2351,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                             <View style={styles.col}>
                                                 <Text style={styles.label}>Shift <Text style={{ color: 'red' }}> *</Text></Text>
                                                 <View style={{ flex: 1 }}>
-                                                    {/* <Picker
-                                                        selectedValue={shift}
-                                                        onValueChange={setShift}
-                                                    >
-                                                        <Picker.Item label="Select" value="" />
-                                                        {getShiftData.map((item, index) => (
-                                                            <Picker.Item
-                                                                key={index}
-                                                                label={item.ShfName}
-                                                                value={item.ShfCode}
-                                                            />
-                                                        ))}
-                                                    </Picker> */}
                                                     <PartyDropdown
                                                         data={getShiftData}
                                                         placeholder="Choose shift..."
@@ -2043,66 +2410,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                                         </View>
 
-                                        {/* STOCK TYPE */}
-                                        {/* <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Stock Type <Text style={{ color: 'red' }}> *</Text></Text>
-                                            <View style={styles.input}>                                            
-                                                <PartyDropdown
-                                                    data={getStockTypes}
-                                                    placeholder="Choose stock type..."
-                                                    labelKey={["stktypename"]}   // ya ["stktypename", "StkType"] agar combo dikhana hai
-                                                    valueKey="StkType"
-                                                    initialValue={
-                                                        getStockTypes?.find(x => x.StkType === stocktype) ?? null
-                                                    }
-                                                    selected={
-                                                        getStockTypes?.find(x => x.StkType === stocktype) ?? null
-                                                    }
-                                                    type="stocktype"
-                                                    onSelect={(item) => {
-                                                        setstocktype(item.StkType);
-                                                        setFormState(prev => ({
-                                                            ...prev,
-                                                            values: {
-                                                                ...prev.values,
-                                                                StkType: item.StkType,
-                                                                StockTypeName: item.stktypename
-                                                            }
-                                                        }));
-                                                    }}
-
-                                                    setSelected={(val) => {
-                                                        if (!val) {
-                                                            setstocktype('');
-
-                                                            setFormState(prev => ({
-                                                                ...prev,
-                                                                values: {
-                                                                    ...prev.values,
-                                                                    StkType: '',
-                                                                    StockTypeName: ''
-                                                                }
-                                                            }));
-                                                        } else {
-                                                            setstocktype(val.StkType);
-
-                                                            setFormState(prev => ({
-                                                                ...prev,
-                                                                values: {
-                                                                    ...prev.values,
-                                                                    StkType: val.StkType,
-                                                                    StockTypeName: val.stktypename
-                                                                }
-                                                            }));
-                                                        }
-                                                    }}
-                                                />                                               
-                                            </View>
-                                        </View> */}
-
                                         <View style={styles.field}>
                                             <Text style={styles.label}>Stcok Type *</Text>
-
                                             <PartyDropdown
                                                 data={getStockTypes}
                                                 placeholder="Select Stock Type"
@@ -2586,39 +2895,42 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 <ScrollView horizontal showsHorizontalScrollIndicator>
                                                     <View style={{ minWidth: screenWidth + 300 }}>
                                                         <View style={styles.headerRow}>
-                                                            <Text style={[styles.header, { width: 40 }]}>Sr No.</Text>
-                                                            <Text style={[styles.header, { width: 100 }]}>Carton</Text>
-                                                            <Text style={[styles.header, { width: 150 }]}>Item</Text>
-                                                            <Text style={[styles.header, { width: 80 }]}>Merge</Text>
-                                                            <Text style={[styles.header, { width: 80 }]}>Grade</Text>
-                                                            <Text style={[styles.header, { width: 85 }]}>Shade</Text>
-                                                            <Text style={[styles.header, { width: 80 }]}>Qty</Text>
-                                                            <Text style={[styles.header, { width: 70 }]}>Chees</Text>
-                                                            <Text style={[styles.header, { width: 50 }]}>Action</Text>
+                                                            {/* <Text style={[styles.header1, { width: COL.sr }]}>Sr No.</Text> */}
+                                                            <Text style={[styles.header1, { width: COL.carton }]}>Carton</Text>
+                                                            <Text style={[styles.header1, { width: COL.item }]}>Item</Text>
+                                                            <Text style={[styles.header1, { width: COL.merge }]}>Merge</Text>
+                                                            <Text style={[styles.header1, { width: COL.grade }]}>Grade</Text>
+                                                            <Text style={[styles.header1, { width: COL.shade }]}>Shade</Text>
+                                                            <Text style={[styles.header1, { width: COL.qty }]}>Qty</Text>
+                                                            <Text style={[styles.header1, { width: COL.chees }]}>Chees</Text>
+                                                            <Text style={[styles.header1, { width: COL.action }]}>Action</Text>
                                                         </View>
                                                         <ScrollView
-                                                            style={{ maxHeight: 150 }}
+                                                            style={{ maxHeight: 200 }}
                                                             nestedScrollEnabled={true}
                                                             showsVerticalScrollIndicator={true}
                                                         >
                                                             {cartonSummary.map((item, index) => (
                                                                 <View style={styles.row1} key={index}>
-                                                                    <Text style={[styles.cell, { width: 40 }]}>{item.PSrNo}</Text>
-                                                                    <Text style={[styles.cell, { width: 100 }]}>{item.cartonNo}</Text>
-                                                                    <Text style={[styles.cell, { width: 150 }]}>{item.ItmName}</Text>
-                                                                    <Text style={[styles.cell, { width: 80 }]}>{item.MerName}</Text>
-                                                                    <Text style={[styles.cell, { width: 80 }]}>{item.GrdName}</Text>
-                                                                    <Text style={[styles.cell, { width: 85 }]}>{item.ShdName}</Text>
-                                                                    <Text style={[styles.cell, { width: 70 }]}>{item.qty}</Text>
-                                                                    <Text style={[styles.cell, { width: 50 }]}>{item.chees}</Text>
+                                                                    {/* <Text style={[styles.cell, { width: COL.sr }]}>{item.SrNo}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.sr }]}>{item.SubSrNo}</Text> */}
+                                                                    <Text style={[styles.cell, { width: COL.carton }]}>{item.cartonNo}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.item }]}>{item.ItmName}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.merge }]}>{item.MerName}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.shade }]}>{item.GrdName}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.qty }]}>{item.ShdName}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.chees }]}>{item.qty}</Text>
+                                                                    <Text style={[styles.cell, { width: COL.action }]}>{item.chees}</Text>
 
                                                                     <TouchableOpacity
                                                                         style={{ width: 80, alignItems: 'center' }}
-                                                                        onPress={() => {
-                                                                            setCartonSummary(prev =>
-                                                                                prev.filter((_, i) => i !== index)
-                                                                            );
-                                                                        }}
+                                                                        // onPress={() => {
+                                                                        // setCartonSummary(prev =>
+                                                                        //     prev.filter((_, i) => i !== index)
+                                                                        // );
+                                                                        // handledeletecarton();
+                                                                        // }}
+                                                                        onPress={() => confirmcartondelete(item)}
                                                                     >
                                                                         <Icon name="delete" size={18} color="#ff4d4f" />
                                                                     </TouchableOpacity>

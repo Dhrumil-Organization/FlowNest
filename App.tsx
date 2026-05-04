@@ -72,7 +72,7 @@ import YarnManagementSystem from './components/YarnManagementSystem/YarnManageme
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 import PartyDetailScreen from './components/PartyDashboard/PartyDetailScreen';
 import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
-// import WftIssue from './components/WftIssue/WftIssue';
+import WftIssue from './components/WftIssue/WftIssue';
 
 const Stack = createNativeStackNavigator();
 
@@ -719,12 +719,12 @@ export default function App() {
                       </>
                     }</Stack.Screen>
                     <Stack.Screen name="PartyDetailScreen" component={PartyDetailScreen} />
-                    {/* <Stack.Screen name="Weft Issue">{(props) =>
+                     <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
-                    }</Stack.Screen>                     */}
+                    }</Stack.Screen>                    
                   </Stack.Navigator>
 
                 </NavigationContainer>

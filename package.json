@@ -40,6 +40,7 @@
     "react-native-animatable": "^1.4.0",
     "react-native-blob-util": "^0.24.5",
     "react-native-calendars": "^1.1314.0",
+    "react-native-chart-kit": "^6.12.2",
     "react-native-device-info": "^14.0.4",
     "react-native-element-dropdown": "^2.12.4",
     "react-native-fs": "^2.20.0",
@@ -62,7 +63,7 @@
     "react-native-snackbar": "^2.9.0",
     "react-native-splash-screen": "^3.3.0",
     "react-native-sqlite-storage": "^6.0.1",
-    "react-native-svg": "^15.14.0",
+    "react-native-svg": "^15.15.4",
     "react-native-vector-icons": "^10.3.0",
     "react-native-vision-camera": "^4.7.0",
     "react-native-webview": "^13.16.0"

@@ -41,7 +41,11 @@ const WeftIssueItemDrawer = ({
     onClose,
     FormState,
     setFormState,
-    token
+    token,
+    isEditMode,
+    mainUId,
+    editData,
+    closeAllDrawers
 }) => {
     const device = useCameraDevice('back');
     const scanLock = useRef(false);
@@ -93,8 +97,8 @@ const WeftIssueItemDrawer = ({
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [selectedCreel, setSelectedCreel] = useState(null);
-    const [mainUId, setMainUId] = useState(null);
-    const [isEditMode, setIsEditMode] = useState(false);
+    // const [mainUId, setMainUId] = useState(null);
+    // const [isEditMode, setIsEditMode] = useState(false);
     const [propertydata, setpropertydata] = useState<ExeData[]>([]);
     const screenWidth = Dimensions.get('window').width;
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
@@ -166,7 +170,7 @@ const WeftIssueItemDrawer = ({
         searchRow: { flexDirection: 'row', alignItems: 'center' },
         searchInput: {
             flex: 1,
-            height: 50,
+            height: 40,
             borderRadius: 12,
             backgroundColor: '#f8fafc',
             paddingHorizontal: 12,
@@ -176,7 +180,7 @@ const WeftIssueItemDrawer = ({
         searchBtn: {
             marginLeft: 10,
             width: 50,
-            height: 50,
+            height: 40,
             borderRadius: 12,
             backgroundColor: '#0e7490',
             justifyContent: 'center',
@@ -419,11 +423,11 @@ const WeftIssueItemDrawer = ({
         addMoreBtn: {
             backgroundColor: '#0e7490',
             paddingVertical: 14,
-            borderRadius: 20,   
+            borderRadius: 20,
             alignItems: 'center',
             marginTop: 0,
 
-            elevation: 4,       
+            elevation: 4,
             shadowColor: '#000',
             shadowOpacity: 0.15,
             shadowRadius: 6,
@@ -445,8 +449,8 @@ const WeftIssueItemDrawer = ({
         backBtn1: {
             flex: 1,
             backgroundColor: '#e5e7eb',
-            paddingVertical: 12,      
-            borderRadius: 20,        
+            paddingVertical: 12,
+            borderRadius: 20,
             alignItems: 'center',
             marginRight: 6
         },
@@ -454,7 +458,7 @@ const WeftIssueItemDrawer = ({
         submitBtn: {
             flex: 1,
             backgroundColor: '#0e7490',
-            paddingVertical: 12,     
+            paddingVertical: 12,
             borderRadius: 20,
             alignItems: 'center',
             marginLeft: 6
@@ -463,13 +467,13 @@ const WeftIssueItemDrawer = ({
         backText: {
             color: '#333',
             fontWeight: '600',
-            fontSize: 13            
+            fontSize: 13
         },
 
         submitText: {
             color: '#fff',
             fontWeight: '600',
-            fontSize: 13            
+            fontSize: 13
         },
         deleteIcon: {
             alignSelf: 'flex-end',
@@ -490,9 +494,9 @@ const WeftIssueItemDrawer = ({
         summaryBar: {
             flexDirection: 'row',
             backgroundColor: '#f1f5f9',
-            borderRadius: 8,         
-            paddingVertical: 6,     
-            marginTop: 8,            
+            borderRadius: 8,
+            paddingVertical: 6,
+            marginTop: 8,
             alignItems: 'center'
         },
 
@@ -502,22 +506,104 @@ const WeftIssueItemDrawer = ({
         },
 
         summaryLabel: {
-            fontSize: 10,             
+            fontSize: 10,
             color: '#64748b'
         },
 
         summaryValue: {
-            fontSize: 14,             
+            fontSize: 14,
             fontWeight: '700',
             color: '#0f172a',
-            marginTop: 1              
+            marginTop: 1
         },
 
         divider: {
             width: 1,
-            height: 20,              
+            height: 20,
             backgroundColor: '#e2e8f0'
-        }
+        },
+        overlayContainer: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.4)', // 👈 dim background
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999
+        },
+
+        overlayCard: {
+            width: '85%',
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 16,
+            elevation: 10
+        },
+        selectedItem: {
+            backgroundColor: '#dbeafe',   // light blue
+            borderWidth: 1,
+            borderColor: '#2563eb'
+        },
+        overlayContainer1: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)', // darker blur
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999
+        },
+
+        overlayCardNew: {
+            width: '80%',
+            backgroundColor: '#fff',
+            borderRadius: 20,
+            padding: 20,
+            alignItems: 'center',
+            elevation: 10
+        },
+
+        successIcon: {
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: '#e6f9f0',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 10
+        },
+
+        successTitle: {
+            fontSize: 18,
+            fontWeight: '700',
+            color: '#0f172a',
+            marginBottom: 6
+        },
+
+        successMessage: {
+            fontSize: 14,
+            color: '#475569',
+            textAlign: 'center',
+            marginBottom: 20
+        },
+
+        okButton: {
+            width: '100%',
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 12,
+            alignItems: 'center'
+        },
+
+        okButtonText: {
+            color: '#fff',
+            fontWeight: '700',
+            fontSize: 15
+        },
     });
 
     let cancelToken: any;
@@ -562,45 +648,6 @@ const WeftIssueItemDrawer = ({
         ["#E0F7FA", "#B2EBF2"],
     ];
 
-    const handleLoadPress = () => {
-        const { PrpCode, YearNo, fromdate, todate } = FormState.values;
-        if (!PrpCode || !YearNo) {
-            Alert.alert("Validation", "Please select Property and Year");
-            return;
-        }
-        const yearNo = parseInt(YearNo);
-
-        const startYear = 2000 + yearNo - 1;
-        const endYear = 2000 + yearNo;
-
-        const fyStart = new Date(startYear, 3, 1);
-        const fyEnd = new Date(endYear, 2, 31, 23, 59, 59);
-
-        const from = parseDate(fromdate);
-        const to = parseDate(todate);
-
-        // console.log("from:", from);
-        // console.log("to:", to);
-        // console.log("fyStart:", fyStart);
-        // console.log("fyEnd:", fyEnd);
-
-        if (from < fyStart || to > fyEnd) {
-            Alert.alert(
-                "Validation",
-                `Date must be between ${fyStart.toLocaleDateString()} and ${fyEnd.toLocaleDateString()}`
-            );
-            return;
-        }
-
-        if (from > to) {
-            Alert.alert("Validation", "From Date cannot be greater than To Date");
-            return;
-        }
-        fetchBrowseData();
-        // console.log("Selected 👉", FormState.values);
-        setIsDrawerVisible(false);
-    };
-
     const getCurrentFinancialYear = () => {
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
@@ -611,201 +658,6 @@ const WeftIssueItemDrawer = ({
     };
 
 
-    const fetchBrowseData = async () => {
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
-        const headers = {
-            Authorization: `Bearer ${getToken()}`,
-            'Content-Type': 'application/json',
-            'X-Requested-with': 'XMLHttpRequest',
-        };
-
-        const userPtype = await AsyncStorage.getItem('user_prptype');
-        // const selectedProperty = await AsyncStorage.getItem('selected_property');
-        // let finalPrptype = userPtype;
-        // if (selectedProperty === 'sudamo_knits') {
-        //     finalPrptype = 'S';
-        // } else if (selectedProperty === 'rayons') {
-        //     finalPrptype = 'R';
-        // }
-
-        try {
-            const params = {
-                prpcode: FormState.values.PrpCode || '',
-                prptype: userPtype,
-                strcode: '002',
-                txntype: 'creel_yarn_issue',
-                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
-                // yearno: '26',
-                fromdate: FormState.values.fromdate || '',
-                todate: FormState.values.todate || '',
-                status: FormState.values.status || '',
-
-            };
-
-            const response = await axios.post(`${API}/api/get_yarn_issue_browse`, params, { headers });
-
-            console.log("browse response", response)
-            console.log("browse payload", params)
-
-            const apiData = response?.data?.response?.data || [];
-            if (response?.data?.success) {
-                let finalData = apiData || [];
-                if (FormState.values.status === 'C') {
-                    finalData = finalData.filter(item => {
-                        const qty = parseFloat(item.CreelQty || 0);
-                        return qty === 0;
-                    });
-                } else {
-                    finalData = finalData.filter(item => {
-                        const qty = parseFloat(item.CreelQty || 0);
-                        return qty !== 0;
-                    });
-                }
-
-                if (finalData.length > 0) {
-                    setActiveCreels(finalData);
-                    closeDrawer();
-                } else {
-                    setActiveCreels([]);
-                    Alert.alert("No Record Found", "No data available");
-                }
-            }
-        } catch (error) {
-            if (axios.isCancel(error)) {
-                setActiveCreels([]);
-                // console.log("Request cancelled");
-            } else {
-                console.log("API Error:", error);
-                // Alert.alert('Error while searching');
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const getStatusFromQty = (qty) => {
-        const parsedQty = parseFloat(qty || 0);
-        return parsedQty === 0 ? 'Complete' : 'Pending';
-    };
-
-
-
-    const handleViewClick = async (item = null) => {
-        if (!item) return; // safety
-
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
-
-        setIsLoading(true);
-
-        const headers = {
-            Authorization: `Bearer ${getToken()}`,
-            'Content-Type': 'application/json',
-            'X-Requested-with': 'XMLHttpRequest',
-        };
-
-        try {
-            const payload = {
-                uid: item.UId,
-                prpcode: FormState.values.PrpCode,
-                strcode: '002',
-                yearno: FormState.values.YearNo,
-                txntype: 'creel_yarn_issue',
-            };
-            console.log("show Payload:", payload);
-            const response = await axios.post(
-                `${API}/api/get_yarn_issue_show`,
-                payload,
-                { headers }
-            );
-
-            console.log("show response", response);
-
-            if (response?.data?.success) {
-
-                const resData = response.data.response;
-
-                const d1 = resData.d1 || [];
-                const d2 = resData.d2 || [];
-
-                const mainData = resData.main || [];
-                if (mainData.length > 0) {
-                    setCreelId(mainData[0].BatchNo || '');
-                }
-
-                // const mappedData = d2.map(d2Item => {
-                //     const d1Item = d1.find(
-                //         x => String(x.SrNo) === String(d2Item.SrNo)
-                //     ) || {};
-
-                const d1Map = {};
-                d1.forEach(item => {
-                    d1Map[String(item.SrNo)] = item;
-                });
-
-                const mappedData = d2
-                    .filter(d2Item => d1Map[String(d2Item.SrNo)])
-                    .map(d2Item => {
-                        const d1Item = d1Map[String(d2Item.SrNo)];
-
-                        return {
-                            cartonNo: d2Item.CartNo || '',
-                            qty: d2Item.Qty || '',
-                            chees: d2Item.Chees || '',
-
-                            PUId: d2Item.PUId || '',
-                            PSrNo: d2Item.PSrNo || '',
-                            PSubSr: d2Item.PSubSr || '',
-                            TranType: d2Item.TranType || '',
-                            d2SrNo: String(d2Item.SrNo || ''),
-
-                            ItmCode: d1Item.ItmCode || '',
-                            ItmName: d1Item.ItmName || '',
-                            MerCode: d1Item.MerCode || '',
-                            MerName: d1Item.MerName || '',
-                            GrdCode: d1Item.GrdCode || '',
-                            GrdName: d1Item.GrdName || '',
-                            ShdCode: d1Item.ShdCode || '',
-                            ShdName: d1Item.ShdName || '',
-                            Denier: d1Item.Denier || '',
-                            d1SrNo: String(d1Item.SrNo || ''),
-                            UId: d1Item.UId || '',
-                            yearNo: FormState.values.YearNo || ''
-                        };
-                    });
-
-                setCartonSummary(mappedData);
-
-                console.log("mappedData", mappedData, cartonSummary);
-
-                // setCartonSummary(mappedData);
-                setSelectedCreel(payload);
-                // setSelectedCreel({
-                //     UId: item.UId
-                // });
-                setIsEditMode(true);
-                setMainUId(item.UId);
-                setIsCreelModalVisible(false);
-                setIsScanModalVisible(true);
-
-            } else {
-                Alert.alert("Error", "No data found");
-            }
-
-        } catch (error) {
-            if (axios.isCancel(error)) {
-                // console.log("Request cancelled");
-            } else {
-                console.log("API Error:", error);
-                // Alert.alert("Error while processing");
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     const codeScanner = useCodeScanner({
         codeTypes: ['qr'],
         onCodeScanned: (codes) => {
@@ -813,7 +665,7 @@ const WeftIssueItemDrawer = ({
             console.log("📦 Raw QR Value 👉", value);
             try {
                 const parts = value.split("~");
-                if (parts.length < 17) {
+                if (parts.length < 13) {
                     throw new Error("Invalid format");
                 }
                 const parsed = {
@@ -823,24 +675,24 @@ const WeftIssueItemDrawer = ({
                     TranType: parts[3],
                     CartNo: parts[4],
                     ItmCode: parts[5],
-                    ItmName: parts[6],
-                    MerCode: parts[7],
-                    MerName: parts[8],
-                    GrdCode: parts[9],
-                    GrdName: parts[10],
-                    ShdCode: parts[11],
-                    ShdName: parts[12],
-                    Denier: parts[13],
-                    Wt: parts[14],
-                    Chees: parts[15],
-                    yearNo: parts[16]
+                    MerCode: parts[6],
+                    GrdCode: parts[7],
+                    ShdCode: parts[8],
+                    Denier: parts[9],
+                    Wt: parts[10],
+                    Chees: parts[11],
+                    yearNo: parts[12]
                 };
+
                 console.log("✅ Parsed 👉", parsed);
                 setScannedObj(parsed);
                 setCartonNo(parsed.CartNo || '');
                 setYearNo(parsed.yearNo || '');
                 setchees(parsed.Chees || '');
                 setavgwt(parsed.Wt || '');
+
+                fetchitmgrdshdname(parsed);
+
                 sendScannedValue(value);
             } catch (err) {
                 Alert.alert("Invalid QR", "QR format not valid");
@@ -848,6 +700,49 @@ const WeftIssueItemDrawer = ({
             setIsScanning(false);
         },
     });
+
+    const fetchitmgrdshdname = async (parsedData) => {
+        setIsLoading(true); // ✅ start loader
+        try {
+            const payload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                strcode: FormState.values.yarnstrcode,
+                itmcode: parsedData?.ItmCode,
+                mercode: parsedData?.MerCode,
+                grdcode: parsedData?.GrdCode,
+                shdcode: parsedData?.ShdCode,
+
+            };
+            console.log("payload", payload)
+            const res = await axios.post(`${API}/api/get_item_detail_from_carton`, payload, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                }
+            });
+            console.log(res);
+            if (res.data.success && res.data.response?.data) {
+
+                const data = res.data.response.data;
+                // 🔥 SIRF NAME SET KARNA
+                setScannedObj(prev => ({
+                    ...prev,
+                    ItmName: data.ItmName || '',
+                    MerName: data.MerName || '',
+                    ShdName: data.ShdName || '',
+                    GrdName: data.GrdName || '',
+                }));
+
+            }
+
+        } catch (e) {
+            console.log("API ERROR:", e);
+        } finally {
+            setIsLoading(false); // ✅ stop loader
+        }
+    };
 
     const handleSearch = async () => {
         if (!searchText) {
@@ -863,6 +758,8 @@ const WeftIssueItemDrawer = ({
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 strcode: FormState.values.yarnstrcode,
+                mitmcode: FormState.values.ItmCode,
+                txntype: 'beam_weft_issue',
                 searchcarton: searchText.trim()
             };
             console.log("Payload:", payload);
@@ -899,7 +796,7 @@ const WeftIssueItemDrawer = ({
         }
     };
 
-    const handleAddCarton = () => {
+    const handleAddCarton = async () => {
         if (!CartonNo || !getchees || !getavgwt) {
             Alert.alert("Error", "Please scan carton first");
             return;
@@ -964,9 +861,20 @@ const WeftIssueItemDrawer = ({
             Denier: getScannedObj?.Denier,
             yearNo: getScannedObj?.yearNo,
             SrNo: getScannedObj.SrNo,
+            DsnRcpSrNo: getScannedObj?.DsnRcpSrNo || editData?.cartonSummary?.[0]?.DsnRcpSrNo || '',
             UId: mainUId?.UId,
         };
+
+        console.log("Form srno:", FormState.values.srno);
+        console.log("newCarton:", newCarton);
+        console.log("newCarton DsnRcpSrNo:", newCarton?.DsnRcpSrNo);
+
+        const expQty = await ExpectedProdQty(newCarton);
+
+        newCarton.ExpProdQty = expQty;
+
         setCartonSummary(prev => [...prev, newCarton]);
+
         setCartonNo('');
         setchees('');
         setavgwt('');
@@ -1036,6 +944,61 @@ const WeftIssueItemDrawer = ({
         }
     }
 
+    const ExpectedProdQty = async (newCarton) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            const historyPayload = {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                txntype: 'beam_weft_issue',
+                WfIssQty: newCarton?.qty,
+                MRUId: '0',
+                MRSrNo: '0',
+                ItmCode: newCarton?.ItmCode,
+                ShdCode: newCarton?.ShdCode,
+                // PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo,
+                PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo || '',
+                beamuid: FormState.values.BeamUId,
+                dsncode: FormState.values.DsnCode
+            };
+
+            console.log("get_expprodqty_from_issueqty historyPayload", historyPayload);
+            const response = await axios.get(
+                `${API}/api/get_expprodqty_from_issueqty`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+            console.log("get_expprodqty_from_issueqty", response);
+            const dataArray = response?.data?.data?.data;
+
+            if (Array.isArray(dataArray) && dataArray.length > 0) {
+
+                const expQty = dataArray[0].ExpProdQty || 0;
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        ExpProdQty: expQty
+                    }
+                }));
+
+                return expQty;
+            }
+
+            return 0;
+
+        } catch (error) {
+            console.log("API ExpectedProdQty error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     useEffect(() => {
         const { PrpCode, YearNo } = FormState.values;
         if (PrpCode && YearNo) {
@@ -1051,24 +1014,6 @@ const WeftIssueItemDrawer = ({
         }
     }, [isCreelModalVisible]);
 
-    const handleAdd = () => {
-        if (!design) {
-            Alert.alert('Please select Design');
-            return;
-        }
-
-        const selectedRow = getData.find(el => el.DsnCode === design);
-
-        const newRow = {
-            srNo: gridData.length + 1,
-            CartonNo: CartonNo,
-            design: selectedRow?.DsnName || ''
-        };
-        setGridData(prev => [...prev, newRow]);
-        setBeamNo(prev => prev + 1);
-        setDesign('');
-        setDesignName('');
-    };
 
     const sendScannedValue = async (qrValue: string) => {
 
@@ -1118,14 +1063,18 @@ const WeftIssueItemDrawer = ({
             const payloadObj = {
                 PrpCode: FormState.values.PrpCode,
                 YearNo: FormState.values.YearNo,
-                txntype: 'creel_yarn_issue',
+                // txntype: 'creel_yarn_issue',
                 CreelId: creelId,
                 // setupDate: setupDate,
                 SetupDate: setupDate.toISOString().split('T')[0],
+                Issdate: formatDisplayDate(FormState.values.IssDate),
                 Shift: shift,
                 Remark: Remark || '',
                 StkType: FormState.values.StkType || stocktype || '',
                 uid: mainUId || '',
+                DsnCode: FormState.values.DsnCode,
+                txntype: 'beam_weft_issue',
+                RecipeUId: '2',
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId,
                     CartNo: item.cartonNo || '',
@@ -1145,6 +1094,9 @@ const WeftIssueItemDrawer = ({
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
                     yearno: item.yearNo || '',
+                    ExpProdQty: item.ExpProdQty || 0,
+                    DsnRcpSrNo: FormState.values.srno,
+                    DsnCode: FormState.values.DsnCode,
                 }))
             };
 
@@ -1227,16 +1179,6 @@ const WeftIssueItemDrawer = ({
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
-                // PrpCode: FormState.values.PrpCode,
-                // YearNo: FormState.values.YearNo,
-                // txntype: 'creel_yarn_issue',
-                // CreelId: creelId,
-                // // setupDate: setupDate,
-                // SetupDate: setupDate.toISOString().split('T')[0],
-                // Shift: shift,
-                // Remark: Remark || '',
-                // StkType: FormState.values.StkType || stocktype || '',
-                // uid: mainUId || '',
                 PrpCode: FormState.values.PrpCode,
                 YearNo: FormState.values.YearNo,
                 BeamNo: FormState.values.BeamNo,
@@ -1244,15 +1186,20 @@ const WeftIssueItemDrawer = ({
                 StkType: FormState.values.StkType,
                 IssNo: FormState.values.IssNo,
                 WarpLen: FormState.values.WarpLen,
-                Issdate: formatDisplayDate(FormState.values.Issdate),
-                uid: FormState.values.UId,
-                month: FormState.values.monthno,
+                Issdate: formatDisplayDate(FormState.values.IssDate),
+                SetupDate: formatDisplayDate(FormState.values.IssDate),
+                // uid: FormState.values.UId,
+                uid: '',
+                month: FormState.values.month,
                 suffix: FormState.values.suffix,
                 strcode: FormState.values.yarnstrcode,
                 txntype: 'beam_weft_issue',
+                RecipeUId: '2',
+                // mitmcode: FormState.values.ItmCode,
                 DsnCode: FormState.values.DsnCode,
                 Cartons: cartonSummary.map(item => ({
-                    uid: item.UId || mainUId || '',
+                    // uid: item.UId || FormState.values.UId || '',
+                    uid: '',
                     CartNo: item.cartonNo || '',
                     Chees: item.chees || '',
                     Wt: item.qty || '',
@@ -1270,6 +1217,9 @@ const WeftIssueItemDrawer = ({
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
                     yearno: item.yearNo || '',
+                    ExpProdQty: item.ExpProdQty || 0,
+                    DsnRcpSrNo: FormState.values.srno,
+                    DsnCode: FormState.values.DsnCode,
                 }))
             };
 
@@ -1291,33 +1241,62 @@ const WeftIssueItemDrawer = ({
             //     setShowSuccess(true);
 
             // }
-            if (response.data.success === true) {
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+            //     setSuccessMessage('Data Updated Successfully ✅');
+            //     setShowSuccess(true);
+            // }
+            // else if (response.data.success === false) {
+            //     setIsLoading(false);
+            //     setDataSaved(false);
+            //     Snackbar.show({
+            //         text: response.data.message,
+            //         duration: Snackbar.LENGTH_LONG,
+            //         backgroundColor: '#000',
+            //         textColor: '#fff',
+            //         action: { text: 'OK', textColor: 'yellow' },
+            //     });
+            // } 
+            // else {
+            //     setIsLoading(false);
+            //     setDataSaved(false);
+            //     Snackbar.show({
+            //         text: response.data.message,
+            //         duration: Snackbar.LENGTH_LONG,
+            //         backgroundColor: '#000',
+            //         textColor: '#fff',
+            //         action: { text: 'OK', textColor: 'red' },
+            //     });
+            // }
+            const res = response.data;
+            if (res.success && res.response?.error !== true) {
+                console.log("SUCCESS BLOCK HIT");
                 setDataSaved(true);
-                setSuccessMessage('Data Updated Successfully ✅');
-                setShowSuccess(true);
-                resetAllFields();
-                setIsScanModalVisible(false);
+                // setSuccessMessage(
+                //     typeof res.message === 'string'
+                //         ? res.message
+                //         : 'Data Saved Successfully ✅'
+                // );
+                if (res.success) {
+                    setDataSaved(true);
 
-            }
-            else if (response.data.success === false) {
-                setIsLoading(false);
-                setDataSaved(false);
-                Snackbar.show({
-                    text: response.data.message,
-                    duration: Snackbar.LENGTH_LONG,
-                    backgroundColor: '#000',
-                    textColor: '#fff',
-                    action: { text: 'OK', textColor: 'yellow' },
-                });
+                    setSuccessMessage(
+                        res.response?.message || res.message
+                    );
+
+                    setShowSuccess(true);
+                }
+                setShowSuccess(true);
             } else {
-                setIsLoading(false);
                 setDataSaved(false);
                 Snackbar.show({
-                    text: response.data.message,
+                    text:
+                        typeof res.response?.message === 'string'
+                            ? res.response.message
+                            : 'Save failed (Invalid data / permission issue)',
                     duration: Snackbar.LENGTH_LONG,
                     backgroundColor: '#000',
                     textColor: '#fff',
-                    action: { text: 'OK', textColor: 'red' },
                 });
             }
         } catch (error) {
@@ -1330,10 +1309,9 @@ const WeftIssueItemDrawer = ({
 
     }
 
-
     const resetAllFields = () => {
-        setIsEditMode(false);   // 🔥 VERY IMPORTANT
-        setMainUId(null);
+        // setIsEditMode(false);   // 🔥 VERY IMPORTANT
+        // setMainUId(null);
         // Creel modal fields
         setCreelId('');
         setShift('');
@@ -1370,6 +1348,17 @@ const WeftIssueItemDrawer = ({
         setIsScanning(false);
     };
 
+
+    useEffect(() => {
+        if (isEditMode && editData?.cartonSummary?.length > 0) {
+            setCartonSummary(editData.cartonSummary);
+        }
+    }, [editData]);
+
+    useEffect(() => {
+        console.log("FormState UPDATED:", FormState.values);
+    }, [FormState.values]);
+
     const d1 = FormState?.values?.d1 || [];
     const d2 = FormState?.values?.d2 || [];
 
@@ -1400,6 +1389,47 @@ const WeftIssueItemDrawer = ({
             <Modal visible={isVisible} animationType="slide">
                 <View style={styles.container}>
 
+
+                    {showSuccess && (
+                        <View style={styles.overlayContainer1}>
+                            <View style={styles.overlayCardNew}>
+
+                                {/* ✅ ICON */}
+                                <View style={styles.successIcon}>
+                                    <Text style={{ fontSize: 28 }}>✅</Text>
+                                </View>
+
+                                {/* ✅ MESSAGE */}
+                                <Text style={styles.successTitle}>
+                                    Success
+                                </Text>
+
+                                <Text style={styles.successMessage}>
+                                    {successMessage}
+                                </Text>
+
+                                {/* ✅ BUTTON */}
+                                <TouchableOpacity
+                                    style={styles.okButton}
+                                    // onPress={() => {
+                                    //     setShowSuccess(false);
+                                    //     resetAllFields();
+                                    //     onClose();
+                                    // }}
+                                    onPress={() => {
+                                        setShowSuccess(false);
+                                        resetAllFields();
+
+                                        closeAllDrawers();   // 🔥 sab band
+                                    }}
+                                >
+                                    <Text style={styles.okButtonText}>OK</Text>
+                                </TouchableOpacity>
+
+                            </View>
+                        </View>
+                    )}
+
                     {/* HEADER */}
                     <View style={styles.header}>
                         <TouchableOpacity style={styles.backBtn} onPress={onClose}>
@@ -1413,347 +1443,331 @@ const WeftIssueItemDrawer = ({
                     </View>
 
                     {/* SEGMENT */}
-                    <View style={styles.segment}>
-                        <TouchableOpacity
-                            style={[styles.segmentBtn, !showManualSearch && styles.segmentActive]}
-                            onPress={() => {
-                                setShowManualSearch(false);
-                                setIsScanning(true); // 🔥 direct camera open
-                            }}
-                        >
-                            <View style={styles.segmentInner}>
-                                <Icon
-                                    name="qr-code-scanner"
-                                    size={18}
-                                    color={!showManualSearch ? "#fff" : "#007EA7"}
-                                />
-                                <Text style={[
-                                    styles.segmentText,
-                                    !showManualSearch && styles.segmentTextActive
-                                ]}>
-                                    Scan
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.segmentBtn, showManualSearch && styles.segmentActive]}
-                            onPress={() => setShowManualSearch(true)}
-                        >
-                            <View style={styles.segmentInner}>
-                                <Icon
-                                    name="search"
-                                    size={18}
-                                    color={showManualSearch ? "#fff" : "#007EA7"}
-                                />
-                                <Text style={[
-                                    styles.segmentText,
-                                    showManualSearch && styles.segmentTextActive
-                                ]}>
-                                    Manual
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* MANUAL SEARCH */}
-                    {showManualSearch && (
-                        <View style={styles.card}>
-                            <Text style={styles.label}>Search Carton</Text>
-
-                            {/* SEARCH INPUT */}
-                            <View style={styles.searchRow}>
-                                <TextInput
-                                    placeholder="Enter carton no"
-                                    value={searchText}
-                                    onChangeText={setSearchText}
-                                    style={styles.searchInput}
-                                />
-
-                                <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-                                    <Icon name="search" size={20} color="#fff" />
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* LOADING */}
-                            {isLoading && (
-                                <ActivityIndicator
-                                    style={{ marginTop: 10 }}
-                                    size="small"
-                                    color="#0f766e"
-                                />
-                            )}
-
-                            {/* RESULTS (INSIDE SAME CARD) */}
-                            {searchResults.length > 0 && (
-                                <FlatList
-                                    data={searchResults}
-                                    keyExtractor={(item, index) => index.toString()}
-                                    style={{ marginTop: 10, maxHeight: 200 }}
-                                    showsVerticalScrollIndicator={false}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={styles.resultItem}
-                                            onPress={() => {
-                                                setSelectedItem(item);
-                                                setCartonNo(item.CartNo);
-                                                setchees(item.Chees || '0');
-                                                setavgwt(item.Wt || '0');
-                                            }}
-                                        >
-                                            <View>
-                                                <Text style={styles.resultTitle}>{item.CartNo}</Text>
-                                                <Text style={styles.resultSub}>
-                                                    Chees: {item.Chees}
-                                                </Text>
-                                                <Text style={styles.resultSub}>
-                                                    {item.ItmName} / {item.MerName} / {item.ShdName}
-                                                </Text>
-                                            </View>
-
-                                            {/* <Icon name="chevron-right" size={22} color="#94a3b8" /> */}
-                                        </TouchableOpacity>
-                                    )}
-                                />
-                            )}
-
-                            {selectedItem && (
-                                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-
-                                    <TouchableOpacity
-                                        style={[styles.primaryBtn, { flex: 1 }]}
-                                        onPress={() => {
-                                            if (!selectedItem) {
-                                                Alert.alert("Select carton first");
-                                                return;
-                                            }
-
-                                            const data = {
-                                                CartNo: selectedItem.CartNo,
-                                                ItmName: selectedItem.ItmName,
-                                                MerName: selectedItem.MerName,
-                                                ShdName: selectedItem.ShdName,
-                                                GrdName: selectedItem.GrdName,
-                                                Chees: selectedItem.Chees,
-                                                Wt: selectedItem.Wt,
-                                                PUId: selectedItem.PUId,
-                                                PSrNo: selectedItem.PSrNo,
-                                                PSubSr: selectedItem.PSubSr,
-                                                TranType: selectedItem.TranType,
-                                                ItmCode: selectedItem.ItmCode,
-                                                MerCode: selectedItem.MerCode,
-                                                GrdCode: selectedItem.GrdCode,
-                                                ShdCode: selectedItem.ShdCode,
-                                                Denier: selectedItem.Denier,
-                                                yearNo: selectedItem.yearno,
-                                                SrNo: selectedItem.SrNo,
-                                            };
-
-                                            setCartonNo(data.CartNo || '');
-                                            setchees(data.Chees || '');
-                                            setavgwt(data.Wt || '');
-                                            setScannedObj(data);
-
-                                            setShowManualSearch(null);
-                                            setSearchText('');
-                                            setSearchResults([]);
-                                            setSelectedItem(null);
-                                        }}
-                                    >
-                                        <Text style={styles.primaryText}>OK</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={[styles.secondaryBtn, { flex: 1 }]}
-                                        onPress={() => {
-                                            setSelectedItem(null);
-                                            setSearchResults([]);
-                                            setSearchText('');
-                                            setShowManualSearch(null);
-                                        }}
-                                    >
-                                        <Text style={styles.secondaryText}>Close</Text>
-                                    </TouchableOpacity>
-
-                                </View>
-                            )}
-                        </View>
-                    )}
-
-                    {/* SCANNER */}
-                    {/* {!showManualSearch && (
-                        <TouchableOpacity style={styles.scanCard} onPress={() => setIsScanning(true)}>
-                            <Icon name="qr-code-scanner" size={18} color="#fff" />
-                            <Text style={styles.scanText}>Tap to Scan Carton</Text>
-                        </TouchableOpacity>
-                    )} */}
-
-                    {/* CAMERA MODAL */}
-                    {isScanning && (
-                        <Modal animationType="fade">
-                            <View style={{ flex: 1, backgroundColor: '#000' }}>
-
-                                {/* 🔝 TOP BAR */}
-                                <View style={styles.cameraHeader}>
-                                    {/* <TouchableOpacity onPress={() => setIsScanning(false)}>
-                                        <Icon name="arrow-back" size={26} color="#fff" />
-                                    </TouchableOpacity> */}
-
-                                    <Text style={styles.cameraTitle}>Scan QR Code</Text>
-
-                                    <View style={{ width: 26 }} />
-                                </View>
-
-                                {/* 📷 CAMERA */}
-                                <View style={styles.cameraContainer}>
-                                    {device && hasPermission && (
-                                        <Camera
-                                            style={styles.camera}
-                                            device={device}
-                                            isActive={true}
-                                            codeScanner={codeScanner}
-                                        />
-                                    )}
-
-                                    {/* 🔲 SCAN BOX */}
-                                    <View style={styles.overlay}>
-                                        <View style={styles.scanBox} />
-                                    </View>
-                                </View>
-
-                                {/* 🔻 BOTTOM BUTTON */}
-                                <View style={styles.cameraFooter}>
-                                    <TouchableOpacity
-                                        style={styles.closeScanBtn}
-                                        onPress={() => setIsScanning(false)}
-                                    >
-                                        <Text style={styles.closeScanText}>Close Scanner</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                            </View>
-                        </Modal>
-                    )}
 
                     {!showList ? (
-                        <ScrollView
-                            showsVerticalScrollIndicator={true}
-                            contentContainerStyle={{ paddingBottom: 20 }}
-                        >
-
-                            {cartonSummary.length > 0 && (
+                        <>
+                            <View style={styles.segment}>
                                 <TouchableOpacity
-                                    style={styles.viewListBtn}
-                                    onPress={() => setShowList(true)}
+                                    style={[styles.segmentBtn, !showManualSearch && styles.segmentActive]}
+                                    onPress={() => {
+                                        setShowManualSearch(false);
+                                        setIsScanning(true); // 🔥 direct camera open
+                                    }}
                                 >
-                                    <Text style={styles.viewListText}>
-                                        📋 View Cartons ({cartonSummary.length})
-                                    </Text>
+                                    <View style={styles.segmentInner}>
+                                        <Icon
+                                            name="qr-code-scanner"
+                                            size={18}
+                                            color={!showManualSearch ? "#fff" : "#007EA7"}
+                                        />
+                                        <Text style={[
+                                            styles.segmentText,
+                                            !showManualSearch && styles.segmentTextActive
+                                        ]}>
+                                            Scan
+                                        </Text>
+                                    </View>
                                 </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.segmentBtn, showManualSearch && styles.segmentActive]}
+                                    onPress={() => setShowManualSearch(true)}
+                                >
+                                    <View style={styles.segmentInner}>
+                                        <Icon
+                                            name="search"
+                                            size={18}
+                                            color={showManualSearch ? "#fff" : "#007EA7"}
+                                        />
+                                        <Text style={[
+                                            styles.segmentText,
+                                            showManualSearch && styles.segmentTextActive
+                                        ]}>
+                                            Manual
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+
+                            {showManualSearch && (
+                                <View style={styles.overlayContainer}>
+                                    <View style={styles.overlayCard}>
+                                        <Text style={styles.label}>Search Carton</Text>
+                                        <View style={styles.searchRow}>
+                                            <TextInput
+                                                placeholder="Enter carton no"
+                                                value={searchText}
+                                                onChangeText={setSearchText}
+                                                style={styles.searchInput}
+                                            />
+                                            <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                                                <Icon name="search" size={20} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+                                        {isLoading && (
+                                            <ActivityIndicator
+                                                style={{ marginTop: 10 }}
+                                                size="small"
+                                                color="#0f766e"
+                                            />
+                                        )}
+                                        {searchResults.length > 0 && (
+                                            <FlatList
+                                                data={searchResults}
+                                                keyExtractor={(item, index) => index.toString()}
+                                                style={{ marginTop: 10, maxHeight: 200 }}
+                                                showsVerticalScrollIndicator={false}
+                                                // renderItem={({ item }) => (
+                                                //     <TouchableOpacity
+                                                //         style={styles.resultItem}
+                                                //         onPress={() => {
+                                                //             setSelectedItem(item);
+                                                //             setCartonNo(item.CartNo);
+                                                //             setchees(item.Chees || '0');
+                                                //             setavgwt(item.Wt || '0');
+                                                //         }}
+                                                //     >
+                                                //         <View>
+                                                //             <Text style={styles.resultTitle}>{item.CartNo}</Text>
+                                                //             <Text style={styles.resultSub}>
+                                                //                 Chees: {item.Chees}
+                                                //             </Text>
+                                                //             <Text style={styles.resultSub}>
+                                                //                 {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                //             </Text>
+                                                //         </View>
+                                                //     </TouchableOpacity>
+                                                // )}
+                                                renderItem={({ item }) => {
+                                                    const isSelected = selectedItem?.CartNo === item.CartNo;
+
+                                                    return (
+                                                        <TouchableOpacity
+                                                            style={[
+                                                                styles.resultItem,
+                                                                isSelected && styles.selectedItem   // 🔥 highlight
+                                                            ]}
+                                                            onPress={() => {
+                                                                setSelectedItem(item);
+                                                                setCartonNo(item.CartNo);
+                                                                setchees(item.Chees || '0');
+                                                                setavgwt(item.Wt || '0');
+                                                            }}
+                                                        >
+                                                            <View>
+                                                                <Text style={styles.resultTitle}>{item.CartNo}</Text>
+
+                                                                <Text style={styles.resultSub}>
+                                                                    Chees: {item.Chees}
+                                                                </Text>
+
+                                                                <Text style={styles.resultSub}>
+                                                                    {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                                </Text>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    );
+                                                }}
+                                            />
+                                        )}
+                                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                                            <TouchableOpacity
+                                                style={[styles.primaryBtn, { flex: 1 }]}
+                                                onPress={() => {
+                                                    if (!selectedItem) {
+                                                        Alert.alert("Select carton first");
+                                                        return;
+                                                    }
+                                                    const data = {
+                                                        CartNo: selectedItem.CartNo,
+                                                        ItmName: selectedItem.ItmName,
+                                                        MerName: selectedItem.MerName,
+                                                        ShdName: selectedItem.ShdName,
+                                                        GrdName: selectedItem.GrdName,
+                                                        Chees: selectedItem.Chees,
+                                                        Wt: selectedItem.Wt,
+                                                        PUId: selectedItem.PUId,
+                                                        PSrNo: selectedItem.PSrNo,
+                                                        PSubSr: selectedItem.PSubSr,
+                                                        TranType: selectedItem.TranType,
+                                                        ItmCode: selectedItem.ItmCode,
+                                                        MerCode: selectedItem.MerCode,
+                                                        GrdCode: selectedItem.GrdCode,
+                                                        ShdCode: selectedItem.ShdCode,
+                                                        Denier: selectedItem.Denier,
+                                                        yearNo: selectedItem.yearno,
+                                                        SrNo: selectedItem.SrNo,
+                                                    };
+                                                    setCartonNo(data.CartNo || '');
+                                                    setchees(data.Chees || '');
+                                                    setavgwt(data.Wt || '');
+                                                    setScannedObj(data);
+                                                    setShowManualSearch(null);
+                                                    setSearchText('');
+                                                    setSearchResults([]);
+                                                    setSelectedItem(null);
+                                                }}
+                                            >
+                                                <Text style={styles.primaryText}>OK</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.secondaryBtn, { flex: 1 }]}
+                                                onPress={() => {
+                                                    setSelectedItem(null);
+                                                    setSearchResults([]);
+                                                    setSearchText('');
+                                                    setShowManualSearch(null);
+                                                }}
+                                            >
+                                                <Text style={styles.secondaryText}>Close</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </View>
                             )}
 
-                            <View style={styles.card}>
-                                <Text style={styles.cardTitle}>Carton Details</Text>
+                            {isScanning && (
+                                <Modal animationType="fade">
+                                    <View style={{ flex: 1, backgroundColor: '#000' }}>
+                                        <View style={styles.cameraHeader}>
+                                            <Text style={styles.cameraTitle}>Scan QR Code</Text>
 
-                                <View style={styles.field}>
-                                    <Text style={styles.label}>Carton Number</Text>
-                                    <TextInput
-                                        style={styles.inputDisabled}
-                                        value={CartonNo}
-                                        editable={false}
-                                    />
-                                </View>
+                                            <View style={{ width: 26 }} />
+                                        </View>
+                                        <View style={styles.cameraContainer}>
+                                            {device && hasPermission && (
+                                                <Camera
+                                                    style={styles.camera}
+                                                    device={device}
+                                                    isActive={true}
+                                                    codeScanner={codeScanner}
+                                                />
+                                            )}
+                                            <View style={styles.overlay}>
+                                                <View style={styles.scanBox} />
+                                            </View>
+                                        </View>
+                                        <View style={styles.cameraFooter}>
+                                            <TouchableOpacity
+                                                style={styles.closeScanBtn}
+                                                onPress={() => setIsScanning(false)}
+                                            >
+                                                <Text style={styles.closeScanText}>Close Scanner</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </Modal>
+                            )}
 
-                                <View style={styles.row}>
-                                    <View style={styles.fieldHalf}>
-                                        <Text style={styles.label}>Chees</Text>
+                            <ScrollView
+                                showsVerticalScrollIndicator={true}
+                                contentContainerStyle={{ paddingBottom: 20 }}
+                            >
+                                {cartonSummary.length > 0 && (
+                                    <TouchableOpacity
+                                        style={styles.viewListBtn}
+                                        onPress={() => setShowList(true)}
+                                    >
+                                        <Text style={styles.viewListText}>
+                                            📋 View Cartons ({cartonSummary.length})
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                                <View style={styles.card}>
+                                    <Text style={styles.cardTitle}>Carton Details</Text>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Carton Number</Text>
                                         <TextInput
-                                            style={styles.input}
-                                            value={getchees}
-                                            onChangeText={setchees}
-                                            keyboardType="numeric"
+                                            style={styles.inputDisabled}
+                                            value={CartonNo}
+                                            editable={false}
+                                        />
+                                    </View>
+                                    <View style={styles.row}>
+                                        <View style={styles.fieldHalf}>
+                                            <Text style={styles.label}>Chees</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={getchees}
+                                                onChangeText={setchees}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+
+                                        <View style={styles.fieldHalf}>
+                                            <Text style={styles.label}>Quantity</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={getavgwt}
+                                                onChangeText={setavgwt}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Item</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.ItmName || ''}
+                                            editable={false}
                                         />
                                     </View>
 
-                                    <View style={styles.fieldHalf}>
-                                        <Text style={styles.label}>Quantity</Text>
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Merge</Text>
                                         <TextInput
-                                            style={styles.input}
-                                            value={getavgwt}
-                                            onChangeText={setavgwt}
-                                            keyboardType="numeric"
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.MerName || ''}
+                                            editable={false}
                                         />
                                     </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Shade</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.ShdName || ''}
+                                            editable={false}
+                                        />
+                                    </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Grade</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.GrdName || ''}
+                                            editable={false}
+                                        />
+                                    </View>
+
+                                </View>
+                                <View style={styles.bottomBar}>
+                                    <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
+                                        <Text style={styles.secondaryText}>Close</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.primaryBtn} onPress={handleAddCarton}>
+                                        <Text style={styles.primaryText}>Submit</Text>
+                                    </TouchableOpacity>
                                 </View>
 
-                                <View style={styles.field}>
-                                    <Text style={styles.label}>Item</Text>
-                                    <TextInput
-                                        style={styles.inputDisabled}
-                                        value={getScannedObj?.ItmName || ''}
-                                        editable={false}
-                                    />
-                                </View>
-
-                                <View style={styles.field}>
-                                    <Text style={styles.label}>Merge</Text>
-                                    <TextInput
-                                        style={styles.inputDisabled}
-                                        value={getScannedObj?.MerName || ''}
-                                        editable={false}
-                                    />
-                                </View>
-
-                                <View style={styles.field}>
-                                    <Text style={styles.label}>Shade</Text>
-                                    <TextInput
-                                        style={styles.inputDisabled}
-                                        value={getScannedObj?.ShdName || ''}
-                                        editable={false}
-                                    />
-                                </View>
-
-                                <View style={styles.field}>
-                                    <Text style={styles.label}>Grade</Text>
-                                    <TextInput
-                                        style={styles.inputDisabled}
-                                        value={getScannedObj?.GrdName || ''}
-                                        editable={false}
-                                    />
-                                </View>
-
-                            </View>
-
-
-                            <View style={styles.bottomBar}>
-                                <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
-                                    <Text style={styles.secondaryText}>Close</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.primaryBtn} onPress={handleAddCarton}>
-                                    <Text style={styles.primaryText}>Submit</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                        </ScrollView>
+                            </ScrollView>
+                        </>
                     ) : (
-
                         <View style={styles.card}>
-
                             <Text style={styles.cardTitle}>
                                 Yarn Issuance Summary ({cartonSummary.length})
                             </Text>
-
                             <FlatList
                                 data={cartonSummary}
                                 keyExtractor={(item, index) => index.toString()}
                                 contentContainerStyle={{ paddingBottom: 10 }}
                                 renderItem={({ item, index }) => (
-
                                     <View style={styles.listCard}>
-
                                         {/* LEFT SIDE */}
                                         <View style={styles.leftSection}>
-
                                             <View style={styles.indexCircle}>
                                                 <Text style={styles.indexText}>{index + 1}</Text>
                                             </View>
@@ -1762,17 +1776,13 @@ const WeftIssueItemDrawer = ({
                                                 <Text style={styles.cartonNo}>
                                                     {item.cartonNo}
                                                 </Text>
-
                                                 <Text style={styles.subText}>
                                                     {item.ItmName} / {item.MerName}
                                                 </Text>
-
                                                 <Text style={styles.subText}>
                                                     {item.ShdName} / {item.GrdName}
                                                 </Text>
-
                                             </View>
-
                                         </View>
 
                                         {/* RIGHT SIDE */}
@@ -1791,9 +1801,7 @@ const WeftIssueItemDrawer = ({
                                                 Chees: {item.chees}
                                             </Text>
                                         </View>
-
                                     </View>
-
                                 )}
                             />
 
@@ -1809,7 +1817,11 @@ const WeftIssueItemDrawer = ({
                                 <View style={styles.summaryItem}>
                                     <Text style={styles.summaryLabel}>Total Qty</Text>
                                     <Text style={styles.summaryValue}>
-                                        {cartonSummary.reduce((sum, item) => sum + Number(item.qty || 0), 0)}
+                                        {/* {cartonSummary.reduce((sum, item) => sum + Number(item.qty || 0), 0)} */}
+                                        {cartonSummary
+                                            .reduce((sum, item) => sum + Number(item.qty || 0), 0)
+                                            .toFixed(3)
+                                        }
                                     </Text>
                                 </View>
 
@@ -1828,8 +1840,9 @@ const WeftIssueItemDrawer = ({
                                     <Text style={styles.backText}>＋ Add More</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.submitBtn}
-                                    // onPress={() => handleFinalSubmit
-                                    onPress={handleaddCreel}
+                                    // onPress={() => handleFinalSubmit}
+                                    onPress={handleFinalSubmit}
+                                // onPress={handleaddCreel}
                                 >
                                     <Text style={styles.submitText}>✈ Submit All</Text>
                                 </TouchableOpacity>

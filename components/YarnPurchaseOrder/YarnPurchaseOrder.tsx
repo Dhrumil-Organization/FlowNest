@@ -34,7 +34,8 @@ import { API } from '../../common/API/dynamicAPI';
 import CriteriaForm from './CriteriaForm';
 import { fetchAllStoredata } from '../../common/API/Functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { useNavigation } from '@react-navigation/native';
+import { navigate } from '../../android/app/src/navigation/NavigationService';
 interface CardData {
     [key: string]: string;
     isProcessed: boolean;
@@ -130,7 +131,8 @@ interface D1datakeys {
     LastShade: string;
 }
 
-const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, username }) => {
+const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, username, ...rest }) => {
+
     const [searchQueryYPO, setSearchQueryYPO] = useState('');
     const [searchhistoryQueryYPO, setSearchhistoryQueryYPO] = useState('');
     const [searchverifyQueryYPO, setSearchverifyQueryYPO] = useState('');
@@ -174,6 +176,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [getAllStoreData, setAllStoreData] = useState([]);
     const [FormState, setFormState] = useState({
         values: {
+            PrpType: '',
             PrpCode: '',
             YearNo: '',
             StrCode: ''
@@ -195,85 +198,321 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [subCardData, setSubCardData] = useState<{ [key: string]: D1datakeys[] }>({});
     const [loadingSubCard, setLoadingSubCard] = useState<{ [key: string]: boolean }>({});
 
+    const [chartVisible, setChartVisible] = useState(false);
+    const [chartData, setChartData] = useState<any>(null);
+    const [chartLoading, setChartLoading] = useState(false);
+    const [chartPayload, setChartPayload] = useState(null);
+    const [ChartHelp, setChartHelpOpen] = useState(false);
+
+    console.log("ROUTES:", navigation.getState()?.routeNames);
+    // const styles = StyleSheet.create({
+    //     modalContainer: {
+    //         flex: 1,
+    //         backgroundColor: 'rgba(0,0,0,0.4)',
+    //         justifyContent: 'center',
+    //         alignItems: 'center'
+    //     },
+
+    //     modalContent: {
+    //         width: '100%', // ✅ simple responsive
+    //         maxHeight: '90%',
+    //         backgroundColor: '#fff',
+    //         borderRadius: 16,
+    //         padding: 16
+    //     },
+
+    //     modalTitle: {
+    //         fontSize: 18, // ✅ fixed
+    //         fontWeight: '700',
+    //         marginBottom: 14,
+    //         color: '#1e88e5',
+    //         textAlign: 'center'
+    //     },
+
+    //     logCard: {
+    //         backgroundColor: '#f4f8f4',
+    //         borderRadius: 12,
+    //         padding: 14,
+    //         marginBottom: 12,
+    //     },
+
+    //     logHeaderBox: {
+    //         backgroundColor: '#6d756d',
+    //         paddingVertical: 6,
+    //         borderRadius: 6,
+    //         marginBottom: 10
+    //     },
+
+    //     logHeader: {
+    //         textAlign: 'center',
+    //         fontWeight: 'bold',
+    //         fontSize: 15,
+    //         color: '#fff'
+    //     },
+
+    //     rowBox: {
+    //         flexDirection: 'row',
+    //         justifyContent: 'space-between',
+    //         alignItems: 'flex-start',
+    //         marginBottom: 6
+    //     },
+
+    //     label: {
+    //         fontSize: 12,
+    //         color: '#555',
+    //         fontWeight: '600',
+    //         flex: 1
+    //     },
+
+    //     value: {
+    //         fontSize: 12,
+    //         color: '#0a0a0a',
+    //         flex: 1.2,
+    //         textAlign: 'left'
+    //     },
+
+    //     closeBtn: {
+    //         backgroundColor: '#1e88e5',
+    //         paddingVertical: 12,
+    //         borderRadius: 10,
+    //         alignItems: 'center',
+    //         marginTop: 10
+    //     },
+
+    //     closeText: {
+    //         color: '#fff',
+    //         fontSize: 15,
+    //         fontWeight: '600'
+    //     },
+
+    //     fixedCardWrapper: {
+    //         position: 'relative',   // 🔥 REQUIRED
+    //     },
+
+    //     fixedStampContainer: {
+    //         position: 'absolute',
+    //         top: 0,
+    //         right: 8,
+    //         zIndex: 999,
+    //     },
+
+    //     fixedStamp: {
+    //         paddingHorizontal: 10,
+    //         paddingVertical: 4,
+    //         borderRadius: 4,
+    //         minWidth: 100,
+    //         alignItems: 'center',
+    //         transform: [{ rotate: '-10deg' }], // less tilt
+    //         elevation: 4,
+    //     },
+
+    //     fixedStampText: {
+    //         color: '#fff',
+    //         fontWeight: 'bold',
+    //         fontSize: 11,
+    //         letterSpacing: 1,
+    //     },
+    // });
+
     const styles = StyleSheet.create({
-        modalContainer: {
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.4)',
+
+        card: {
+            backgroundColor: '#fff',
+            marginVertical: 8,
+            marginHorizontal: 12,
+            borderRadius: 12,
+            padding: 14,
+            elevation: 3
+        },
+
+        acceptedCard: {
+            borderLeftWidth: 4,
+            borderLeftColor: '#4CAF50'
+        },
+
+        rejectedCard: {
+            borderLeftWidth: 4,
+            borderLeftColor: '#F44336'
+        },
+
+        headerRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+
+        poNo: {
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#333'
+        },
+
+        date: {
+            fontSize: 12,
+            color: '#777'
+        },
+
+        statusChip: {
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 20
+        },
+
+        party: {
+            marginTop: 6,
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#444'
+        },
+
+        row: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 6
+        },
+
+        label: {
+            color: '#888',
+            fontSize: 12
+        },
+
+        value: {
+            color: '#222',
+            fontWeight: '500'
+        },
+
+        actionRow: {
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            marginTop: 10
+        },
+
+        iconBtn: {
+            marginLeft: 8,
+            padding: 8,
+            borderRadius: 8,
             justifyContent: 'center',
             alignItems: 'center'
         },
 
-        modalContent: {
-            width: '100%', // ✅ simple responsive
-            maxHeight: '90%',
+        // chatIconBtn: {
+        //     position: 'absolute',
+        //     top: 8,
+        //     right: 8,
+        //     backgroundColor: '#4A90E2',
+        //     padding: 6,
+        //     borderRadius: 20,
+        //     elevation: 3, // android shadow
+        //     shadowColor: '#000',
+        //     shadowOpacity: 0.2,
+        //     shadowOffset: { width: 0, height: 2 },
+        //     shadowRadius: 3,
+        //     zIndex: 10
+        // },
+
+        chatIconBottom: {
+            marginTop: 10,
+            alignSelf: 'flex-end',  // right side niche
+            backgroundColor: '#2196F3',
+            padding: 8,
+            borderRadius: 20
+        },
+
+        expandHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 12,
+            paddingTop: 10,
+            borderTopWidth: 1,
+            borderColor: '#eee'
+        },
+
+        expandText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#333'
+        },
+
+        itemContainer: {
+            marginTop: 8
+        },
+
+        itemCard: {
             backgroundColor: '#fff',
-            borderRadius: 16,
-            padding: 16
-        },
-
-        modalTitle: {
-            fontSize: 18, // ✅ fixed
-            fontWeight: '700',
-            marginBottom: 14,
-            color: '#1e88e5',
-            textAlign: 'center'
-        },
-
-        logCard: {
-            backgroundColor: '#f4f8f4',
             borderRadius: 12,
             padding: 14,
             marginBottom: 12,
+            elevation: 3,
         },
 
-        logHeaderBox: {
-            backgroundColor: '#6d756d',
-            paddingVertical: 6,
-            borderRadius: 6,
-            marginBottom: 10
-        },
-
-        logHeader: {
-            textAlign: 'center',
-            fontWeight: 'bold',
-            fontSize: 15,
-            color: '#fff'
-        },
-
-        rowBox: {
+        itemHeader: {
             flexDirection: 'row',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: 6
-        },
-
-        label: {
-            fontSize: 12,
-            color: '#555',
-            fontWeight: '600',
-            flex: 1
-        },
-
-        value: {
-            fontSize: 12,
-            color: '#0a0a0a',
-            flex: 1.2,
-            textAlign: 'left'
-        },
-
-        closeBtn: {
-            backgroundColor: '#1e88e5',
-            paddingVertical: 12,
-            borderRadius: 10,
             alignItems: 'center',
-            marginTop: 10
+            marginBottom: 10,
         },
 
-        closeText: {
-            color: '#fff',
+        itemTitle: {
             fontSize: 15,
-            fontWeight: '600'
-        }
+            fontWeight: '600',
+            color: '#222',
+            flex: 1,
+            paddingRight: 10,
+        },
+
+        chartBtn: {
+            backgroundColor: '#2196F3',
+            padding: 8,
+            borderRadius: 8,
+            elevation: 2,
+        },
+
+        itemGrid: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+        },
+
+        itemBox: {
+            width: '48%',
+            marginBottom: 10,
+        },
+
+        itemLabel: {
+            fontSize: 11,
+            color: '#888',
+        },
+
+        itemValue: {
+            fontSize: 13,
+            fontWeight: '500',
+            color: '#333',
+        },
+
+        itemTitle: {
+            fontWeight: 'bold',
+            fontSize: 14,
+            marginBottom: 6,
+            color: '#222'
+        },
+
+        itemRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 4
+        },
+
+        itemLabel: {
+            fontSize: 12,
+            color: '#888'
+        },
+
+        itemValue: {
+            fontSize: 13,
+            fontWeight: '500',
+            color: '#333'
+        },
     });
 
     useEffect(() => {
@@ -1260,6 +1499,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             onClose();
         };
 
+        const openDrawer = () => setChartHelpOpen(true);
+        const closeDrawer = () => setChartHelpOpen(false);
+
         return (
             <Modal visible={visible} animationType="slide" onRequestClose={handleClose} presentationStyle="fullScreen">
                 <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -1299,6 +1541,107 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         );
     };
 
+    // const userPtype = await AsyncStorage.getItem('user_prptype');
+
+    const buildChartPayload = (item: any, d1Item: any) => ({
+        prptype: prptype,
+        yearno: item.yearno,
+        prpcode: item.PrpCode,
+        uid: item.UId,
+        strcode: item.StrCode,
+        itemcode: d1Item.ItmCode,
+        parcode: item.ParCode,
+    });
+
+    console.log("PRPTYPE 1 ::- ", FormState.values.PrpType)
+    console.log("PRPTYPE 2 ::- ", prptype)
+
+    const fetchPurchaseOrderChart = async (payload: any) => {
+        try {
+            const response = await fetch(`${API}/api/purchase_order_chart`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            console.log("payload :- ", payload)
+
+            const result = await response.json();
+
+            console.log("result :- ", result)
+
+            if (!response.ok) {
+                throw new Error(result?.message || 'API Error');
+            }
+
+            return result;
+
+        } catch (error) {
+            console.log('Chart API Error:', error);
+            throw error;
+        }
+    };
+
+    const handleChartClick = async (item, d1Item) => {
+        const payload = {
+            prptype: prptype,
+            yearno: item.yearno,
+            prpcode: item.PrpCode,
+            uid: item.UId,
+            strcode: item.StrCode,
+            itmcode: d1Item.ItmCode,
+            parcode: item.ParCode,
+        };
+
+        console.log("📤 Chart Payload:", payload);
+
+        setChartLoading(true);
+        setChartVisible(true);
+
+        try {
+            const response = await fetch(`${API}/api/purchase_order_chart`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+
+            console.log("📊 Chart Response:", result);
+
+            if (result?.success && result?.response) {
+
+                const itemData = Array.isArray(result.response.itemwisedata)
+                    ? result.response.itemwisedata
+                    : [];
+
+                setChartData({
+                    labels: itemData.map(i => i?.label || ''),
+                    values: itemData.map(i => i?.value || 0),
+                    itemName: result.response?.itemdetail || '',
+                    partyName: result.response?.party_detail || ''
+                });
+
+            } else {
+                setChartData({
+                    labels: [],
+                    values: []
+                });
+            }
+            // setChartData(result);
+        } catch (error) {
+            console.log("❌ Chart Error:", error);
+        } finally {
+            setChartLoading(false);
+        }
+    };
 
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
 
@@ -1486,120 +1829,353 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         </View >
     );
 
-    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
-        <View style={[
-            crlimtreq_styles.card,
-            item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {
-                item.IsAuth && (
-                    <View style={crlimtreq_styles.stampContainerYOS}>
+    // const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
+    //     <View style={[
+    //         crlimtreq_styles.card,
+    //         item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2'
+    //             ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card,
+    //         { paddingTop: 18 }
+    //     ]}>
+    //         <View style={crlimtreq_styles.dateContainer}>
+    //             <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
+    //         </View>
+    //         <View style={crlimtreq_styles.cardHeaderContainer}>
+    //             <View style={crlimtreq_styles.cardHeader}>
+    //                 <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
+    //             </View>
+    //         </View>
+    //         <View style={crlimtreq_styles.cardSubHeader}>
+    //             <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
+    //         </View>
+    //         <View style={crlimtreq_styles.cardContent}>
+    //             <View style={crlimtreq_styles.twoColumnRow}>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>Broker:</Text>
+    //                     <Text style={crlimtreq_styles.value}>
+    //                         {item.BAccName || ''}
+    //                     </Text>
+    //                 </View>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
+    //                     <Text style={crlimtreq_styles.value}>
+    //                         {item.NetAmt || ''}:
+    //                     </Text>
+    //                 </View>
+    //             </View>
+    //             <View style={crlimtreq_styles.twoColumnRow}>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
+    //                     <Text style={crlimtreq_styles.Authvalue}>
+    //                         {item.ARemark || ''}
+    //                     </Text>
+    //                 </View>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>Auth Date:</Text>
+    //                     <Text style={crlimtreq_styles.Authvalue}>
+    //                         {item.AuthorisedDate || 'N/A'}
+    //                     </Text>
+    //                 </View>
+
+    //             </View>
+    //             <View style={crlimtreq_styles.twoColumnRow}>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>Auth By:</Text>
+    //                     <Text style={crlimtreq_styles.value}>
+    //                         {item.AuthorisedBy || 'N/A'}
+    //                     </Text>
+    //                 </View>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>Status:</Text>
+    //                     <Text style={crlimtreq_styles.value}>
+    //                         {item.AuthStatus || ''}
+    //                     </Text>
+    //                 </View>
+    //             </View>
+    //             <View style={crlimtreq_styles.twoColumnRow}>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+    //                     <Text style={crlimtreq_styles.key}>StoreName:</Text>
+    //                     <Text style={crlimtreq_styles.value}>
+    //                         {item.StoreName || 'N/A'}
+    //                     </Text>
+    //                 </View>
+    //                 <View style={crlimtreq_styles.keyValuePair}>
+
+    //                 </View>
+
+    //                 {(item.IsAuth === '1' || item.IsAuth === '2') && (
+    //                     <View style={{
+    //                         flex: 1,
+    //                         alignItems: 'flex-end',
+    //                         justifyContent: 'center'
+    //                     }}>
+
+    //                         {/* Wrapper for vertical buttons */}
+    //                         <View style={{ alignItems: 'flex-end' }}>
+
+    //                             {/* AUTH BUTTON */}
+    //                             <View style={{
+    //                                 backgroundColor: item.IsAuth === '1' ? '#4CAF50' : '#F44336',
+    //                                 paddingHorizontal: 10,
+    //                                 paddingVertical: 4,
+    //                                 borderRadius: 6,
+    //                                 minWidth: 100,
+    //                                 alignItems: 'center'
+    //                             }}>
+    //                                 <Text style={{
+    //                                     color: '#fff',
+    //                                     fontWeight: 'bold',
+    //                                     fontSize: 15
+    //                                 }}>
+    //                                     {item.IsAuth === '1' ? 'AUTHORISED' : 'REJECTED'}
+    //                                 </Text>
+    //                             </View>
+
+    //                             <TouchableOpacity
+    //                                 style={{
+    //                                     marginTop: 6,
+    //                                     backgroundColor: '#2196F3',
+    //                                     paddingHorizontal: 10,
+    //                                     paddingVertical: 4,
+    //                                     borderRadius: 6,
+    //                                     minWidth: 100,
+    //                                     alignItems: 'center'
+    //                                 }}
+    //                                 onPress={() => {
+    //                                     console.log('Chart clicked', item);
+    //                                 }}
+    //                             >
+    //                                 <Text style={{
+    //                                     color: '#fff',
+    //                                     fontWeight: 'bold',
+    //                                     fontSize: 14
+    //                                 }}>
+    //                                     CHART
+    //                                 </Text>
+    //                             </TouchableOpacity>
+
+    //                         </View>
+    //                     </View>
+    //                 )}
+
+    //             </View>
+    //         </View>
+    //         <View style={crlimtreq_styles.expandRow}>
+
+    //             <View style={{ flex: 1, alignItems: 'left' }}>
+
+    //                 {prptype === 'R' && item.mailsent === '1' && (
+    //                     <TouchableOpacity
+    //                         onPress={() => handleInfoClick(item)}
+    //                         disabled={!isConnected}
+    //                     >
+    //                         <View style={crlimtreq_styles.infoIconContainer}>
+    //                             <Icon
+    //                                 name="email"
+    //                                 size={32}
+    //                                 color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
+    //                             />
+    //                         </View>
+    //                     </TouchableOpacity>
+    //                 )}
+
+    //             </View>
+
+    //         </View>
+    //         <View style={crlimtreq_styles.expandRow}>
+    //             <TouchableOpacity
+    //                 style={crlimtreq_styles.expandButton}
+    //                 onPress={() => toggleExpandHistory(item.UId, item)}
+    //             >
+    //                 <Text style={crlimtreq_styles.expandText}>
+    //                     Items: {item.d1?.length || 0}
+    //                 </Text>
+
+    //                 <Icon
+    //                     name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+    //                     size={24}
+    //                     color="#333"
+    //                 />
+    //             </TouchableOpacity>
+
+    //         </View>
+    //         {
+    //             expandedHistoryCards[item.UId] && item.d1.map((d1Item, index) => (
+    //                 <View key={index} style={crlimtreq_styles.subCard}>
+    //                     <View style={crlimtreq_styles.subRow1}>
+    //                         <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
+    //                     </View>
+    //                     <View style={crlimtreq_styles.subRow1}>
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
+    //                         </View>
+
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
+    //                         </View>
+    //                     </View>
+    //                     <View style={crlimtreq_styles.subRow1}>
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
+    //                         </View>
+
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
+    //                         </View>
+    //                     </View>
+    //                     <View style={crlimtreq_styles.subRow1}>
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
+    //                         </View>
+
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
+    //                         </View>
+    //                     </View>
+    //                     <View style={crlimtreq_styles.subRow1}>
+    //                         <View style={crlimtreq_styles.subCol}>
+    //                             <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
+    //                             <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
+    //                         </View>
+    //                     </View>
+    //                     {
+    //                         activeTab1YPO === 'requests' &&
+    //                         (
+    //                             <>
+    //                                 <View style={crlimtreq_styles.subRow1}>
+    //                                     <View style={crlimtreq_styles.subCol}>
+    //                                         <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
+    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
+    //                                     </View>
+    //                                     <View style={crlimtreq_styles.subCol}>
+    //                                         <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
+    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
+    //                                     </View>
+    //                                 </View>
+    //                                 <View style={crlimtreq_styles.subRow1}>
+    //                                     <View style={crlimtreq_styles.subCol}>
+    //                                         <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
+    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
+    //                                     </View>
+    //                                     <View style={crlimtreq_styles.subCol}>
+    //                                         <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
+    //                                         <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
+    //                                     </View>
+    //                                 </View>
+    //                             </>
+    //                         )
+    //                     }
+    //                 </View>
+    //             ))
+    //         }
+
+    //         {/* <View style={crlimtreq_styles.cardActions}>
+    //             <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
+    //                 <View style={crlimtreq_styles.infoIconContainer}>
+    //                     <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
+    //                     {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
+    //                 </View>
+    //             </TouchableOpacity>
+    //         </View> */}
+    //     </View>
+    // );
+
+
+    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
+
+        const isApproved = item.IsAuth === '1';
+        const isRejected = item.IsAuth === '2';
+
+        return (
+            <View style={[
+                styles.card,
+                isApproved ? styles.acceptedCard :
+                    isRejected ? styles.rejectedCard : null
+            ]}>
+
+                {/* HEADER */}
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.poNo}>{item.PONo}</Text>
+                        <Text style={styles.date}>{item.PODate}</Text>
+                    </View>
+
+                    {(isApproved || isRejected) && (
                         <View style={[
-                            crlimtreq_styles.stamp,
-                            item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
+                            styles.statusChip,
+                            { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
                         ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' ? 'REJECTED' : 'PENDING'}
+                            <Text style={{
+                                color: isApproved ? '#2E7D32' : '#C62828',
+                                fontWeight: '600'
+                            }}>
+                                {isApproved ? 'Approved' : 'Rejected'}
                             </Text>
                         </View>
+                    )}
+                </View>
+
+                {/* PARTY */}
+                <Text style={styles.party}>{item.ParName}</Text>
+
+                {/* DETAILS */}
+                <View style={styles.row}>
+                    <Text style={styles.label}>Broker</Text>
+                    <Text style={styles.value}>{item.BAccName || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Net Amount</Text>
+                    <Text style={styles.value}>{item.NetAmt || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Store</Text>
+                    <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Auth By</Text>
+                    <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                </View>
+
+                {/* ACTION ROW */}
+                {(isApproved || isRejected) && (
+                    <View style={styles.actionRow}>
+
+                        <View style={[
+                            styles.iconBtn,
+                            { backgroundColor: isApproved ? '#4CAF50' : '#F44336' }
+                        ]}>
+                            <Icon
+                                name={isApproved ? 'check' : 'close'}
+                                size={20}
+                                color="#fff"
+                            />
+                        </View>
+
+                        {/* <TouchableOpacity
+                            style={[styles.iconBtn, { backgroundColor: '#2196F3' }]}
+                            onPress={() => console.log('Chart clicked', item)}
+                        >
+                            <Icon name="bar-chart" size={20} color="#fff" />
+                        </TouchableOpacity> */}
+
                     </View>
                 )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                </View>
-            </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.ARemark || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Date:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.AuthorisedDate || 'N/A'}
-                        </Text>
-                    </View>
 
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth By:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthorisedBy || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthStatus || ''}
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.StoreName || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-
-                    </View>
-                </View>
-            </View>
-            <View style={crlimtreq_styles.expandRow}>
-
-                <View style={{ flex: 1, alignItems: 'left' }}>
-
-                    {prptype === 'R' && item.mailsent === '1' && (
-                        <TouchableOpacity
-                            onPress={() => handleInfoClick(item)}
-                            disabled={!isConnected}
-                        >
-                            <View style={crlimtreq_styles.infoIconContainer}>
-                                <Icon
-                                    name="email"
-                                    size={32}
-                                    color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
-                                />
-                            </View>
-                        </TouchableOpacity>
-                    )}
-
-                </View>
-
-            </View>
-            <View style={crlimtreq_styles.expandRow}>
+                {/* 🔽 EXPAND BUTTON */}
                 <TouchableOpacity
-                    style={crlimtreq_styles.expandButton}
-                    onPress={() => toggleExpandHistory(item.UId, item)}
+                    style={styles.expandHeader}
+                    onPress={() => toggleExpandHistory(item.UId)}
                 >
-                    <Text style={crlimtreq_styles.expandText}>
-                        Items: {item.d1?.length || 0}
+                    <Text style={styles.expandText}>
+                        Items ({item.d1?.length || 0})
                     </Text>
 
                     <Icon
@@ -1609,93 +2185,120 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     />
                 </TouchableOpacity>
 
-            </View>
-            {
-                expandedHistoryCards[item.UId] && item.d1.map((d1Item, index) => (
-                    <View key={index} style={crlimtreq_styles.subCard}>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
-                            </View>
+                {/* 🔽 EXPANDED ITEMS */}
+                {expandedHistoryCards[item.UId] && (
+                    <View style={styles.itemContainer}>
+                        {item.d1?.map((d1Item, index) => (
+                            // <View key={index} style={styles.itemCard}>
 
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
-                            </View>
+                            //     <Text style={styles.itemTitle}>
+                            //         {d1Item.ItmName}
+                            //     </Text>
 
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
-                            </View>
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Grade</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
+                            //     </View>
 
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
-                            </View>
-                        </View>
-                        {
-                            activeTab1YPO === 'requests' &&
-                            (
-                                <>
-                                    <View style={crlimtreq_styles.subRow1}>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
-                                        </View>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
-                                        </View>
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Shade</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Qty</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Rate</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Amount</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                            //     </View>
+
+                            //     {/* 🔵 CHAT ICON (TOP RIGHT) */}
+                            //     <TouchableOpacity
+                            //         style={[styles.chatIconBottom, { backgroundColor: '#2196F3' }]}
+                            //         onPress={() => console.log('Chart clicked', item)}
+                            //     >
+                            //         <Icon name="bar-chart" size={20} color="#fff" />
+                            //     </TouchableOpacity>
+
+                            // </View>
+
+                            <View key={index} style={styles.itemCard}>
+
+                                {/* TOP ROW (TITLE + ICON) */}
+                                <View style={styles.itemHeader}>
+                                    <Text style={styles.itemTitle}>
+                                        {d1Item.ItmName}
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={styles.chartBtn}
+                                        onPress={() => {
+    console.log("NAV TEST", navigation);
+    navigation.navigate('ChartScreen', {
+        item,
+        d1Item,
+        token
+    });
+}}
+                                    // onPress={() => {
+                                    //     console.log('Chart clicked', d1Item);
+                                    //     // handleChartClick(item, d1Item);
+                                    //     handleChartClick(item, d1Item)
+                                    // }}
+
+                                    //onPress={() => handleChartClick(item, d1Item)}
+                                    >
+                                        <Icon name="bar-chart" size={18} color="#fff" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* DETAILS GRID */}
+                                < View style={styles.itemGrid} >
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Grade</Text>
+                                        <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
                                     </View>
-                                    <View style={crlimtreq_styles.subRow1}>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
-                                        </View>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
-                                        </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Shade</Text>
+                                        <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
                                     </View>
-                                </>
-                            )
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Qty</Text>
+                                        <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Rate</Text>
+                                        <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Amount</Text>
+                                        <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                                    </View>
+
+                                </View>
+
+                            </View>
+                        ))
                         }
-                    </View>
-                ))
-            }
+                    </View >
+                )}
 
-            {/* <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                    </View>
-                </TouchableOpacity>
-            </View> */}
-        </View>
-    );
+            </View >
+        );
+    };
 
     const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' | 'pending' } }) => (
         <View style={[
@@ -2322,6 +2925,85 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 </Modal>
 
             </View>
+
+            {/* <ChartScreen
+                visible={chartVisible}
+                data={chartData}
+                loading={chartLoading}
+                token={token}
+                onClose={() => setChartVisible(false)}
+            /> */}
+
+            {/* ✅ CHART MODAL (YAHAN) */}
+            <Modal
+                visible={chartVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setChartVisible(false)}
+            >
+                <View style={{ flex: 1, padding: 12 }}>
+
+                    {chartLoading && (
+                        <ActivityIndicator size="large" color="#2196F3" />
+                    )}
+
+                    {!chartLoading && chartData?.labels?.length > 0 && (
+
+                        <ScrollView horizontal>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+
+                                {chartData.labels.map((label, index) => {
+
+                                    const rate = chartData.rate[index] || 0;
+                                    const qty = chartData.qty[index] || 0;
+
+                                    return (
+                                        <View
+                                            key={index}
+                                            style={{
+                                                marginHorizontal: 8,
+                                                alignItems: 'center'
+                                            }}
+                                        >
+
+                                            {/* RATE BAR */}
+                                            <View style={{
+                                                height: rate / 2, // scale adjust karo
+                                                width: 20,
+                                                backgroundColor: '#4CAF50',
+                                                marginBottom: 4,
+                                                borderRadius: 4
+                                            }} />
+
+                                            {/* QTY BAR */}
+                                            <View style={{
+                                                height: qty / 2,
+                                                width: 20,
+                                                backgroundColor: '#2196F3',
+                                                borderRadius: 4
+                                            }} />
+
+                                            {/* LABEL */}
+                                            <Text style={{ fontSize: 10, marginTop: 6 }}>
+                                                {label}
+                                            </Text>
+
+                                        </View>
+                                    );
+                                })}
+
+                            </View>
+                        </ScrollView>
+                    )}
+
+                    {!chartLoading && (!chartData || chartData.labels?.length === 0) && (
+                        <Text style={{ textAlign: 'center', marginTop: 20 }}>
+                            No chart data available
+                        </Text>
+                    )}
+
+                </View>
+            </Modal>
 
             <Modal visible={mailLogModal} animationType="slide" transparent>
                 <View style={styles.modalContainer}>

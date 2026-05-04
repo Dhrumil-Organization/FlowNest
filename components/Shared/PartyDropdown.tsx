@@ -209,6 +209,10 @@ interface stock {
     StkType: string;
     stktypename: string
 }
+interface chekingdesigndata {
+    dsncode: string;
+    dsnname: string
+}
 
 
 const extractLocation = (addr?: string) => {
@@ -839,6 +843,25 @@ const PartyDropdown: React.FC<Props> = ({
         );
     };
 
+    const renderdesigndata = (item: chekingdesigndata, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.dsnname)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Design : {`${item.dsnname || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.dsncode || '—'}`}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
     return (
         <View>
             {/* If loading: show a disabled trigger with spinner */}
@@ -892,7 +915,8 @@ const PartyDropdown: React.FC<Props> = ({
                                                                                                                     : type == 'weftbeam' ? renderRowContentWeftBeamData
                                                                                                                         : type == 'Designdata' ? renderRowContentWeftDesign
                                                                                                                             : type == 'partydata' ? renderRowContentpartydata
-                                                                                                                                : renderRowContentEmpty}
+                                                                                                                                : type == 'checkingdesigndata' ?renderdesigndata
+                                                                                                                                    : renderRowContentEmpty}
                 />
             )}
 

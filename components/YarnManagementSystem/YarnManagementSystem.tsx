@@ -2643,11 +2643,13 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                     : yarnmanagementsystemstyle.filamentBadge
                                                             ]}>
                                                                 <Text style={yarnmanagementsystemstyle.categoryBadgeText}>
-                                                                    {item.WYarnType == '1'
-                                                                        ? 'Spun'
-                                                                        : item.WYarnType == '2'
-                                                                            ? 'Filament'
-                                                                            : 'Yarn'}
+                                                                    {item.mitmcode
+                                                                        // item.WYarnType == '1'
+                                                                        //     ? 'Spun'
+                                                                        //     : item.WYarnType == '2'
+                                                                        //         ? 'Filament'
+                                                                        //         : 'Yarn'
+                                                                    }
                                                                 </Text>
                                                             </View>
                                                         </View>
@@ -2844,6 +2846,52 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                                             <View style={yarnmanagementsystemstyle.inputGroup}>
                                                 <Text style={yarnmanagementsystemstyle.label}>
+                                                    Count <Text style={{ color: 'red' }}>*</Text>
+                                                </Text>
+                                                <View style={yarnmanagementsystemstyle.inputBox}>
+                                                    <TextInput
+                                                        placeholder="Count..."
+                                                        value={spunForm.count_no || ''}
+                                                        editable={true}
+                                                        // onChangeText={(text) => {
+                                                        //     setSpunForm(prev => ({
+                                                        //         ...prev,
+                                                        //         count: text
+                                                        //     }));
+                                                        // }}
+                                                        onChangeText={(text) => {
+                                                            const regex = /^[0-9]*$/;
+
+                                                            if (!regex.test(text)) return;
+
+                                                            if (text !== '' && parseInt(text, 10) > 100) return;
+
+                                                            setSpunForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    count_no: text
+                                                                };
+
+                                                                // 👇 calculation sirf textbox value se
+                                                                return {
+                                                                    ...updated,
+                                                                    denier: calculateDenier(updated, prev.formula),
+                                                                    linkitmcode: buildMainItem(updated)
+                                                                };
+                                                            });
+
+                                                        }}
+                                                        style={{
+                                                            color: '#000',
+                                                            opacity: 1,
+                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                        }}
+                                                    />
+                                                </View>
+                                            </View>
+
+                                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                <Text style={yarnmanagementsystemstyle.label}>
                                                     Other <Text style={{ color: 'red' }}>*</Text>
                                                 </Text>
                                                 {/* <PartyDropdown
@@ -2912,52 +2960,6 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                             })
                                                         }
                                                         maxLength={200}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
-                                                </View>
-                                            </View>
-
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Count <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Count..."
-                                                        value={spunForm.count_no || ''}
-                                                        editable={true}
-                                                        // onChangeText={(text) => {
-                                                        //     setSpunForm(prev => ({
-                                                        //         ...prev,
-                                                        //         count: text
-                                                        //     }));
-                                                        // }}
-                                                        onChangeText={(text) => {
-                                                            const regex = /^[0-9]*$/;
-
-                                                            if (!regex.test(text)) return;
-
-                                                            if (text !== '' && parseInt(text, 10) > 100) return;
-
-                                                            setSpunForm(prev => {
-                                                                const updated = {
-                                                                    ...prev,
-                                                                    count_no: text
-                                                                };
-
-                                                                // 👇 calculation sirf textbox value se
-                                                                return {
-                                                                    ...updated,
-                                                                    denier: calculateDenier(updated, prev.formula),
-                                                                    linkitmcode: buildMainItem(updated)
-                                                                };
-                                                            });
-
-                                                        }}
                                                         style={{
                                                             color: '#000',
                                                             opacity: 1,
@@ -3184,7 +3186,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                                                         {/* 🔹 Header */}
                                                         <View style={yarnmanagementsystemstyle.cardHeader}>
-                                                            <Text style={yarnmanagementsystemstyle.itmTitle}>
+                                                            <Text style={yarnmanagementsystemstyle.itmTitle} numberOfLines={2} ellipsizeMode="tail">
                                                                 {item.WNameCode}
                                                             </Text>
 
@@ -3195,11 +3197,13 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                     : yarnmanagementsystemstyle.filamentBadge
                                                             ]}>
                                                                 <Text style={yarnmanagementsystemstyle.categoryBadgeText}>
-                                                                    {item.WYarnType == '1'
-                                                                        ? 'Spun'
-                                                                        : item.WYarnType == '2'
-                                                                            ? 'Filament'
-                                                                            : 'Yarn'}
+                                                                    {item.mitmcode
+                                                                        // item.WYarnType == '1'
+                                                                        //     ? 'Spun'
+                                                                        //     : item.WYarnType == '2'
+                                                                        //         ? 'Filament'
+                                                                        //         : 'Yarn'
+                                                                    }
                                                                 </Text>
                                                             </View>
                                                         </View>

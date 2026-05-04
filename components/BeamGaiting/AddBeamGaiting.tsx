@@ -1772,7 +1772,7 @@ const castyles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
         marginBottom: 5,
-        color: "#444"
+        color: "#000"
     },
 
     input: {
@@ -1780,7 +1780,8 @@ const castyles = StyleSheet.create({
         padding: 14,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: "#e0e0e0"
+        borderColor: "#e0e0e0",
+        color:'#000'
     },
 
     row: {
@@ -1830,7 +1831,8 @@ const castyles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 8,
         padding: 10,
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
+        color:'#000'
     },
     halfInput: {
         width: "48%",

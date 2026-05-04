@@ -281,6 +281,12 @@ const APP_SECTIONS = [
             { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
+    {
+        title: 'P',
+        data: [
+            { id: '32', name: 'Production Report', screen: 'Production Report', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
 
 
 ];
@@ -550,6 +556,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                                     {
 
                                         "title": "Weft Issue",
+                                        "href": "/"
+                                    },
+                                    {
+
+                                        "title": "Production Report",
                                         "href": "/"
                                     },
                                     

@@ -84,6 +84,7 @@ const PartyDetailScreen = ({ route, navigation }) => {
 
       };
       console.log('PartyDetailScreen ', payload);
+      console.log("Selected Year:", selectedYear);
       console.log(`${API}/api/get_report`)
       const res = await axios.post(`${API}/api/get_report`, payload, {
         headers: {
@@ -127,7 +128,7 @@ const PartyDetailScreen = ({ route, navigation }) => {
   };
 
   const Empty = () => (
-    <Text style={{ textAlign: "center", marginTop: 30 }}>
+    <Text style={{ textAlign: "center", marginTop: 30, color: '#000' }}>
       No data found
     </Text>
   );
@@ -748,11 +749,11 @@ const styles = StyleSheet.create({
 
   label: {
     fontSize: 11,
-    color: "#777",
+    color: "#000",
   },
 
   date: {
-    color: "#777",
+    color: "#000",
   },
 
   ref: {
@@ -761,6 +762,7 @@ const styles = StyleSheet.create({
 
   amount: {
     fontWeight: "700",
+    color: "#000"
   },
 
   strike: {

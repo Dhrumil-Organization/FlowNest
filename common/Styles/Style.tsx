@@ -1439,7 +1439,8 @@ export const checkingScannerStyles = StyleSheet.create({
         marginTop: 5,
         height: 40,
         justifyContent: 'center',
-        width: '100%'
+        width: '100%',
+        color:'#000'
 
 
     },

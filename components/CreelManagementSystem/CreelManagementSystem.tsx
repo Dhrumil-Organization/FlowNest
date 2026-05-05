@@ -8,7 +8,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import FullScreenLoader from '../Loader/Loader';
-import { checkingScannerStyles } from '../../common/Styles/Style';
+import { checkingScannerStyles, yarnmanagementsystemstyle } from '../../common/Styles/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
 import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
 import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
@@ -70,14 +70,14 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [getavgwt, setavgwt] = useState('0');
     const [cartonSummary, setCartonSummary] = useState<any[]>([]);
     const [Remark, setRemark] = useState('');
-    const [showManualSearch, setShowManualSearch] = useState(null);
+    const [showManualSearch, setShowManualSearch] = useState(false);
     const [searchText, setSearchText] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [selectedItem, setSelectedItem] = useState(null);
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
     const [selectedYear, setSelectedYear] = useState(null);
     const [getAllPropertyData, setAllPropertyData] = useState([]);
-
+    const [showSummary, setShowSummary] = useState(false);
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     const formatDate = (date) => date.toISOString().split('T')[0];
@@ -102,10 +102,18 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [mainUId, setMainUId] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [propertydata, setpropertydata] = useState<ExeData[]>([]);
+    const [filteredData, setFilteredData] = useState([]);   // 🔥 filtered data
     const screenWidth = Dimensions.get('window').width;
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
+    const [showList, setShowList] = useState(false);
 
     const styles = StyleSheet.create({
+        field: {
+            marginBottom: 12
+        },
+        fieldHalf: {
+            flex: 1
+        },
         modalWrapper: {
             flex: 1,
             backgroundColor: 'rgba(0,0,0,0.5)',
@@ -142,14 +150,36 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             color: '#e0f7ff',
             fontSize: 13
         },
-
-        card: {
+        searchWrapper: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 10,
+            marginTop: 10,
+            marginBottom: 10
+        },
+        searchContainer: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
             backgroundColor: '#fff',
             borderRadius: 12,
-            padding: 15,
-            elevation: 3
+            paddingHorizontal: 12,
+            paddingVertical: 10,
         },
-
+        searchInput: {
+            flex: 1,
+            marginLeft: 8,
+            fontSize: 14,
+            color: '#0f172a'
+        },
+        filterBtn: {
+            marginLeft: 8,
+            backgroundColor: '#f1f5f9',
+            padding: 10,
+            borderRadius: 12,
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
         title: {
             fontSize: 17,
             fontWeight: 'bold',
@@ -354,10 +384,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             fontSize: 12,
             color: '#555'
         },
-
-        // deleteBtn: {
-        //     marginTop: 4
-        // },
         tableHeader: {
             flexDirection: 'row',
             borderBottomWidth: 1,
@@ -365,13 +391,11 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             paddingBottom: 2,
             marginBottom: 2
         },
-
         th: {
             flex: 1,
             fontWeight: 'bold',
             fontSize: 13
         },
-
         tableRow: {
             flexDirection: 'row',
             paddingVertical: 10,
@@ -379,12 +403,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             borderColor: '#eee',
             alignItems: 'center'
         },
-
         td: {
             flex: 1,
             fontSize: 13
         },
-
         completeBtn: {
             backgroundColor: '#3f5fa8',
             padding: 12,
@@ -392,15 +414,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             marginTop: 15,
             alignItems: 'center'
         },
-
         completeText: {
             color: '#fff',
             fontWeight: 'bold'
-        },
-        deleteBtn: {
-            flex: 1,
-            alignItems: 'center',
-            marginTop: 4
         },
         deleteText: {
             color: 'red',
@@ -446,49 +462,17 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             fontWeight: 'bold',
             color: '#000',
         },
-
-        statusBadge: {
-            backgroundColor: '#ffffff90',
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 20,
-        },
-
         badgeText: {
             fontSize: 12,
             fontWeight: 'bold',
             color: '#333',
         },
-
-        // creelTitle: {
-        //     fontSize: 14,
-        //     fontWeight: 'bold',
-        //     marginRight: 8,
-        //     marginBottom: 5
-        // },
-
         badge: {
             backgroundColor: '#E3F2FD',
             paddingHorizontal: 8,
             paddingVertical: 2,
             borderRadius: 10
         },
-        // badgeText: {
-        //     fontSize: 12,
-        //     color: '#007EA7',
-        //     fontWeight: 'bold'
-        // },
-        // labelSmall: {
-        //     fontSize: 13,
-        //     color: '#777',
-        //     // marginTop: 5,
-        //     fontWeight: 'bold'
-        // },
-        // valueSmall: {
-        //     fontSize: 13,
-        //     // fontWeight: '500',
-        //     flexShrink: 1
-        // },
         viewBtn: {
             backgroundColor: '#f1f1f1',
             paddingHorizontal: 12,
@@ -554,13 +538,15 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         modalTitle: {
             fontSize: 20,
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            color: '#000'
         },
 
         modalMessage: {
             fontSize: 16,
             marginVertical: 10,
-            textAlign: 'center'
+            textAlign: 'center',
+            color: '#000'
         },
 
         okButton: {
@@ -574,16 +560,11 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             color: '#fff',
             fontWeight: 'bold'
         },
-        // qtyBig: {
-        //     fontSize: 11,
-        // },
-
         topSwitchContainer: {
             flexDirection: 'row',
             margin: 4,
             gap: 10
         },
-
         switchCard: {
             flex: 1,
             flexDirection: 'row',
@@ -597,7 +578,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             backgroundColor: '#fff',
             elevation: 3
         },
-
         activeCard: {
             backgroundColor: '#007EA7'
         },
@@ -611,8 +591,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         activeText: {
             color: '#fff'
         },
-
-        /* Manual Card */
         manualCard: {
             margin: 12,
             backgroundColor: '#fff',
@@ -658,24 +636,22 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         cartDetail: {
             fontSize: 11,
-            color: '#555'
+            color: '#000'
         },
-
-        /* Scanner */
         scannerCard: {
             margin: 6,
-            paddingVertical: 10,   // 👈 pehle 16 tha → kam kar diya
+            paddingVertical: 10,
             paddingHorizontal: 12,
             borderRadius: 12,
             backgroundColor: '#fff',
-            alignItems: 'center',   // 👈 center same rakha
+            alignItems: 'center',
             justifyContent: 'center',
             elevation: 3,
-            minHeight: 80           // 👈 control height
+            minHeight: 80
         },
 
         scanTitle: {
-            fontSize: 16,           // 👈 thoda chhota
+            fontSize: 16,
             fontWeight: '600',
             color: '#000',
             marginVertical: 4
@@ -709,15 +685,15 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         },
 
         /* Camera */
-        cameraContainer: {
-            height: 250,
-            margin: 12,
-            borderRadius: 12,
-            overflow: 'hidden'
-        },
-        camera: {
-            flex: 1
-        },
+        // cameraContainer: {
+        //     height: 250,
+        //     margin: 12,
+        //     borderRadius: 12,
+        //     overflow: 'hidden'
+        // },
+        // camera: {
+        //     flex: 1
+        // },
         overlay: {
             position: 'absolute',
             top: 0,
@@ -801,16 +777,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             justifyContent: 'center',
             alignItems: 'center',
         },
-        card: {
-            backgroundColor: '#fff',
-            borderRadius: 16,
-            padding: 14,
-            shadowColor: '#000',
-            shadowOpacity: 0.08,
-            shadowRadius: 6,
-            elevation: 3,
-        },
-
         header1: {
             flexDirection: 'row',
             justifyContent: 'space-between',
@@ -825,33 +791,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             justifyContent: 'center',
             alignItems: 'center',
         },
-
-        title: {
-            fontSize: 15,
-            fontWeight: '700',
-        },
-
-        statusBadge: {
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 10,
-        },
-
-        deleteBtn: {
-            marginTop: 6,
-            backgroundColor: '#FFEBEE',
-            padding: 6,
-            borderRadius: 8,
-        },
-
-        bottomRow: {
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            marginTop: 12,
-            gap: 8,
-        },
-
         infoBox: {
             backgroundColor: '#F1F3F6',
             paddingHorizontal: 10,
@@ -862,6 +801,287 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         infoText: {
             fontSize: 12,
             color: '#555',
+        },
+        card: {
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 14,
+            marginBottom: 12,
+            elevation: 3,
+        },
+
+        cardHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+
+        voucher: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: '#0f172a'
+        },
+
+        middleRow: {
+            marginTop: 8
+        },
+
+        // label: {
+        //     fontSize: 13,
+        //     color: '#64748b',
+        //     marginTop: 2
+        // },
+
+        bottomRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 12
+        },
+
+        backBtn1: {
+            flex: 1,
+            backgroundColor: '#e5e7eb',
+            paddingVertical: 12,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginRight: 6
+        },
+        submitBtn: {
+            flex: 1,
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginLeft: 6
+        },
+        backText: {
+            color: '#000',
+            fontWeight: '600',
+            fontSize: 13
+        },
+
+        submitText: {
+            color: '#fff',
+            fontWeight: '600',
+            fontSize: 13
+        },
+        smallBox: {
+            backgroundColor: '#e5e7eb',
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 8,
+            fontSize: 12,
+            marginRight: 8,
+            color:'#000'
+        },
+
+        editBtn: {
+            backgroundColor: '#dbeafe',
+            padding: 8,
+            borderRadius: 10,
+            marginLeft: 'auto',
+            marginRight: 6
+        },
+
+        deleteBtn: {
+            backgroundColor: '#fee2e2',
+            padding: 8,
+            borderRadius: 10
+        },
+
+        statusBadge: {
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 20,
+            borderWidth: 1
+        },
+
+        filterInfoContainer: {
+            marginHorizontal: 10,
+            marginBottom: 10
+        },
+        yearBox: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 8,
+            backgroundColor: '#ecfeff',
+            padding: 8,
+            borderRadius: 8,
+            alignSelf: 'flex-start'
+        },
+
+        yearText: {
+            marginLeft: 6,
+            fontSize: 12,
+            color: '#000'
+        },
+        viewListBtn: {
+            margin: 10,
+            backgroundColor: '#e0f2f1',
+            padding: 12,
+            borderRadius: 12,
+            alignItems: 'center'
+        },
+
+        viewListText: {
+            color: '#0e7490',
+            fontWeight: '700'
+        },
+        summaryBar: {
+            flexDirection: 'row',
+            backgroundColor: '#f1f5f9',
+            borderRadius: 8,
+            paddingVertical: 6,
+            marginTop: 8,
+            alignItems: 'center'
+        },
+        divider: {
+            width: 1,
+            height: 20,
+            backgroundColor: '#e2e8f0'
+        },
+        summaryItem: {
+            flex: 1,
+            alignItems: 'center'
+        },
+
+        summaryLabel: {
+            fontSize: 10,
+            color: '#64748b'
+        },
+
+        summaryValue: {
+            fontSize: 14,
+            fontWeight: '700',
+            color: '#0f172a',
+            marginTop: 1
+        },
+        cardTitle: { fontWeight: '700', marginBottom: 10, color: '#000' },
+        bottomBar: {
+            flexDirection: 'row',
+            padding: 15,
+            backgroundColor: '#fff',
+            borderTopWidth: 1,
+            borderColor: '#eee',
+        },
+        primaryText: { color: '#fff', fontWeight: '700' },
+        secondaryText: { color: '#000', fontWeight: '600' },
+        summaryContainer: {
+            padding: 10
+        },
+
+        summaryCard1: {
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 12,
+            marginTop: 10,
+            elevation: 3
+        },
+
+        summaryRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+
+        leftBox1: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+
+        indexCircle: {
+            backgroundColor: '#0e7490',
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10
+        },
+
+        cartonNo1: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: '#0e7490'
+        },
+
+        subText1: {
+            fontSize: 12,
+            color: '#555'
+        },
+
+        rightBox1: {
+            alignItems: 'flex-end'
+        },
+
+        totalBox: {
+            backgroundColor: '#eef2f7',
+            padding: 14,
+            borderRadius: 12,
+            marginTop: 12,
+            flexDirection: 'row',
+            justifyContent: 'space-between'
+        },
+        listCard: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            backgroundColor: '#fff',
+            padding: 14,
+            borderRadius: 14,
+            marginBottom: 12,
+            elevation: 3
+        },
+        leftSection: {
+            flexDirection: 'row',
+            alignItems: 'center'
+        },
+        indexText: {
+            color: '#fff',
+            fontWeight: 'bold'
+        },
+        rightSection: {
+            alignItems: 'flex-end',
+            justifyContent: 'center'
+        },
+        deleteIcon: {
+            alignSelf: 'flex-end',
+            marginBottom: 6
+        },
+        cameraHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 40,
+            paddingBottom: 10,
+            backgroundColor: '#000'
+        },
+        cameraTitle: {
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: '600'
+        },
+        cameraContainer: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+        camera: {
+            ...StyleSheet.absoluteFillObject
+        },
+        cameraFooter: {
+            padding: 20,
+            backgroundColor: '#000'
+        },
+        closeScanBtn: {
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 10,
+            alignItems: 'center'
+        },
+        closeScanText: {
+            color: '#fff',
+            fontWeight: '600'
         },
     });
 
@@ -1027,9 +1247,11 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                 if (finalData.length > 0) {
                     setActiveCreels(finalData);
+                    setFilteredData(finalData);
                     closeDrawer();
                 } else {
                     setActiveCreels([]);
+                    setFilteredData([]);
                     Alert.alert("No Record Found", "No data available");
                 }
             }
@@ -1739,8 +1961,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 setDataSaved(true);
                 setSuccessMessage('Data Updated Successfully ✅');
                 setShowSuccess(true);
-                resetAllFields();
-                setIsScanModalVisible(false);
+                // resetAllFields();
+                // setIsScanModalVisible(false);
 
             }
             else if (response.data.success === false) {
@@ -1857,7 +2079,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 setDataSaved(true);
                 setSuccessMessage('Data deleted Successfully ✅');
                 setShowSuccess(true);
-                resetAllFields();
+                // resetAllFields();
 
             }
             else {
@@ -1880,6 +2102,23 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
 
     }
+
+    useEffect(() => {
+        if (!searchText) {
+            setFilteredData(activeCreels);
+        } else {
+            const search = searchText.toLowerCase();
+
+            const filtered = activeCreels.filter(item =>
+                item.CreelId?.toString().toLowerCase().includes(search) ||
+                item.IssDate?.toString().toLowerCase().includes(search) ||
+                item.Shift?.toString().toLowerCase().includes(search) ||
+                item.CreelQty?.toString().toLowerCase().includes(search)
+            );
+
+            setFilteredData(filtered);
+        }
+    }, [searchText, activeCreels]);
 
     // useEffect(() => {
     //     if (!isScanModalVisible) {
@@ -1991,37 +2230,30 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             <HeaderBarwithBack
                 userName={username}
                 header={'Creel Managment System'}
+                subHeader={'Create and manage creel entries for production'}
             />
-            <View style={checkingScannerStyles.flexContainer}>
+            <View style={styles.searchWrapper}>
 
-                {/* creel modal show staert here */}
-                <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => setIsCreelModalVisible(true)}
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: '#007EA7',
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: 6,
-                        marginTop: 0,
-                    }}
-                >
-                    <Icon
-                        name="add"
-                        size={18}
-                        color="#fff"
-                        style={{ marginRight: 0 }}
+                <View style={styles.searchContainer}>
+                    <Icon name="search" size={18} color="#64748b" />
+
+                    <TextInput
+                        placeholder="Search creel..."
+                        placeholderTextColor="#94a3b8"
+                        value={searchText}
+                        onChangeText={setSearchText}
+                        style={styles.searchInput}
                     />
+                </View>
 
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                        Create New Creel
-                    </Text>
+                {/* FILTER BUTTON */}
+                <TouchableOpacity style={styles.filterBtn} onPress={openDrawer}>
+                    <Icon name="filter-list" size={22} color="#0f172a" />
                 </TouchableOpacity>
+
             </View>
-            <View style={checkingScannerStyles.flexContainer}>
-                <TouchableOpacity
+            {/* <View style={checkingScannerStyles.flexContainer}> */}
+            {/* <TouchableOpacity
                     activeOpacity={0.8}
                     style={{
                         flexDirection: 'row',
@@ -2036,193 +2268,81 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     <Text style={{ color: '#070000', fontWeight: 'bold' }}>
                         Active Creels
                     </Text>
-                </TouchableOpacity>
-            </View>
-
+                </TouchableOpacity> */}
+            {/* </View> */}
             <View style={{ paddingHorizontal: 10, flex: 1 }}>
                 <FlatList
-                    data={activeCreels}
+                    data={filteredData}
                     keyExtractor={(item, index) => index.toString()}
                     showsVerticalScrollIndicator={true}
                     contentContainerStyle={{ paddingBottom: 20 }}
                     renderItem={({ item }) => {
-
                         const status = getStatusFromQty(item.CreelQty);
 
                         return (
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                onPress={() => handleViewClick(item)}
-                                style={{ marginBottom: 12 }}
-                            >
-                                <View style={styles.creelCard}>
-                                    <View style={styles.rowBetween}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <Text style={styles.creelTitle}>Creel ID : </Text>
-                                            <Text style={styles.creelTitle}>{item.CreelId}</Text>
-                                        </View>
-
-                                        <View style={{ alignItems: 'flex-end' }}>
-                                            <View style={[
-                                                styles.statusBadge,
-                                                {
-                                                    backgroundColor: status === 'Pending' ? '#FFF3E0' : '#E8F5E9',
-                                                    borderColor: status === 'Pending' ? '#F57C00' : '#2E7D32',
-                                                    borderWidth: 1,
-                                                },
-                                            ]}>
-                                                <Text style={[
-                                                    styles.badgeText,
-                                                    {
-                                                        color: status === 'Pending' ? '#F57C00' : '#2E7D32',
-                                                    },
-                                                ]}>
-                                                    {status}
-                                                </Text>
-                                            </View>
-
-                                            <TouchableOpacity
-                                                onPress={(e) => {
-                                                    e.stopPropagation();
-                                                    confirmDelete(item);
-                                                }}
-                                                style={{
-                                                    marginTop: 6,
-                                                    backgroundColor: '#FFEBEE',
-                                                    padding: 6,
-                                                    borderRadius: 8
-                                                }}
-                                            >
-                                                <Icon name="delete-outline" size={18} color="#D32F2F" />
-                                            </TouchableOpacity>
-
-                                        </View>
-                                    </View>
-
-                                    <View style={{ marginTop: 8 }}>
-                                        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
-                                            <Text style={styles.labelSmall}>Date : </Text>
-                                            <Text style={styles.valueSmall}>{item.IssDate}</Text>
-                                        </View>
-
-                                        <View style={{ flexDirection: 'row' }}>
-                                            <Text style={styles.labelSmall}>Shift : </Text>
-                                            <Text style={styles.valueSmall}>{item.Shift}</Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center' }}>
-                                        <Text style={styles.labelSmall}>Creel Qty : </Text>
-
-                                        <Text
-                                            style={[
-                                                styles.qtyBig,
-                                                {
-                                                    backgroundColor: '#E3F2FD',
-                                                    color: '#1565C0',
-                                                    paddingVertical: 4,
-                                                    paddingHorizontal: 10,
-                                                    borderRadius: 8,
-                                                },
-                                            ]}
-                                        >
-                                            {item.CreelQty}
+                            <View style={styles.card}>
+                                <View style={styles.cardHeader}>
+                                    <View>
+                                        <Text style={styles.voucher}>
+                                            Creel ID : {item.CreelId}
                                         </Text>
                                     </View>
 
+                                    {/* STATUS */}
+                                    <View style={[
+                                        styles.statusBadge,
+                                        {
+                                            backgroundColor: status === 'Pending' ? '#fff7ed' : '#ecfdf5',
+                                            borderColor: status === 'Pending' ? '#f59e0b' : '#16a34a'
+                                        }
+                                    ]}>
+                                        <Text style={{
+                                            color: status === 'Pending' ? '#f59e0b' : '#16a34a',
+                                            fontSize: 12,
+                                            fontWeight: '600'
+                                        }}>
+                                            {status}
+                                        </Text>
+                                    </View>
                                 </View>
-                            </TouchableOpacity>
+                                <View style={styles.middleRow}>
+                                    <Text style={styles.label}>
+                                        Creel Vou No: {item.IssNo}
+                                    </Text>
+                                    <Text style={styles.label}>
+                                        Shift: {item.Shift}
+                                    </Text>
+                                </View>
+                                <View style={styles.bottomRow}>
+
+                                    <Text style={styles.smallBox}>
+                                        {item.IssDate}
+                                    </Text>
+
+                                    <Text style={styles.smallBox}>
+                                        Qty: {Number(item.CreelQty || 0).toFixed(3)}
+                                    </Text>
+                                    <TouchableOpacity style={styles.editBtn}
+                                        onPress={() => {
+                                            setIsEditMode(true);
+                                            handleViewClick(item);
+                                        }}
+                                    >
+                                        <Icon name="edit" size={18} color="#2563eb" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.deleteBtn}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            confirmDelete(item);
+                                        }}>
+                                        <Icon name="delete" size={18} color="#ef4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         );
                     }}
                 />
             </View>
-
-            {/* <View style={{ paddingHorizontal: 10, flex: 1 }}>
-                <FlatList
-                    data={activeCreels}
-                    keyExtractor={(item, index) => index.toString()}
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={{ paddingBottom: 20 }}
-                    renderItem={({ item }) => {
-
-                        const status = getStatusFromQty(item.CreelQty);
-
-                        return (
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                onPress={() => handleViewClick(item)}
-                                style={{ marginBottom: 14 }}
-                            >
-                                <View style={styles.card}>
-
-                                    <View style={styles.header}>
-
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                                            <View style={styles.iconBox}>
-                                                <Text>📦</Text>
-                                            </View>
-
-                                            <View style={{ marginLeft: 10 }}>
-                                                <Text style={styles.title}>Creel ID : {item.CreelId}</Text>
-                                            </View>
-
-                                        </View>
-
-                                        <View style={{ alignItems: 'flex-end' }}>
-
-                                            <View style={[
-                                                styles.statusBadge,
-                                                {
-                                                    backgroundColor: status === 'Pending' ? '#E3F2FD' : '#E8F5E9',
-                                                }
-                                            ]}>
-                                                <Text style={{
-                                                    color: status === 'Pending' ? '#1565C0' : '#2E7D32',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    {status}
-                                                </Text>
-                                            </View>
-
-                                            <TouchableOpacity
-                                                onPress={(e) => {
-                                                    e.stopPropagation();
-                                                    confirmDelete(item);
-                                                }}
-                                                style={styles.deleteBtn}
-                                            >
-                                                <Text style={{ color: '#D32F2F' }}>🗑️</Text>
-                                            </TouchableOpacity>
-
-                                        </View>
-
-                                    </View>
-
-                                    <View style={styles.bottomRow}>
-
-                                        <View style={styles.infoBox}>
-                                            <Text style={styles.infoText}>📅 {item.IssDate}</Text>
-                                        </View>
-
-                                        <View style={styles.infoBox}>
-                                            <Text style={styles.infoText}>Shift: {item.Shift}</Text>
-                                        </View>
-
-                                        <View style={[styles.infoBox, { backgroundColor: '#E3F2FD' }]}>
-                                            <Text style={{ color: '#1565C0', fontWeight: '600' }}>
-                                                Qty: {item.CreelQty}
-                                            </Text>
-                                        </View>
-
-                                    </View>
-
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    }}
-                />
-            </View> */}
             {/* creel modal show over */}
 
             {/* creel add modal start here */}
@@ -2334,7 +2454,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     style={styles.input}
                                                     onPress={() => setShowPicker(true)}
                                                 >
-                                                    <Text>
+                                                    <Text style={{ color: '#000' }}>
                                                         {setupDate ? setupDate.toLocaleDateString() : 'Select Date'}
                                                     </Text>
                                                 </TouchableOpacity>
@@ -2520,443 +2640,437 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 animationType="slide"
                 transparent={false}
                 onRequestClose={() => setIsScanModalVisible(false)}
-
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.container}>
-                        {isLoading && <FullScreenLoader />}
+
+                        {/* 🔥 HEADER */}
                         <HeaderBarwithBack
                             userName={username}
                             header={'Issue Yarn'}
-                            subHeader={
-                                <Text style={{ fontSize: 14, fontWeight: 'bold' }}>
-                                    Scan Cartons and issue yarn for Creel {creelId}
-                                </Text>
-                            }
+                            subHeader={`Scan Cartons and issue yarn for Creel ${creelId}`}
                         />
-                        <View style={styles.topSwitchContainer}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.switchCard,
-                                    showManualSearch === false && styles.activeCard
-                                ]}
-                                onPress={() => setShowManualSearch(false)}
-                            >
-                                <Icon name="camera" size={22} color={showManualSearch === false ? "#fff" : "#007EA7"} />
-                                <Text style={[
-                                    styles.switchText,
-                                    showManualSearch === false && styles.activeText
-                                ]}>
-                                    Scan Carton
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[
-                                    styles.switchCard,
-                                    showManualSearch === true && styles.activeCard
-                                ]}
-                                onPress={() => setShowManualSearch(true)}
-                            >
-                                <Icon name="search" size={20} color={showManualSearch === true ? "#fff" : "#007EA7"} />
-                                <Text style={[
-                                    styles.switchText,
-                                    showManualSearch === true && styles.activeText
-                                ]}>
-                                    Manual Search
-                                </Text>
-                            </TouchableOpacity>
 
-                        </View>
-
-                        {showManualSearch === true && (
-                            <View style={styles.manualCard}>
-
-                                <View style={{ flexDirection: 'row', gap: 8 }}>
-                                    <TextInput
-                                        placeholder="Enter Carton No"
-                                        value={searchText}
-                                        onChangeText={setSearchText}
-                                        style={styles.searchInput}
-                                    />
-                                    <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-                                        <Icon name="search" size={20} color="#fff" />
+                        {/* 🔥 MAIN SWITCH */}
+                        {!showList ? (
+                            <>
+                                <View style={styles.topSwitchContainer}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.switchCard,
+                                            showManualSearch === false && styles.activeCard
+                                        ]}
+                                        // onPress={() => setShowManualSearch(false)
+                                        // }
+                                        onPress={() => {
+                                            setShowManualSearch(false);
+                                            setIsScanning(true); // 🔥 direct camera open
+                                        }}
+                                    >
+                                        <Icon name="camera" size={22} color={showManualSearch === false ? "#fff" : "#007EA7"} />
+                                        <Text style={[
+                                            styles.switchText,
+                                            showManualSearch === false && styles.activeText
+                                        ]}>
+                                            Scan Carton
+                                        </Text>
                                     </TouchableOpacity>
-                                </View>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.switchCard,
+                                            showManualSearch === true && styles.activeCard
+                                        ]}
+                                        onPress={() => setShowManualSearch(true)}
+                                    >
+                                        <Icon name="search" size={20} color={showManualSearch === true ? "#fff" : "#007EA7"} />
+                                        <Text style={[
+                                            styles.switchText,
+                                            showManualSearch === true && styles.activeText
+                                        ]}>
+                                            Manual Search
+                                        </Text>
+                                    </TouchableOpacity>
 
-                                <FlatList
-                                    data={searchResults}
-                                    keyExtractor={(item, index) => index.toString()}
-                                    style={{ marginTop: 10, maxHeight: 150 }}
-                                    renderItem={({ item }) => (
+                                </View>
+                                {showManualSearch === true && (
+                                    <View style={styles.manualCard}>
+
+                                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                                            <TextInput
+                                                placeholder="Enter Carton No"
+                                                value={searchText}
+                                                onChangeText={setSearchText}
+                                                style={styles.searchInput}
+                                            />
+                                            <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                                                <Icon name="search" size={20} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <FlatList
+                                            data={searchResults}
+                                            keyExtractor={(item, index) => index.toString()}
+                                            style={{ marginTop: 10, maxHeight: 150 }}
+                                            renderItem={({ item }) => (
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.resultItem,
+                                                        selectedItem?.CartNo === item.CartNo && styles.selectedItem
+                                                    ]}
+                                                    onPress={() => setSelectedItem(item)}
+                                                >
+                                                    <Text style={styles.cartNo}>{item.CartNo}</Text>
+                                                    <Text style={styles.cartDetail}>
+                                                        {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        />
+
+                                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                                            <TouchableOpacity
+                                                style={[styles.okBtn, { flex: 1 }]}
+                                                onPress={() => {
+                                                    if (!selectedItem) {
+                                                        Alert.alert("Select carton first");
+                                                        return;
+                                                    }
+
+                                                    const data = {
+                                                        CartNo: selectedItem.CartNo,
+                                                        ItmName: selectedItem.ItmName,
+                                                        MerName: selectedItem.MerName,
+                                                        ShdName: selectedItem.ShdName,
+                                                        GrdName: selectedItem.GrdName,
+                                                        Chees: selectedItem.Chees,
+                                                        Wt: selectedItem.Wt,
+                                                        PUId: selectedItem.PUId,
+                                                        PSrNo: selectedItem.PSrNo,
+                                                        PSubSr: selectedItem.PSubSr,
+                                                        TranType: selectedItem.TranType,
+                                                        ItmCode: selectedItem.ItmCode,
+                                                        MerCode: selectedItem.MerCode,
+                                                        GrdCode: selectedItem.GrdCode,
+                                                        ShdCode: selectedItem.ShdCode,
+                                                        Denier: selectedItem.Denier,
+                                                        yearNo: selectedItem.yearno,
+                                                        SrNo: selectedItem.SrNo,
+                                                    };
+
+                                                    setCartonNo(data.CartNo || '');
+                                                    setchees(data.Chees || '');
+                                                    setavgwt(data.Wt || '');
+                                                    setScannedObj(data);
+
+                                                    setShowManualSearch(null);
+                                                    setSearchText('');
+                                                    setSearchResults([]);
+                                                    setSelectedItem(null);
+                                                }}
+
+                                            >
+                                                <Text style={styles.btnTextWhite}>OK</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                style={[styles.cancelBtn2, { flex: 1 }]}
+                                                onPress={() => {
+                                                    setShowManualSearch(null);
+                                                    setSearchText('');
+                                                    setSearchResults([]);
+                                                    setSelectedItem(null);
+                                                }}
+                                            >
+                                                <Text style={styles.btnTextWhite}>Close</Text>
+                                            </TouchableOpacity>
+                                        </View>
+
+                                    </View>
+                                )}
+                                {/* {showManualSearch === false && (
+                                    <View style={styles.scannerCard}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Icon name="camera" size={20} color="#007EA7" />
+                                            <Text style={styles.scanTitle}>QR Scanner</Text>
+                                        </View>
                                         <TouchableOpacity
-                                            style={[
-                                                styles.resultItem,
-                                                selectedItem?.CartNo === item.CartNo && styles.selectedItem
-                                            ]}
-                                            onPress={() => setSelectedItem(item)}
+                                            style={styles.scanBtn}
+                                            onPress={() => setIsScanning(!isScanning)}
                                         >
-                                            <Text style={styles.cartNo}>{item.CartNo}</Text>
-                                            <Text style={styles.cartDetail}>
-                                                {item.ItmName} / {item.MerName} / {item.ShdName}
+                                            <Text style={styles.btnTextWhite}>
+                                                {isScanning ? "Stop" : "Start"}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )} */}
+                                {/* {isScanning && showManualSearch === false && (
+                                    <View style={styles.cameraContainer}>
+                                        {device && hasPermission && (
+                                            <Camera
+                                                style={styles.camera}
+                                                device={device}
+                                                isActive={true}
+                                                codeScanner={codeScanner}
+                                            />
+                                        )}
+                                        <View style={styles.overlay}>
+                                            <View style={styles.scanBox} />
+                                        </View>
+                                    </View>
+                                )} */}
+                                {isScanning && (
+                                    <Modal animationType="fade">
+                                        <View style={{ flex: 1, backgroundColor: '#000' }}>
+                                            <View style={styles.cameraHeader}>
+                                                <Text style={styles.cameraTitle}>Scan QR Code</Text>
+
+                                                <View style={{ width: 26 }} />
+                                            </View>
+                                            <View style={styles.cameraContainer}>
+                                                {device && hasPermission && (
+                                                    <Camera
+                                                        style={styles.camera}
+                                                        device={device}
+                                                        isActive={true}
+                                                        codeScanner={codeScanner}
+                                                    />
+                                                )}
+                                                <View style={styles.overlay}>
+                                                    <View style={styles.scanBox} />
+                                                </View>
+                                            </View>
+                                            <View style={styles.cameraFooter}>
+                                                <TouchableOpacity
+                                                    style={styles.closeScanBtn}
+                                                    onPress={() => setIsScanning(false)}
+                                                >
+                                                    <Text style={styles.closeScanText}>Close Scanner</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    </Modal>
+                                )}
+                                <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                                    {cartonSummary.length > 0 && (
+                                        <TouchableOpacity
+                                            style={styles.viewListBtn}
+                                            onPress={() => setShowList(true)}
+                                        >
+                                            <Text style={styles.viewListText}>
+                                                📋 View Cartons ({cartonSummary.length})
                                             </Text>
                                         </TouchableOpacity>
                                     )}
-                                />
 
-                                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                                    <TouchableOpacity
-                                        style={[styles.okBtn, { flex: 1 }]}
-                                        onPress={() => {
-                                            if (!selectedItem) {
-                                                Alert.alert("Select carton first");
-                                                return;
-                                            }
+                                    <Text style={styles.cardTitle}>Carton Details</Text>
 
-                                            const data = {
-                                                CartNo: selectedItem.CartNo,
-                                                ItmName: selectedItem.ItmName,
-                                                MerName: selectedItem.MerName,
-                                                ShdName: selectedItem.ShdName,
-                                                GrdName: selectedItem.GrdName,
-                                                Chees: selectedItem.Chees,
-                                                Wt: selectedItem.Wt,
-                                                PUId: selectedItem.PUId,
-                                                PSrNo: selectedItem.PSrNo,
-                                                PSubSr: selectedItem.PSubSr,
-                                                TranType: selectedItem.TranType,
-                                                ItmCode: selectedItem.ItmCode,
-                                                MerCode: selectedItem.MerCode,
-                                                GrdCode: selectedItem.GrdCode,
-                                                ShdCode: selectedItem.ShdCode,
-                                                Denier: selectedItem.Denier,
-                                                yearNo: selectedItem.yearno,
-                                                SrNo: selectedItem.SrNo,
-                                            };
+                                    <View style={styles.card}>
 
-                                            setCartonNo(data.CartNo || '');
-                                            setchees(data.Chees || '');
-                                            setavgwt(data.Wt || '');
-                                            setScannedObj(data);
-
-                                            setShowManualSearch(null);
-                                            setSearchText('');
-                                            setSearchResults([]);
-                                            setSelectedItem(null);
-                                        }}
-
-                                    >
-                                        <Text style={styles.btnTextWhite}>OK</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={[styles.cancelBtn2, { flex: 1 }]}
-                                        onPress={() => {
-                                            setShowManualSearch(null);
-                                            setSearchText('');
-                                            setSearchResults([]);
-                                            setSelectedItem(null);
-                                        }}
-                                    >
-                                        <Text style={styles.btnTextWhite}>Close</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                            </View>
-                        )}
-                        {showManualSearch === false && (
-                            <View style={styles.scannerCard}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Icon name="camera" size={20} color="#007EA7" />
-                                    <Text style={styles.scanTitle}>QR Scanner</Text>
-                                </View>
-                                <TouchableOpacity
-                                    style={styles.scanBtn}
-                                    onPress={() => setIsScanning(!isScanning)}
-                                >
-                                    <Text style={styles.btnTextWhite}>
-                                        {isScanning ? "Stop" : "Start"}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                        {isScanning && showManualSearch === false && (
-                            <View style={styles.cameraContainer}>
-                                {device && hasPermission && (
-                                    <Camera
-                                        style={styles.camera}
-                                        device={device}
-                                        isActive={true}
-                                        codeScanner={codeScanner}
-                                    />
-                                )}
-                                <View style={styles.overlay}>
-                                    <View style={styles.scanBox} />
-                                </View>
-                            </View>
-                        )}
-                        <FlatList
-                            data={[1]}
-                            keyExtractor={(item, index) => index.toString()}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ padding: 12, paddingBottom: 30 }}
-
-                            // 🔹 HEADER (Form Card)
-                            ListHeaderComponent={
-                                <View style={styles.card}>
-
-                                    <Text style={styles.title}>
-                                        Enter Cartons Detail
-                                    </Text>
-
-                                    {/* Carton Number */}
-                                    <View style={checkingScannerStyles.row}>
-                                        <View style={checkingScannerStyles.halfInput}>
-                                            <Text style={styles.label}>
-                                                Carton Number <Text style={{ color: 'red' }}>*</Text>
-                                            </Text>
+                                        <View style={styles.field}>
+                                            <Text style={styles.label}>Carton Number</Text>
                                             <TextInput
-                                                placeholder="Carton number"
                                                 style={styles.inputDisabled}
                                                 value={CartonNo}
-                                                onChangeText={setCartonNo}
                                                 editable={false}
                                             />
                                         </View>
-                                    </View>
 
-                                    {/* Chees + Qty */}
-                                    <View style={styles.row}>
-                                        <View style={[styles.halfInput, { marginTop: 10 }]}>
-                                            <Text style={styles.label}>
-                                                Number Of Chees <Text style={{ color: 'red' }}>*</Text>
-                                            </Text>
+                                        <View style={styles.row}>
+                                            <View style={styles.fieldHalf}>
+                                                <Text style={styles.label}>Chees</Text>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    value={getchees}
+                                                    onChangeText={setchees}
+                                                    keyboardType="numeric"
+                                                />
+                                            </View>
+
+                                            <View style={styles.fieldHalf}>
+                                                <Text style={styles.label}>Quantity</Text>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    value={getavgwt}
+                                                    onChangeText={setavgwt}
+                                                    keyboardType="numeric"
+                                                />
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.field}>
+                                            <Text style={styles.label}>Item</Text>
                                             <TextInput
-                                                placeholder="Enter number"
-                                                value={getchees}
-                                                keyboardType="decimal-pad"
                                                 style={styles.inputDisabled}
-                                                onChangeText={setchees}
+                                                value={getScannedObj?.ItmName || ''}
+                                                editable={false}
                                             />
                                         </View>
 
-                                        <View style={[styles.halfInput, { marginTop: 10 }]}>
-                                            <Text style={styles.label}>
-                                                Quantity (Kg) <Text style={{ color: 'red' }}>*</Text>
-                                            </Text>
+                                        <View style={styles.field}>
+                                            <Text style={styles.label}>Merge</Text>
                                             <TextInput
-                                                placeholder="Enter qty"
-                                                value={getavgwt}
-                                                keyboardType="decimal-pad"
                                                 style={styles.inputDisabled}
-                                                onChangeText={setavgwt}
+                                                value={getScannedObj?.MerName || ''}
+                                                editable={false}
                                             />
                                         </View>
+
+                                        <View style={styles.field}>
+                                            <Text style={styles.label}>Shade</Text>
+                                            <TextInput
+                                                style={styles.inputDisabled}
+                                                value={getScannedObj?.ShdName || ''}
+                                                editable={false}
+                                            />
+                                        </View>
+
+                                        <View style={styles.field}>
+                                            <Text style={styles.label}>Grade</Text>
+                                            <TextInput
+                                                style={styles.inputDisabled}
+                                                value={getScannedObj?.GrdName || ''}
+                                                editable={false}
+                                            />
+                                        </View>
+
                                     </View>
 
-                                    {/* Info */}
-                                    {getScannedObj && Object.keys(getScannedObj).length > 0 && (
-                                        <View style={{ marginTop: 6 }}>
-                                            <View style={styles.infoRow}>
-                                                <Text style={styles.infoLabel}>Item Name:</Text>
-                                                <Text style={styles.infoValue}>{getScannedObj?.ItmName || '-'}</Text>
+                                </ScrollView>
+
+                                {/* 🔥 BUTTONS */}
+                                <View style={styles.bottomBar}>
+                                    <TouchableOpacity
+                                        style={styles.secondaryBtn}
+                                        // onPress={() => {
+                                        //     setIsScanModalVisible(false);
+                                        //     resetAllFields();
+                                        // }}
+                                        onPress={() => {
+                                            setIsScanModalVisible(false);
+                                            setIsCreelModalVisible(true);
+
+                                            // resetAllFields();              
+                                        }}
+                                    >
+                                        <Text style={styles.secondaryText}>Close</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.primaryBtn}
+                                        onPress={() => {
+                                            handleAddCarton();
+                                            setShowList(true);
+                                        }}
+                                    >
+                                        <Text style={styles.primaryText}>Submit</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+
+                        ) : (
+                            <View style={styles.card}>
+                                <Text style={styles.cardTitle}>
+                                    Yarn Issuance Summary ({cartonSummary.length})
+                                </Text>
+                                <FlatList
+                                    data={cartonSummary}
+                                    keyExtractor={(item, index) => index.toString()}
+                                    contentContainerStyle={{ paddingBottom: 10 }}
+                                    renderItem={({ item, index }) => (
+                                        <View style={styles.listCard}>
+                                            {/* LEFT SIDE */}
+                                            <View style={styles.leftSection}>
+                                                <View style={styles.indexCircle}>
+                                                    <Text style={styles.indexText}>{index + 1}</Text>
+                                                </View>
+
+                                                <View>
+                                                    <Text style={styles.cartonNo}>
+                                                        {item.cartonNo}
+                                                    </Text>
+                                                    <Text style={styles.subText}>
+                                                        {item.ItmName} / {item.MerName}
+                                                    </Text>
+                                                    <Text style={styles.subText}>
+                                                        {item.ShdName} / {item.GrdName}
+                                                    </Text>
+                                                </View>
                                             </View>
-                                            <View style={styles.infoRow}>
-                                                <Text style={styles.infoLabel}>Merge:</Text>
-                                                <Text style={styles.infoValue}>{getScannedObj?.MerName || '-'}</Text>
-                                            </View>
-                                            <View style={styles.infoRow}>
-                                                <Text style={styles.infoLabel}>Shade:</Text>
-                                                <Text style={styles.infoValue}>{getScannedObj?.ShdName || '-'}</Text>
-                                            </View>
-                                            <View style={styles.infoRow}>
-                                                <Text style={styles.infoLabel}>Grade:</Text>
-                                                <Text style={styles.infoValue}>{getScannedObj?.GrdName || '-'}</Text>
+
+                                            {/* RIGHT SIDE */}
+                                            <View style={styles.rightSection}>
+                                                <TouchableOpacity
+                                                    style={styles.deleteIcon}
+                                                    onPress={() => confirmcartondelete(item)}
+                                                >
+                                                    <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                                </TouchableOpacity>
+                                                <Text style={styles.qtyText}>
+                                                    Qty: {item.qty}
+                                                </Text>
+
+                                                <Text style={styles.cheesText}>
+                                                    Chees: {item.chees}
+                                                </Text>
                                             </View>
                                         </View>
                                     )}
+                                />
+
+                                <View style={styles.summaryBar}>
+                                    <View style={styles.summaryItem}>
+                                        <Text style={styles.summaryLabel}>Items</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {cartonSummary.length}
+                                        </Text>
+                                    </View>
+
+                                    <View style={styles.divider} />
+                                    <View style={styles.summaryItem}>
+                                        <Text style={styles.summaryLabel}>Total Qty</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {cartonSummary
+                                                .reduce((sum, item) => sum + Number(item.qty || 0), 0)
+                                                .toFixed(3)
+                                            }
+                                        </Text>
+                                    </View>
 
                                 </View>
-                            }
-                            ListFooterComponent={() => (
-                                <>
-                                    <View style={styles.bottomBtnContainer}>
+                                <View style={styles.bottomRow}>
+                                    <TouchableOpacity
+                                        style={styles.backBtn1}
+                                        // onPress={() => setShowList(false)}
+                                        onPress={() => setShowList(false)}
+                                    >
+                                        <Text style={styles.backText}>＋ Add More</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.submitBtn}
+                                        onPress={handleFinalSubmit}
+                                    >
+                                        <Text style={styles.submitText}>✈ Submit All</Text>
+                                    </TouchableOpacity>
+                                </View>
 
-                                        <View style={styles.btnRow}>
-                                            <TouchableOpacity
-                                                style={styles.primaryBtn}
-                                                onPress={handleAddCarton}
-                                            >
-                                                <Text style={styles.btnText}>Add Carton</Text>
-                                            </TouchableOpacity>
+                            </View>
 
-                                            <TouchableOpacity
-                                                style={styles.secondaryBtn}
-                                                onPress={() => {
-                                                    setCartonNo('');
-                                                    setchees('');
-                                                    setavgwt('');
-                                                    setScannedObj({});
-                                                }}
-                                            >
-                                                <Text style={styles.btnText}>Cancel</Text>
-                                            </TouchableOpacity>
-                                        </View>
+                        )}
 
-                                        <View style={styles.btnRow}>
-                                            <TouchableOpacity
-                                                style={styles.primaryBtn}
-                                                onPress={handleFinalSubmit}
-                                            // onPress={handleaddCreel}
-                                            >
-                                                <Text style={styles.btnText}>
-                                                    {isEditMode ? "Update Scan" : "Submit Scan"}
-                                                </Text>
-                                                {/* <Text style={styles.btnText}>Submit Scan</Text> */}
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={styles.secondaryBtn}
-                                                onPress={() => {
-                                                    setIsScanModalVisible(false);
-                                                    resetAllFields();
-                                                    // setIsCreelModalVisible(true);
-                                                }}
-                                            >
-                                                <Text style={styles.btnText}>Close</Text>
-                                            </TouchableOpacity>
-                                        </View>
-
-                                    </View>
-
-                                    {cartonSummary.length > 0 && (
-                                        <View style={styles.summaryCard}>
-                                            <Text style={styles.summaryTitle}>
-                                                Yarn Issuance Summary
-                                            </Text>
-
-                                            <Text style={styles.summarySub}>
-                                                {cartonSummary.length} carton(s)
-                                            </Text>
-
-                                            {/* <View style={{ height: 100 }}>
-                                                <ScrollView
-                                                    horizontal
-                                                    showsHorizontalScrollIndicator={true}
-                                                    nestedScrollEnabled={true}
-
-                                                >
-                                                    <View style={{ minWidth: screenWidth + 300 }}>
-                                                        <View style={styles.headerRow}>
-                                                            <Text style={[styles.header, { width: 40 }]}>Sr No.</Text>
-                                                            <Text style={[styles.header, { width: 100 }]}>Carton</Text>
-                                                            <Text style={[styles.header, { width: 150 }]}>Item</Text>
-                                                            <Text style={[styles.header, { width: 80 }]}>Merge</Text>
-                                                            <Text style={[styles.header, { width: 80 }]}>Grade</Text>
-                                                            <Text style={[styles.header, { width: 85 }]}>Shade</Text>
-                                                            <Text style={[styles.header, { width: 80 }]}>Qty</Text>
-                                                            <Text style={[styles.header, { width: 70 }]}>Chees</Text>
-                                                            <Text style={[styles.header, { width: 50 }]}>Action</Text>
-                                                        </View>
-
-                                                        <FlatList
-                                                            data={cartonSummary}
-                                                            keyExtractor={(item, index) => index.toString()}
-                                                            renderItem={({ item, index }) => (
-                                                                <View style={styles.row1}>
-                                                                    <Text style={[styles.cell, { width: 40 }]}>{item.PSrNo}</Text>
-                                                                    <Text style={[styles.cell, { width: 100 }]}>{item.cartonNo}</Text>
-                                                                    <Text style={[styles.cell, { width: 150 }]}>{item.ItmName}</Text>
-                                                                    <Text style={[styles.cell, { width: 80 }]}>{item.MerName}</Text>
-                                                                    <Text style={[styles.cell, { width: 80 }]}>{item.GrdName}</Text>
-                                                                    <Text style={[styles.cell, { width: 85 }]}>{item.ShdName}</Text>
-                                                                    <Text style={[styles.cell, { width: 70 }]}>{item.qty}</Text>
-                                                                    <Text style={[styles.cell, { width: 50 }]}>{item.chees}</Text>
-
-                                                                    <TouchableOpacity
-                                                                        style={[styles.cell, { width: 80, alignItems: 'center' }]}
-                                                                        onPress={() => {
-                                                                            setCartonSummary(prev =>
-                                                                                prev.filter((_, i) => i !== index)
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        <Icon name="delete" size={18} color="#ff4d4f" />
-                                                                    </TouchableOpacity>
-                                                                </View>
-                                                            )}
-                                                            style={{ maxHeight: 100 }}
-                                                        />
-                                                    </View>
-                                                </ScrollView>
-                                            </View> */}
-
-
-                                            <View style={{ maxHeight: 200 }}>
-                                                <ScrollView horizontal showsHorizontalScrollIndicator>
-                                                    <View style={{ minWidth: screenWidth + 300 }}>
-                                                        <View style={styles.headerRow}>
-                                                            {/* <Text style={[styles.header1, { width: COL.sr }]}>Sr No.</Text> */}
-                                                            <Text style={[styles.header1, { width: COL.carton }]}>Carton</Text>
-                                                            <Text style={[styles.header1, { width: COL.item }]}>Item</Text>
-                                                            <Text style={[styles.header1, { width: COL.merge }]}>Merge</Text>
-                                                            <Text style={[styles.header1, { width: COL.grade }]}>Grade</Text>
-                                                            <Text style={[styles.header1, { width: COL.shade }]}>Shade</Text>
-                                                            <Text style={[styles.header1, { width: COL.qty }]}>Qty</Text>
-                                                            <Text style={[styles.header1, { width: COL.chees }]}>Chees</Text>
-                                                            <Text style={[styles.header1, { width: COL.action }]}>Action</Text>
-                                                        </View>
-                                                        <ScrollView
-                                                            style={{ maxHeight: 200 }}
-                                                            nestedScrollEnabled={true}
-                                                            showsVerticalScrollIndicator={true}
-                                                        >
-                                                            {cartonSummary.map((item, index) => (
-                                                                <View style={styles.row1} key={index}>
-                                                                    {/* <Text style={[styles.cell, { width: COL.sr }]}>{item.SrNo}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.sr }]}>{item.SubSrNo}</Text> */}
-                                                                    <Text style={[styles.cell, { width: COL.carton }]}>{item.cartonNo}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.item }]}>{item.ItmName}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.merge }]}>{item.MerName}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.shade }]}>{item.GrdName}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.qty }]}>{item.ShdName}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.chees }]}>{item.qty}</Text>
-                                                                    <Text style={[styles.cell, { width: COL.action }]}>{item.chees}</Text>
-
-                                                                    <TouchableOpacity
-                                                                        style={{ width: 80, alignItems: 'center' }}
-                                                                        // onPress={() => {
-                                                                        // setCartonSummary(prev =>
-                                                                        //     prev.filter((_, i) => i !== index)
-                                                                        // );
-                                                                        // handledeletecarton();
-                                                                        // }}
-                                                                        onPress={() => confirmcartondelete(item)}
-                                                                    >
-                                                                        <Icon name="delete" size={18} color="#ff4d4f" />
-                                                                    </TouchableOpacity>
-                                                                </View>
-                                                            ))}
-                                                        </ScrollView>
-
-                                                    </View>
-                                                </ScrollView>
-                                            </View>
-                                        </View>
-                                    )}
-
-                                </>
-                            )}
-                        />
                     </View>
-
-
                 </View>
-            </Modal>
+            </Modal >
+
             {/* cartons modal end over */}
 
-            <TouchableOpacity style={styles.fab} onPress={openDrawer}>
-                <Icon name="read-more" size={20} color="#fff" />
-            </TouchableOpacity>
+
+            <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
+                onPress={() => {
+                    setIsCreelModalVisible(true);
+                    resetAllFields();
+                }}
+            >
+                <Icon name="add" size={20} color="#fff" />
+            </TouchableOpacity >
 
             <Modal transparent visible={showSuccess} animationType="fade">
                 <View style={styles.modalOverlay}>

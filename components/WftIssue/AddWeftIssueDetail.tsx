@@ -32,7 +32,8 @@ const AddWeftIssueDetail = (props) => {
         editData,
         mainUId,
         isEditMode,
-        isItemdetailvisible
+        isItemdetailvisible,
+        resetFlag
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -59,6 +60,8 @@ const AddWeftIssueDetail = (props) => {
     let cancelToken: any;
 
     // console.log("FormState.values", FormState.values)
+    console.log("Formstate.values.PrpCode", FormState.values.PrpCode);
+    console.log("Formstate.values.YearNo", FormState.values.YearNo);
 
     React.useEffect(() => {
         Animated.timing(slideAnim, {
@@ -78,17 +81,94 @@ const AddWeftIssueDetail = (props) => {
         cancelToken: cancelToken?.token,
     });
 
+    // const soshow = async () => {
+    //     const userPtype = await AsyncStorage.getItem('user_prptype');
+    //     if (!FormState.values.PrpCode || !FormState.values.YearNo) {
+    //         return;
+    //     }
+    //     try {
+    //         setIsLoading(true);
+
+    //         const source = axios.CancelToken.source();
+
+    //         const historyPayload = {
+    //             uid: FormState.values.uid || '0',
+    //             prpcode: FormState.values.PrpCode,
+    //             yearno: FormState.values.YearNo,
+    //             strcode: '012',
+    //             action: 'add',
+    //             txntype: 'beam_weft_issue'
+    //         };
+
+    //         console.log("GET Params:", historyPayload);
+
+    //         const response = await axios.get(
+    //             `${API}/api/warpissueshow`,
+    //             {
+    //                 params: historyPayload,
+    //                 headers: {
+    //                     Authorization: `Bearer ${token}`,
+    //                     Accept: 'application/json',
+    //                 },
+    //                 cancelToken: source.token
+    //             }
+    //         );
+
+    //         // 🔥 DEBUG (keep this for now)
+    //         console.log("FULL RESPONSE:", response.data);
+
+    //         // ✅ correct extraction
+    //         const resData = response?.data?.data || {};
+    //         const mainData = resData?.main?.[0] || {};
+
+    //         // console.log("MAIN DATA:", mainData);
+    //         // console.log("D1:", resData?.d1);
+    //         // console.log("D2:", resData?.d2);
+
+    //         const cleanMainData = Object.fromEntries(
+    //             Object.entries(mainData).filter(([key, value]) => {
+    //                 return value !== null && value !== '';
+    //             })
+    //         );
+    //         if (response?.data?.success) {
+    //             const updatedValues = {
+    //                 ...FormState.values,
+    //                 ...cleanMainData,
+    //                 d1: resData?.d1 || [],
+    //                 d2: resData?.d2 || []
+    //             };
+    //             setFormState(prev => ({
+    //                 ...prev,
+    //                 values: updatedValues
+    //             }));
+    //             checkvoucher(updatedValues);
+    //             fetchbeam(updatedValues);
+    //         }
+    //     } catch (error) {
+    //         if (axios.isCancel(error)) {
+    //             console.log("Request cancelled:", error.message);
+    //         } else {
+    //             console.log("ERROR STATUS:", error?.response?.status);
+    //             console.log("ERROR DATA:", error?.response?.data);
+    //         }
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
+
+    const prp = FormState.values.PrpCode;
+    const year = FormState.values.YearNo;
+
     const soshow = async () => {
-        const userPtype = await AsyncStorage.getItem('user_prptype');
-        if (!FormState.values.PrpCode || !FormState.values.YearNo) {
-            return;
-        }
+        // if (!FormState.values.PrpCode || !FormState.values.YearNo) {
+        //     console.log("❌ Missing values");
+        //     return;
+        // }
+
         try {
             setIsLoading(true);
 
-            const source = axios.CancelToken.source();
-
-            const historyPayload = {
+            const payload = {
                 uid: FormState.values.uid || '0',
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
@@ -97,57 +177,52 @@ const AddWeftIssueDetail = (props) => {
                 txntype: 'beam_weft_issue'
             };
 
-            console.log("GET Params:", historyPayload);
+            console.log("🚀 API PAYLOAD:", payload);
 
-            const response = await axios.get(
-                `${API}/api/warpissueshow`,
-                {
-                    params: historyPayload,
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        Accept: 'application/json',
-                    },
-                    cancelToken: source.token
+            const response = await axios.get(`${API}/api/warpissueshow`, {
+                params: payload,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
                 }
-            );
+            });
 
-            // 🔥 DEBUG (keep this for now)
-            console.log("FULL RESPONSE:", response.data);
+            console.log("✅ API RESPONSE:", response.data);
 
-            // ✅ correct extraction
-            const resData = response?.data?.data || {};
-            const mainData = resData?.main?.[0] || {};
-
-            // console.log("MAIN DATA:", mainData);
-            // console.log("D1:", resData?.d1);
-            // console.log("D2:", resData?.d2);
-
-            const cleanMainData = Object.fromEntries(
-                Object.entries(mainData).filter(([key, value]) => {
-                    return value !== null && value !== '';
-                })
-            );
             if (response?.data?.success) {
-                const updatedValues = {
-                    ...FormState.values,
-                    ...cleanMainData,
-                    d1: resData?.d1 || [],
-                    d2: resData?.d2 || []
-                };
+                const resData = response?.data?.data || {};
+                const mainData = resData?.main?.[0] || {};
+
+                // 🔥 SAFE MERGE (NO OVERWRITE IF BLANK)
+                const safeData = {};
+
+                Object.keys(mainData).forEach(key => {
+                    if (mainData[key] !== null && mainData[key] !== '') {
+                        safeData[key] = mainData[key];
+                    }
+                });
+
                 setFormState(prev => ({
                     ...prev,
-                    values: updatedValues
+                    values: {
+                        ...prev.values,   // old safe values
+                        ...safeData,      // only valid values
+
+                        // 🔥 FORCE KEEP (CRITICAL)
+                        PrpCode: prev.values.PrpCode,
+                        YearNo: prev.values.YearNo,
+
+                        d1: resData?.d1 || [],
+                        d2: resData?.d2 || []
+                    }
                 }));
-                checkvoucher(updatedValues);
-                fetchbeam(updatedValues);
+
+                checkvoucher(mainData);
+                fetchbeam(mainData);
             }
+
         } catch (error) {
-            if (axios.isCancel(error)) {
-                console.log("Request cancelled:", error.message);
-            } else {
-                console.log("ERROR STATUS:", error?.response?.status);
-                console.log("ERROR DATA:", error?.response?.data);
-            }
+            console.log("❌ ERROR:", error?.response?.data || error.message);
         } finally {
             setIsLoading(false);
         }
@@ -189,15 +264,16 @@ const AddWeftIssueDetail = (props) => {
                 vouno: values.IssNo || '',
                 suffix: values.suffix || '',
                 month: month,
+                // date: formatDisplayDate(values.IssDate),
                 uid: values.UId,
 
                 // ✅ IMPORTANT: send ISO date directly
-                date: formatDisplayDate(FormState.values.IssDate),
+                date: formatDisplayDate(FormState.values.IssDate) || formatDisplayDate(values.IssDate),
                 module: 'POYIssue',
                 module_no_key: 'IssNo'
             };
 
-            // console.log("Voucher Payload:", payload);
+            console.log("Voucher Payload:", payload);
 
             const response = await axios.get(
                 `${API}/api/checkvoucherno`,
@@ -370,16 +446,31 @@ const AddWeftIssueDetail = (props) => {
         }
     };
 
+    // useEffect(() => {
+    //     console.log("PrpCode:", FormState.values.PrpCode);
+    //     console.log("YearNo:", FormState.values.YearNo);
+    //         console.log("API CALL HO RAHI HAI");
+    //         soshow();
+    // }, [FormState.values.PrpCode, FormState.values.YearNo]);
+
+    // useEffect(() => {
+    //     console.log("🔥 useEffect TRIGGERED");
+    //     console.log("PrpCode:", FormState.values.PrpCode);
+    //     console.log("YearNo:", FormState.values.YearNo);
+
+    //     if (FormState.values.PrpCode && FormState.values.YearNo) {
+    //         console.log("🚀 API CALL");
+    //         soshow();
+    //     }
+    // }, [FormState.values.PrpCode, FormState.values.YearNo]); // ✅ TEMP for debug // ✅ correct
+
 
     useEffect(() => {
-        if (  // 🔥 IMPORTANT
-            FormState.values.PrpCode &&
-            FormState.values.YearNo
-        ) {
+        console.log("🔥 useEffect TRIGGERED", prp, year);
+        if (isVisible && prp && year) {
             soshow();
         }
-    }, [FormState.values.PrpCode, FormState.values.YearNo]);
-
+    }, [isVisible, prp, year]);
 
     const handleLoaddata = async () => {
         onLoadPress();
@@ -474,6 +565,33 @@ const AddWeftIssueDetail = (props) => {
         props.onNext && props.onNext();
     };
 
+    useEffect(() => {
+        if (!FormState.values.IssDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            setFormState(prev => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    IssDate: today.toISOString()
+                }
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
+        console.log("🔥 RESET TRIGGERED");
+
+        setSelectedbeam(null);
+        setselectedstocktype(null);
+        setselecteddesign(null);
+
+        setBeamdata([]);
+        setDesigndata([]);
+
+    }, [resetFlag]);
+
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
 
@@ -560,17 +678,40 @@ const AddWeftIssueDetail = (props) => {
                                                     ? new Date(FormState.values.IssDate)
                                                     : new Date()
                                             }
+                                            // onConfirm={(date) => {
+                                            //     const selectedDate = new Date(date);
+                                            //     selectedDate.setHours(0, 0, 0, 0);
+
+                                            //     setFormState(prev => ({
+                                            //         ...prev,
+                                            //         values: {
+                                            //             ...prev.values,
+                                            //             IssDate: selectedDate.toISOString(),
+                                            //         }
+                                            //     }));
+
+                                            //     setCheckingDatePickerVisible(false);
+                                            // }}
                                             onConfirm={(date) => {
                                                 const selectedDate = new Date(date);
                                                 selectedDate.setHours(0, 0, 0, 0);
 
+                                                const isoDate = selectedDate.toISOString();
+
+                                                // 🔥 updated values bana lo (IMPORTANT)
+                                                const updatedValues = {
+                                                    ...FormState.values,
+                                                    IssDate: isoDate
+                                                };
+
+                                                // ✅ state update
                                                 setFormState(prev => ({
                                                     ...prev,
-                                                    values: {
-                                                        ...prev.values,
-                                                        IssDate: selectedDate.toISOString(),
-                                                    }
+                                                    values: updatedValues
                                                 }));
+
+                                                // 🔥 API call with latest values
+                                                checkvoucher(updatedValues);
 
                                                 setCheckingDatePickerVisible(false);
                                             }}
@@ -883,7 +1024,8 @@ const styles = StyleSheet.create({
         marginBottom: 12
     },
     field: {
-        marginTop: 15
+        marginTop: 15,
+        color: '#000'
     },
     label: {
         fontSize: 14,
@@ -900,7 +1042,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#e2e4e8'
+        borderColor: '#e2e4e8',
+        color: '#000'
     },
     inputText: {
         color: '#000',
@@ -924,7 +1067,8 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 8,
         padding: 10,
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
+        color: '#000'
     },
     card: {
         backgroundColor: '#fff',

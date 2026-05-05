@@ -26,6 +26,7 @@ import { values } from 'lodash';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PartyDropdown from '../Shared/PartyDropdown';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors } from 'react-native/Libraries/NewAppScreen';
 
 
 const CartonAddDrawer = (props) => {
@@ -47,6 +48,7 @@ const CartonAddDrawer = (props) => {
     const [loading, setLoading] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
+    const [timeField, setTimeField] = useState(null);
     const [visible, setVisible] = useState(false);
     const [beamVisible, setBeamVisible] = useState(false);
     const [getDataSaved, setDataSaved] = useState(false);
@@ -158,10 +160,12 @@ const CartonAddDrawer = (props) => {
             const data = response?.data?.response?.data || [];
             if (response?.data?.success && data.length > 0) {
                 setBeamdata(data);
-                await fetchshift(machine);
-                await fetchoperator(machine);
-                await fetchsupervisior(machine);
-                await fetchemployee(machine)
+                await Promise.all([
+                    fetchshift(machine).catch(e => console.log('shift error', e)),
+                    fetchoperator(machine).catch(e => console.log('operator error', e)),
+                    fetchsupervisior(machine).catch(e => console.log('supervisor error', e)),
+                    fetchemployee(machine).catch(e => console.log('employee error', e)),
+                ]);
                 // await checkvoucher(values);
             } else {
                 setBeamdata([]);
@@ -277,9 +281,9 @@ const CartonAddDrawer = (props) => {
                 yearno: FormState.values.YearNo,
                 txntype: 'beam_gaiting_detail',
                 fetch: 'shift',
-                prpcode: machine?.PrpCode || 'SIP'
+                prpcode: machine?.PrpCode || FormState.values.prpcode
             };
-            // console.log("Payload:", historyPayload);
+            console.log("Payload:", historyPayload);
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -314,10 +318,10 @@ const CartonAddDrawer = (props) => {
                 yearno: FormState.values.YearNo,
                 txntype: 'beam_gaiting_detail',
                 fetch: 'employee',
-                prpcode: machine?.PrpCode || 'SIP',
+                prpcode: machine?.PrpCode,
                 stcode: ''
             };
-            // console.log("Payload:", historyPayload);
+            console.log("Payload:", historyPayload);
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -352,10 +356,10 @@ const CartonAddDrawer = (props) => {
                 yearno: FormState.values.YearNo,
                 txntype: 'beam_gaiting_detail',
                 fetch: 'operator',
-                prpcode: machine?.PrpCode || 'SIP',
+                prpcode: machine?.PrpCode,
                 stcode: ''
             };
-            // console.log("Payload:", historyPayload);
+            console.log("Payload:", historyPayload);
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -391,10 +395,10 @@ const CartonAddDrawer = (props) => {
                 yearno: FormState.values.YearNo,
                 txntype: 'beam_gaiting_detail',
                 fetch: 'sprvsr',
-                prpcode: machine?.PrpCode || 'SIP',
+                prpcode: machine?.PrpCode,
                 stcode: ''
             };
-            // console.log("Payload:", historyPayload);
+            console.log("Payload:", historyPayload);
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -506,7 +510,7 @@ const CartonAddDrawer = (props) => {
                 vouno: values.VouNo,
                 suffix: values.Suffix || '',   // ✅ ab sahi jaayega
                 month: month,
-                uid: Uid,
+                uid: values.uid || Uid,
                 // uid: 0,
                 date: formatDate(FormState.values.VouDate),
                 module: 'GRYProcess',
@@ -898,7 +902,12 @@ const CartonAddDrawer = (props) => {
                             <View>
                                 <Text style={castyles.headerTitle}>Beam Gaiting</Text>
                             </View>
-                            <TouchableOpacity onPress={onClose}>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    onClose();
+                                    handleClearForm();
+                                }}
+                            >
                                 <Icon name="close" size={24} color="#fff" />
                             </TouchableOpacity>
 
@@ -909,8 +918,6 @@ const CartonAddDrawer = (props) => {
                             style={castyles.container}
                             contentContainerStyle={{ paddingBottom: 120 }}
                         >
-
-                            {/* DATE */}
                             <View style={castyles.field}>
                                 <Text style={castyles.label}>
                                     Voucher Date <Text style={{ color: "red" }}>*</Text>
@@ -1065,8 +1072,31 @@ const CartonAddDrawer = (props) => {
                                     //         }
                                     //     }));
                                     // }}
-                                    onSelect={(item) => {
+                                    // onSelect={(item) => {
+                                    //     setSelectedbeam(item);
+                                    //     const updatedValues = {
+                                    //         ...FormState.values,
+                                    //         BeamNo: item?.BeamNo || "",
+                                    //         UBeamNo: item?.UBeamNo || "",
+                                    //         WarpLen: item?.WarpLen || "",
+                                    //         BeamLength: item?.WarpLen || "",
+                                    //         PrpCode: item?.PrpCode || "",
+                                    //         BeamUId: item?.BeamUId || "",
+                                    //     };
+                                    //     setFormState(prev => ({
+                                    //         ...prev,
+                                    //         values: updatedValues
+                                    //     }));
+
+                                    //     Soshow({
+                                    //         ...FormState.values,
+                                    //         ...updatedValues
+                                    //     });
+                                    //     checkvoucher(updatedValues);
+                                    // }}
+                                    onSelect={async (item) => {
                                         setSelectedbeam(item);
+
                                         const updatedValues = {
                                             ...FormState.values,
                                             BeamNo: item?.BeamNo || "",
@@ -1080,12 +1110,12 @@ const CartonAddDrawer = (props) => {
                                             ...prev,
                                             values: updatedValues
                                         }));
-
-                                        Soshow({
-                                            ...FormState.values,
-                                            ...updatedValues
+                                        const uidFromShow = await Soshow(updatedValues);
+                                        setUID(uidFromShow);
+                                        await checkvoucher({
+                                            ...updatedValues,
+                                            uid: uidFromShow
                                         });
-                                        checkvoucher(updatedValues);
                                     }}
                                     setSelected={(val) => {
                                         if (!val) {
@@ -1151,14 +1181,14 @@ const CartonAddDrawer = (props) => {
                                 <View style={castyles.row3}>
 
                                     <RNTextInput
-                                        style={[castyles.input3]}
+                                        style={[castyles.input3, { color: '#000' }]}
                                         value={FormState.values.month || ""}
                                         placeholder="Month"
                                         editable={false}
                                     />
 
                                     <RNTextInput
-                                        style={[castyles.input3]}
+                                        style={[castyles.input3, { color: '#000' }]}
                                         value={FormState.values.VouNo || ""}
                                         placeholder="Vou No"
                                         onChangeText={(text) => {
@@ -1175,7 +1205,7 @@ const CartonAddDrawer = (props) => {
                                     />
 
                                     <RNTextInput
-                                        style={[castyles.input3]}
+                                        style={[castyles.input3, { color: '#000' }]}
                                         value={FormState.values.Suffix || ""}
                                         placeholder="Suffix"
                                         onChangeText={(text) => {
@@ -1243,10 +1273,14 @@ const CartonAddDrawer = (props) => {
                                         Start Time <Text style={{ color: 'red' }}>*</Text>
                                     </Text>
                                     <TouchableOpacity
-                                        onPress={() => setShowTimePicker(true)}
+                                        // onPress={() => setShowTimePicker(true)}
+                                        onPress={() => {
+                                            setTimeField("BStTime");
+                                            setShowTimePicker(true);
+                                        }}
                                         style={castyles.editableValueBlack}
                                     >
-                                        <Text>
+                                        <Text style={{ color: '#000' }}>
                                             {new Date(FormState.values.BStTime).toLocaleTimeString([], {
                                                 hour: '2-digit',
                                                 minute: '2-digit'
@@ -1257,8 +1291,8 @@ const CartonAddDrawer = (props) => {
                                     {showTimePicker && (
                                         <DateTimePicker
                                             value={
-                                                FormState.values.BStTime
-                                                    ? new Date(FormState.values.BStTime)
+                                                FormState.values[timeField]
+                                                    ? new Date(FormState.values[timeField])
                                                     : new Date()
                                             }
                                             mode="time"
@@ -1293,10 +1327,14 @@ const CartonAddDrawer = (props) => {
                                         End Time <Text style={{ color: 'red' }}>*</Text>
                                     </Text>
                                     <TouchableOpacity
-                                        onPress={() => setShowTimePicker(true)}
+                                        // onPress={() => setShowTimePicker(true)}
+                                        onPress={() => {
+                                            setTimeField("BEndTime");
+                                            setShowTimePicker(true);
+                                        }}
                                         style={castyles.editableValueBlack}
                                     >
-                                        <Text>
+                                        <Text style={{ color: '#000' }}>
                                             {new Date(FormState.values.BEndTime).toLocaleTimeString([], {
                                                 hour: '2-digit',
                                                 minute: '2-digit'
@@ -1307,8 +1345,8 @@ const CartonAddDrawer = (props) => {
                                     {showTimePicker && (
                                         <DateTimePicker
                                             value={
-                                                FormState.values.BEndTime
-                                                    ? new Date(FormState.values.BEndTime)
+                                                FormState.values[timeField]
+                                                    ? new Date(FormState.values[timeField])
                                                     : new Date()
                                             }
                                             mode="time"
@@ -1781,7 +1819,7 @@ const castyles = StyleSheet.create({
         borderRadius: 12,
         borderWidth: 1,
         borderColor: "#e0e0e0",
-        color:'#000'
+        color: '#000'
     },
 
     row: {
@@ -1832,7 +1870,7 @@ const castyles = StyleSheet.create({
         borderRadius: 8,
         padding: 10,
         backgroundColor: '#fff',
-        color:'#000'
+        color: '#0000'
     },
     halfInput: {
         width: "48%",

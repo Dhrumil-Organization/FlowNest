@@ -317,7 +317,10 @@ const PartyDashboard = ({ navigation, token }) => {
                 {/* 🔥 EXTRA INFO */}
                 <View style={styles.extraRow}>
                   <Text style={styles.extraText}>
-                    💰 Limit: {parseFloat(item.crlimit).toFixed(2) || "0"}
+                    💰 Limit: {Number(item.crlimit || 0).toLocaleString('en-IN', {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    })}
                   </Text>
 
                   <Text style={styles.extraText}>

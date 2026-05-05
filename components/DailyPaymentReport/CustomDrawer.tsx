@@ -335,8 +335,11 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
 
                                     // onConfirm={(date) => setForm(prev => ({ ...prev, EDate: toISODate(date) }))}
                                     onConfirm={(date) => {
+                                        console.log("date --->", date)
                                         const selectedDate = new Date(date);
+                                        console.log("selectedDate --->", selectedDate)
                                         selectedDate.setHours(0, 0, 0, 0);
+                                        console.log("toISODate(selectedDate) --->", toISODate(selectedDate))
                                         setForm(prev => ({ ...prev, fromdate: toISODate(selectedDate) }));
                                         setCheckingDatePickerVisible(false);
                                         // Force UI update

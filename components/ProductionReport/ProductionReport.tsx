@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Modal,
   Animated,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -23,6 +25,8 @@ import {
   fetchAllYeardata,
   fetchAllStoredata,
 } from '../../common/API/Functions';
+//import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const SkeletonCard = () => (
   <View style={styles.card}>
@@ -51,11 +55,97 @@ const ProductionReport = ({ navigation, token }) => {
   const [getAllYearData, setAllYearData] = useState([]);
   const [getAllStoreData, setAllStoreData] = useState([]);
   const [selectedStore, setSelectedStore] = useState('');
+  const [storePickerVisible, setStorePickerVisible] = useState(false);
+
+  const [getFromDate, setFromDate] = useState(null);
+
+  const [getToDate, setToDate] = useState(null);
+  const [checkingDatePickerVisible, setCheckingDatePickerVisible] =
+    useState(false);
+  const [checkingDatePickerVisible1, setCheckingDatePickerVisible1] =
+    useState(false);
+
+  const [getAllMachineGroups, setAllMachineGroups] = useState([]);
+  const [machinegroupPickerVisible, setMachineGroupPickerVisible] =
+    useState(false);
+  const [selectedMachineGroup, setSelectedMachineGroup] = useState(null);
+  const [machineGroupSearch, setMachineGroupSearch] = useState('');
+
+  const [getAllMachineSubGroups, setAllMachineSubGroups] = useState([]);
+  const [machinesubgroupPickerVisible, setMachineSubGroupPickerVisible] =
+    useState(false);
+  const [selectedMachineSubGroup, setSelectedMachineSubGroup] = useState(null);
+  const [machineSubGroupSearch, setMachineSubGroupSearch] = useState('');
+
+  const [getAllMachines, setAllMachines] = useState([]);
+  const [machinePickerVisible, setMachinePickerVisible] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [machineSearch, setMachineSearch] = useState('');
+
+  const [getAllData, setAllData] = useState([]);
+
+  const [alertData, setAlertData] = useState({
+    visible: false,
+    message: '',
+    type: 'warning',
+  });
+
+  const showWarning = msg => {
+    setAlertData({
+      visible: true,
+      message: msg,
+      type: 'warning',
+    });
+  };
+
+  const showSuccess = msg => {
+    setAlertData({
+      visible: true,
+      message: msg,
+      type: 'success',
+    });
+  };
+
+  const showError = msg => {
+    setAlertData({
+      visible: true,
+      message: msg,
+      type: 'error',
+    });
+  };
 
   const getToken = () => token;
 
+  // PROPERTY
   useEffect(() => {
-    console.log('selectedProperty :', selectedProperty);
+    const load = async () => {
+      console.log('token --> ', token);
+      const data = await fetchPropertyData(token);
+      setPropertyData(data || []);
+
+      if (data?.length) setSelectedProperty(data[0]);
+
+      //   if (data && data.length > 0) {
+      //     await fetchAllYeardata(token, data[0].PrpCode);
+      //   }
+    };
+
+    setTimeout(() => {
+      load();
+    }, 2000);
+  }, [token]);
+
+  const selectProperty = item => {
+    setSelectedProperty(item);
+
+    const updated = [
+      item,
+      ...recentProps.filter(p => p.PrpCode !== item.PrpCode),
+    ];
+    setRecentProps(updated.slice(0, 3));
+  };
+
+  useEffect(() => {
     if (
       typeof selectedProperty != 'undefined' &&
       selectedProperty != null &&
@@ -68,18 +158,17 @@ const ProductionReport = ({ navigation, token }) => {
           selectedProperty.PrpCode,
         );
 
-        setAllYearData(allyeardata);
         setYearOptions(allyeardata);
         setSelectedYear(allyeardata[0].YearName);
-        console.log('allyeardata[0].YearName :', allyeardata[0].YearName);
       };
 
-      testFunc();
+      setTimeout(() => {
+        testFunc();
+      }, 2000);
     }
   }, [selectedProperty]);
 
   useEffect(() => {
-    console.log('selectedProperty :', selectedProperty);
     if (
       typeof selectedProperty != 'undefined' &&
       selectedProperty != null &&
@@ -91,61 +180,389 @@ const ProductionReport = ({ navigation, token }) => {
     ) {
       const testFuncyear = async () => {
         const yearno = selectedYear?.slice(-2);
-        console.log('yearno ==>', yearno);
         const allstoredata = await fetchAllStoredata(
           token,
           selectedProperty.PrpCode,
           yearno,
         );
 
-        console.log('allstoredata ------>', allstoredata);
         setAllStoreData(allstoredata);
-        setSelectedStore(allstoredata[0].StrCode);
+        setSelectedStore(allstoredata[0]);
       };
 
-      testFuncyear();
+      setTimeout(() => {
+        testFuncyear();
+      }, 2000);
     }
   }, [selectedYear]);
 
-  //console.log("getAllYearData --->", getAllYearData)
+  //   const filteredData = getAllData.filter(i =>
+  //     i.rowuid?.toLowerCase().includes(search.toLowerCase()),
+  //   );
 
-  // YEAR
-  // useEffect(() => {
-  //   const y = new Date().getFullYear();
-  //   const arr = [];
-  //   for (let i = 0; i < 5; i++) {
-  //     arr.push(`${y - i}-${y - i + 1}`);
-  //   }
-  //   console.log("arr --->", arr)
-  //   setYearOptions(arr);
-  //   setSelectedYear(arr[0]);
-  // }, []);
+  const filteredData = getAllData.filter(item => {
+    const s = search.toLowerCase();
 
-  // PROPERTY
-  useEffect(() => {
-    const load = async () => {
-      const data = await fetchPropertyData(token);
-      console.log('data :', data);
-      setPropertyData(data || []);
-      if (data?.length) setSelectedProperty(data[0]);
-    };
-    load();
-  }, []);
+    return (
+      item.vouno?.toLowerCase().includes(s) ||
+      item.mgrpname?.toLowerCase().includes(s) ||
+      item.msgrpname?.toLowerCase().includes(s) ||
+      item.macname?.toLowerCase().includes(s) ||
+      item.mername?.toLowerCase().includes(s) ||
+      item.prodorderqty?.toString().includes(s) ||
+      item.doffqty?.toString().includes(s) ||
+      item.packingqty?.toString().includes(s)
+    );
+  });
 
-  // SELECT PROPERTY
-  const selectProperty = item => {
-    setSelectedProperty(item);
+  const formatFull = date =>
+    date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
 
-    const updated = [
-      item,
-      ...recentProps.filter(p => p.PrpCode !== item.PrpCode),
-    ];
-    setRecentProps(updated.slice(0, 3));
+  const getMachineGroupData = async () => {
+    let prp1 = selectedProperty ? selectedProperty.PrpCode : '';
+    let yearnumber1 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+
+    if (typeof prp1 == 'undefined' || prp1 == null || prp1 == '') {
+      showWarning('Please select property');
+      return;
+    } else if (
+      typeof yearnumber1 == 'undefined' ||
+      yearnumber1 == null ||
+      yearnumber1 == ''
+    ) {
+      showWarning('Please select yaer');
+      return;
+    } else if (
+      typeof finalStrCode == 'undefined' ||
+      finalStrCode == null ||
+      finalStrCode == ''
+    ) {
+      showWarning('Please select store');
+      return;
+    }
+
+    try {
+      const payload = {
+        fetch: 'macgrp',
+        txntype: 'mob_production_report',
+        prptype: '',
+        prpcode: prp1,
+        yearno: yearnumber1,
+        strcode: finalStrCode,
+      };
+
+      const responsemacgrp = await axios.get(`${API}/api/get_criterion`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        params: payload,
+      });
+
+      if (
+        responsemacgrp.data.success &&
+        responsemacgrp.data.response.data.length > 0
+      ) {
+        setAllMachineGroups(responsemacgrp.data.response.data);
+        if (
+          responsemacgrp.data.response.data &&
+          responsemacgrp.data.response.data.length > 0
+        ) {
+          setSelectedMachineGroup(
+            responsemacgrp.data.response.data[0].MGrpName,
+          );
+        }
+      } else {
+        console.log('❌ API success false:', responsemacgrp?.data);
+      }
+    } catch (error) {
+      console.log('❌ fetchPropertyData error:', error);
+    }
+
+    setMachineGroupPickerVisible(true);
+  };
+  const getMachineSubGroupData = async () => {
+    let prp2 = selectedProperty ? selectedProperty.PrpCode : '';
+    let yearnumber2 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let macgrp2 = selectedMachineGroup ? selectedMachineGroup.MacGrp : '';
+
+    if (typeof prp2 == 'undefined' || prp2 == null || prp2 == '') {
+      showWarning('Please select property');
+      return;
+    } else if (
+      typeof yearnumber2 == 'undefined' ||
+      yearnumber2 == null ||
+      yearnumber2 == ''
+    ) {
+      showWarning('Please select yaer');
+      return;
+    } else if (
+      typeof finalStrCode == 'undefined' ||
+      finalStrCode == null ||
+      finalStrCode == ''
+    ) {
+      showWarning('Please select store');
+      return;
+    }
+
+    try {
+      const payload = {
+        fetch: 'macsgrp',
+        txntype: 'mob_production_report',
+        prptype: '',
+        prpcode: prp2,
+        yearno: yearnumber2,
+        macgrp: macgrp2,
+        strcode: finalStrCode,
+      };
+
+      const responsemacsgrp = await axios.get(`${API}/api/get_criterion`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        params: payload,
+      });
+
+      if (
+        responsemacsgrp.data.success &&
+        responsemacsgrp.data.response.data.length > 0
+      ) {
+        setAllMachineSubGroups(responsemacsgrp.data.response.data);
+        if (
+          responsemacsgrp.data.response.data &&
+          responsemacsgrp.data.response.data.length > 0
+        ) {
+          setSelectedMachineSubGroup(
+            responsemacsgrp.data.response.data[0].MSGrpName,
+          );
+        }
+      } else {
+        console.log('❌ API success false:', responsemacsgrp?.data);
+      }
+    } catch (error) {
+      console.log('❌ fetchPropertyData error:', error);
+    }
+
+    setMachineSubGroupPickerVisible(true);
   };
 
-  const filteredData = partyData.filter(i =>
-    i.accname?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const getMachineData = async () => {
+    let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
+    let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let macgrp3 = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
+    let macsgrp3 = selectedMachineSubGroup
+      ? selectedMachineSubGroup?.MacSGrp
+      : '';
+
+    if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
+      showWarning('Please select property');
+      return;
+    } else if (
+      typeof yearnumber3 == 'undefined' ||
+      yearnumber3 == null ||
+      yearnumber3 == ''
+    ) {
+      showWarning('Please select yaer');
+      return;
+    } else if (
+      typeof finalStrCode == 'undefined' ||
+      finalStrCode == null ||
+      finalStrCode == ''
+    ) {
+      showWarning('Please select store');
+      return;
+    }
+
+    try {
+      const payload = {
+        fetch: 'machine',
+        txntype: 'mob_production_report',
+        prptype: '',
+        prpcode: prp3,
+        yearno: yearnumber3,
+        macgrp: macgrp3,
+        macsgrp: macsgrp3,
+        strcode: finalStrCode,
+      };
+
+      const respo = await axios.get(`${API}/api/get_criterion`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        params: payload,
+      });
+
+      if (respo.data.success && respo.data.response.data.length > 0) {
+        setAllMachines(respo.data.response.data);
+        if (respo.data.response.data && respo.data.response.data.length > 0) {
+          setSelectedMachine(respo.data.response.data[0].MacName);
+        }
+      } else {
+        console.log('❌ API success false:', respo?.data);
+      }
+    } catch (error) {
+      console.log('❌ machine api error:', error);
+    }
+
+    setMachinePickerVisible(true);
+  };
+
+  const fetchData = async () => {
+    let finalPrpCode = selectedProperty ? selectedProperty?.PrpCode : '';
+    let finalYearNo = selectedYear ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let finalMacGrp = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
+    let finalMacSGrp = selectedMachineSubGroup
+      ? selectedMachineSubGroup?.MacSGrp
+      : '';
+    let finalMacCode = selectedMachine ? selectedMachine?.MacCode : '';
+
+    let fd = '';
+    let resfd = '';
+    let finalfromdate = '';
+
+    let td = '';
+    let restd = '';
+    let finaltodate = '';
+
+    if (fd != '') {
+      fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
+      resfd = fd.split('-');
+      finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+    }
+
+    if (td != '') {
+      td = getToDate ? getToDate.toISOString().split('T')[0] : '';
+      restd = td.split('-');
+      finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
+    }
+
+    if (
+      typeof finalPrpCode == 'undefined' ||
+      finalPrpCode == null ||
+      finalPrpCode == ''
+    ) {
+      showWarning('Please select property');
+      return;
+    } else if (
+      typeof finalYearNo == 'undefined' ||
+      finalYearNo == null ||
+      finalYearNo == ''
+    ) {
+      showWarning('Please select yaer');
+      return;
+    } else if (
+      typeof finalStrCode == 'undefined' ||
+      finalStrCode == null ||
+      finalStrCode == ''
+    ) {
+      showWarning('Please select store');
+      return;
+    } else {
+      setLoading(true);
+      const payload = {
+        prptype: '',
+        txntype: 'mob_production_report',
+        prpcode: finalPrpCode,
+        yearno: finalYearNo,
+        strcode: finalStrCode,
+        macgrp: finalMacGrp,
+        macsgrp: finalMacSGrp,
+        maccode: finalMacCode,
+        fromdate: finalfromdate,
+        todate: finaltodate,
+      };
+
+      const headers = {
+        Authorization: `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+        'X-Requested-with': 'XMLHttpRequest',
+      };
+
+      console.log('proproductionreport API payload', payload);
+      console.log(
+        'proproductionreport API URL',
+        `${API}/api/prodproductionreport`,
+      );
+      //console.log("userPtype :", userPtype)
+
+      try {
+        const response = await axios.post(
+          `${API}/api/prodproductionreport`,
+          payload,
+          { headers },
+        );
+        console.log('proproductionreport API response', response);
+
+        if (response.data.success === true && response.data.data.length === 0) {
+          Alert.alert('No Data Found');
+
+          setAllData([]);
+        } else if (
+          response.data.success === true &&
+          response.data.data.length > 0
+        ) {
+          setAllData(response.data.data);
+        } else if (response.data.success === false) {
+          Alert.alert(`${response.data.message}`);
+
+          setAllData([]);
+        } else {
+          Alert.alert(`${response.data.message}`);
+
+          setAllData([]);
+        }
+      } catch (error) {
+        setLoading(false);
+        setAllData([]);
+        Alert.alert('Server Error');
+      } finally {
+        setLoading(false);
+        // handleCriteriaFormClose()
+        // setCriteriaFormOpen(false)
+      }
+    }
+  };
+
+  function formatDate(input = '') {
+    // Handle empty, null, undefined, or 0
+    if (!input || input === 0) return '';
+
+    const str = String(input);
+
+    // Validate length (must be YYYYMMDD = 8 chars)
+    if (str.length !== 8) return '';
+
+    const year = str.substring(0, 4);
+    const month = str.substring(4, 6);
+    const day = str.substring(6, 8);
+
+    return `${day}/${month}/${year}`;
+  }
+
+  const calcQty = (a = 0, b = 0) => {
+    let a1 = typeof a == 'undefined' || a == null || a == '' ? 0 : a;
+    let b1 = typeof b == 'undefined' || b == null || b == '' ? 0 : b;
+    let c1 = 0;
+    let c = 0;
+
+    c1 = parseFloat(a1) - parseFloat(b1);
+    c = parseFloat(c1).toFixed(3);
+
+    return c;
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F5F7FB' }}>
@@ -165,6 +582,19 @@ const ProductionReport = ({ navigation, token }) => {
         </TouchableOpacity>
       </LinearGradient>
 
+      {/* SEARCH */}
+      <View style={styles.searchBox}>
+        <Icon name="search" size={18} color="#888" style={{ marginRight: 8 }} />
+
+        <TextInput
+          placeholder="Search here..."
+          placeholderTextColor="#999"
+          value={search}
+          onChangeText={setSearch}
+          style={styles.searchInput}
+        />
+      </View>
+
       <FlatList
         data={filteredData}
         keyExtractor={(i, index) => index.toString()}
@@ -174,7 +604,7 @@ const ProductionReport = ({ navigation, token }) => {
 
           const onPressIn = () => {
             Animated.spring(scale, {
-              toValue: 0.96,
+              toValue: 0.97,
               useNativeDriver: true,
             }).start();
           };
@@ -186,71 +616,69 @@ const ProductionReport = ({ navigation, token }) => {
             }).start();
           };
 
-          const fullAddress = [
-            item.Address,
-            item.City,
-            item.State,
-            item.Cnty,
-            item.Zip,
-          ]
-            .filter(Boolean)
-            .join(', ');
-
           return (
             <AnimatedTouchable
-              style={[styles.card, { transform: [{ scale }] }]}
+              style={[styles.proCard, { transform: [{ scale }] }]}
               activeOpacity={0.9}
               onPressIn={onPressIn}
               onPressOut={onPressOut}
-              onPress={() =>
-                navigation.navigate('PartyDetailScreen', {
-                  party: item,
-                  token: token,
-                  selectedProperty: selectedProperty, // ✅ ADD THIS
-                  selectedYear: selectedYear, // ✅ ADD THIS
-                })
-              }
             >
-              {/* AVATAR */}
+              {/* TOP GRADIENT STRIP */}
               <LinearGradient
-                colors={['#0F2027', '#2C5364']}
-                style={styles.avatar}
+                colors={['#0F6C7B', '#1399A8']}
+                style={styles.cardTop}
               >
-                <Text style={styles.avatarText}>
-                  {item.accountname?.charAt(0)}
-                </Text>
+                <Text style={styles.voucherText}>#{item.vouno}</Text>
+                <Text style={styles.dateText}>{formatDate(item.voudate)}</Text>
               </LinearGradient>
 
-              {/* CONTENT */}
-              <View style={{ flex: 1 }}>
-                {/* TOP ROW */}
-                <View style={styles.topRow}>
-                  <View style={styles.codeBadge}>
-                    <Text style={styles.codeText}>{item.acccode}</Text>
+              {/* BODY */}
+              <View style={styles.cardBody}>
+                {/* MACHINE INFO */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Machine Info</Text>
+
+                  <Text style={styles.infoText}>
+                    group : {item.mgrpname} | sub group : {item.msgrpname}
+                  </Text>
+
+                  <Text style={styles.machineName}>{item.macname}</Text>
+                </View>
+
+                {/* DIVIDER */}
+                <View style={styles.divider} />
+
+                {/* QTY GRID */}
+                <View style={styles.qtyRow}>
+                  <View style={styles.qtyBox}>
+                    <Text style={styles.qtyLabel}>Order qty</Text>
+                    <Text style={styles.qtyValue}>{item.prodorderqty}</Text>
                   </View>
 
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>Active</Text>
+                  <View style={styles.qtyBox}>
+                    <Text style={styles.qtyLabel}>Doff</Text>
+                    <Text style={styles.qtyValue}>{item.doffqty}</Text>
+                  </View>
+
+                  <View style={styles.qtyBox}>
+                    <Text style={styles.qtyLabel}>Packing</Text>
+                    <Text style={styles.qtyValue}>{item.packingqty || 0}</Text>
                   </View>
                 </View>
 
-                {/* NAME */}
-                <Text style={styles.name}>{item.accountname}</Text>
-
-                {/* ADDRESS */}
-                <Text style={styles.address}>
-                  {fullAddress || 'No address available'}
-                </Text>
-
-                {/* 🔥 EXTRA INFO */}
-                <View style={styles.extraRow}>
-                  <Text style={styles.extraText}>
-                    💰 Limit: {parseFloat(item.crlimit).toFixed(2) || '0'}
+                {/* REMAIN HIGHLIGHT */}
+                <View style={styles.remainBox}>
+                  <Text style={styles.remainLabel}>Remaining</Text>
+                  <Text style={styles.remainValue}>
+                    {calcQty(item.doffqty, item.packingqty)}
                   </Text>
+                </View>
 
-                  <Text style={styles.extraText}>👤 {item.conname || '-'}</Text>
-
-                  <Text style={styles.extraText}>📞 {item.contel || '-'}</Text>
+                {/* FOOTER */}
+                <View style={styles.footer}>
+                  <Text style={styles.footerText}>
+                    Merge: {item.mername || '-'}
+                  </Text>
                 </View>
               </View>
             </AnimatedTouchable>
@@ -272,43 +700,390 @@ const ProductionReport = ({ navigation, token }) => {
       />
 
       {/* FILTER MODAL */}
-      <Modal transparent visible={filterVisible} animationType="fade">
+      <Modal
+        transparent
+        visible={filterVisible}
+        animationType="fade"
+        statusBarTranslucent={true}
+      >
         <View style={styles.overlay}>
           <View style={styles.sheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.title}></Text>
-              <TouchableOpacity onPress={() => setFilterVisible(false)}>
-                <Icon name="close" size={15} style={{ color: '#000' }} />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.title}></Text>
+                <TouchableOpacity onPress={() => setFilterVisible(false)}>
+                  <Icon name="close" size={20} style={{ color: '#000' }} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.label}>Property</Text>
+              <TouchableOpacity
+                style={styles.inputBox}
+                onPress={() => setPropertyPickerVisible(true)}
+              >
+                <Text numberOfLines={1} style={{ color: '#000' }}>
+                  {selectedProperty?.LngName || 'Select property'}
+                </Text>
+                <Icon name="keyboard-arrow-down" size={24} />
               </TouchableOpacity>
-            </View>
 
-            <Text style={styles.label}>Property</Text>
-            <TouchableOpacity
-              style={styles.inputBox}
-              onPress={() => setPropertyPickerVisible(true)}
-            >
-              <Text numberOfLines={1} style={{ color: '#000' }}>
-                {selectedProperty?.LngName || 'Select property'}
-              </Text>
-              <Icon name="keyboard-arrow-down" size={24} />
-            </TouchableOpacity>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginTop: 10,
+                }}
+              >
+                {/* YEAR → 30% */}
+                <View style={{ flex: 0.4, marginRight: 8 }}>
+                  <Text style={styles.label}>Year</Text>
+                  <TouchableOpacity
+                    style={styles.bigInput}
+                    onPress={() => setYearPickerVisible(true)}
+                  >
+                    <Text numberOfLines={1} style={styles.inputText}>
+                      {selectedYear || 'Year'}
+                    </Text>
+                    <Icon name="keyboard-arrow-down" size={20} />
+                  </TouchableOpacity>
+                </View>
 
-            <Text style={styles.label}>Year</Text>
-            <TouchableOpacity
-              style={styles.bigInput}
-              onPress={() => setYearPickerVisible(true)}
-            >
-              <Text style={styles.inputText}>
-                {selectedYear || 'Select Year'}
-              </Text>
+                {/* STORE → 70% */}
+                <View style={{ flex: 0.6, marginLeft: 8 }}>
+                  <Text style={styles.label}>Store</Text>
+                  <TouchableOpacity
+                    style={styles.bigInput}
+                    onPress={() => setStorePickerVisible(true)}
+                  >
+                    <Text numberOfLines={1} style={styles.inputText}>
+                      {selectedStore?.StrName || 'Select Store'}
+                    </Text>
+                    <Icon name="keyboard-arrow-down" size={20} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginTop: 10,
+                }}
+              >
+                {/* FROM DATE */}
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.label}>From date</Text>
+                  <TouchableOpacity
+                    style={styles.bigInput}
+                    onPress={() => setCheckingDatePickerVisible(true)}
+                  >
+                    <Text style={styles.inputText}>
+                      {getFromDate ? formatFull(getFromDate) : 'From date'}
+                    </Text>
+                    <Icon name="keyboard-arrow-down" size={20} />
+                  </TouchableOpacity>
+                </View>
 
-              <Icon name="keyboard-arrow-down" size={20} />
-            </TouchableOpacity>
+                {/* TO DATE */}
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.label}>To date</Text>
+                  <TouchableOpacity
+                    style={styles.bigInput}
+                    onPress={() => setCheckingDatePickerVisible1(true)}
+                  >
+                    <Text style={styles.inputText}>
+                      {getToDate ? formatFull(getToDate) : 'To date'}
+                    </Text>
+                    <Icon name="keyboard-arrow-down" size={20} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.label}>Machine group</Text>
+              <TouchableOpacity
+                style={styles.inputBox}
+                onPress={getMachineGroupData}
+              >
+                <Text numberOfLines={1} style={{ color: '#000' }}>
+                  {selectedMachineGroup?.MGrpName || 'Select machine group'}
+                </Text>
+                <Icon name="keyboard-arrow-down" size={24} />
+              </TouchableOpacity>
+
+              <Text style={styles.label}>Machine sub group</Text>
+              <TouchableOpacity
+                style={styles.inputBox}
+                onPress={getMachineSubGroupData}
+              >
+                <Text numberOfLines={1} style={{ color: '#000' }}>
+                  {selectedMachineSubGroup?.MSGrpName ||
+                    'Select machine sub group'}
+                </Text>
+                <Icon name="keyboard-arrow-down" size={24} />
+              </TouchableOpacity>
+
+              <Text style={styles.label}>Machine</Text>
+              <TouchableOpacity
+                style={styles.inputBox}
+                onPress={getMachineData}
+              >
+                <Text numberOfLines={1} style={{ color: '#000' }}>
+                  {selectedMachine?.MacName || 'Select machine'}
+                </Text>
+                <Icon name="keyboard-arrow-down" size={24} />
+              </TouchableOpacity>
+
+              {/* APPLY */}
+              <TouchableOpacity
+                style={styles.applyBtn}
+                onPress={() => {
+                  fetchData();
+                  setFilterVisible(false);
+                }}
+              >
+                <Text style={{ color: '#fff' }}>OK</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={yearPickerVisible} animationType="slide">
+      {checkingDatePickerVisible && (
+        <DateTimePicker
+          value={getFromDate || new Date()}
+          mode="date"
+          //   onChange={(e, d) => {
+          //     if (d) setFromDate(d);
+          //     setCheckingDatePickerVisible(false);
+          //   }}
+          onChange={(event, selectedDate) => {
+            if (event.type === 'set' && selectedDate) {
+              setFromDate(selectedDate);
+            }
+
+            setCheckingDatePickerVisible(false);
+          }}
+        />
+      )}
+
+      {checkingDatePickerVisible1 && (
+        <DateTimePicker
+          value={getToDate || new Date()}
+          mode="date"
+        //   onChange={(e, d) => {
+        //     console.log('ToDate :', d);
+        //     if (d) setToDate(d);
+
+        //     setCheckingDatePickerVisible1(false);
+        //   }}
+            onChange={(event, selectedDate) => {
+              if (event.type === 'set' && selectedDate) {
+                setToDate(selectedDate);
+              }
+
+              setCheckingDatePickerVisible1(false);
+            }}
+        />
+      )}
+
+      {/* /**machine group */}
+      <Modal
+        visible={machinegroupPickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          {/* HEADER */}
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity
+              onPress={() => setMachineGroupPickerVisible(false)}
+            >
+              <Icon name="arrow-back-ios" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <Text style={styles.pickerTitle}>Select machine group</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <View style={styles.pickerSearch}>
+            <Icon name="search" size={18} color="#777" />
+            <TextInput
+              placeholder="Search machine group..."
+              placeholderTextColor="#000"
+              value={machineGroupSearch}
+              onChangeText={setMachineGroupSearch}
+              style={{ flex: 1, color: '#000' }}
+            />
+          </View>
+
+          {/* LIST */}
+          <FlatList
+            //data={getAllMachineGroups}
+            data={getAllMachineGroups.filter(p =>
+              p.MGrpName.toLowerCase().includes(
+                machineGroupSearch.toLowerCase(),
+              ),
+            )}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.pickerItem}
+                onPress={() => {
+                  setSelectedMachineGroup(item);
+                  setMachineGroupPickerVisible(false);
+                }}
+              >
+                <Text style={{ color: '#000' }}>{item.MGrpName}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+
+      {/* /**machine SUB group */}
+      <Modal
+        visible={machinesubgroupPickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          {/* HEADER */}
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity
+              onPress={() => setMachineSubGroupPickerVisible(false)}
+            >
+              <Icon name="arrow-back-ios" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <Text style={styles.pickerTitle}>Select machine sub group</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <View style={styles.pickerSearch}>
+            <Icon name="search" size={18} color="#777" />
+            <TextInput
+              placeholder="Search machine group..."
+              placeholderTextColor="#000"
+              value={machineSubGroupSearch}
+              onChangeText={setMachineSubGroupSearch}
+              style={{ flex: 1, color: '#000' }}
+            />
+          </View>
+
+          {/* LIST */}
+          <FlatList
+            //data={getAllMachineSubGroups}
+            data={getAllMachineSubGroups.filter(p =>
+              p.MSGrpName.toLowerCase().includes(
+                machineSubGroupSearch.toLowerCase(),
+              ),
+            )}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.pickerItem}
+                onPress={() => {
+                  setSelectedMachineSubGroup(item);
+                  setMachineSubGroupPickerVisible(false);
+                }}
+              >
+                <Text style={{ color: '#000' }}>{item.MSGrpName}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+
+      {/* /**machine  */}
+      <Modal
+        visible={machinePickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setMachinePickerVisible(false)}>
+              <Icon name="arrow-back-ios" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <Text style={styles.pickerTitle}>Select machine</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <View style={styles.pickerSearch}>
+            <Icon name="search" size={18} color="#777" />
+            <TextInput
+              placeholder="Search machine group..."
+              placeholderTextColor="#000"
+              value={machineSearch}
+              onChangeText={setMachineSearch}
+              style={{ flex: 1, color: '#000' }}
+            />
+          </View>
+
+          <FlatList
+            //data={getAllMachines}
+            data={getAllMachines.filter(p =>
+              p.MacName.toLowerCase().includes(machineSearch.toLowerCase()),
+            )}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.pickerItem}
+                onPress={() => {
+                  setSelectedMachine(item);
+                  setMachinePickerVisible(false);
+                }}
+              >
+                <Text style={{ color: '#000' }}>{item.MacName}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={storePickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          {/* HEADER */}
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setStorePickerVisible(false)}>
+              <Icon name="arrow-back-ios" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <Text style={styles.pickerTitle}>Select Store</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          {/* LIST */}
+          <FlatList
+            data={getAllStoreData}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.pickerItem}
+                onPress={() => {
+                  setSelectedStore(item);
+                  setStorePickerVisible(false);
+                }}
+              >
+                <Text style={{ color: '#000' }}>{item.StrName}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={yearPickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
           {/* HEADER */}
           <View style={styles.pickerHeader}>
@@ -340,7 +1115,11 @@ const ProductionReport = ({ navigation, token }) => {
       </Modal>
 
       {/* PROPERTY PICKER */}
-      <Modal visible={propertyPickerVisible} animationType="slide">
+      <Modal
+        visible={propertyPickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
           <View style={styles.pickerHeader}>
             <TouchableOpacity onPress={() => setPropertyPickerVisible(false)}>
@@ -401,6 +1180,77 @@ const ProductionReport = ({ navigation, token }) => {
           />
         </View>
       </Modal>
+
+      <Modal transparent visible={alertData.visible} animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+          }}
+        >
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 15,
+              padding: 20,
+              alignItems: 'center',
+            }}
+          >
+            <Icon
+              name={
+                alertData.type === 'success'
+                  ? 'check-circle'
+                  : alertData.type === 'error'
+                  ? 'error'
+                  : 'warning'
+              }
+              size={40}
+              color={
+                alertData.type === 'success'
+                  ? '#4CAF50'
+                  : alertData.type === 'error'
+                  ? '#F44336'
+                  : '#FFA000'
+              }
+            />
+
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '600',
+                marginTop: 10,
+                color: '#000',
+              }}
+            >
+              {alertData.type === 'success'
+                ? 'Success'
+                : alertData.type === 'error'
+                ? 'Error'
+                : 'Warning'}
+            </Text>
+
+            <Text style={{ textAlign: 'center', marginTop: 8, color: '#444' }}>
+              {alertData.message}
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setAlertData({ visible: false, message: '' })}
+              style={{
+                marginTop: 15,
+                backgroundColor: '#0F6C7B',
+                paddingHorizontal: 25,
+                paddingVertical: 10,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -434,16 +1284,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', // ✅ FIX vertical alignment
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginTop: 10, // ✅ floating effect like modern apps
+    marginTop: 18, // ✅ floating effect like modern apps
     paddingHorizontal: 12,
-    height: 48, // ✅ FIX height
-    borderRadius: 14,
+    height: 35, // ✅ FIX height
+    borderRadius: 10,
     elevation: 4,
   },
 
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
     color: '#000',
   },
 
@@ -461,7 +1311,7 @@ const styles = StyleSheet.create({
   },
 
   sheet: {
-    backgroundColor: '#fff',
+    backgroundColor: '#e9e6e6',
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -474,7 +1324,7 @@ const styles = StyleSheet.create({
   },
 
   title: { fontSize: 14, color: '#6e6e6e' },
-  label: { marginTop: 10, color: '#6e6e6e' },
+  label: { marginTop: 8, color: '#6e6e6e' },
 
   yearRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 5 },
 
@@ -540,22 +1390,32 @@ const styles = StyleSheet.create({
     borderColor: '#eee',
   },
 
-  section: {
-    marginLeft: 15,
-    marginTop: 10,
-    fontWeight: '600',
-    color: '#000',
-  },
+  //   section: {
+  //     marginLeft: 15,
+  //     marginTop: 10,
+  //     fontWeight: '600',
+  //     color: '#000',
+  //   },
+  // card: {
+  //   flexDirection: 'row',
+  //   backgroundColor: '#fff',
+  //   borderRadius: 18,
+  //   padding: 16,
+  //   marginBottom: 14,
+  //   elevation: 4,
+  //   shadowColor: '#000',
+  //   shadowOpacity: 0.08,
+  //   shadowRadius: 8,
+  // },
   card: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 16,
+    padding: 14,
     marginBottom: 14,
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowRadius: 6,
   },
 
   avatar: {
@@ -629,18 +1489,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0F6C7B',
   },
+  // topRow: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   marginBottom: 4,
+  // },
+
   topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+    paddingBottom: 6,
   },
 
   codeBadge: {
+    flexDirection: 'row', // 🔥 THIS MAKES IT SIDE BY SIDE
+    alignItems: 'center',
     backgroundColor: '#E3F2FD',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    // backgroundColor: '#E3F2FD',
+    // paddingHorizontal: 10,
+    // paddingVertical: 4,
+    // borderRadius: 8,
   },
 
   codeText: {
@@ -722,12 +1595,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  codeBadge: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
+  // codeBadge: {
+  //   backgroundColor: '#E3F2FD',
+  //   paddingHorizontal: 10,
+  //   paddingVertical: 4,
+  //   borderRadius: 8,
+  // },
 
   codeText: {
     color: '#1565C0',
@@ -872,4 +1745,181 @@ const styles = StyleSheet.create({
   },
 
   inputText: { flex: 1, color: '#000' },
+
+  // codeRow: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   marginTop: 4,
+  // },
+
+  // codeLabel: {
+  //   width: 80, // 🔥 FIXED WIDTH (adjust as needed)
+  //   color: '#757575',
+  //   fontSize: 12,
+  //   fontWeight: '600',
+  // },
+
+  // codeValue: {
+  //   flex: 1, // 🔥 TAKES REMAINING SPACE
+  //   color: '#000',
+  //   fontSize: 14,
+  //   fontWeight: '600',
+  // },
+  content: {
+    flex: 1,
+  },
+
+  headerText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F6C7B',
+  },
+
+  twoColumnContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  column: {
+    flex: 1,
+    paddingRight: 6,
+  },
+
+  codeRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+
+  codeLabel: {
+    width: 55,
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '600',
+  },
+
+  codeValue: {
+    flex: 1,
+    fontSize: 13,
+    color: '#000',
+    fontWeight: '600',
+    flexWrap: 'wrap',
+  },
+
+  proCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 18,
+    overflow: 'hidden',
+
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  },
+
+  cardTop: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  voucherText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  dateText: {
+    color: '#E0F7FA',
+    fontSize: 12,
+  },
+
+  cardBody: {
+    padding: 10,
+  },
+
+  section: {
+    marginBottom: 2,
+  },
+
+  sectionTitle: {
+    fontSize: 11,
+    color: '#888',
+    //marginBottom: 2,
+  },
+
+  infoText: {
+    fontSize: 12,
+    color: '#555',
+  },
+
+  machineName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111',
+    marginTop: 2,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 3,
+  },
+
+  qtyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  qtyBox: {
+    flex: 1,
+    backgroundColor: '#F4F6F8',
+    padding: 5,
+    borderRadius: 10,
+    marginRight: 6,
+  },
+
+  qtyLabel: {
+    fontSize: 10,
+    color: '#777',
+  },
+
+  qtyValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F6C7B',
+  },
+
+  remainBox: {
+    //marginTop: 3,
+    backgroundColor: '#E8F5E9',
+    padding: 3,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+
+  remainLabel: {
+    fontSize: 11,
+    color: '#2E7D32',
+  },
+
+  remainValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1B5E20',
+  },
+
+  footer: {
+    //marginTop: 5,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+    paddingTop: 0,
+  },
+
+  footerText: {
+    fontSize: 11,
+    color: '#161515',
+  },
 });

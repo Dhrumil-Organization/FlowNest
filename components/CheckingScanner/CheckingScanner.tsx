@@ -29,6 +29,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [scannedValue, setScannedValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [getData, setData] = useState([]);
+    const [Designdata, setDesigndata] = useState([]);
     const [getdesigndata, setdesigndata] = useState([]);
     const [beamNo, setBeamNo] = useState('');
     const [takaNo, setTakaNo] = useState('');
@@ -56,6 +57,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [selectedMachine, setSelectedMachine] = useState(null);
     const [selecteddesign, setselecteddesign] = useState(null);
     //
+
     const [showManualPopup, setShowManualPopup] = useState(false);
     const [machinedata, setMachineData] = useState([]);
     const [FormState, setFormState] = useState({
@@ -64,6 +66,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [activeTab, setActiveTab] = useState('manual');
     const [showManual, setShowManual] = useState(true); // true = manual, false = scanner
     // const [isScanning, setIsScanning] = useState(false);
+    console.log("Designdata", Designdata);
 
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
@@ -113,6 +116,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
 
             const value = codes[0]?.value || '';
             console.log("📦 Raw QR Value 👉", value);
+            setScannedValue(value);
 
             try {
 
@@ -299,7 +303,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 scannedString: temp,
                 prpcode: temp.prpcode,
                 // yearno: yno
-                yearno: '26'
+                yearno: getCurrentFinancialYear()
             };
             console.log("infoPyload", infoPyload)
             const headers = {
@@ -309,9 +313,63 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             };
             const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
             console.log("response", response)
-            if (response.data.success && response.data.response.data) {
-                setData(response.data.response.data);
+            if (response.data.success && response.data.response.design) {
+                setData(response.data.response.design);
                 setIsLoading(false);
+            } else {
+                setIsLoading(false);
+                console.error('Unexpected response structure:', response.data);
+                Alert.alert(`${response.data}`);
+            }
+        } catch (error) {
+            //console.log("API sendScannedValue error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const sendScannedValue1 = async (qrValue, dsncode) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+
+        try {
+            let temp = JSON.parse(qrValue)
+            let yno = await AsyncStorage.getItem('yno');
+
+            let infoPyload = {
+                txntype: 'chekingScanner',
+                referrer: 'dashboard',
+                scannedString: temp,
+                prpcode: temp.prpcode,
+                dsncode: dsncode,
+                // yearno: yno
+                yearno: getCurrentFinancialYear()
+            };
+            console.log("infoPyload1-----", infoPyload)
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
+            console.log("response", response)
+            const dataArr = response.data.response.data || [];
+            if (response.data.success) {
+
+                if (dataArr.length > 0) {
+                    // ✅ Data available
+                    setDesigndata(dataArr);
+                    setWarpLen(dataArr[0].WarpLen || '0');
+                } else {
+                    // ❌ No data case
+                    setDesigndata([]);
+                    setWarpLen('0');
+
+                    Alert.alert("No Data Found");
+                }
+
             } else {
                 setIsLoading(false);
                 console.error('Unexpected response structure:', response.data);
@@ -428,6 +486,10 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 let yno = await AsyncStorage.getItem('yno');
                 let payloadObj = new Object();
                 payloadObj = finalObj;
+                // payloadObj = {
+                //     ...finalObj,       // ✅ existing data
+                //     ...Designdata      // ✅ new API data (merge)
+                // };
                 payloadObj['prpcode'] = getScannedObj.prpcode;
                 payloadObj['yearno'] = yno;
                 payloadObj['TakaNo'] = takaNo;
@@ -445,13 +507,41 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 payloadObj['IsLastTaka'] = getScannedObj.islasttaka;
                 payloadObj['IsFirstTaka'] = getScannedObj.isfirsttaka;
                 payloadObj['ismending'] = isMending ? 1 : 0;
+                payloadObj['AuthStatus'] = Designdata[0].AuthStatus;
+                payloadObj['BeamNo'] = Designdata[0].BeamNo;
+                payloadObj['OrderUId'] = Designdata[0].OrderUId;
+                payloadObj['OrderNo'] = Designdata[0].OrderNo;
+                payloadObj['OrderDsnCode'] = Designdata[0].OrderDsnCode;
+                payloadObj['OrderDsnName'] = Designdata[0].OrderDsnName;
+                payloadObj['OrderLastDate'] = Designdata[0].OrderLastDate;
+                payloadObj['UId'] = Designdata[0].UId;
+                payloadObj['PlanUId'] = Designdata[0].PlanUId;
+                payloadObj['PlanNo'] = Designdata[0].PlanNo;
+                payloadObj['BeamUId'] = Designdata[0].BeamUId;
+                payloadObj['MacCode'] = Designdata[0].MacCode;
+                payloadObj['MacName'] = Designdata[0].MacName;
+                payloadObj['BeamNo'] = Designdata[0].BeamNo;
+                payloadObj['DsnCode'] = Designdata[0].DsnCode;
+                payloadObj['DsnName'] = Designdata[0].DsnName;
+                payloadObj['TakaNo'] = Designdata[0].TakaNo;
+                payloadObj['WarpLen'] = Designdata[0].WarpLen;
+                payloadObj['QltWt'] = Designdata[0].QltWt;
+                payloadObj['islasttakatrack'] = Designdata[0].islasttakatrack;
+                payloadObj['bstatus'] = Designdata[0].bstatus;
+                payloadObj['Status'] = Designdata[0].Status;
+                payloadObj['IsAuth'] = Designdata[0].IsAuth;
+                payloadObj['AuthStatus'] = Designdata[0].AuthStatus;
+                payloadObj['PrpCode'] = Designdata[0].PrpCode;
 
                 const headers = {
                     Authorization: `Bearer ${getToken()}`,
                     'Content-Type': 'application/json',
                     'X-Requested-with': 'XMLHttpRequest',
                 };
+
+                console.log("payloadObj", payloadObj)
                 const response = await axios.post(`${API}/api/add_auto_checking_detail`, payloadObj, { headers });
+                console.log("response", response)
 
                 if (response.data.success == true) {
                     setIsLoading(false);
@@ -1105,23 +1195,44 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             <PartyDropdown
                                 data={getData}
                                 placeholder="Choose design..."
-                                labelKey={["DsnName", "DsnCode"]}
-                                valueKey="DsnCode"
+                                labelKey={["dsnname", "dsncode"]}
+                                valueKey="dsncode"
                                 pageSize={12}
                                 initialValue={null}
                                 selected={null}
                                 loading={false}
-                                type="design"
+                                type="checkingdesigndata"
+                                // onSelect={(item) => {
+                                //     const selectedDesign = item?.dsncode || '';
+                                //     setDesign(item.dsncode);
+                                //     setWarpLen(item.WarpLen || '0');
+
+                                //     if (scannedValue) {
+                                //         sendScannedValue1(scannedValue, selectedDesign);
+                                //     }
+                                // }}
                                 onSelect={(item) => {
-                                    setDesign(item.DsnCode);
-                                    setWarpLen(item.WarpLen || '0');
+                                    const selectedDesign = item?.dsncode || '';
+
+                                    console.log("👉 DESIGN SELECTED:", selectedDesign);
+                                    console.log("👉 SCANNED VALUE:", scannedValue);
+
+                                    setDesign(selectedDesign);
+                                    // setWarpLen(item.WarpLen || '0');
+
+                                    if (scannedValue) {
+                                        console.log("🔥 CALLING API...");
+                                        sendScannedValue1(scannedValue, selectedDesign);
+                                    } else {
+                                        console.log("❌ scannedValue missing");
+                                    }
                                 }}
                                 setSelected={(val) => {
                                     if (!val) {
                                         setDesign('');
                                         setWarpLen('0');
                                     } else {
-                                        setDesign(val.DsnCode);
+                                        setDesign(val.dsncode);
                                         setWarpLen(val.WarpLen || '0');
                                     }
                                 }}

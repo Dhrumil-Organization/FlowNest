@@ -17,6 +17,7 @@ import CustomDrawer from './CustomDrawer';
 import AddWeftIssueDetail from './AddWeftIssueDetail';
 import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
 import WeftIssueItemDrawer from './WeftIssueItemDrawer';
+import Snackbar from 'react-native-snackbar';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
@@ -44,6 +45,9 @@ type YarnIssueItem = {
     Shift: string;
     StkType: string;
     CreelQty: string;
+    BeamNo: string;
+    DsnName: string;
+
 };
 
 const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username }) => {
@@ -62,7 +66,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
             PrpCode: '',
             YearNo: '',
             fromdate: '',
-            IssDate: '',
+            IssDate: new Date().toISOString(),
             todate: '',
             d1: [],
             d2: [],
@@ -74,7 +78,12 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
             YearName: '',
             BeamNo: '',
             BeamUId: '',
-            IssNo: ''
+            IssNo: '',
+            DsnCode: '',
+            DsnName: '',
+            suffix: '',
+            month: '',
+            yarnstrcode: ''
         }
     });
     const [getAllYearData, setAllYearData] = useState([]);
@@ -87,11 +96,16 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
     const [mainUId, setMainUId] = useState(null);
     const [editData, setEditData] = useState(null);
     const [cartonSummary, setCartonSummary] = useState([]);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [resetFlag, setResetFlag] = useState(false);
     // const [filteredData, setFilteredData] = useState([]);
     console.log("getallpropertydata", getAllPropertyData)
 
     console.log("FormState.values", FormState.values);
     console.log("data", data);
+    console.log("FormState.values.LngName", FormState.values.LngName);
+    console.log("FormState.values.PrpCode", FormState.values.PrpCode);
 
     const cancelToken = useRef(null);
 
@@ -449,12 +463,23 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
 
 
     const resetAllData = () => {
-        setFormState({
+        setFormState(prev => ({
+            ...prev,
             values: {
-                PrpCode: '',
-                YearNo: '',
+                // ✅ preserve
+                PrpCode: prev.values.PrpCode,
+                YearNo: prev.values.YearNo,
+                UId: '',
+                IssNo: '',
+                IssDate: prev.values.IssDate,
+                CreelId: '',
+                Remark: '',
+                Shift: '',
+                StkType: '',
+                CreelQty: '',
+                BeamNo: '',
+                DsnName: '',
                 fromdate: '',
-                IssDate: '',
                 todate: '',
                 d1: [],
                 d2: [],
@@ -462,35 +487,141 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 ItmName: '',
                 srno: '',
                 ExpProdQty: '',
-                LngName: '',
-                YearName: '',
-                BeamNo: '',
+                LngName: prev.values.LngName,
+                YearName: prev.values.YearName,
                 BeamUId: '',
                 DsnCode: '',
-                DsnName: '',
-                Remark: '',
-                BatchNo: '',
                 suffix: '',
                 month: '',
                 yarnstrcode: ''
             }
-        });
+        }));
 
+        setResetFlag(prev => !prev);
         setEditData(null);
         setIsEditMode(false);
         setMainUId(null);
     };
+
+    // const resetAllData = () => {
+    //     setFormState(prev => ({
+    //         ...prev,
+    //         values: {
+    //             ...prev.values, // 🔥 ye important hai
+    //             fromdate: '',
+    //             IssDate: '',
+    //             todate: '',
+    //             d1: [],
+    //             d2: [],
+    //             ItmCode: '',
+    //             ItmName: '',
+    //             srno: '',
+    //             ExpProdQty: '',
+    //             // LngName: '',
+    //             // YearName: '',
+    //             BeamNo: '',
+    //             BeamUId: '',
+    //             DsnCode: '',
+    //             DsnName: '',
+    //             Remark: '',
+    //             BatchNo: '',
+    //             suffix: '',
+    //             month: '',
+    //             yarnstrcode: ''
+    //         }
+    //     }));
+
+    //     setEditData(null);
+    //     setIsEditMode(false);
+    //     setMainUId(null);
+    // };
+
     const resetDrawerStates = () => {
         setCartonSummary([]);
         // setSelectedItem(null);
         setSelectedYear(null);
     };
+
     const closeAllDrawers = () => {
-        setIsItemVisible(false);         // item drawer
-        setisItemdetailvisible(false);   // item detail drawer
+        setIsItemVisible(false);
+        setisItemdetailvisible(false);
         setIsDetailVisible(false);
         resetAllData();
-        resetDrawerStates();       // detail drawer (agar hai)
+        resetDrawerStates();
+    };
+
+    const handledeletedata = async (item) => {
+        console.log("🔥 FUNCTION ENTERED", item);
+        try {
+            setIsLoading(true);
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                // txntype: 'creel_yarn_issue',
+                uid: item.UId,
+            };
+            console.log("delete payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/delete_creel_data`, payloadObj, { headers });
+
+            console.log("delete response", response);
+
+            if (response.data.success === true) {
+                setDataSaved(true);
+                setSuccessMessage('Data deleted Successfully ✅');
+                setShowSuccess(true);
+                resetAllData();
+                resetDrawerStates();
+
+            }
+            else {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+    const confirmDelete = (item) => {
+        Alert.alert(
+            "Delete Creel",
+            `Are you sure you want to delete this ${item.BeamNo}?`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    // onPress: () => handledeletedata(item)
+                    onPress: () => {
+                        console.log("DELETE CLICKED", item); // 🔥 debug
+                        handledeletedata(item);
+                    }
+                }
+            ]
+        );
     };
 
     return (
@@ -533,7 +664,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                     <View style={styles.yearBox}>
                         <Icon name="calendar-today" size={14} color="#0f766e" />
                         <Text style={styles.yearText}>
-                            {FormState.values.YearName || 'Select Year'}
+                            {selectedYear?.YearName || FormState.values.YearName || 'Select Year'}
                         </Text>
                     </View>
                 </View>
@@ -576,9 +707,13 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                                 <Icon name="edit" size={18} color="#2563eb" />
                             </TouchableOpacity>
 
-                            {/* <TouchableOpacity style={styles.deleteBtn}>
+                            <TouchableOpacity style={styles.deleteBtn}
+                                onPress={(e) => {
+                                    // e.stopPropagation();
+                                    confirmDelete(item);
+                                }}>
                                 <Icon name="delete" size={18} color="red" />
-                            </TouchableOpacity> */}
+                            </TouchableOpacity>
                         </View>
 
                     </View>
@@ -593,9 +728,43 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 }
             />
 
-            <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd} onPress={detailopenDrawer}>
+            <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
+                // onPress={detailopenDrawer}
+                onPress={() => {
+                    detailopenDrawer();
+                    resetAllData();
+                    resetDrawerStates();
+                }}
+            >
                 <Icon name="add" size={20} color="#fff" />
             </TouchableOpacity>
+
+            <Modal transparent visible={showSuccess} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+
+                        <Text style={styles.successIcon}>✅</Text>
+
+                        <Text style={styles.modalTitle}>Success</Text>
+
+                        <Text style={styles.modalMessage}>
+                            {successMessage}
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.okButton}
+                            onPress={() => {
+                                setShowSuccess(false);
+                                resetAllData();
+                                resetDrawerStates();
+                                fetchbrowse();
+                            }}
+                        >
+                            <Text style={styles.okText}>OK</Text>
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+            </Modal>
 
             <CustomDrawer
                 isVisible={isDrawerVisible}
@@ -635,6 +804,7 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 mainUId={mainUId}
                 editData={editData}
                 isItemdetailvisible={isItemdetailvisible}
+                resetFlag={resetFlag}
             />
 
             <AddWeftIssueItemDetail
@@ -669,14 +839,26 @@ const WftIssue: React.FC<Props> = ({ token, navigation, isConnected, username })
                 isEditMode={isEditMode}
                 mainUId={mainUId}
                 editData={editData}
-                closeAllDrawers={closeAllDrawers} // 🔥 yahi pass hoga
+                resetAllData={resetAllData}
+                closeAllDrawers={closeAllDrawers}
+                fetchbrowse={fetchbrowse} // 🔥 yahi pass hoga
             />
         </>
     );
 };
 export default WftIssue;
 const styles = StyleSheet.create({
+    okButton: {
+        backgroundColor: '#2e7d32',
+        paddingHorizontal: 25,
+        paddingVertical: 10,
+        borderRadius: 6
+    },
 
+    okText: {
+        color: '#fff',
+        fontWeight: 'bold'
+    },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -802,6 +984,38 @@ const styles = StyleSheet.create({
     yearText: {
         marginLeft: 6,
         fontSize: 12,
+        color: '#000'
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+
+    modalBox: {
+        width: 300,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+        alignItems: 'center',
+        elevation: 10
+    },
+    successIcon: {
+        fontSize: 50,
+        marginBottom: 10
+    },
+
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#000'
+    },
+
+    modalMessage: {
+        fontSize: 16,
+        marginVertical: 10,
+        textAlign: 'center',
         color: '#000'
     },
 

@@ -94,7 +94,7 @@ const CustomDrawer = (props) => {
             }
         }));
     };
-
+    console.log("Property Data 👉", getAllPropertyData);
     const getToken = () => token
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;

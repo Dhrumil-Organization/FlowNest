@@ -45,7 +45,9 @@ const WeftIssueItemDrawer = ({
     isEditMode,
     mainUId,
     editData,
-    closeAllDrawers
+    closeAllDrawers,
+    resetAllData,
+    fetchbrowse
 }) => {
     const device = useCameraDevice('back');
     const scanLock = useRef(false);
@@ -96,6 +98,7 @@ const WeftIssueItemDrawer = ({
     const [activeCreels, setActiveCreels] = useState([]);
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [deleteshowSuccess, setdeleteShowSuccess] = useState(false);
     const [selectedCreel, setSelectedCreel] = useState(null);
     // const [mainUId, setMainUId] = useState(null);
     // const [isEditMode, setIsEditMode] = useState(false);
@@ -104,6 +107,7 @@ const WeftIssueItemDrawer = ({
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
 
     console.log("Formstate.values", FormState.values);
+
 
     const styles = StyleSheet.create({
         container: { flex: 1, backgroundColor: '#f4f6f8' },
@@ -176,6 +180,7 @@ const WeftIssueItemDrawer = ({
             paddingHorizontal: 12,
             borderWidth: 1,
             borderColor: '#e5e7eb',
+            color: '#000'
         },
         searchBtn: {
             marginLeft: 10,
@@ -208,7 +213,8 @@ const WeftIssueItemDrawer = ({
             paddingHorizontal: 10,
             height: 42,
             borderWidth: 1,
-            borderColor: '#ddd'
+            borderColor: '#ddd',
+            color: '#000'
         },
         inputDisabled: {
             backgroundColor: '#e9ecef',
@@ -1309,45 +1315,6 @@ const WeftIssueItemDrawer = ({
 
     }
 
-    const resetAllFields = () => {
-        // setIsEditMode(false);   // 🔥 VERY IMPORTANT
-        // setMainUId(null);
-        // Creel modal fields
-        setCreelId('');
-        setShift('');
-        setstocktype('');
-        setRemark('');
-        setShowPicker(false);
-        // setSetupDate(null);
-
-        setFormState(prev => ({
-            ...prev,
-            values: {
-                ...prev.values,
-                // PrpCode: '',
-                // LngName: '',
-                // YearNo: '',
-                // YearName: '',
-                Shift: '',
-                ShiftName: '',
-                stocktype: '',
-                StockTypeName: ''
-            }
-        }));
-
-        // Scan modal fields
-        setCartonNo('');
-        setchees('');
-        setavgwt('');
-        setScannedObj({});
-        setCartonSummary([]);
-        setSearchText('');
-        setSearchResults([]);
-        setSelectedItem(null);
-        setShowManualSearch(null);
-        setIsScanning(false);
-    };
-
 
     useEffect(() => {
         if (isEditMode && editData?.cartonSummary?.length > 0) {
@@ -1363,6 +1330,79 @@ const WeftIssueItemDrawer = ({
     const d2 = FormState?.values?.d2 || [];
 
     console.log("d1", d1);
+
+    const handledeletecarton = async (item) => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                cartonno: item.cartonNo,
+                srno: item.SrNo,
+                subsrno: item.SubSr,
+                uid: item.UId,
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                txntype: 'beam_weft_issue',
+            };
+            console.log("delete payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/delete_creel_single_data`, payloadObj, { headers });
+
+            console.log("delete response", response);
+
+            if (response.data.success === true) {
+                setDataSaved(true);
+                setSuccessMessage('Data deleted Successfully ✅');
+                setdeleteShowSuccess(true);
+                // resetAllFields();
+
+            }
+            else {
+                setIsLoading(false);
+                setDataSaved(false);
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+    const confirmcartondelete = (item) => {
+        Alert.alert(
+            "Delete Creel",
+            `Are you sure you want to delete this Carton ${item.cartonNo}?`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => handledeletecarton(item)
+                }
+            ]
+        );
+    };
 
     const handleDelete = (index) => {
         Alert.alert(
@@ -1420,7 +1460,8 @@ const WeftIssueItemDrawer = ({
                                         setShowSuccess(false);
                                         resetAllFields();
 
-                                        closeAllDrawers();   // 🔥 sab band
+                                        closeAllDrawers();
+                                        fetchbrowse();  // 🔥 sab band
                                     }}
                                 >
                                     <Text style={styles.okButtonText}>OK</Text>
@@ -1430,6 +1471,47 @@ const WeftIssueItemDrawer = ({
                         </View>
                     )}
 
+                    {deleteshowSuccess && (
+                        <View style={styles.overlayContainer1}>
+                            <View style={styles.overlayCardNew}>
+
+                                {/* ✅ ICON */}
+                                <View style={styles.successIcon}>
+                                    <Text style={{ fontSize: 28 }}>✅</Text>
+                                </View>
+
+                                {/* ✅ MESSAGE */}
+                                <Text style={styles.successTitle}>
+                                    Success
+                                </Text>
+
+                                <Text style={styles.successMessage}>
+                                    {successMessage}
+                                </Text>
+
+                                {/* ✅ BUTTON */}
+                                <TouchableOpacity
+                                    style={styles.okButton}
+                                    // onPress={() => {
+                                    //     setShowSuccess(false);
+                                    //     resetAllFields();
+                                    //     onClose();
+                                    // }}
+                                    onPress={() => {
+                                        setdeleteShowSuccess(false);
+                                        resetAllFields();
+
+                                        // closeAllDrawers();
+                                        // fetchbrowse();  // 🔥 sab band
+                                    }}
+                                >
+                                    <Text style={styles.okButtonText}>OK</Text>
+                                </TouchableOpacity>
+
+                            </View>
+                        </View>
+                    )}
+                
                     {/* HEADER */}
                     <View style={styles.header}>
                         <TouchableOpacity style={styles.backBtn} onPress={onClose}>
@@ -1789,7 +1871,15 @@ const WeftIssueItemDrawer = ({
                                         <View style={styles.rightSection}>
                                             <TouchableOpacity
                                                 style={styles.deleteIcon}
-                                                onPress={() => handleDelete(index)}
+                                                // onPress={() => handleDelete(index)}
+                                                // onPress={() => confirmcartondelete(item)}
+                                                onPress={() => {
+                                                    if (item?.UId) {
+                                                        confirmcartondelete(item);
+                                                    } else {
+                                                        handleDelete(index);
+                                                    }
+                                                }}
                                             >
                                                 <Text style={{ fontSize: 16 }}>🗑️</Text>
                                             </TouchableOpacity>

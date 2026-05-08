@@ -411,11 +411,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
         try {
             setIsLoading(true);
 
-            if (cancelToken.current) {
-                cancelToken.current.cancel("Cancelled previous request");
-            }
+            // if (cancelToken.current) {
+            //     cancelToken.current.cancel("Cancelled previous request");
+            // }
 
-            cancelToken.current = axios.CancelToken.source();
+            // cancelToken.current = axios.CancelToken.source();
 
             const historyPayload = {
                 prptype: userPtype,
@@ -424,7 +424,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                 txntype: 'yarn_creation_item_master',
             };
 
-            // console.log("type historyPayload:", historyPayload);
+            console.log("type historyPayload:", historyPayload);
 
             const response = await axios.get(
                 `${API}/api/yarntype`,
@@ -433,7 +433,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                     cancelToken: cancelToken.token
                 })
             );
-            // console.log("type API Response:", response);
+            console.log("type API Response:", response);
 
             const data = response?.data?.data?.data || [];
             if (response?.data?.success && response?.data?.data?.data?.length > 0) {
@@ -639,10 +639,10 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
         const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
             setIsLoading(true);
-            if (cancelToken.current) {
-                cancelToken.current.cancel("Cancelled previous request");
-            }
-            cancelToken.current = axios.CancelToken.source();
+            // if (cancelToken.current) {
+            //     cancelToken.current.cancel("Cancelled previous request");
+            // }
+            // cancelToken.current = axios.CancelToken.source();
             const historyPayload = {
                 prptype: userPtype,
                 // prptype: 'S',
@@ -847,29 +847,29 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
         }
     }, [FormState.values.prpcode, FormState.values.yarnstrcode, activeTab]);
 
-    const buildMainItem = (values) => {
-        const { count_no, count, ply, blend, others } = values;
+    // const buildMainItem = (values) => {
+    //     const { count_no, count, ply, blend, others } = values;
 
-        if (!count_no || !count || !ply || !blend || !others) return '';
+    //     if (!count_no || !count || !ply || !blend || !others) return '';
 
-        let blendStr = '';
+    //     let blendStr = '';
 
-        if (Array.isArray(blend)) {
-            // ✅ handles array of objects OR array of strings
-            blendStr = blend
-                .map(b => typeof b === 'object' ? b?.name : b)
-                .filter(Boolean)
-                .join(' ');
-        }
-        else if (typeof blend === 'object') {
-            blendStr = blend?.name || '';
-        }
-        else {
-            blendStr = blend;
-        }
+    //     if (Array.isArray(blend)) {
+    //         // ✅ handles array of objects OR array of strings
+    //         blendStr = blend
+    //             .map(b => typeof b === 'object' ? b?.name : b)
+    //             .filter(Boolean)
+    //             .join(' ');
+    //     }
+    //     else if (typeof blend === 'object') {
+    //         blendStr = blend?.name || '';
+    //     }
+    //     else {
+    //         blendStr = blend;
+    //     }
 
-        return `${count_no}/${ply} ${count} ${blendStr} ${others}`;
-    };
+    //     return `${count_no}/${ply} ${count} ${blendStr} ${others}`;
+    // };
 
     // const calculateDenier = (values) => {
     //     const count = parseFloat(values.count_no);
@@ -880,6 +880,35 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
     //     return ((5315 / (count / ply)) + 5).toFixed(2);
     // };
 
+
+    const buildMainItem = (values) => {
+        const { count_no, count, ply, blend, others } = values;
+
+        if (!count_no || !count || !ply || !blend) return '';
+
+        let blendStr = '';
+
+        if (Array.isArray(blend)) {
+            blendStr = blend
+                .map(b => typeof b === 'object' ? b?.name : b)
+                .filter(Boolean)
+                .join(' ');
+        } else if (typeof blend === 'object') {
+            blendStr = blend?.name || '';
+        } else {
+            blendStr = blend;
+        }
+
+        // 🔥 main fix
+        return [
+            `${count_no}/${ply}`,
+            count,
+            blendStr,
+            others   // 👈 optional
+        ]
+            .filter(val => val && val.toString().trim() !== '') // ❌ remove blank
+            .join(' '); // ✅ clean string
+    };
 
     const calculateDenier = (values, formula) => {
         const count = parseFloat(values.count_no);
@@ -907,9 +936,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
     const filamentbuildMainItem = (values) => {
         const { count_no, count, ply, lustre, type, others } = values;
 
-        if (!count_no || !count || !ply || !lustre || !type || !others) return '';
+        if (!count_no || !count || !ply || !lustre || !type) return '';
 
-        return `${count_no}/${ply} ${count} ${lustre} ${type} ${others}`;
+        return `${count_no}/${ply} ${count} ${lustre} ${type} ${others || ''}`.trim();
     };
 
     const calculatefilamentDenier = (values, formula) => {
@@ -994,9 +1023,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
         if (!spunForm.blend_id) {
             return "Please select Blend";
         }
-        if (!spunForm.others) {
-            return "Please Enter Other Value";
-        }
+        // if (!spunForm.others) {
+        //     return "Please Enter Other Value";
+        // }
         if (!spunForm.count_no) {
             return "Please Enter Count Value";
         }
@@ -1137,9 +1166,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
         if (!filamentForm.lustre_id) {
             return "Please select Lustre";
         }
-        if (!filamentForm.others) {
-            return "Please Enter Other value";
-        }
+        // if (!filamentForm.others) {
+        //     return "Please Enter Other value";
+        // }
         // if (!filamentForm.ItmCode) {
         //     return "Please select Link Item";
         // }
@@ -1327,10 +1356,10 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
             return false;
         }
 
-        if (!subitemform.others) {
-            Alert.alert("Validation", "Please enter others Value");
-            return false;
-        }
+        // if (!subitemform.others) {
+        //     Alert.alert("Validation", "Please enter others Value");
+        //     return false;
+        // }
         if (!subitemform.linkitmcode) {
             Alert.alert("Validation", "Please enter Sub Item Name");
             return false;
@@ -1893,7 +1922,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                                         if (!regex.test(text)) return;
 
-                                        if (text !== '' && parseInt(text, 10) > 100) return;
+                                        // if (text !== '' && parseInt(text, 10) > 100) return;
 
                                         setsubitemform(prev => {
                                             const updated = {
@@ -1984,7 +2013,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                         <View style={yarnmanagementsystemstyle.inputGroup}>
                             <Text style={yarnmanagementsystemstyle.label}>
-                                Other <Text style={{ color: 'red' }}>*</Text>
+                                Other
+                                {/* <Text style={{ color: 'red' }}>*</Text> */}
                             </Text>
                             {/* <PartyDropdown
                                 data={othersdata}
@@ -2678,8 +2708,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                     fetchBlendply();
                                                                     fetchOthresdata();
                                                                     fetchyarntype();
-                                                                    const selectedBlendId = item?.WBlend;
 
+                                                                    const selectedBlendId = item?.WBlend;
                                                                     const blendObj = mapped.find(
                                                                         b =>
                                                                             String(b.blendid) === String(selectedBlendId) &&
@@ -2864,7 +2894,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                                                             if (!regex.test(text)) return;
 
-                                                            if (text !== '' && parseInt(text, 10) > 100) return;
+                                                            // if (text !== '' && parseInt(text, 10) > 100) return;
 
                                                             setSpunForm(prev => {
                                                                 const updated = {
@@ -2890,9 +2920,45 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                 </View>
                                             </View>
 
+
+
+                                            {/* Ply */}
                                             <View style={yarnmanagementsystemstyle.inputGroup}>
                                                 <Text style={yarnmanagementsystemstyle.label}>
-                                                    Other <Text style={{ color: 'red' }}>*</Text>
+                                                    Ply <Text style={{ color: 'red' }}>*</Text>
+                                                </Text>
+
+                                                <PartyDropdown
+                                                    data={plydata}
+                                                    placeholder="Choose Ply..."
+                                                    labelKey={["ply", "id"]}
+                                                    valueKey="id"
+                                                    pageSize={12}
+                                                    initialValue={selectedply ?? null}
+                                                    selected={selectedply ?? null}
+                                                    type="ply"
+                                                    onSelect={(item) => {
+                                                        setselectedply(item);
+                                                        setSpunForm(prev => {
+                                                            const updated = {
+                                                                ...prev,
+                                                                ply_id: item?.id || '',
+                                                                ply: item?.ply || ''
+                                                            };
+                                                            return {
+                                                                ...updated,
+                                                                linkitmcode: buildMainItem(updated),
+                                                                denier: calculateDenier(updated, prev.formula)
+                                                            };
+                                                        });
+                                                    }}
+                                                />
+                                            </View>
+
+                                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                <Text style={yarnmanagementsystemstyle.label}>
+                                                    Other
+                                                    {/* <Text style={{ color: 'red' }}>*</Text> */}
                                                 </Text>
                                                 {/* <PartyDropdown
                                                     data={othersdata}
@@ -2967,39 +3033,6 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                         }}
                                                     />
                                                 </View>
-                                            </View>
-
-                                            {/* Ply */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Ply <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-
-                                                <PartyDropdown
-                                                    data={plydata}
-                                                    placeholder="Choose Ply..."
-                                                    labelKey={["ply", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedply ?? null}
-                                                    selected={selectedply ?? null}
-                                                    type="ply"
-                                                    onSelect={(item) => {
-                                                        setselectedply(item);
-                                                        setSpunForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                ply_id: item?.id || '',
-                                                                ply: item?.ply || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: buildMainItem(updated),
-                                                                denier: calculateDenier(updated, prev.formula)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
                                             </View>
 
                                             {/* Main Item */}
@@ -3450,7 +3483,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                                                             if (!regex.test(text)) return;
 
-                                                            if (text !== '' && parseInt(text, 10) > 100) return;
+                                                            // if (text !== '' && parseInt(text, 10) > 100) return;
 
                                                             setFilamentForm(prev => {
                                                                 const updated = {
@@ -3570,7 +3603,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                                             <View style={yarnmanagementsystemstyle.inputGroup}>
                                                 <Text style={yarnmanagementsystemstyle.label}>
-                                                    Other <Text style={{ color: 'red' }}>*</Text>
+                                                    Other
+                                                    {/* <Text style={{ color: 'red' }}>*</Text> */}
                                                 </Text>
                                                 {/* <PartyDropdown
                                                     data={othersdata}

@@ -73,6 +73,11 @@ import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 import PartyDetailScreen from './components/PartyDashboard/PartyDetailScreen';
 import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
 import WftIssue from './components/WftIssue/WftIssue';
+import SalesOrderNew from './components/SalesOrderNew/SalesOrderNew';
+import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
+import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
+import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
+import SalesOrderModule from './components/SalesOrderNew/SalesOrderModule';
 
 const Stack = createNativeStackNavigator();
 
@@ -719,12 +724,23 @@ export default function App() {
                       </>
                     }</Stack.Screen>
                     <Stack.Screen name="PartyDetailScreen" component={PartyDetailScreen} />
-                     <Stack.Screen name="Weft Issue">{(props) =>
+
+                    <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
-                    }</Stack.Screen>                    
+                    }</Stack.Screen>
+                    <Stack.Screen name="Sales Order New">
+                      {(props) => (
+                        <SalesOrderModule
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
                   </Stack.Navigator>
 
                 </NavigationContainer>

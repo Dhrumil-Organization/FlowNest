@@ -367,19 +367,36 @@ const WeftIssueItemDrawer = ({
             alignItems: 'center',
             gap: 6   // 👈 spacing between icon & text
         },
+        // listCard: {
+        //     flexDirection: 'row',
+        //     justifyContent: 'space-between',
+        //     backgroundColor: '#fff',
+        //     padding: 14,
+        //     borderRadius: 14,
+        //     marginBottom: 12,
+        //     elevation: 3
+        // },
         listCard: {
             flexDirection: 'row',
             justifyContent: 'space-between',
+            alignItems: 'flex-start', // 🔥 important (top align)
+            padding: 10,
             backgroundColor: '#fff',
-            padding: 14,
-            borderRadius: 14,
-            marginBottom: 12,
+            marginBottom: 8,
+            borderRadius: 8,
+            marginHorizontal: 6,
             elevation: 3
         },
 
+        // leftSection: {
+        //     flexDirection: 'row',
+        //     alignItems: 'center'
+        // },
+
         leftSection: {
             flexDirection: 'row',
-            alignItems: 'center'
+            alignItems: 'flex-start',
+            flex: 1,
         },
 
         indexCircle: {
@@ -1511,7 +1528,7 @@ const WeftIssueItemDrawer = ({
                             </View>
                         </View>
                     )}
-                
+
                     {/* HEADER */}
                     <View style={styles.header}>
                         <TouchableOpacity style={styles.backBtn} onPress={onClose}>
@@ -1842,13 +1859,12 @@ const WeftIssueItemDrawer = ({
                             <Text style={styles.cardTitle}>
                                 Yarn Issuance Summary ({cartonSummary.length})
                             </Text>
-                            <FlatList
+                            {/* <FlatList
                                 data={cartonSummary}
                                 keyExtractor={(item, index) => index.toString()}
                                 contentContainerStyle={{ paddingBottom: 10 }}
                                 renderItem={({ item, index }) => (
                                     <View style={styles.listCard}>
-                                        {/* LEFT SIDE */}
                                         <View style={styles.leftSection}>
                                             <View style={styles.indexCircle}>
                                                 <Text style={styles.indexText}>{index + 1}</Text>
@@ -1867,12 +1883,9 @@ const WeftIssueItemDrawer = ({
                                             </View>
                                         </View>
 
-                                        {/* RIGHT SIDE */}
                                         <View style={styles.rightSection}>
                                             <TouchableOpacity
                                                 style={styles.deleteIcon}
-                                                // onPress={() => handleDelete(index)}
-                                                // onPress={() => confirmcartondelete(item)}
                                                 onPress={() => {
                                                     if (item?.UId) {
                                                         confirmcartondelete(item);
@@ -1893,7 +1906,57 @@ const WeftIssueItemDrawer = ({
                                         </View>
                                     </View>
                                 )}
-                            />
+                            /> */}
+
+                            <ScrollView
+                                style={{ maxHeight: 450 }}   // 🔥 IMPORTANT (adjust as needed)
+                                contentContainerStyle={{ paddingBottom: 10 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {cartonSummary.map((item, index) => (
+                                    <View style={styles.listCard}>
+                                        <View style={styles.leftSection}>
+                                            <View style={styles.indexCircle}>
+                                                <Text style={styles.indexText}>{index + 1}</Text>
+                                            </View>
+
+                                            <View>
+                                                <Text style={styles.cartonNo}>
+                                                    {item.cartonNo}
+                                                </Text>
+                                                <Text style={styles.subText}>
+                                                    {item.ItmName} / {item.MerName}
+                                                </Text>
+                                                <Text style={styles.subText}>
+                                                    {item.ShdName} / {item.GrdName}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.rightSection}>
+                                            <TouchableOpacity
+                                                style={styles.deleteIcon}
+                                                onPress={() => {
+                                                    if (item?.UId) {
+                                                        confirmcartondelete(item);
+                                                    } else {
+                                                        handleDelete(index);
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.qtyText}>
+                                                Qty: {item.qty}
+                                            </Text>
+
+                                            <Text style={styles.cheesText}>
+                                                Chees: {item.chees}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </ScrollView>
 
                             <View style={styles.summaryBar}>
                                 <View style={styles.summaryItem}>

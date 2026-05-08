@@ -281,8 +281,12 @@ const APP_SECTIONS = [
             { id: '32', name: 'Party Dashboard', screen: 'Party Dashboard', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
-
-
+    {
+        title: 'S',
+        data: [
+            { id: '33', name: 'Sales Order New', screen: 'Sales Order New', icon: 'shopping-cart-checkout', iconColor: '#48cbef' },
+        ],
+    },
 ];
 
 interface Props {
@@ -552,7 +556,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Weft Issue",
                 //                         "href": "/"
                 //                     },
-                                    
+                //                     {
+                //                         "title": "Sales Order New",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

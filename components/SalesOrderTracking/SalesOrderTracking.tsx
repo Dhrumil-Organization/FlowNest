@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    FlatList,
+    Dimensions,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    TextInput,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBar from '../HeaderBar/HeaderBar';
 import theme from '../../android/app/src/theme';
@@ -10,9 +21,20 @@ import CustomDrawer from './CustomDrawer';
 import data from './data.json';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { crlimtreq_styles } from '../../common/Styles/Style';
-import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload, WiseStatus } from './Modal';
+import {
+    ExeData,
+    DesignData,
+    ItemData,
+    POTData,
+    ItemStatus,
+    CardPayload,
+    WiseStatus,
+} from './Modal';
 import FullScreenLoader from '../FullScreenLoader/FullScreenLoader';
-import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
+import {
+    generateFinancialYearOptions,
+    getCurrentFinancialYearMain,
+} from '../../common/API/Functions';
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
 
@@ -47,11 +69,11 @@ const formatNumber = (value: string) => {
     return parseFloat(value).toLocaleString('en-IN');
 };
 
-
-
-
-
-const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: string }> = ({ token, navigation, username }) => {
+const SalesOrderTracking: React.FC<{
+    token: string;
+    navigation: any;
+    username: string;
+}> = ({ token, navigation, username }) => {
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
     const [renderedData, setRenderedData] = useState<Party[]>([]);
@@ -70,7 +92,9 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const yearOptions = generateFinancialYearOptions(currentYear);
-    const [selectedYear, setSelectedYear] = useState<string>(getCurrentFinancialYearMain());
+    const [selectedYear, setSelectedYear] = useState<string>(
+        getCurrentFinancialYearMain(),
+    );
     const [selectedExe, setSelectedExe] = useState<ExeData | null>(null);
     const [getDData, setDData] = useState(null);
     const [exeData, setExeData] = useState<ExeData[]>([]);
@@ -79,13 +103,17 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const [selectedDesigns, setSelectedDesigns] = useState<DesignData[]>([]);
     const [selectedItems, setSelectedItems] = useState<ItemData[]>([]);
     const [selectedParty, setSelectedParty] = useState([]);
-    const [selectedItemStatus, setSelectedItemStatus] = useState<ItemStatus>('All');
-    const [selectedItemStatus1, setSelectedItemStatus1] = useState<WiseStatus>('Party Wise');
-    const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(null);
+    const [selectedItemStatus, setSelectedItemStatus] =
+        useState<ItemStatus>('All');
+    const [selectedItemStatus1, setSelectedItemStatus1] =
+        useState<WiseStatus>('Party Wise');
+    const [lastViewedParcode, setLastViewedParcode] = useState<string | null>(
+        null,
+    );
     const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
     const [isAll, setisALL] = useState(false);
     const [dsnData, setDsnData] = useState([]);
-    // 
+    //
     const [isDesignModalVisible, setIsDesignModalVisible] = useState(false);
     const [selectedDesignData, setSelectedDesignData] = useState<{
         designdetails: any[];
@@ -93,8 +121,10 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         payload: any;
     } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filteredDesignDetails, setFilteredDesignDetails] = useState(selectedDesignData?.designdetails || []);
-    // 
+    const [filteredDesignDetails, setFilteredDesignDetails] = useState(
+        selectedDesignData?.designdetails || [],
+    );
+    //
     const [designChildData, setDesignChildData] = useState([]);
     const [designPage, setDesignPage] = useState(1);
     const [subdesignPage, setsubDesignPage] = useState(1);
@@ -102,14 +132,17 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const subdesignItemsPerPage = 10;
     const [isListReady, setIsListReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
-    const [isPartyDetailsModalVisible, setIsPartyDetailsModalVisible] = useState(false);
+    const [isPartyDetailsModalVisible, setIsPartyDetailsModalVisible] =
+        useState(false);
     const [selectedPartyDetails, setSelectedPartyDetails] = useState<{
         designdetails: any[];
         design_summary: any[];
         payload: any;
     } | null>(null);
     const [searchQueryPartyDetails, setSearchQueryPartyDetails] = useState('');
-    const [filteredPartyDetails, setFilteredPartyDetails] = useState(selectedPartyDetails?.designdetails || []);
+    const [filteredPartyDetails, setFilteredPartyDetails] = useState(
+        selectedPartyDetails?.designdetails || [],
+    );
     const loadMoreDesignDetails = () => {
         if (designPage * designItemsPerPage < filteredDesignDetails.length) {
             setDesignPage(designPage + 1);
@@ -121,7 +154,21 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         }
     };
 
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder1, setSortOrder1] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder2, setSortOrder2] = useState<'asc' | 'desc'>('asc');
+    const [selectedSalesExes, setSelectedSalesExes] = useState([]);
+    const [salesExeData, setSalesExeData] = useState([]);
 
+    const toggleSortOrder = () => {
+        setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+    const toggleSortOrder1 = () => {
+        setSortOrder1(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+    const toggleSortOrder2 = () => {
+        setSortOrder2(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
 
     // useEffect(() => {
     //     if (selectedDesignData) {
@@ -149,16 +196,25 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         if (!selectedDesignData) return;
 
         if (!searchQuery.trim()) {
-            setFilteredDesignDetails(selectedDesignData.designdetails);
+            const sorted1 = [...selectedDesignData.designdetails].sort((a, b) => {
+                const aAmt = parseFloat(a.pendingamt) || 0;
+                const bAmt = parseFloat(b.pendingamt) || 0;
+
+                return sortOrder1 === 'asc' ? aAmt - bAmt : bAmt - aAmt;
+            });
+
+            setFilteredDesignDetails(sorted1);
+            //setFilteredDesignDetails(selectedDesignData.designdetails);
         } else {
             const query = searchQuery.toLowerCase();
 
             // 🔹 Step 1: child filter (responsedes)
-            const filteredChild = designChildData.filter(item =>
-                item?.pdsncode?.toLowerCase().includes(query) ||
-                item?.pdesign?.toLowerCase().includes(query) ||
-                item?.cdsncode?.toLowerCase().includes(query) ||
-                item?.cdesign?.toLowerCase().includes(query)
+            const filteredChild = designChildData.filter(
+                item =>
+                    item?.pdsncode?.toLowerCase().includes(query) ||
+                    item?.pdesign?.toLowerCase().includes(query) ||
+                    item?.cdsncode?.toLowerCase().includes(query) ||
+                    item?.cdesign?.toLowerCase().includes(query),
             );
 
             // 🔹 Step 2: unique cdsncode nikalo
@@ -166,23 +222,31 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             const codeSet = new Set(uniqueCodes);
 
             const finalFiltered = selectedDesignData.designdetails.filter(item =>
-                codeSet.has(item.dsncode)
+                codeSet.has(item.dsncode),
             );
             // 🔹 Step 3: parent filter (dsncode match)
             // const finalFiltered = selectedDesignData.designdetails.filter(item =>
             //     uniqueCodes.includes(item.dsncode)
             // );
 
-            setFilteredDesignDetails(finalFiltered);
+            const sortedFiltered1 = [...finalFiltered].sort((a, b) => {
+                const aAmt = parseFloat(a.pendingamt) || 0;
+                const bAmt = parseFloat(b.pendingamt) || 0;
+
+                return sortOrder === 'asc' ? aAmt - bAmt : bAmt - aAmt;
+            });
+
+            setFilteredDesignDetails(sortedFiltered1);
+            //setFilteredDesignDetails(finalFiltered);
         }
-    }, [searchQuery, selectedDesignData, designChildData]);
+    }, [searchQuery, selectedDesignData, designChildData, sortOrder1]);
 
     // Filter partydetails based on search query
     useEffect(() => {
         if (selectedPartyDetails?.designdetails) {
             const lowercasedQuery = searchQueryPartyDetails.toLowerCase();
             const filtered = selectedPartyDetails.designdetails.filter(
-                (item) =>
+                item =>
                     item?.parcode?.toLowerCase().includes(lowercasedQuery) ||
                     item?.partyname?.toLowerCase().includes(lowercasedQuery) ||
                     item?.sono?.toLowerCase().includes(lowercasedQuery) ||
@@ -194,11 +258,20 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                     item?.chalamt?.toLowerCase().includes(lowercasedQuery) ||
                     item?.noofchallan?.toLowerCase().includes(lowercasedQuery) ||
                     item?.pending?.toLowerCase().includes(lowercasedQuery) ||
-                    item?.pendingamt?.toLowerCase().includes(lowercasedQuery)
+                    item?.pendingamt?.toLowerCase().includes(lowercasedQuery),
             );
-            setFilteredPartyDetails(filtered);
+
+            const sorted2 = [...filtered].sort((a, b) => {
+                const aAmt = parseFloat(a.pendingamt) || 0;
+                const bAmt = parseFloat(b.pendingamt) || 0;
+
+                return sortOrder2 === 'asc' ? aAmt - bAmt : bAmt - aAmt;
+            });
+
+            setFilteredPartyDetails(sorted2);
+            //setFilteredPartyDetails(filtered);
         }
-    }, [searchQueryPartyDetails, selectedPartyDetails]);
+    }, [searchQueryPartyDetails, selectedPartyDetails, sortOrder2]);
 
     // Cache keys
     const CACHE_KEY_CONFIRM_ACTION = 'sales_order_tracking_confirm_action';
@@ -206,11 +279,13 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     const CACHE_KEY_LAST_VIEWED = 'sales_order_tracking_last_viewed';
     const rowsPerPage = 20;
 
-
-
     // Open modal with design data
     const openDesignModal = (data: any, payload: any) => {
-        setSelectedDesignData({ designdetails: data.designdetails, design_summary: data.design_summary, payload });
+        setSelectedDesignData({
+            designdetails: data.designdetails,
+            design_summary: data.design_summary,
+            payload,
+        });
         setIsDesignModalVisible(true);
     };
 
@@ -240,7 +315,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 strcode: '012',
                 txntype: 'production_order_track',
                 prptype: '',
-                fetch: 'salesexe'
+                fetch: 'salesexe',
             };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/get_criterion`,
@@ -252,9 +327,9 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         strcode: '012',
                         txntype: 'production_order_track',
                         prptype: '',
-                        fetch: 'salesexe'
-                    }
-                })
+                        fetch: 'salesexe',
+                    },
+                }),
             );
             console.log('🔵 payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
@@ -296,28 +371,29 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 prpcode: 'SIP',
                 prptype: 'S',
                 yearno: yearValue,
-                strcode: "0",
-                txntype: "sales_order",
-                partytype: "p",
-                type: "s",
+                strcode: '0',
+                txntype: 'sales_order',
+                partytype: 'p',
+                type: 's',
                 page: 1,
                 limit: 20,
-                search: "",
+                search: '',
                 isceo: 0,
                 partype: 0,
-                grntype: "",
-                fetch: "",
-                acccode: "",
-                billdate: "",
-                strtype: "",
-                isfaint: "",
+                grntype: '',
+                fetch: '',
+                acccode: '',
+                billdate: '',
+                strtype: '',
+                isfaint: '',
                 user_id: 1,
             };
             console.log('🔵 payload PARTY', 'HI1');
-            const response = await axios.get(`${API}/api/mobaccountbasic`,
+            const response = await axios.get(
+                `${API}/api/mobaccountbasic`,
                 getRequestConfig({
-                    params: payload
-                })
+                    params: payload,
+                }),
             );
             console.log('🔵 payload PARTY', 'HI2');
             console.log('🔵 payload PARTY', payload, response);
@@ -354,7 +430,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 shdcode: '',
                 page: page + 1,
                 limit: rowsPerPage,
-                txntype: 'production_order_track'
+                txntype: 'production_order_track',
             };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/getdesign`,
@@ -369,9 +445,9 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         shdcode: '',
                         page: page + 1,
                         limit: rowsPerPage,
-                        txntype: 'production_order_track'
-                    }
-                })
+                        txntype: 'production_order_track',
+                    },
+                }),
             );
             console.log('🔵 design payload', payload, response);
             if (response.data.success) {
@@ -391,7 +467,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         }
     };
 
-    console.log("designData", designData)
+    console.log('designData', designData);
 
     const fetchItem = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -418,7 +494,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 fetch: 'itm',
                 itmcode: '',
                 strcodes: '012',
-                issdate: ''
+                issdate: '',
             };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/get_criterion`,
@@ -434,9 +510,9 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         fetch: 'itm',
                         itmcode: '',
                         strcodes: '012',
-                        issdate: ''
-                    }
-                })
+                        issdate: '',
+                    },
+                }),
             );
             console.log('🔵 item payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
@@ -460,6 +536,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             // fetchData();
             fetchDesign();
             fetchParty();
+            fetchSalesExe();
         }
     }, []);
     // Save data to AsyncStorage
@@ -526,10 +603,14 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             !hasAutoScrolled &&
             isListReady &&
             flatListRef.current &&
-            (searchQueryPOT.trim() ? filteredData.length > 0 : renderedData.length > 0)
+            (searchQueryPOT.trim()
+                ? filteredData.length > 0
+                : renderedData.length > 0)
         ) {
             const dataToUse = searchQueryPOT.trim() ? filteredData : renderedData;
-            const index = dataToUse.findIndex(item => item.parcode === lastViewedParcode);
+            const index = dataToUse.findIndex(
+                item => item.parcode === lastViewedParcode,
+            );
             if (index !== -1) {
                 setTimeout(() => {
                     flatListRef.current?.scrollToIndex({ index, animated: true });
@@ -537,7 +618,14 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 }, 300);
             }
         }
-    }, [lastViewedParcode, filteredData, renderedData, searchQueryPOT, hasAutoScrolled, isListReady]);
+    }, [
+        lastViewedParcode,
+        filteredData,
+        renderedData,
+        searchQueryPOT,
+        hasAutoScrolled,
+        isListReady,
+    ]);
 
     // useEffect(() => {
     //     if (!searchQueryPOT.trim()) {
@@ -562,20 +650,30 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     // }, [searchQueryPOT, salesdata]);
     useEffect(() => {
         if (!searchQueryPOT.trim()) {
-            setFilteredData(salesdata);
-            setRenderedData(salesdata.slice(0, itemsPerPage));
+            const sorted = [...salesdata].sort((a, b) => {
+                const aAmt = parseFloat(a.pendingamt) || 0;
+                const bAmt = parseFloat(b.pendingamt) || 0;
+
+                return sortOrder === 'asc' ? aAmt - bAmt : bAmt - aAmt;
+            });
+            setFilteredData(sorted);
+            setRenderedData(sorted.slice(0, itemsPerPage));
+            //setFilteredData(salesdata);
+            //setRenderedData(salesdata.slice(0, itemsPerPage));
+
             setPage(1);
         } else {
             const query = searchQueryPOT.toLowerCase();
 
             // 🔹 Step 1: child (dsnData) filter karo
-            const filteredChild = dsnData.filter(item =>
-                item?.pdsncode?.toLowerCase().includes(query) ||
-                item?.pdesign?.toLowerCase().includes(query) ||
-                item?.cdsncode?.toLowerCase().includes(query) ||
-                item?.cdesign?.toLowerCase().includes(query) ||
-                item?.parcode?.toLowerCase().includes(query) ||
-                item?.accname?.toLowerCase().includes(query)
+            const filteredChild = dsnData.filter(
+                item =>
+                    item?.pdsncode?.toLowerCase().includes(query) ||
+                    item?.pdesign?.toLowerCase().includes(query) ||
+                    item?.cdsncode?.toLowerCase().includes(query) ||
+                    item?.cdesign?.toLowerCase().includes(query) ||
+                    item?.parcode?.toLowerCase().includes(query) ||
+                    item?.accname?.toLowerCase().includes(query),
             );
 
             // 🔹 Step 2: unique parcode nikalo
@@ -587,15 +685,23 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             // );
             const parcodeSet = new Set(uniqueParcodes);
             const finalFiltered = salesdata.filter(item =>
-                parcodeSet.has(item.parcode)
+                parcodeSet.has(item.parcode),
             );
 
-            setFilteredData(finalFiltered);
-            setRenderedData(finalFiltered.slice(0, itemsPerPage));
+            const sortedFiltered = [...finalFiltered].sort((a, b) => {
+                const aAmt = parseFloat(a.pendingamt) || 0;
+                const bAmt = parseFloat(b.pendingamt) || 0;
+
+                return sortOrder === 'asc' ? aAmt - bAmt : bAmt - aAmt;
+            });
+
+            setFilteredData(sortedFiltered);
+            setRenderedData(sortedFiltered.slice(0, itemsPerPage));
+            //setFilteredData(finalFiltered);
+            //setRenderedData(finalFiltered.slice(0, itemsPerPage));
             setPage(1);
         }
-    }, [searchQueryPOT, salesdata, dsnData]);
-
+    }, [searchQueryPOT, salesdata, dsnData, sortOrder]);
 
     // Lazy loading
     const loadMoreData = useCallback(() => {
@@ -605,25 +711,52 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         const startIndex = page * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
 
+        const sortedData = [...salesdata].sort((a, b) => {
+            return sortOrder === 'asc'
+                ? parseFloat(a.pendingamt) - parseFloat(b.pendingamt)
+                : parseFloat(b.pendingamt) - parseFloat(a.pendingamt);
+        });
+
+        const dataToUse = searchQueryPOT.trim() ? filteredData : sortedData;
         // `salesdata` ya `filteredData` mein se data lelo
-        const dataToUse = searchQueryPOT.trim() ? filteredData : salesdata;
+        //const dataToUse = searchQueryPOT.trim() ? filteredData : salesdata;
 
         if (startIndex < dataToUse.length) {
             setLoading(true);
             setTimeout(() => {
                 // `renderedData` ko update karo
-                setRenderedData((prev) => [...prev, ...dataToUse.slice(startIndex, endIndex)]);
+                setRenderedData(prev => [
+                    ...prev,
+                    ...dataToUse.slice(startIndex, endIndex),
+                ]);
                 setPage(nextPage);
                 setLoading(false);
             }, 500);
         }
     }, [page, loading, searchQueryPOT, filteredData, salesdata]);
 
-
     // Get initials and color for party
-    const getInitials = (name: string) => name.split(' ').map((n) => n[0]).join('').substring(0, 1);
+    const getInitials = (name: string) =>
+        name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .substring(0, 1);
     const getColorForInitial = (id: string) => {
-        const colors = ['#2196F3', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4', '#3F51B5', '#757575', '#E91E63', '#FF5722', '#673AB7', '#009688', '#FFC107'];
+        const colors = [
+            '#2196F3',
+            '#4CAF50',
+            '#FF9800',
+            '#9C27B0',
+            '#00BCD4',
+            '#3F51B5',
+            '#757575',
+            '#E91E63',
+            '#FF5722',
+            '#673AB7',
+            '#009688',
+            '#FFC107',
+        ];
         return colors[parseInt(id) % colors.length];
     };
 
@@ -647,7 +780,6 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         cancelToken: cancelToken?.token,
     });
 
-
     const formatDate = (rawDate: any) => {
         let day = rawDate.getDate().toString().padStart(2, '0') || '';
         let month = (rawDate.getMonth() + 1).toString().padStart(2, '0') || '';
@@ -656,29 +788,55 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     };
 
     const handleConfirmAction = async () => {
+        console.log("selectedExe ----", selectedSalesExes)
         if (selectedItemStatus1 === 'Party Wise') {
             setIsLoading(true);
             setsalesdata([]);
             setsalessumdata([]);
             const yearValue = selectedYear.split('-')[1].substring(2);
-            const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
+            const dsnCodes = selectedDesigns.map(design => design.DsnCode);
             const partyCodes = selectedParty.map((item: any) => item.acccode);
+
+            let seArr = []
+            let seArrCntr = 0;
+            selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+                seArr[seArrCntr] = el.sexe;
+                seArrCntr++;
+
+            })
+
+
+
             const payload = {
                 // fromdate: formatDate(fromDate),
-                fromdate: "",
+                fromdate: '',
                 deldate: formatDate(delDate),
-                todate: "",
+                todate: '',
                 yearno: yearValue,
-                sexes: selectedExe?.Code ? selectedExe?.Code : '0',
-                type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-                wise: selectedItemStatus1 === 'Party Wise' ? 'party' : selectedItemStatus1 === 'Design Wise' ? 'design' : '',
+                //sexes: selectedExe?.Code ? selectedExe?.Code : '0',
+                sexes: seArr,
+                type:
+                    selectedItemStatus === 'All'
+                        ? 'all'
+                        : selectedItemStatus === 'Open'
+                            ? 'open'
+                            : selectedItemStatus === 'Closed'
+                                ? 'closed'
+                                : 'all',
+                wise:
+                    selectedItemStatus1 === 'Party Wise'
+                        ? 'party'
+                        : selectedItemStatus1 === 'Design Wise'
+                            ? 'design'
+                            : '',
 
                 dsncodes: dsnCodes,
                 parties: partyCodes,
                 prptype: 'S',
-                txntype: 'prodorderlist'
+                txntype: 'prodorderlist',
             };
-            console.log("payload", payload);
+            console.log('payload', payload);
 
             // Check cache first
             // const cachedData = await loadFromCache(CACHE_KEY_CONFIRM_ACTION);
@@ -699,13 +857,24 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             };
 
             try {
-                const response = await axios.post(`${API}/api/salesordertracking`, payload, { headers });
-                const responsedsn = await axios.post(`${API}/api/salesorderparentdesign`, payload, { headers });
-                console.log("🔵 responsedsn", payload, responsedsn)
+                const response = await axios.post(
+                    `${API}/api/salesordertracking`,
+                    payload,
+                    { headers },
+                );
+                const responsedsn = await axios.post(
+                    `${API}/api/salesorderparentdesign`,
+                    payload,
+                    { headers },
+                );
+                console.log('🔵 responsedsn', payload, responsedsn);
 
-                console.log("🔵 response", payload, response)
+                console.log('🔵 response', payload, response);
                 // console.log("🔵 responsedsn", payload, responsedsn)
-                if (response.data.success === true && response.data.data.salesdata.length > 0) {
+                if (
+                    response.data.success === true &&
+                    response.data.data.salesdata.length > 0
+                ) {
                     closeDrawer();
                     setsalesdata(response.data.data.salesdata);
                     setsalesdataTotal(response.data.data.salesdata.length);
@@ -723,8 +892,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 if (responsedsn?.data?.data) {
                     setDsnData(responsedsn.data.data);
                 }
-                console.log("🔵 responsedsn hiii")
-
+                console.log('🔵 responsedsn hiii');
             } catch (error) {
                 Alert.alert('Error', `Server error: ${error?.message}`);
                 setsalesdata([]);
@@ -739,7 +907,6 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     };
 
     const handleCardPressforDesign = async (partyData: Party) => {
-
         // setDData(partyData);
         const cacheKey = `${CACHE_KEY_CARD_PRESS}${partyData.parcode}`;
         const headers = {
@@ -750,26 +917,58 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         setTrackingLoader(true);
         try {
             const yearValue = selectedYear.split('-')[1].substring(2);
-            const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
+            const dsnCodes = selectedDesigns.map(design => design.DsnCode);
+
+            let seArr = []
+            let seArrCntr = 0;
+            selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+                seArr[seArrCntr] = el.sexe;
+                seArrCntr++;
+
+            })
+
+
             const payload = {
                 // fromdate: formatDate(fromDate),
-                fromdate: "",
+                fromdate: '',
                 // todate: formatDate(delDate),
-                todate: "",
+                todate: '',
                 deldate: formatDate(delDate),
                 yearno: yearValue,
-                sexes: selectedExe?.Code ? selectedExe?.Code : '0',
-                type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-                wise: selectedItemStatus1 === 'Party Wise' ? 'party' : selectedItemStatus1 === 'Design Wise' ? 'design' : '',
+                //sexes: selectedExe?.Code ? selectedExe?.Code : '0',
+                sexes: seArr,
+                type:
+                    selectedItemStatus === 'All'
+                        ? 'all'
+                        : selectedItemStatus === 'Open'
+                            ? 'open'
+                            : selectedItemStatus === 'Closed'
+                                ? 'closed'
+                                : 'all',
+                wise:
+                    selectedItemStatus1 === 'Party Wise'
+                        ? 'party'
+                        : selectedItemStatus1 === 'Design Wise'
+                            ? 'design'
+                            : '',
                 dsncodes: dsnCodes,
                 parcode: partyData.parcode,
                 prptype: 'S',
-                txntype: 'prodorderlist'
+                txntype: 'prodorderlist',
             };
-            const response = await axios.post(`${API}/api/salesorderdesigntracking`, payload, { headers });
-            const responsedes = await axios.post(`${API}/api/salesorderparentdesignmaster`, payload, { headers });
-            console.log("🔵 responsedd design", payload, response);
-            console.log("🔵 responsedd child design", payload, responsedes);
+            const response = await axios.post(
+                `${API}/api/salesorderdesigntracking`,
+                payload,
+                { headers },
+            );
+            const responsedes = await axios.post(
+                `${API}/api/salesorderparentdesignmaster`,
+                payload,
+                { headers },
+            );
+            console.log('🔵 responsedd design', payload, response);
+            console.log('🔵 responsedd child design', payload, responsedes);
             if (response.data.success) {
                 if (response.data.data.designdetails.length > 0) {
                     setDData(partyData);
@@ -777,7 +976,6 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 } else {
                     Alert.alert('No Data Found!');
                 }
-
             }
             if (responsedes?.data?.data) {
                 setDesignChildData(responsedes.data.data);
@@ -792,8 +990,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             //     navigation.navigate('SOPartyDetails', { party: partyData.partyname });
             // }
         } catch (error) {
-            console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            console.error('Error in handleCardPress:', error);
+            Alert.alert('Error', 'Failed to process party details');
         } finally {
             setTrackingLoader(false);
         }
@@ -812,27 +1010,59 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         setIsLoading(true);
         try {
             const yearValue = selectedYear.split('-')[1].substring(2);
-            const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
+            const dsnCodes = selectedDesigns.map(design => design.DsnCode);
+
+            let seArr = []
+            let seArrCntr = 0;
+            selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+                seArr[seArrCntr] = el.sexe;
+                seArrCntr++;
+
+            })
+
+
             const payload = {
                 // fromdate: formatDate(fromDate),
-                fromdate: "",
+                fromdate: '',
                 // todate: formatDate(delDate),
-                todate: "",
+                todate: '',
                 deldate: formatDate(delDate),
                 yearno: yearValue,
                 sexes: selectedExe?.Code ? selectedExe?.Code : '0',
-                type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-                wise: selectedItemStatus1 === 'Party Wise' ? 'party' : selectedItemStatus1 === 'Design Wise' ? 'design' : '',
+                type:
+                    selectedItemStatus === 'All'
+                        ? 'all'
+                        : selectedItemStatus === 'Open'
+                            ? 'open'
+                            : selectedItemStatus === 'Closed'
+                                ? 'closed'
+                                : 'all',
+                wise:
+                    selectedItemStatus1 === 'Party Wise'
+                        ? 'party'
+                        : selectedItemStatus1 === 'Design Wise'
+                            ? 'design'
+                            : '',
                 dsncodes: dsnCodes,
-                parcode: "",
+                parcode: '',
                 parties: partyCodes,
                 prptype: 'S',
-                txntype: 'prodorderlist'
+                txntype: 'prodorderlist',
+                sexes: seArr,
             };
-            const response = await axios.post(`${API}/api/salesorderdesigntracking`, payload, { headers });
-            const responsedes = await axios.post(`${API}/api/salesorderparentdesignmaster`, payload, { headers });
-            console.log("🔵 responsedd direct design", payload, response);
-            console.log("🔵 responsedd direct child design", payload, responsedes);
+            const response = await axios.post(
+                `${API}/api/salesorderdesigntracking`,
+                payload,
+                { headers },
+            );
+            const responsedes = await axios.post(
+                `${API}/api/salesorderparentdesignmaster`,
+                payload,
+                { headers },
+            );
+            console.log('🔵 responsedd direct design', payload, response);
+            console.log('🔵 responsedd direct child design', payload, responsedes);
             if (response.data.success) {
                 setDData(null);
                 openDesignModal(response.data.data, payload);
@@ -850,8 +1080,8 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
             //     navigation.navigate('SOPartyDetails', { party: partyData.partyname });
             // }
         } catch (error) {
-            console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            console.error('Error in handleCardPress:', error);
+            Alert.alert('Error', 'Failed to process party details');
         } finally {
             setIsLoading(false);
         }
@@ -897,8 +1127,20 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
     //     }
     // };
 
-    const handleCardSubDesignPress = async (getDData?: any, parname, customPayload?: any, item?: any, isall = false) => {
-        console.log('🔵 payload PARTY', getDData || "", parname || "", customPayload || "", item || "");
+    const handleCardSubDesignPress = async (
+        getDData?: any,
+        parname,
+        customPayload?: any,
+        item?: any,
+        isall = false,
+    ) => {
+        console.log(
+            '🔵 payload PARTY',
+            getDData || '',
+            parname || '',
+            customPayload || '',
+            item || '',
+        );
         const headers = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -910,29 +1152,56 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         } else {
             setisALL(false);
         }
+
+
+        let seArr = []
+        let seArrCntr = 0;
+        selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+            seArr[seArrCntr] = el.sexe;
+            seArrCntr++;
+
+        })
+
         const payload = {
             // fromdate: formatDate(fromDate),
-            fromdate: "",
+            fromdate: '',
             // deldate: formatDate(customPayload.delDate),
             deldate: customPayload.deldate,
             // todate: formatDate(delDate),
-            todate: "",
+            todate: '',
             yearno: selectedYear.split('-')[1].substring(2),
-            sexes: selectedExe?.Code ? selectedExe?.Code : '0',
-            type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-            wise: selectedItemStatus1 === 'Party Wise' ? 'party' : selectedItemStatus1 === 'Design Wise' ? 'design' : '',
+            //sexes: selectedExe?.Code ? selectedExe?.Code : '0',
+            sexes: seArr,
+            type:
+                selectedItemStatus === 'All'
+                    ? 'all'
+                    : selectedItemStatus === 'Open'
+                        ? 'open'
+                        : selectedItemStatus === 'Closed'
+                            ? 'closed'
+                            : 'all',
+            wise:
+                selectedItemStatus1 === 'Party Wise'
+                    ? 'party'
+                    : selectedItemStatus1 === 'Design Wise'
+                        ? 'design'
+                        : '',
             dsncodes: customPayload.dsncodes,
-            uid: item?.muid ? item?.muid : "",
-            mdsncode: item?.mdsncode ? item?.mdsncode : "",
+            uid: item?.muid ? item?.muid : '',
+            mdsncode: item?.mdsncode ? item?.mdsncode : '',
             parcode: customPayload.parcode,
             prptype: 'S',
-            txntype: 'prodorderlist'
+            txntype: 'prodorderlist',
         };
         try {
-
-            const response = await axios.post(`${API}/api/salesordersubdesigntracking`, payload, { headers });
-            console.log("🔵 response subdesign ddddd", response, payload);
-            console.log("🔵 response subdesign ddddd", response.data.data, payload);
+            const response = await axios.post(
+                `${API}/api/salesordersubdesigntracking`,
+                payload,
+                { headers },
+            );
+            console.log('🔵 response subdesign ddddd', response, payload);
+            console.log('🔵 response subdesign ddddd', response.data.data, payload);
             if (response.data.success) {
                 // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
                 // await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
@@ -943,19 +1212,40 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 setSelectedPartyDetails({
                     designdetails: response.data.data.designdetails,
                     design_summary: response.data.data.design_summary,
-                    payload: payload
+                    payload: payload,
                 });
                 setIsPartyDetailsModalVisible(true);
             }
         } catch (error) {
-            console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            console.error('Error in handleCardPress:', error);
+            Alert.alert('Error', 'Failed to process party details');
         } finally {
             setTrackingLoader(false);
         }
     };
-    const handleCardPress = async (getDData?: any, parname, dsnname, customPayload?: any, item?: any) => {
-        console.log('🔵 payload subdesign Clicked PARTY', getDData, parname, dsnname, customPayload, item);
+    const handleCardPress = async (
+        getDData?: any,
+        parname,
+        dsnname,
+        customPayload?: any,
+        item?: any,
+    ) => {
+        console.log(
+            '🔵 payload subdesign Clicked PARTY',
+            getDData,
+            parname,
+            dsnname,
+            customPayload,
+            item,
+        );
+        let seArr = []
+        let seArrCntr = 0;
+        selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+            seArr[seArrCntr] = el.sexe;
+            seArrCntr++;
+
+        })
         const headers = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -965,40 +1255,73 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         try {
             const payload = {
                 // fromdate: formatDate(fromDate),
-                fromdate: "",
+                fromdate: '',
                 deldate: customPayload.deldate,
                 // todate: formatDate(delDate),
-                todate: "",
+                todate: '',
                 yearno: selectedYear.split('-')[1].substring(2),
-                sexes: selectedExe?.Code ? selectedExe?.Code : '0',
-                type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-                wise: selectedItemStatus1 === 'Party Wise' ? 'party' : selectedItemStatus1 === 'Design Wise' ? 'design' : '',
+                // sexes: selectedExe?.Code ? selectedExe?.Code : '0',
+                sexes: seArr,
+                type:
+                    selectedItemStatus === 'All'
+                        ? 'all'
+                        : selectedItemStatus === 'Open'
+                            ? 'open'
+                            : selectedItemStatus === 'Closed'
+                                ? 'closed'
+                                : 'all',
+                wise:
+                    selectedItemStatus1 === 'Party Wise'
+                        ? 'party'
+                        : selectedItemStatus1 === 'Design Wise'
+                            ? 'design'
+                            : '',
                 dsncodes: item?.dsncode ? [item?.dsncode] : [],
-                uid: item?.suid ? item?.suid : "",
-                mdsncode: item?.mdsncode ? item?.mdsncode : "",
+                uid: item?.suid ? item?.suid : '',
+                mdsncode: item?.mdsncode ? item?.mdsncode : '',
                 parcode: getDData?.parcode,
                 prptype: 'S',
-                txntype: 'prodorderlist'
+                txntype: 'prodorderlist',
             };
-            const response = await axios.post(`${API}/api/salesorderpartytracking`, payload, { headers });
-            console.log("🔵 response ddddd", response, payload);
+            const response = await axios.post(
+                `${API}/api/salesorderpartytracking`,
+                payload,
+                { headers },
+            );
+            console.log('🔵 response ddddd', response, payload);
             if (response.data.success) {
-                await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
-                await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
-                await AsyncStorage.setItem('parties_tracking_details_party_name', selectedItemStatus1 === 'Design Wise' ? dsnname.dsnname : parname.parname);
+                await AsyncStorage.setItem(
+                    'parties_tracking_details',
+                    JSON.stringify(response.data.data),
+                );
+                await AsyncStorage.setItem(
+                    'parties_tracking_details_challan_payload',
+                    JSON.stringify(payload),
+                );
+                await AsyncStorage.setItem(
+                    'parties_tracking_details_party_name',
+                    selectedItemStatus1 === 'Design Wise'
+                        ? dsnname.dsnname
+                        : parname.parname,
+                );
                 // await AsyncStorage.setItem('parties_tracking_details_sub_design_name', dsnname.dsnname);
                 await saveLastViewedToCache(getDData.parcode);
                 setLastViewedParcode(getDData.parcode);
-                navigation.navigate('SOPartyDetails', { party: selectedItemStatus1 === 'Design Wise' ? dsnname.dsnname : parname.parname });
+                navigation.navigate('SOPartyDetails', {
+                    party:
+                        selectedItemStatus1 === 'Design Wise'
+                            ? dsnname.dsnname
+                            : parname.parname,
+                    selectedSalesExes: seArr
+                });
             }
         } catch (error) {
-            console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            console.error('Error in handleCardPress:', error);
+            Alert.alert('Error', 'Failed to process party details');
         } finally {
             setTrackingLoader(false);
         }
     };
-
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -1007,14 +1330,25 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
         <TouchableOpacity
             style={[
                 styles.partyCard,
-                lastViewedParcode === item.parcode && styles.recentlyViewedCard
+                lastViewedParcode === item.parcode && styles.recentlyViewedCard,
             ]}
             // onPress={() => handleCardPress(item)}
             onPress={() => handleCardPressforDesign(item)}
         >
             <View style={styles.partyHeader}>
-                <View style={[styles.partyAvatar, { backgroundColor: getColorForInitial(item.parcode) }]}>
-                    {getTrackingLoader ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.partyAvatarText}>{getInitials(item.partyname)}</Text>}
+                <View
+                    style={[
+                        styles.partyAvatar,
+                        { backgroundColor: getColorForInitial(item.parcode) },
+                    ]}
+                >
+                    {getTrackingLoader ? (
+                        <ActivityIndicator size="small" color="white" />
+                    ) : (
+                        <Text style={styles.partyAvatarText}>
+                            {getInitials(item.partyname)}
+                        </Text>
+                    )}
                 </View>
                 <View style={styles.partyInfo}>
                     <Text style={styles.partyName}>{item.partyname}</Text>
@@ -1022,7 +1356,12 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         <Text style={styles.partyOrdersText}>{item.noof} orders</Text>
                     </View>
                 </View>
-                <Icon name="chevron-right" size={24} color="#999" style={styles.chevronIcon} />
+                <Icon
+                    name="chevron-right"
+                    size={24}
+                    color="#999"
+                    style={styles.chevronIcon}
+                />
             </View>
             <View style={styles.partyValues}>
                 <View style={styles.valueRow}>
@@ -1031,8 +1370,12 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         <Text style={styles.valueText}>{formatNumber(item.totmtr)}</Text>
                     </View>
                     <View style={styles.valueItem}>
-                        <Text style={[styles.valueLabel, { color: '#E65100' }]}>Pending Meter:</Text>
-                        <Text style={[styles.valueText, { color: '#E65100' }]}>{formatNumber(item.pendingmtr)}</Text>
+                        <Text style={[styles.valueLabel, { color: '#E65100' }]}>
+                            Pending Meter:
+                        </Text>
+                        <Text style={[styles.valueText, { color: '#E65100' }]}>
+                            {formatNumber(item.pendingmtr)}
+                        </Text>
                     </View>
                 </View>
                 <View style={styles.valueRow}>
@@ -1041,8 +1384,12 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         <Text style={styles.valueText}>{formatValue(item.amount)}</Text>
                     </View>
                     <View style={styles.valueItem}>
-                        <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>Pending Amount:</Text>
-                        <Text style={[styles.valueText, { color: '#4CAF50' }]}>{formatValue(item.pendingamt)}</Text>
+                        <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>
+                            Pending Amount:
+                        </Text>
+                        <Text style={[styles.valueText, { color: '#4CAF50' }]}>
+                            {formatValue(item.pendingamt)}
+                        </Text>
                     </View>
                 </View>
             </View>
@@ -1056,13 +1403,71 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
 
     const renderFooter = () => {
         if (!loading) return null;
-        return <ActivityIndicator style={styles.loadingIndicator} size="large" color={theme.BRAND_GRADIENT_END} />;
+        return (
+            <ActivityIndicator
+                style={styles.loadingIndicator}
+                size="large"
+                color={theme.BRAND_GRADIENT_END}
+            />
+        );
+    };
+
+    const fetchSalesExe = async () => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        console.log("fetchSalesExe function :", userPtype)
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+
+        cancelToken = axios.CancelToken.source();
+
+        try {
+
+            let pload = {
+                prptype: userPtype,
+                yearno: getCurrentFinancialYear()
+            };
+
+            console.log("payload : ", pload);
+            console.log("url :", `${API}/api/getsexes`)
+
+            const response = await axios.get(
+                `${API}/api/getsexes`,
+                getRequestConfig({
+                    params: pload,
+                }),
+            );
+
+            console.log("response :", response)
+            console.log("response1 :", response.data)
+            console.log("response2 :", response.data.data)
+
+            if (response.data.success) {
+                console.log('✅ getsexex API response:', response.data.data);
+
+                setSalesExeData(response.data.data);
+
+            } else {
+
+                setSalesExeData([]);
+
+            }
+
+        } catch (error) {
+            if (!axios.isCancel(error)) {
+
+                Alert.alert('Error', `Server error: ${error.message}`);
+            }
+        }
     };
 
     return (
         <>
             {getTrackingLoader && <FullScreenLoader />}
-            <HeaderBar userName={username} placeholder="Search sales order..." onSearch={setSearchQueryPOT} />
+            <HeaderBar
+                userName={username}
+                placeholder="Search sales order..."
+                onSearch={setSearchQueryPOT}
+            />
             <TouchableOpacity style={styles.listIconContainer} onPress={openDrawer}>
                 <Icon name="list" size={24} color="white" />
             </TouchableOpacity>
@@ -1076,7 +1481,7 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 onToDateChange={setDelDate}
                 onYearChange={setSelectedYear}
                 onLoadPress={handleConfirmAction}
-                exeData={exeData}
+                exeData={salesExeData}
                 onExeChange={setSelectedExe}
                 selectedExe={selectedExe?.SalesExecutive || 'Select Executive'}
                 designData={designData}
@@ -1098,34 +1503,84 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                 setSelectedParty={setSelectedParty}
                 selectedParty={selectedParty}
                 yearOptions={yearOptions}
+                setSelectedSalesExes={setSelectedSalesExes}
+                selectedSalesExes={selectedSalesExes}
+                onSalesExeSelect={setSelectedSalesExes}
+            //salesExeData={salesExeData}
             />
             {salessumdata.length > 0 ? (
                 <View style={styles.container}>
                     <View style={styles.summaryContainer}>
                         <View style={[styles.summaryBox, { backgroundColor: '#E3F2FD' }]}>
                             <Text style={styles.summaryLabel}>Total Orders</Text>
-                            <Text style={styles.summaryValue}>{formatNumber(salessumdata[0]?.noof || '0')}</Text>
+                            <Text style={styles.summaryValue}>
+                                {formatNumber(salessumdata[0]?.noof || '0')}
+                            </Text>
                         </View>
                         <View style={[styles.summaryBox, { backgroundColor: '#E8F5E8' }]}>
                             <Text style={styles.summaryLabel}>Total Meter</Text>
-                            <Text style={styles.summaryValue}>{formatNumber(salessumdata[0]?.totmtr || '0')}</Text>
-                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>Amount</Text>
-                            <Text style={styles.summaryValue}>{formatValue(salessumdata[0]?.amount || '0')}</Text>
+                            <Text style={styles.summaryValue}>
+                                {formatNumber(salessumdata[0]?.totmtr || '0')}
+                            </Text>
+                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
+                                Amount
+                            </Text>
+                            <Text style={styles.summaryValue}>
+                                {formatValue(salessumdata[0]?.amount || '0')}
+                            </Text>
                         </View>
                         <View style={[styles.summaryBox, { backgroundColor: '#FFF3E0' }]}>
                             <Text style={styles.summaryLabel}>Pending Meter</Text>
-                            <Text style={[styles.summaryValue, { color: '#E65100' }]}>{salessumdata[0]?.pendingmtr || '0'}</Text>
-                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>Pending Amount</Text>
-                            <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatValue(salessumdata[0]?.pendingamt || '0')}</Text>
+                            <Text style={[styles.summaryValue, { color: '#E65100' }]}>
+                                {salessumdata[0]?.pendingmtr || '0'}
+                            </Text>
+                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
+                                Pending Amount
+                            </Text>
+                            <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
+                                {formatValue(salessumdata[0]?.pendingamt || '0')}
+                            </Text>
                         </View>
                     </View>
-                    <View style={{ display: "flex", flexDirection: "row", justifyContent: "space-between" }}>
+                    <View
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                        }}
+                    >
                         <Text style={styles.sectionTitle}>
-                            PARTIES ({searchQueryPOT.trim() ? filteredData.length : (renderedData && renderedData.length) || '0'})
+                            PARTIES (
+                            {searchQueryPOT.trim()
+                                ? filteredData.length
+                                : (renderedData && renderedData.length) || '0'}
+                            )
                         </Text>
                         <Text style={styles.sectionTitle}>
                             ALL PARTIES ({salesdataTotal || '0'})
                         </Text>
+                    </View>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text style={styles.sectionTitle}></Text>
+                        <TouchableOpacity
+                            onPress={toggleSortOrder}
+                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                        >
+                            <Icon
+                                name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={12}
+                                color="#333"
+                            />
+                            <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>
+                                Sort by Pending Amt.
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                     <FlatList
                         ref={flatListRef}
@@ -1139,20 +1594,23 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         ListEmptyComponent={
                             !isLoading ? (
                                 <View style={crlimtreq_styles.emptyContainer}>
-                                    <Text style={crlimtreq_styles.emptyText}>No request data found!</Text>
+                                    <Text style={crlimtreq_styles.emptyText}>
+                                        No request data found!
+                                    </Text>
                                 </View>
                             ) : null
                         }
                         extraData={lastViewedParcode}
                         onContentSizeChange={() => setIsListReady(true)}
                     />
-
                 </View>
-            ) : (<>
-                <View style={crlimtreq_styles.emptyContainer}>
-                    <Text style={crlimtreq_styles.emptyText}>No data found!</Text>
-                </View>
-            </>)}
+            ) : (
+                <>
+                    <View style={crlimtreq_styles.emptyContainer}>
+                        <Text style={crlimtreq_styles.emptyText}>No data found!</Text>
+                    </View>
+                </>
+            )}
             <Modal
                 visible={isDesignModalVisible}
                 animationType="slide"
@@ -1166,83 +1624,174 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                             <Icon name="close" size={24} color="#333" />
                         </TouchableOpacity>
                     </View>
-                    {getTrackingLoader ? <ActivityIndicator style={{ marginBottom: 10 }} size={24} color={theme.BRAND_GRADIENT_END} /> :
+                    {getTrackingLoader ? (
+                        <ActivityIndicator
+                            style={{ marginBottom: 10 }}
+                            size={24}
+                            color={theme.BRAND_GRADIENT_END}
+                        />
+                    ) : (
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search designs..."
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                         />
-                    }
+                    )}
                     {selectedDesignData?.design_summary.map((summary, index) => (
                         <TouchableOpacity
                             key={index}
-                            style={selectedItemStatus1 === 'Design Wise' ? styles.summaryCard123 : styles.summaryCard}
+                            style={
+                                selectedItemStatus1 === 'Design Wise'
+                                    ? styles.summaryCard123
+                                    : styles.summaryCard
+                            }
                             onPress={() => {
                                 // handleCardPress(getDData, { parname: selectedDesignData?.designdetails[0].partyname }, selectedDesignData?.payload);
-                                handleCardSubDesignPress(getDData, { parname: selectedDesignData?.designdetails[0].partyname }, selectedDesignData?.payload);
+                                handleCardSubDesignPress(
+                                    getDData,
+                                    { parname: selectedDesignData?.designdetails[0].partyname },
+                                    selectedDesignData?.payload,
+                                );
                                 setisALL(true);
                             }}
                         >
-                            {selectedItemStatus1 === 'Design Wise' ? null : (<Text style={styles.partyNameInSummary}>
-                                Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
-                            </Text>)}
-                            {selectedItemStatus1 === 'Design Wise' ? (<>
-                                <View style={styles.summaryContainer}>
-                                    <View style={[styles.summaryBox, { backgroundColor: '#E3F2FD' }]}>
-                                        <Text style={styles.summaryLabel}>Total Orders</Text>
-                                        <Text style={styles.summaryValue}>{formatNumber(summary?.noofchallan || '0')}</Text>
+                            {selectedItemStatus1 === 'Design Wise' ? null : (
+                                <Text style={styles.partyNameInSummary}>
+                                    Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
+                                </Text>
+                            )}
+                            {selectedItemStatus1 === 'Design Wise' ? (
+                                <>
+                                    <View style={styles.summaryContainer}>
+                                        <View
+                                            style={[
+                                                styles.summaryBox,
+                                                { backgroundColor: '#E3F2FD' },
+                                            ]}
+                                        >
+                                            <Text style={styles.summaryLabel}>Total Orders</Text>
+                                            <Text style={styles.summaryValue}>
+                                                {formatNumber(summary?.noofchallan || '0')}
+                                            </Text>
+                                        </View>
+                                        <View
+                                            style={[
+                                                styles.summaryBox,
+                                                { backgroundColor: '#E8F5E8' },
+                                            ]}
+                                        >
+                                            <Text style={styles.summaryLabel}>Total Meter</Text>
+                                            <Text style={styles.summaryValue}>
+                                                {formatNumber(summary.totmtr)}
+                                            </Text>
+                                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
+                                                Total Amount
+                                            </Text>
+                                            <Text style={styles.summaryValue}>
+                                                {formatValue(summary.totamt)}
+                                            </Text>
+                                        </View>
+                                        <View
+                                            style={[
+                                                styles.summaryBox,
+                                                { backgroundColor: '#FFF3E0' },
+                                            ]}
+                                        >
+                                            <Text style={styles.summaryLabel}>Pending Meter</Text>
+                                            <Text style={[styles.summaryValue, { color: '#E65100' }]}>
+                                                {formatNumber(summary.pending)}
+                                            </Text>
+                                            <Text style={[styles.summaryLabel, { marginTop: 5 }]}>
+                                                Pending Amount
+                                            </Text>
+                                            <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
+                                                {formatValue(summary.pendingamt)}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <View style={[styles.summaryBox, { backgroundColor: '#E8F5E8' }]}>
-                                        <Text style={styles.summaryLabel}>Total Meter</Text>
-                                        <Text style={styles.summaryValue}>{formatNumber(summary.totmtr)}</Text>
-                                        <Text style={[styles.summaryLabel, { marginTop: 5 }]}>Total Amount</Text>
-                                        <Text style={styles.summaryValue}>{formatValue(summary.totamt)}</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Total Meter:</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {formatNumber(summary.totmtr)}
+                                        </Text>
                                     </View>
-                                    <View style={[styles.summaryBox, { backgroundColor: '#FFF3E0' }]}>
-                                        <Text style={styles.summaryLabel}>Pending Meter</Text>
-                                        <Text style={[styles.summaryValue, { color: '#E65100' }]}>{formatNumber(summary.pending)}</Text>
-                                        <Text style={[styles.summaryLabel, { marginTop: 5 }]}>Pending Amount</Text>
-                                        <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatValue(summary.pendingamt)}</Text>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Total Amount:</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {formatValue(summary.totamt)}
+                                        </Text>
                                     </View>
-                                </View>
-                            </>) : (<>
-                                <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Total Meter:</Text>
-                                    <Text style={styles.summaryValue}>{formatNumber(summary.totmtr)}</Text>
-                                </View>
-                                <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Total Amount:</Text>
-                                    <Text style={styles.summaryValue}>{formatValue(summary.totamt)}</Text>
-                                </View>
-                                <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Challan Qty:</Text>
-                                    <Text style={styles.summaryValue}>{formatNumber(summary.chalqty)}</Text>
-                                </View>
-                                <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Pending Meter:</Text>
-                                    <Text style={[styles.summaryValue, { color: '#E65100' }]}>{formatNumber(summary.pending)}</Text>
-                                </View>
-                                <View style={styles.summaryRow}>
-                                    <Text style={styles.summaryLabel}>Pending Amount:</Text>
-                                    <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatValue(summary.pendingamt)}</Text>
-                                </View>
-                            </>)}
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Challan Qty:</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {formatNumber(summary.chalqty)}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Pending Meter:</Text>
+                                        <Text style={[styles.summaryValue, { color: '#E65100' }]}>
+                                            {formatNumber(summary.pending)}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.summaryRow}>
+                                        <Text style={styles.summaryLabel}>Pending Amount:</Text>
+                                        <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
+                                            {formatValue(summary.pendingamt)}
+                                        </Text>
+                                    </View>
+                                </>
+                            )}
 
                             {/*  */}
-
                         </TouchableOpacity>
                     ))}
-                    <Text style={styles.sectionTitle}>Main Design Details</Text>
+                    {/* <Text style={styles.sectionTitle}>Main Design Details</Text> */}
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text style={styles.sectionTitle}>Main Design Details</Text>
+                        <TouchableOpacity
+                            onPress={toggleSortOrder1}
+                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                        >
+                            <Icon
+                                name={sortOrder1 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={12}
+                                color="#333"
+                            />
+                            <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>
+                                Sort by Pending Amt.
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                     <FlatList
-                        data={filteredDesignDetails.slice(0, designPage * designItemsPerPage)}
+                        data={filteredDesignDetails.slice(
+                            0,
+                            designPage * designItemsPerPage,
+                        )}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 style={styles.designCard}
                                 onPress={() => {
-                                    const payload = { ...selectedDesignData!.payload, dsncodes: [item.dsncode] };
+                                    const payload = {
+                                        ...selectedDesignData!.payload,
+                                        dsncodes: [item.dsncode],
+                                    };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);
-                                    handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);
+                                    handleCardSubDesignPress(
+                                        getDData,
+                                        { parname: item.partyname },
+                                        payload,
+                                        item,
+                                    );
                                     setisALL(false);
                                 }}
                             >
@@ -1254,21 +1803,33 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                     <View style={styles.valueRow}>
                                         <View style={styles.valueItem}>
                                             <Text style={styles.valueLabel}>Total Meter:</Text>
-                                            <Text style={styles.valueText}>{formatNumber(item.totmtr)}</Text>
+                                            <Text style={styles.valueText}>
+                                                {formatNumber(item.totmtr)}
+                                            </Text>
                                         </View>
                                         <View style={styles.valueItem}>
-                                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>Pending Meter:</Text>
-                                            <Text style={[styles.valueText, { color: '#E65100' }]}>{formatNumber(item.pending)}</Text>
+                                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>
+                                                Pending Meter:
+                                            </Text>
+                                            <Text style={[styles.valueText, { color: '#E65100' }]}>
+                                                {formatNumber(item.pending)}
+                                            </Text>
                                         </View>
                                     </View>
                                     <View style={styles.valueRow}>
                                         <View style={styles.valueItem}>
                                             <Text style={styles.valueLabel}>Total Amount:</Text>
-                                            <Text style={styles.valueText}>{formatValue(item.totamt)}</Text>
+                                            <Text style={styles.valueText}>
+                                                {formatValue(item.totamt)}
+                                            </Text>
                                         </View>
                                         <View style={styles.valueItem}>
-                                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>Pending Amount:</Text>
-                                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>{formatValue(item.pendingamt)}</Text>
+                                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>
+                                                Pending Amount:
+                                            </Text>
+                                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>
+                                                {formatValue(item.pendingamt)}
+                                            </Text>
                                         </View>
                                     </View>
                                 </View>
@@ -1277,7 +1838,14 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         keyExtractor={(item, index) => `${item.dsncode}-${index}`}
                         onEndReached={loadMoreDesignDetails}
                         onEndReachedThreshold={0.5}
-                        ListFooterComponent={designPage * designItemsPerPage < filteredDesignDetails.length ? <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} /> : null}
+                        ListFooterComponent={
+                            designPage * designItemsPerPage < filteredDesignDetails.length ? (
+                                <ActivityIndicator
+                                    size="large"
+                                    color={theme.BRAND_GRADIENT_END}
+                                />
+                            ) : null
+                        }
                     />
                 </View>
             </Modal>
@@ -1294,20 +1862,28 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         <>
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>Sub Design Summary</Text>
-                                <TouchableOpacity onPress={() => setIsPartyDetailsModalVisible(false)}>
+                                <TouchableOpacity
+                                    onPress={() => setIsPartyDetailsModalVisible(false)}
+                                >
                                     <Icon name="close" size={24} color="#333" />
                                 </TouchableOpacity>
                             </View>
 
                             {/* Search Input */}
-                            {getTrackingLoader ? <ActivityIndicator style={{ marginBottom: 10 }} size={24} color={theme.BRAND_GRADIENT_END} /> :
+                            {getTrackingLoader ? (
+                                <ActivityIndicator
+                                    style={{ marginBottom: 10 }}
+                                    size={24}
+                                    color={theme.BRAND_GRADIENT_END}
+                                />
+                            ) : (
                                 <TextInput
                                     style={styles.searchInput}
                                     placeholder="Search sub design details..."
                                     value={searchQueryPartyDetails}
                                     onChangeText={setSearchQueryPartyDetails}
                                 />
-                            }
+                            )}
                             {selectedPartyDetails?.design_summary.map((summary, index) => (
                                 <TouchableOpacity
                                     key={index}
@@ -1315,12 +1891,24 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                     onPress={() => {
                                         // handleCardPress(getDData, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload);
                                         // handleCardSubDesignPress(getDData, { parname: selectedPartyDetails?.designdetails[0].partyname }, selectedPartyDetails?.payload);
-                                        handleCardPress(selectedPartyDetails?.payload, { parname: selectedPartyDetails?.designdetails[0].partyname }, { dsnname: 'All Designs' }, selectedPartyDetails?.payload, summary);
+                                        handleCardPress(
+                                            selectedPartyDetails?.payload,
+                                            {
+                                                parname:
+                                                    selectedPartyDetails?.designdetails[0].partyname,
+                                            },
+                                            { dsnname: 'All Designs' },
+                                            selectedPartyDetails?.payload,
+                                            summary,
+                                        );
                                     }}
                                 >
-                                    {selectedItemStatus1 === 'Design Wise' ? null : (<Text style={styles.partyNameInSummary}>
-                                        Party: {selectedPartyDetails?.designdetails[0]?.partyname || ''}
-                                    </Text>)}
+                                    {selectedItemStatus1 === 'Design Wise' ? null : (
+                                        <Text style={styles.partyNameInSummary}>
+                                            Party:{' '}
+                                            {selectedPartyDetails?.designdetails[0]?.partyname || ''}
+                                        </Text>
+                                    )}
 
                                     <View style={styles.summaryRow}>
                                         <Text style={styles.summaryLabel}>Total Meter:</Text>
@@ -1328,19 +1916,27 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                     </View>
                                     <View style={styles.summaryRow}>
                                         <Text style={styles.summaryLabel}>Total Amount:</Text>
-                                        <Text style={styles.summaryValue}>{formatValue(summary.totamt)}</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {formatValue(summary.totamt)}
+                                        </Text>
                                     </View>
                                     <View style={styles.summaryRow}>
                                         <Text style={styles.summaryLabel}>Challan Qty:</Text>
-                                        <Text style={styles.summaryValue}>{formatNumber(summary.chalqty)}</Text>
+                                        <Text style={styles.summaryValue}>
+                                            {formatNumber(summary.chalqty)}
+                                        </Text>
                                     </View>
                                     <View style={styles.summaryRow}>
                                         <Text style={styles.summaryLabel}>Pending Meter:</Text>
-                                        <Text style={[styles.summaryValue, { color: '#E65100' }]}>{formatNumber(summary.pending)}</Text>
+                                        <Text style={[styles.summaryValue, { color: '#E65100' }]}>
+                                            {formatNumber(summary.pending)}
+                                        </Text>
                                     </View>
                                     <View style={styles.summaryRow}>
                                         <Text style={styles.summaryLabel}>Pending Amount:</Text>
-                                        <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatValue(summary.pendingamt)}</Text>
+                                        <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>
+                                            {formatValue(summary.pendingamt)}
+                                        </Text>
                                     </View>
                                 </TouchableOpacity>
                             ))}
@@ -1349,18 +1945,26 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                         <View>
                             <View style={styles.modalHeader}>
                                 <Text style={styles.modalTitle}>Sub Design Summary</Text>
-                                <TouchableOpacity onPress={() => setIsPartyDetailsModalVisible(false)}>
+                                <TouchableOpacity
+                                    onPress={() => setIsPartyDetailsModalVisible(false)}
+                                >
                                     <Icon name="close" size={24} color="#333" />
                                 </TouchableOpacity>
                             </View>
-                            {getTrackingLoader ? <ActivityIndicator style={{ marginBottom: 10 }} size={24} color={theme.BRAND_GRADIENT_END} /> :
+                            {getTrackingLoader ? (
+                                <ActivityIndicator
+                                    style={{ marginBottom: 10 }}
+                                    size={24}
+                                    color={theme.BRAND_GRADIENT_END}
+                                />
+                            ) : (
                                 <TextInput
                                     style={styles.searchInput}
                                     placeholder="Search sub design details..."
                                     value={searchQueryPartyDetails}
                                     onChangeText={setSearchQueryPartyDetails}
                                 />
-                            }
+                            )}
                         </View>
                     )}
                     {/* Party Details List */}
@@ -1397,17 +2001,51 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                             </View>
                         }
                     /> */}
-                    <Text style={styles.sectionTitle}>Sub Design Details</Text>
+                    {/* <Text style={styles.sectionTitle}>Sub Design Details</Text> */}
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text style={styles.sectionTitle}>Sub Design Details</Text>
+                        <TouchableOpacity
+                            onPress={toggleSortOrder2}
+                            style={{ flexDirection: 'row', alignItems: 'center' }}
+                        >
+                            <Icon
+                                name={sortOrder2 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={12}
+                                color="#333"
+                            />
+                            <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>
+                                Sort by Pending Amt.
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                     <FlatList
-                        data={filteredPartyDetails.slice(0, subdesignPage * subdesignItemsPerPage)}
+                        data={filteredPartyDetails.slice(
+                            0,
+                            subdesignPage * subdesignItemsPerPage,
+                        )}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 style={styles.designCard}
                                 onPress={() => {
-                                    const payload = { ...selectedPartyDetails!.payload, dsncodes: [item.dsncode] };
+                                    const payload = {
+                                        ...selectedPartyDetails!.payload,
+                                        dsncodes: [item.dsncode],
+                                    };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);
                                     // handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);
-                                    handleCardPress(selectedPartyDetails?.payload, { parname: item.partyname }, { dsnname: item.Dsnname }, payload, item);
+                                    handleCardPress(
+                                        selectedPartyDetails?.payload,
+                                        { parname: item.partyname },
+                                        { dsnname: item.Dsnname },
+                                        payload,
+                                        item,
+                                    );
                                 }}
                             >
                                 <View style={styles.designHeader}>
@@ -1418,21 +2056,33 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                     <View style={styles.valueRow}>
                                         <View style={styles.valueItem}>
                                             <Text style={styles.valueLabel}>Total Meter:</Text>
-                                            <Text style={styles.valueText}>{formatNumber(item.totmtr)}</Text>
+                                            <Text style={styles.valueText}>
+                                                {formatNumber(item.totmtr)}
+                                            </Text>
                                         </View>
                                         <View style={styles.valueItem}>
-                                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>Pending Meter:</Text>
-                                            <Text style={[styles.valueText, { color: '#E65100' }]}>{formatNumber(item.pending)}</Text>
+                                            <Text style={[styles.valueLabel, { color: '#E65100' }]}>
+                                                Pending Meter:
+                                            </Text>
+                                            <Text style={[styles.valueText, { color: '#E65100' }]}>
+                                                {formatNumber(item.pending)}
+                                            </Text>
                                         </View>
                                     </View>
                                     <View style={styles.valueRow}>
                                         <View style={styles.valueItem}>
                                             <Text style={styles.valueLabel}>Total Amount:</Text>
-                                            <Text style={styles.valueText}>{formatValue(item.totamt)}</Text>
+                                            <Text style={styles.valueText}>
+                                                {formatValue(item.totamt)}
+                                            </Text>
                                         </View>
                                         <View style={styles.valueItem}>
-                                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>Pending Amount:</Text>
-                                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>{formatValue(item.pendingamt)}</Text>
+                                            <Text style={[styles.valueLabel, { color: '#4CAF50' }]}>
+                                                Pending Amount:
+                                            </Text>
+                                            <Text style={[styles.valueText, { color: '#4CAF50' }]}>
+                                                {formatValue(item.pendingamt)}
+                                            </Text>
                                         </View>
                                     </View>
                                     <View style={styles.valueRow}>
@@ -1445,19 +2095,24 @@ const SalesOrderTracking: React.FC<{ token: string, navigation: any; username: s
                                             <Text style={[styles.valueText]}>{item.sodate}</Text>
                                         </View>
                                     </View>
-
                                 </View>
                             </TouchableOpacity>
                         )}
                         keyExtractor={(item, index) => `${item.dsncode}-${index}`}
                         onEndReached={loadMoreSubDesignDetails}
                         onEndReachedThreshold={0.5}
-                        ListFooterComponent={subdesignPage * subdesignItemsPerPage < filteredPartyDetails.length ? <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} /> : null}
+                        ListFooterComponent={
+                            subdesignPage * subdesignItemsPerPage <
+                                filteredPartyDetails.length ? (
+                                <ActivityIndicator
+                                    size="large"
+                                    color={theme.BRAND_GRADIENT_END}
+                                />
+                            ) : null
+                        }
                     />
                 </View>
             </Modal>
-
-
         </>
     );
 };
@@ -1598,7 +2253,7 @@ const styles = StyleSheet.create({
     listContent: {
         paddingBottom: 20,
     },
-    // 
+    //
     modalContainer: {
         flex: 1,
         padding: 20,
@@ -1741,7 +2396,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#666',
     },
-
 });
 
 export default React.memo(SalesOrderTracking);

@@ -872,7 +872,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             borderRadius: 8,
             fontSize: 12,
             marginRight: 8,
-            color:'#000'
+            color: '#000'
         },
 
         editBtn: {
@@ -1022,18 +1022,34 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             flexDirection: 'row',
             justifyContent: 'space-between'
         },
+        // listCard: {
+        //     flexDirection: 'row',
+        //     justifyContent: 'space-between',
+        //     backgroundColor: '#fff',
+        //     padding: 14,
+        //     borderRadius: 14,
+        //     marginBottom: 12,
+        //     elevation: 3
+        // },
         listCard: {
             flexDirection: 'row',
             justifyContent: 'space-between',
+            alignItems: 'flex-start', // 🔥 important (top align)
+            padding: 10,
             backgroundColor: '#fff',
-            padding: 14,
-            borderRadius: 14,
-            marginBottom: 12,
+            marginBottom: 8,
+            borderRadius: 8,
+            marginHorizontal: 6,
             elevation: 3
         },
+        // leftSection: {
+        //     flexDirection: 'row',
+        //     alignItems: 'center'
+        // },
         leftSection: {
             flexDirection: 'row',
-            alignItems: 'center'
+            alignItems: 'flex-start',
+            flex: 1,
         },
         indexText: {
             color: '#fff',
@@ -1041,7 +1057,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         },
         rightSection: {
             alignItems: 'flex-end',
-            justifyContent: 'center'
+            justifyContent: 'center',
         },
         deleteIcon: {
             alignSelf: 'flex-end',
@@ -2212,6 +2228,25 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         );
     };
 
+    const handleDelete = (index) => {
+        Alert.alert(
+            "Delete",
+            "Are you sure you want to remove this carton?",
+            [
+                { text: "Cancel" },
+                {
+                    text: "Delete",
+                    onPress: () => {
+                        const updatedList = [...cartonSummary];
+                        updatedList.splice(index, 1);
+                        setCartonSummary(updatedList);
+                    },
+                    style: "destructive"
+                }
+            ]
+        );
+    };
+
     const COL = {
         sr: 50,
         carton: 120,
@@ -2972,13 +3007,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 <Text style={styles.cardTitle}>
                                     Yarn Issuance Summary ({cartonSummary.length})
                                 </Text>
-                                <FlatList
+                                {/* <FlatList
                                     data={cartonSummary}
                                     keyExtractor={(item, index) => index.toString()}
                                     contentContainerStyle={{ paddingBottom: 10 }}
                                     renderItem={({ item, index }) => (
                                         <View style={styles.listCard}>
-                                            {/* LEFT SIDE */}
                                             <View style={styles.leftSection}>
                                                 <View style={styles.indexCircle}>
                                                     <Text style={styles.indexText}>{index + 1}</Text>
@@ -2988,16 +3022,17 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     <Text style={styles.cartonNo}>
                                                         {item.cartonNo}
                                                     </Text>
+                                                    <Text style={styles.subText} numberOfLines={2}>
+                                                        {item.ItmName} 
+                                                    </Text>
                                                     <Text style={styles.subText}>
-                                                        {item.ItmName} / {item.MerName}
+                                                        {item.MerName}
                                                     </Text>
                                                     <Text style={styles.subText}>
                                                         {item.ShdName} / {item.GrdName}
                                                     </Text>
                                                 </View>
                                             </View>
-
-                                            {/* RIGHT SIDE */}
                                             <View style={styles.rightSection}>
                                                 <TouchableOpacity
                                                     style={styles.deleteIcon}
@@ -3015,7 +3050,69 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                             </View>
                                         </View>
                                     )}
-                                />
+                                /> */}
+
+                                {/* <ScrollView contentContainerStyle={{ paddingBottom: 10 }}> */}
+                                <ScrollView
+                                    style={{ maxHeight: 450 }}   // 🔥 IMPORTANT (adjust as needed)
+                                    contentContainerStyle={{ paddingBottom: 10 }}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {cartonSummary.map((item, index) => (
+                                        <View key={index} style={styles.listCard}>
+
+                                            {/* LEFT SIDE */}
+                                            <View style={styles.leftSection}>
+                                                <View style={styles.indexCircle}>
+                                                    <Text style={styles.indexText}>{index + 1}</Text>
+                                                </View>
+
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.cartonNo}>
+                                                        {item.cartonNo}
+                                                    </Text>
+
+                                                    <Text style={styles.subText} numberOfLines={2}>
+                                                        {item.ItmName}/{item.MerName}
+                                                    </Text>
+                                                    <Text style={styles.subText}>
+                                                        {item.MerName}
+                                                    </Text>
+
+                                                    <Text style={styles.subText}>
+                                                        {item.ShdName} / {item.GrdName}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* RIGHT SIDE */}
+                                            <View style={styles.rightSection}>
+                                                <TouchableOpacity
+                                                    style={styles.deleteIcon}
+                                                    // onPress={() => confirmcartondelete(item)}
+                                                    onPress={() => {
+                                                        if (item?.UId) {
+                                                            confirmcartondelete(item);
+                                                        } else {
+                                                            handleDelete(index);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                                </TouchableOpacity>
+
+                                                <Text style={styles.qtyText}>
+                                                    Qty: {item.qty}
+                                                </Text>
+
+                                                <Text style={styles.cheesText}>
+                                                    Chees: {item.chees}
+                                                </Text>
+                                            </View>
+
+                                        </View>
+                                    ))}
+                                </ScrollView>
 
                                 <View style={styles.summaryBar}>
                                     <View style={styles.summaryItem}>
@@ -3040,7 +3137,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 <View style={styles.bottomRow}>
                                     <TouchableOpacity
                                         style={styles.backBtn1}
-                                        // onPress={() => setShowList(false)}
                                         onPress={() => setShowList(false)}
                                     >
                                         <Text style={styles.backText}>＋ Add More</Text>
@@ -3059,9 +3155,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     </View>
                 </View>
             </Modal >
-
-            {/* cartons modal end over */}
-
 
             <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
                 onPress={() => {

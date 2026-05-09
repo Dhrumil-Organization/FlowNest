@@ -54,7 +54,7 @@ interface SOPartyDetailsProps {
 }
 
 const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigation, username }) => {
-    const { party } = route?.params || "";
+    const { party, selectedSalesExes } = route?.params || "";
     const [getDetailData, setDetailData] = useState<{
         partydetails: PartyDetail[];
         party_summary: PartySummary[];
@@ -227,6 +227,16 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             'X-Requested-with': 'XMLHttpRequest',
         };
         try {
+
+
+            let seArr = []
+            let seArrCntr = 0;
+            selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+                seArr[seArrCntr] = el.sexe;
+                seArrCntr++;
+
+            })
             // const yearValue = selectedYear.split('-')[1].substring(2);
             // const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
             const payload = {
@@ -235,6 +245,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 todate: "",
                 uid: order.uid,
                 srno: order.srno,
+                sexes: seArr,
             };
             const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
             // const response = {

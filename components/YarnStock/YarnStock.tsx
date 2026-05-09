@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Modal, TextInput } from 'react-native';
 import { useWindowDimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBar from '../HeaderBar/HeaderBar';
@@ -327,11 +327,32 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
         return [allItem, ...result];
     };
 
+    // const subItemData = useMemo(() => {
+    //     if (!selectedItem) return [];
+
+    //     return getSubItemSummary(selectedItem, salesdata);
+    // }, [selectedItem, salesdata]);
+
     const subItemData = useMemo(() => {
+
         if (!selectedItem) return [];
 
-        return getSubItemSummary(selectedItem, salesdata);
-    }, [selectedItem, salesdata]);
+        let data: any[] = getSubItemSummary(selectedItem, salesdata);
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.ITMCODE || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return data;
+
+    }, [selectedItem, salesdata, searchQueryPOT]);
 
 
     // const getmergeSummary = (selectedItem = {}, data = []) => {
@@ -418,17 +439,44 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
         return [allItem, ...result];
     };
 
+    // const mergeData = useMemo(() => {
+    //     if (!selectedDesign || !selectedItem) return [];
+
+    //     return getmergeSummary(
+    //         {
+    //             MITMCODE: selectedItem.MITMCODE,
+    //             ITMCODE: selectedDesign.ITMCODE
+    //         },
+    //         salesdata
+    //     );
+    // }, [selectedDesign, selectedItem, salesdata]);
+
     const mergeData = useMemo(() => {
+
         if (!selectedDesign || !selectedItem) return [];
 
-        return getmergeSummary(
+        let data: any[] = getmergeSummary(
             {
                 MITMCODE: selectedItem.MITMCODE,
                 ITMCODE: selectedDesign.ITMCODE
             },
             salesdata
         );
-    }, [selectedDesign, selectedItem, salesdata]);
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.MERNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return data;
+
+    }, [selectedDesign, selectedItem, salesdata, searchQueryPOT]);
 
 
     // const getshadeSummary = (selectedMerge = {}, data = []) => {
@@ -518,10 +566,24 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
         return [allItem, ...result];
     };
 
+    // const shadeData = useMemo(() => {
+    //     if (!selectedSubDesign || !selectedDesign || !selectedItem) return [];
+
+    //     return getshadeSummary(
+    //         {
+    //             MITMCODE: selectedItem.MITMCODE,
+    //             ITMCODE: selectedDesign.ITMCODE,
+    //             MERCODE: selectedSubDesign.MERCODE
+    //         },
+    //         salesdata
+    //     );
+    // }, [selectedSubDesign, selectedDesign, selectedItem, salesdata]);
+
     const shadeData = useMemo(() => {
+
         if (!selectedSubDesign || !selectedDesign || !selectedItem) return [];
 
-        return getshadeSummary(
+        let data: any[] = getshadeSummary(
             {
                 MITMCODE: selectedItem.MITMCODE,
                 ITMCODE: selectedDesign.ITMCODE,
@@ -529,7 +591,21 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
             },
             salesdata
         );
-    }, [selectedSubDesign, selectedDesign, selectedItem, salesdata]);
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.SHDNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return data;
+
+    }, [selectedSubDesign, selectedDesign, selectedItem, salesdata, searchQueryPOT]);
 
 
     const openDrawer = () => setIsDrawerVisible(true);
@@ -551,16 +627,55 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
         return [allItem, ...data];
     };
 
+    // const displayData = useMemo(() => {
+    //     return addAllCard(renderedData);
+    // }, [renderedData]);
+
     const displayData = useMemo(() => {
-        return addAllCard(renderedData);
-    }, [renderedData]);
+
+        let baseData: any[] = addAllCard(renderedData);
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            baseData = baseData.filter((item: any) =>
+                String(item?.MITMNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return baseData;
+
+    }, [renderedData, searchQueryPOT]);
+
+    // const totalQty = useMemo(() => {
+    //     return renderedData
+    //         .reduce((sum, item) => sum + Number(item.TOTQTY || 0), 0)
+    //         .toFixed(3);
+    // }, [renderedData]);
 
     const totalQty = useMemo(() => {
-        return renderedData
+
+        let data: any[] = renderedData;
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.MITMNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return data
             .reduce((sum, item) => sum + Number(item.TOTQTY || 0), 0)
             .toFixed(3);
-    }, [renderedData]);
 
+    }, [renderedData, searchQueryPOT]);
 
     const getGridConfig = () => {
         const padding = 12;
@@ -680,6 +795,38 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                     <Icon name="close" size={18} color="#fff" />
                                 </TouchableOpacity>
                             </View>
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#fff',
+                                    marginHorizontal: 12,
+                                    marginTop: 12,
+                                    marginBottom: 5,
+                                    borderRadius: 10,
+                                    paddingHorizontal: 12,
+                                    elevation: 3,
+                                    borderWidth: 1,
+                                    borderColor: '#ddd',
+                                    height: 48,
+                                }}
+                            >
+                                <Icon name="search" size={22} color="#666" />
+
+                                <TextInput
+                                    placeholder="Search stock..."
+                                    value={searchQueryPOT}
+                                    onChangeText={setSearchQueryPOT}
+                                    placeholderTextColor="#999"
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 10,
+                                        color: '#000',
+                                        fontSize: 15,
+                                        paddingVertical: 0,
+                                    }}
+                                />
+                            </View>
                             <FlatList
                                 //data={detailData}
                                 data={subItemData}
@@ -743,6 +890,38 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                     <Icon name="close" size={18} color="#fff" />
                                 </TouchableOpacity>
                             </View>
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#fff',
+                                    marginHorizontal: 12,
+                                    marginTop: 12,
+                                    marginBottom: 5,
+                                    borderRadius: 10,
+                                    paddingHorizontal: 12,
+                                    elevation: 3,
+                                    borderWidth: 1,
+                                    borderColor: '#ddd',
+                                    height: 48,
+                                }}
+                            >
+                                <Icon name="search" size={22} color="#666" />
+
+                                <TextInput
+                                    placeholder="Search stock..."
+                                    value={searchQueryPOT}
+                                    onChangeText={setSearchQueryPOT}
+                                    placeholderTextColor="#999"
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 10,
+                                        color: '#000',
+                                        fontSize: 15,
+                                        paddingVertical: 0,
+                                    }}
+                                />
+                            </View>
                             <FlatList
                                 data={mergeData}
                                 keyExtractor={(_, index) => index.toString()}
@@ -800,6 +979,38 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                 <TouchableOpacity onPress={() => setIsShadeVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
                                     <Icon name="close" size={18} color="#fff" />
                                 </TouchableOpacity>
+                            </View>
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#fff',
+                                    marginHorizontal: 12,
+                                    marginTop: 12,
+                                    marginBottom: 5,
+                                    borderRadius: 10,
+                                    paddingHorizontal: 12,
+                                    elevation: 3,
+                                    borderWidth: 1,
+                                    borderColor: '#ddd',
+                                    height: 48,
+                                }}
+                            >
+                                <Icon name="search" size={22} color="#666" />
+
+                                <TextInput
+                                    placeholder="Search stock..."
+                                    value={searchQueryPOT}
+                                    onChangeText={setSearchQueryPOT}
+                                    placeholderTextColor="#999"
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 10,
+                                        color: '#000',
+                                        fontSize: 15,
+                                        paddingVertical: 0,
+                                    }}
+                                />
                             </View>
                             <FlatList
                                 data={shadeData}

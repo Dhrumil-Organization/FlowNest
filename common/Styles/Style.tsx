@@ -1387,6 +1387,34 @@ export const checkingScannerStyles = StyleSheet.create({
         borderRadius: 8,
         alignItems: "center"
     },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 20,
+        gap: 12, // React Native latest versions
+    },
+
+    submitBtn1: {
+        flex: 1, // dono button same width
+        flexDirection: 'row',
+        backgroundColor: "#007EA7",
+        justifyContent: 'center',
+        alignItems: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 18,
+        borderRadius: 14,
+
+        // Shadow
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4.65,
+        elevation: 6,
+    },
 
     submitText: {
         color: "#fff",
@@ -1440,7 +1468,7 @@ export const checkingScannerStyles = StyleSheet.create({
         height: 40,
         justifyContent: 'center',
         width: '100%',
-        color:'#000'
+        color: '#000'
 
 
     },
@@ -1566,6 +1594,119 @@ export const checkingScannerStyles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 10,
         textAlign: 'center'
+    },
+    scannerModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+
+    scannerModalContainer: {
+        height: '85%',
+        backgroundColor: '#F5F7FB',
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        padding: 16,
+    },
+
+    scannerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 18,
+    },
+
+    headerContainer: {
+        paddingTop: 55,
+        paddingHorizontal: 18,
+        paddingBottom: 18,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+
+    closeButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#F4F4F4',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        marginHorizontal: 16,
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        marginBottom: 14,
+        height: 52,
+    },
+
+    billCard: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 14,
+        marginBottom: 14,
+
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+
+        elevation: 3,
+    },
+
+    leftBorder: {
+        width: 4,
+        borderRadius: 10,
+        backgroundColor: '#00C896',
+        marginRight: 12,
+    },
+
+    iconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: '#F1F7FA',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    title: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#111',
+    },
+
+    subText: {
+        fontSize: 13,
+        color: '#666',
+        marginTop: 3,
+        fontWeight: '600',
+    },
+
+    deleteButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 19,
+        backgroundColor: '#E53935',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    qty: {
+        marginTop: 18,
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#007EA7',
     },
 });
 

@@ -66,6 +66,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [showFromDatePicker, setShowFromDatePicker] = useState(false);
   const [designData1, setdesignData11] = useState([]);
+  const [sexeData1, setsexeData11] = useState([]);
   const [showToDatePicker, setShowToDatePicker] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
   const [isExeDropdownOpen, setIsExeDropdownOpen] = useState(false);
@@ -108,6 +109,12 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const [isSalesExeAccordionOpenParty, setIsSalesExeAccordionOpenparty] =
     useState(false);
 
+  const [hasMoreExe, setHasMoreExe] = useState(true);
+  const [displayedSexes, setDisplayedExes] = useState([]);
+  const [searchQuerySexe, setSearchQuerySexe] = useState('');
+
+  console.log("exeData :", exeData)
+
   // const yearOptions = ['2022-2023', '2023-2024', '2024-2025', '2025-2026', '2026-2027'];
 
   useEffect(() => {
@@ -122,7 +129,13 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     }
   }, [designData]);
 
-  console.log('designData1:', designData1, 'itemData:', itemData);
+  useEffect(() => {
+    if (exeData) {
+      setsexeData11(exeData as any);
+    }
+  }, [exeData]);
+
+  console.log('designData1:', designData1, 'itemData:', itemData, sexeData1);
 
   // useEffect(() => {
   //     const filtered = designData1.filter(
@@ -165,12 +178,27 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
           .toLowerCase()
           .includes(searchQueryParty.toLowerCase()),
     );
+
+    // const filteredsexe = sexeData1.filter(
+    //   se =>
+    //     se.lngname.toLowerCase().includes(searchQuerySexe.toLowerCase()) ||
+    //     se.sese.toLowerCase().includes(searchQuerySexe.toLowerCase()),
+    // );
+
+    const filteredsexe = sexeData1.filter(
+      se =>
+        se.lngname?.toLowerCase().includes(searchQuerySexe.toLowerCase()) ||
+        se.sexe?.toLowerCase().includes(searchQuerySexe.toLowerCase()),
+    );
+
     setDisplayedDesigns(filtered.slice(0, 10));
     setDisplayedItems(filtereditem.slice(0, 10));
     setDisplayedParty(filteredparty.slice(0, 10));
+    setDisplayedExes(filteredsexe.slice(0, 10));
     setHasMore(filtered.length > 10);
     setHasMoreItem(filtereditem.length > 10);
     setHasMoreParty(filteredparty.length > 10);
+    setHasMoreExe(filteredsexe.length > 10);
   }, [
     searchQuery,
     designData1,
@@ -178,6 +206,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     itemData,
     getPartyData,
     searchQueryParty,
+    sexeData1,
+    searchQuerySexe
   ]);
 
   // useEffect(() => {
@@ -289,6 +319,9 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     }, 1000); // Simulate network delay
   };
 
+
+
+
   // Toggle design selection
   const toggleDesignSelection = (design: DesignData) => {
     setSelectedDesigns(prev =>
@@ -325,6 +358,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setIsDesignAccordionOpenparty(!isDesignAccordionOpenParty);
   };
 
+
+
   // Remove all selected designs
   const removeAllSelected = () => {
     setSelectedDesigns([]);
@@ -354,6 +389,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   };
 
   const toggleSalesExeAccordion = () => {
+
+    console.log("dsdsdsd", isSalesExeAccordionOpen)
     setIsSalesExeAccordionOpen(!isSalesExeAccordionOpen);
   };
   const toggleSalesExeAccordionItem = () => {
@@ -363,16 +400,45 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setIsSalesExeAccordionOpenparty(!isSalesExeAccordionOpenParty);
   };
 
-  const toggleSalesExeSelection = (design: DesignData) => {
-    setSelectedDesigns(prev =>
-      prev.some(d => d.DsnCode === design.DsnCode)
-        ? prev.filter(d => d.DsnCode !== design.DsnCode)
-        : [...prev, design],
+  // const toggleSalesExeSelection = (temp) => {
+  //   console.log("temp :", temp)
+
+  //   // setSelectedDesigns(prev =>
+  //   //   prev.some(d => d.DsnCode === design.DsnCode)
+  //   //     ? prev.filter(d => d.DsnCode !== design.DsnCode)
+  //   //     : [...prev, design],
+  //   // );
+  // };
+  const toggleSalesExeSelection = (se) => {
+    setSelectedSalesExes(prev =>
+      prev.some(i => i.sexe === se.sexe)
+        ? prev.filter(i => i.sexe !== se.sexe)
+        : [...prev, se],
     );
   };
 
   const removeAllSelectedSalesExes = () => {
     setSelectedSalesExes([]);
+  };
+
+
+  const loadMoreSexes = () => {
+
+    console.log("aaaaaaaaaaaaa")
+    if (isLoadingMore || !hasMoreExe) return;
+
+    setIsLoadingMore(true);
+    setTimeout(() => {
+      const filtered = sexeData1.filter(
+        se =>
+          se.lngname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          se.sexe.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+      const newDisplayed = filtered.slice(0, displayedSexes.length + 10);
+      setDisplayedExes(newDisplayed);
+      setHasMoreExe(newDisplayed.length < filtered.length);
+      setIsLoadingMore(false);
+    }, 1000); // Simulate network delay
   };
 
   return (
@@ -538,6 +604,11 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                                 )}
 
                             </View> */}
+
+
+
+
+
               {/* Accordion for Design Selection */}
               <TouchableOpacity
                 style={styles.accordionHeader}
@@ -669,6 +740,14 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   </ScrollView>
                 </>
               )}
+
+
+
+
+
+
+
+
 
               {/* Accordion for Design Selection */}
               <TouchableOpacity
@@ -800,137 +879,14 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 </>
               )}
 
-              {/* Accordion for Design Selection */}
-              <TouchableOpacity
-                style={styles.accordionHeader}
-                onPress={toggleDesignAccordionParty}
-              >
-                <Text style={styles.accordionHeaderText}>
-                  {isDesignAccordionOpenParty
-                    ? `Hide Party: (${selectedParty.length})`
-                    : `Select Party: (${selectedParty.length})`}
-                </Text>
-                <Icon
-                  name={
-                    isDesignAccordionOpenParty
-                      ? 'keyboard-arrow-up'
-                      : 'keyboard-arrow-down'
-                  }
-                  size={24}
-                  color="#fff"
-                />
-              </TouchableOpacity>
 
-              {isDesignAccordionOpenParty && (
-                <>
-                  {/* Search Bar */}
-                  <View style={styles.searchContainer}>
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search Party..."
-                      placeholderTextColor="#ccc"
-                      value={searchQueryParty}
-                      onChangeText={setSearchQueryParty}
-                    />
-                    <Icon
-                      name="search"
-                      size={24}
-                      color="#fff"
-                      style={styles.searchIcon}
-                    />
-                  </View>
-                  {/* Select All & Remove All Buttons */}
-                  <View style={styles.selectAllContainer}>
-                    <TouchableOpacity
-                      style={styles.selectAllButton}
-                      onPress={() => {
-                        const filtered12 = getPartyData.filter(
-                          party =>
-                            party.acccode
-                              .toLowerCase()
-                              .includes(searchQuery.toLowerCase()) ||
-                            party.accountname
-                              .toLowerCase()
-                              .includes(searchQuery.toLowerCase()),
-                        );
-                        setSelectedParty(filtered12);
-                      }}
-                    >
-                      <Text style={styles.selectAllButtonText}>Select All</Text>
-                    </TouchableOpacity>
-                    {selectedParty.length > 0 && (
-                      <TouchableOpacity
-                        style={styles.removeAllButton}
-                        onPress={removeAllSelectedParty}
-                      >
-                        <Icon name="close" size={20} color="#fff" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
 
-                  {/* Selected Designs (Chips) */}
-                  <ScrollView
-                    horizontal
-                    style={styles.selectedDesignsContainer}
-                  >
-                    {selectedParty.map(party => (
-                      <View
-                        key={party.DsnCode}
-                        style={styles.selectedDesignChip}
-                      >
-                        <Text style={styles.selectedDesignText}>
-                          {party.accountname} ({party.acccode})
-                        </Text>
-                      </View>
-                    ))}
-                  </ScrollView>
 
-                  {/* Design List (with Lazy Loading) */}
-                  <ScrollView
-                    ref={scrollViewRef}
-                    style={styles.designListContainer}
-                    contentContainerStyle={styles.designListContent}
-                    nestedScrollEnabled={true} // Enable nested scrolling
-                    onScroll={({ nativeEvent }) => {
-                      const { layoutMeasurement, contentOffset, contentSize } =
-                        nativeEvent;
-                      const paddingToBottom = 20;
-                      if (
-                        layoutMeasurement.height + contentOffset.y >=
-                        contentSize.height - paddingToBottom
-                      ) {
-                        loadMoreParty();
-                      }
-                    }}
-                    scrollEventThrottle={16}
-                  >
-                    {displayedParty.map(party => (
-                      <TouchableOpacity
-                        key={party.acccode}
-                        style={[
-                          styles.designItem,
-                          selectedParty.some(
-                            d => d.acccode === party.acccode,
-                          ) && styles.selectedDesignItem,
-                        ]}
-                        onPress={() => togglePartySelection(party)}
-                      >
-                        <Text style={styles.designName}>
-                          {party.accountname}
-                        </Text>
-                        <Text style={styles.designCode}>{party.acccode}</Text>
-                      </TouchableOpacity>
-                    ))}
-                    {isLoadingMoreParty && (
-                      <ActivityIndicator
-                        size="small"
-                        color="#fff"
-                        style={styles.loadingIndicator}
-                      />
-                    )}
-                  </ScrollView>
-                </>
-              )}
+
+
+
+
+
 
               {/* Accordion for Slaes exe. Selection */}
               <TouchableOpacity
@@ -939,8 +895,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               >
                 <Text style={styles.accordionHeaderText}>
                   {isSalesExeAccordionOpen
-                    ? `Hide Designs: (${selectedDesigns.length})`
-                    : `Select Designs: (${selectedDesigns.length})`}
+                    ? `Hide Sales exe.: (${selectedSalesExes.length})`
+                    : `Select Sales exe.: (${selectedSalesExes.length})`}
                 </Text>
                 <Icon
                   name={
@@ -961,8 +917,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                       style={styles.searchInput}
                       placeholder="Search Sales exe...."
                       placeholderTextColor="#ccc"
-                      value={searchQuery}
-                      onChangeText={setSearchQuery}
+                      value={searchQuerySexe}
+                      onChangeText={setSearchQuerySexe}
                     />
                     <Icon
                       name="search"
@@ -975,25 +931,29 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   <View style={styles.selectAllContainer}>
                     <TouchableOpacity
                       style={styles.selectAllButton}
+
+
                       onPress={() => {
-                        const filteredpar = getPartyData.filter(
-                          party =>
-                            party.accountname
+                        const filteredpar = exeData.filter(
+                          se =>
+                            se.lngname
                               .toLowerCase()
-                              .includes(searchQuery.toLowerCase()) ||
-                            party.acccode
+                              .includes(searchQuerySexe.toLowerCase()) ||
+                            se.sexe
                               .toLowerCase()
-                              .includes(searchQuery.toLowerCase()),
+                              .includes(searchQuerySexe.toLowerCase()),
                         );
-                        setSelectedParty(filteredpar);
+                        setSelectedSalesExes(filteredpar);
                       }}
+
+
                     >
                       <Text style={styles.selectAllButtonText}>Select All</Text>
                     </TouchableOpacity>
-                    {selectedDesigns.length > 0 && (
+                    {selectedSalesExes.length > 0 && (
                       <TouchableOpacity
                         style={styles.removeAllButton}
-                        onPress={removeAllSelectedParty}
+                        onPress={removeAllSelectedSalesExes}
                       >
                         <Icon name="close" size={20} color="#fff" />
                       </TouchableOpacity>
@@ -1005,16 +965,26 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     horizontal
                     style={styles.selectedDesignsContainer}
                   >
-                    {selectedDesigns.map(design => (
+                    {(selectedSalesExes || []).map(se => (
                       <View
-                        key={design.DsnCode}
+                        key={se.sexe}
                         style={styles.selectedDesignChip}
                       >
                         <Text style={styles.selectedDesignText}>
-                          {design.DsnName} ({design.DsnCode})
+                          {se.lngname} ({se.sexe})
                         </Text>
                       </View>
                     ))}
+                    {/* {selectedSalesExes.map(se => (
+                      <View
+                        key={se.sexe}
+                        style={styles.selectedDesignChip}
+                      >
+                        <Text style={styles.selectedDesignText}>
+                          {se.lngname} ({se.sexe})
+                        </Text>
+                      </View>
+                    ))} */}
                   </ScrollView>
 
                   {/* Design List (with Lazy Loading) */}
@@ -1024,33 +994,30 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     contentContainerStyle={styles.designListContent}
                     nestedScrollEnabled={true} // Enable nested scrolling
                     onScroll={({ nativeEvent }) => {
-                      const { layoutMeasurement, contentOffset, contentSize } =
-                        nativeEvent;
+                      const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
                       const paddingToBottom = 20;
-                      if (
-                        layoutMeasurement.height + contentOffset.y >=
-                        contentSize.height - paddingToBottom
-                      ) {
-                        loadMoreDesigns();
+                      if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+                        loadMoreSexes();
                       }
                     }}
                     scrollEventThrottle={16}
                   >
-                    {displayedDesigns.map(design => (
-                      <TouchableOpacity
-                        key={design.DsnCode}
-                        style={[
-                          styles.designItem,
-                          selectedDesigns.some(
-                            d => d.DsnCode === design.DsnCode,
-                          ) && styles.selectedDesignItem,
-                        ]}
-                        onPress={() => toggleDesignSelection(design)}
-                      >
-                        <Text style={styles.designName}>{design.DsnName}</Text>
-                        <Text style={styles.designCode}>{design.DsnCode}</Text>
-                      </TouchableOpacity>
-                    ))}
+                    {
+                      displayedSexes.map(se => (
+                        <TouchableOpacity
+                          key={se.sexe}
+                          style={[
+                            styles.designItem,
+                            selectedSalesExes.some(
+                              d => d.sexe === se.sexe,
+                            ) && styles.selectedDesignItem,
+                          ]}
+                          onPress={() => toggleSalesExeSelection(se)}
+                        >
+                          <Text style={styles.designName}>{se.lngname}</Text>
+                          <Text style={styles.designCode}>{se.sexe}</Text>
+                        </TouchableOpacity>
+                      ))}
                     {isLoadingMore && (
                       <ActivityIndicator
                         size="small"

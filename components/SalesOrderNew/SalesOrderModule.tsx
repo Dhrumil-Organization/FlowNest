@@ -6,6 +6,10 @@ import PartyListScreen from './PartyListScreen';
 import OrderSummaryScreen from './OrderSummaryScreen';
 
 import { SalesOrderProvider } from './SalesOrderContext';
+import SalesOrderItemList from './SalesOrderItemList';
+import SalesOrderDesignList from './SalesOrderDesignList';
+import SalesOrderShadeList from './SalesOrderShadeList';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -48,8 +52,43 @@ const SalesOrderModule = props => {
                         />
                     )}
                 </Stack.Screen>
+                <Stack.Screen name="SalesOrderItemList">
+                    {screenProps => (
+                        <SalesOrderItemList
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+                <Stack.Screen name="SalesOrderDesignList">
+                    {screenProps => (
+                        <SalesOrderDesignList
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+                <Stack.Screen name="SalesOrderShadeList">
+                    {screenProps => (
+                        <SalesOrderShadeList
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+
+                
 
             </Stack.Navigator>
+
+
+
 
         </SalesOrderProvider>
     );

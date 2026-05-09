@@ -150,15 +150,15 @@ const PartyListScreen = ({ navigation, route, token }) => {
             yearno: route?.params?.yearno || salesOrderParams?.yearno || '',
             token: route?.params?.token || salesOrderParams?.token || token,
             partyData: {
-                ParCode: party.ParCode,
-                ParName: party.ParName,
+                ParCode: party.acccode,
+                ParName: party.accountname,
                 City: party.City || '',
                 Address: party.Address || '',
             },
         };
 
         startNewOrder(params);
-
+        // console.log("params", params);
         navigation.navigate('OrderSummaryScreen', params);
     };
 
@@ -281,7 +281,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
                         }
                     />
                 )}
-{/* 
+                {/* 
                 <TouchableOpacity style={styles.addBtn}>
                     <Text style={styles.addBtnText}>＋ Add New Party</Text>
                 </TouchableOpacity> */}
@@ -304,6 +304,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 14,
     },
+    // header: {
+    //     height: 100,
+    //     backgroundColor: '#13879A',
+    //     flexDirection: 'row',
+    //     alignItems: 'flex-end',
+    //     paddingHorizontal: 14,
+    //     paddingBottom: 16,
+    // },
     back: {
         color: '#fff',
         fontSize: 34,

@@ -9,7 +9,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { fetchPropertyData } from '../../common/API/Functions';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { API } from "../../common/API/dynamicAPI";
-// import { useSalesOrder } from './SalesOrderContext';
+import { useSalesOrder } from './SalesOrderContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
@@ -30,7 +30,7 @@ const todayYmd = () => {
 };
 
 const SalesOrderNew = ({ token, navigation }) => {
-    // const { startNewOrder, loadExistingOrder } = useSalesOrder();
+    const { startNewOrder, loadExistingOrder } = useSalesOrder();
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
     const [yearPickerVisible, setYearPickerVisible] = useState(false);
     const [yearOptions, setYearOptions] = useState([]);
@@ -240,51 +240,37 @@ const SalesOrderNew = ({ token, navigation }) => {
         }, 100);
     };
 
-    // const addNewSalesOrder = () => {
-    //     // startNewOrder();
-
-    //     navigation.navigate('PartyListScreen', {
-    //         prpcode: filters.prpcode,
-    //         yearno: filters.yearno,
-    //         strcode: filters.strcode,
-    //     });
-    // };
-
-    // const addNewSalesOrder = () => {
-
-    //     console.log("filters.prpcode", filters.prpcode);
-
-    //     navigation.navigate('PartyListScreen', {
-    //         prpcode: filters.prpcode,
-    //         yearno: filters.yearno,
-    //         strcode: filters.strcode,
-    //     });
-    // };
-
     const addNewSalesOrder = () => {
-
-        console.log(
-            "filters.prpcode",
-            filters.prpcode
-        );
-
-        navigation.navigate('PartyListScreen', {
+        const params = {
+            mode: 'ADD',
+            uid: 0,
+            prpcode: filters.prpcode || selectedProperty?.PrpCode || '',
+            strcode: filters.strcode || '012',
+            yearno: filters.yearno || selectedYear?.slice(-2) || '',
             token: token,
-            prpcode: selectedProperty?.PrpCode || '',
-            yearno: selectedYear,
-            strcode: filters.strcode,
-        });
+        };
+
+        startNewOrder(params);
+
+        // console.log("params", params);
+        navigation.navigate('PartyListScreen', params);
     };
 
-    const openExistingOrder = async order => {
-        navigation.navigate('SalesOrderSummary', {
+    const openExistingOrder = order => {
+        const params = {
             mode: 'EDIT',
             uid: order.UId,
             prpcode: order.PrpCode,
-            strcode: order.StrCode,
-            yearno: order.YearNo || filters.yearno,
-            order,
-        });
+            strcode: order.StrCode || filters.strcode || '012',
+            yearno: selectedYear?.slice(-2),
+            token: token,
+        };
+
+        console.log('OPEN SO PARAMS:', params);
+
+        loadExistingOrder(params);
+
+        navigation.navigate('OrderSummaryScreen', params);
     };
 
     const getSODate = item => {
@@ -420,7 +406,7 @@ const SalesOrderNew = ({ token, navigation }) => {
                         value={search}
                         onChangeText={setSearch}
                         placeholder="Search order no, party name or code"
-                        placeholderTextColor="#98A2B3"
+                        placeholderTextColor="#000"
                         style={styles.searchInput}
                     />
                 </View>
@@ -760,6 +746,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 14,
     },
+    // header: {
+    //     height: 100,
+    //     backgroundColor: '#13879A',
+    //     flexDirection: 'row',
+    //     alignItems: 'flex-end',
+    //     paddingHorizontal: 14,
+    //     paddingBottom: 16,
+    // },
     back: { color: '#fff', fontSize: 34, width: 35 },
     headerTitle: {
         flex: 1,

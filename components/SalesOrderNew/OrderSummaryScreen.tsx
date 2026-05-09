@@ -15,7 +15,6 @@ import axios from 'axios';
 import { useSalesOrder } from './SalesOrderContext';
 import { API } from '../../common/API/dynamicAPI';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 
 // 🔥 CHANGE THIS TO YOUR ACTUAL LOAD API
@@ -54,6 +53,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [remark, setRemark] = useState('');
     const [saving, setSaving] = useState(false);
     const [loadingOrder, setLoadingOrder] = useState(false);
+
+    console.log("partyData", routeParty)
 
     useEffect(() => {
         const p = {
@@ -312,7 +313,19 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     //         </View>
     //     );
     // };
+    const editD1Row = (item, index) => {
+        if (mode === 'VIEW') return;
 
+        navigation.navigate('SalesOrderItemList', {
+            editMode: true,
+            editIndex: index,
+            oldRow: item,
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
     const renderItem = ({ item, index }) => {
         return (
             <View style={styles.itemCard}>
@@ -336,9 +349,17 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     </View>
 
                     {mode !== 'VIEW' && (
-                        <TouchableOpacity onPress={() => removeItem(index)}>
-                            <Text style={styles.deleteText}>Delete</Text>
-                        </TouchableOpacity>
+                        <View style={styles.actionBox}>
+                            <TouchableOpacity
+                                style={styles.iconBtn}
+                                onPress={() => editD1Row(item, index)}>
+                                <Icon name="more-vert" size={22} color="#13879A" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity onPress={() => removeItem(index)}>
+                                <Text style={styles.deleteText}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
 
@@ -429,7 +450,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     {mode === 'ADD' && (
                         <TouchableOpacity
                             style={styles.changeBtn}
-                            onPress={() => navigation.navigate('PartyListScreen')}>
+                            onPress={() => navigation.navigate('PartyListScreen', {
+                                prpcode,
+                                strcode,
+                                yearno,
+                                token,
+                            })}>
                             <Text style={styles.changeText}>Change</Text>
                         </TouchableOpacity>
                     )}
@@ -514,19 +540,23 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
             {mode !== 'VIEW' && (
                 <View style={styles.footer}>
-                    <TouchableOpacity
-                        style={styles.addBtn}
-                        onPress={() => navigation.navigate('SalesOrderItemList')}>
-                        <Text style={styles.addBtnText}>＋ Add Item</Text>
-                    </TouchableOpacity>
-
                     {/* <TouchableOpacity
+                        style={styles.addBtn}
+                        onPress={() => navigation.navigate('SalesOrderItemList', {
+                            prpcode,
+                            strcode,
+                            yearno,
+                            token,
+                        })}>
+                        <Text style={styles.addBtnText}>＋ Add Item</Text>
+                    </TouchableOpacity> */}
+                    <TouchableOpacity
                         activeOpacity={0.85}
                         style={styles.fab}
-                        onPress={() => navigation.navigate('SalesOrderItemList')}
-                    >
+                        onPress={() => navigation.navigate('SalesOrderItemList')}>
+
                         <Icon name="add" size={30} color="#fff" />
-                    </TouchableOpacity> */}
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.saveBtn}
@@ -815,6 +845,20 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '900',
         marginTop: 4,
+    },
+    actionBox: {
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    iconBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#E7F6F8',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
     },
     fab: {
         position: 'absolute',

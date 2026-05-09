@@ -10,6 +10,7 @@ import {
   Animated,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -27,6 +28,7 @@ import {
 } from '../../common/API/Functions';
 //import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Switch } from 'react-native';
 
 const SkeletonCard = () => (
   <View style={styles.card}>
@@ -68,13 +70,13 @@ const ProductionReport = ({ navigation, token }) => {
   const [getAllMachineGroups, setAllMachineGroups] = useState([]);
   const [machinegroupPickerVisible, setMachineGroupPickerVisible] =
     useState(false);
-  const [selectedMachineGroup, setSelectedMachineGroup] = useState(null);
+  //const [selectedMachineGroup, setSelectedMachineGroup] = useState(null);
   const [machineGroupSearch, setMachineGroupSearch] = useState('');
 
   const [getAllMachineSubGroups, setAllMachineSubGroups] = useState([]);
   const [machinesubgroupPickerVisible, setMachineSubGroupPickerVisible] =
     useState(false);
-  const [selectedMachineSubGroup, setSelectedMachineSubGroup] = useState(null);
+  //const [selectedMachineSubGroup, setSelectedMachineSubGroup] = useState(null);
   const [machineSubGroupSearch, setMachineSubGroupSearch] = useState('');
 
   const [getAllMachines, setAllMachines] = useState([]);
@@ -82,7 +84,23 @@ const ProductionReport = ({ navigation, token }) => {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [machineSearch, setMachineSearch] = useState('');
 
+  const [selectedMachineGroups, setSelectedMachineGroups] = useState([]);
+  const [selectedMachineSubGroups, setSelectedMachineSubGroups] = useState([]);
+  const [selectedMachines, setSelectedMachines] = useState([]);
+
+  const [getAllProduction, setAllProduction] = useState('1');
+  const [getRunningProduction, setRunningProduction] = useState('1');
+  const [getCloseProduction, setCloseProduction] = useState('1');
+
   const [getAllData, setAllData] = useState([]);
+  const [getAllInfoData, setAllInfoData] = useState([]);
+
+  const [productionType, setProductionType] = useState('running');
+  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [expandedItem, setExpandedItem] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [loadingId, setLoadingId] = useState(null);
+  const [infoData, setInfoData] = useState({});
 
   const [alertData, setAlertData] = useState({
     visible: false,
@@ -119,7 +137,6 @@ const ProductionReport = ({ navigation, token }) => {
   // PROPERTY
   useEffect(() => {
     const load = async () => {
-      console.log('token --> ', token);
       const data = await fetchPropertyData(token);
       setPropertyData(data || []);
 
@@ -196,16 +213,13 @@ const ProductionReport = ({ navigation, token }) => {
     }
   }, [selectedYear]);
 
-  //   const filteredData = getAllData.filter(i =>
-  //     i.rowuid?.toLowerCase().includes(search.toLowerCase()),
-  //   );
-
   const filteredData = getAllData.filter(item => {
     const s = search.toLowerCase();
 
     return (
       item.vouno?.toLowerCase().includes(s) ||
       item.mgrpname?.toLowerCase().includes(s) ||
+      item.itmname?.toLowerCase().includes(s) ||
       item.msgrpname?.toLowerCase().includes(s) ||
       item.macname?.toLowerCase().includes(s) ||
       item.mername?.toLowerCase().includes(s) ||
@@ -226,6 +240,15 @@ const ProductionReport = ({ navigation, token }) => {
     let prp1 = selectedProperty ? selectedProperty.PrpCode : '';
     let yearnumber1 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let convertedStatus = '';
+    if (productionType == 'all') {
+      convertedStatus = '-1';
+    } else if (productionType == 'running') {
+      convertedStatus = '0';
+    } else if (productionType == 'close') {
+      convertedStatus = '2';
+    }
+    let status = convertedStatus; // 'all' | 'running' | 'close'
 
     if (typeof prp1 == 'undefined' || prp1 == null || prp1 == '') {
       showWarning('Please select property');
@@ -254,6 +277,7 @@ const ProductionReport = ({ navigation, token }) => {
         prpcode: prp1,
         yearno: yearnumber1,
         strcode: finalStrCode,
+        productiontype: status,
       };
 
       const responsemacgrp = await axios.get(`${API}/api/get_criterion`, {
@@ -274,15 +298,16 @@ const ProductionReport = ({ navigation, token }) => {
           responsemacgrp.data.response.data &&
           responsemacgrp.data.response.data.length > 0
         ) {
-          setSelectedMachineGroup(
-            responsemacgrp.data.response.data[0].MGrpName,
-          );
+          //   setSelectedMachineGroup(
+          //     responsemacgrp.data.response.data[0].MGrpName,
+          //   );
+          //setSelectedMachineGroup.map(i => i.MGrpName).join(', ');
         }
       } else {
-        console.log('❌ API success false:', responsemacgrp?.data);
+        console.log('macgrp API success false:', responsemacgrp?.data);
       }
     } catch (error) {
-      console.log('❌ fetchPropertyData error:', error);
+      console.log('macgrp error:', error);
     }
 
     setMachineGroupPickerVisible(true);
@@ -291,7 +316,20 @@ const ProductionReport = ({ navigation, token }) => {
     let prp2 = selectedProperty ? selectedProperty.PrpCode : '';
     let yearnumber2 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
-    let macgrp2 = selectedMachineGroup ? selectedMachineGroup.MacGrp : '';
+    //let macgrp2 = selectedMachineGroup ? selectedMachineGroup.MacGrp : '';
+    let macgrp2 =
+      selectedMachineGroups && selectedMachineGroups.length > 0
+        ? selectedMachineGroups.map(i => i.MacGrp)
+        : [];
+    let convertedStatus = '';
+    if (productionType == 'all') {
+      convertedStatus = '-1';
+    } else if (productionType == 'running') {
+      convertedStatus = '0';
+    } else if (productionType == 'close') {
+      convertedStatus = '2';
+    }
+    let status = convertedStatus;
 
     if (typeof prp2 == 'undefined' || prp2 == null || prp2 == '') {
       showWarning('Please select property');
@@ -321,8 +359,11 @@ const ProductionReport = ({ navigation, token }) => {
         yearno: yearnumber2,
         macgrp: macgrp2,
         strcode: finalStrCode,
+        productiontype: status,
       };
 
+      console.log('macsgrp API payload', payload);
+      console.log('macsgrp API URL', `${API}/api/get_criterion`);
       const responsemacsgrp = await axios.get(`${API}/api/get_criterion`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -331,6 +372,7 @@ const ProductionReport = ({ navigation, token }) => {
         },
         params: payload,
       });
+      console.log('macsgrp API response', responsemacsgrp.data);
 
       if (
         responsemacsgrp.data.success &&
@@ -341,15 +383,16 @@ const ProductionReport = ({ navigation, token }) => {
           responsemacsgrp.data.response.data &&
           responsemacsgrp.data.response.data.length > 0
         ) {
-          setSelectedMachineSubGroup(
-            responsemacsgrp.data.response.data[0].MSGrpName,
-          );
+          //   setSelectedMachineSubGroups(
+          //     responsemacsgrp.data.response.data[0].MSGrpName,
+          //   );
+          //selectedMachineSubGroups.map(i => i.MSGrpName).join(', ');
         }
       } else {
-        console.log('❌ API success false:', responsemacsgrp?.data);
+        console.log('macsgrp API success false:', responsemacsgrp?.data);
       }
     } catch (error) {
-      console.log('❌ fetchPropertyData error:', error);
+      console.log('macsgrp error:', error);
     }
 
     setMachineSubGroupPickerVisible(true);
@@ -359,10 +402,27 @@ const ProductionReport = ({ navigation, token }) => {
     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
-    let macgrp3 = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
-    let macsgrp3 = selectedMachineSubGroup
-      ? selectedMachineSubGroup?.MacSGrp
-      : '';
+    //let macgrp3 = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
+    //let macsgrp3 = selectedMachineSubGroup ? selectedMachineSubGroup?.MacSGrp : '';
+
+    let macgrp3 =
+      selectedMachineGroups && selectedMachineGroups.length > 0
+        ? selectedMachineGroups.map(i => i.MacGrp)
+        : [];
+    let macsgrp3 =
+      selectedMachineSubGroups && selectedMachineSubGroups.length > 0
+        ? selectedMachineSubGroups.map(i => i.MacSGrp)
+        : [];
+
+    let convertedStatus = '';
+    if (productionType == 'all') {
+      convertedStatus = '-1';
+    } else if (productionType == 'running') {
+      convertedStatus = '0';
+    } else if (productionType == 'close') {
+      convertedStatus = '2';
+    }
+    let status = convertedStatus;
 
     if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
       showWarning('Please select property');
@@ -393,8 +453,11 @@ const ProductionReport = ({ navigation, token }) => {
         macgrp: macgrp3,
         macsgrp: macsgrp3,
         strcode: finalStrCode,
+        productiontype: status,
       };
 
+      console.log('machine API payload :', payload);
+      console.log('machine API URL :', `${API}/api/get_criterion`);
       const respo = await axios.get(`${API}/api/get_criterion`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -404,16 +467,19 @@ const ProductionReport = ({ navigation, token }) => {
         params: payload,
       });
 
+      console.log('machine API response :', respo.data);
+
       if (respo.data.success && respo.data.response.data.length > 0) {
         setAllMachines(respo.data.response.data);
         if (respo.data.response.data && respo.data.response.data.length > 0) {
-          setSelectedMachine(respo.data.response.data[0].MacName);
+          //setSelectedMachine(respo.data.response.data[0].MacName);
+          //setSelectedMachine.map(i => i.MacName).join(', ');
         }
       } else {
-        console.log('❌ API success false:', respo?.data);
+        console.log('machine API success false:', respo?.data);
       }
     } catch (error) {
-      console.log('❌ machine api error:', error);
+      console.log('machine api error:', error);
     }
 
     setMachinePickerVisible(true);
@@ -423,11 +489,22 @@ const ProductionReport = ({ navigation, token }) => {
     let finalPrpCode = selectedProperty ? selectedProperty?.PrpCode : '';
     let finalYearNo = selectedYear ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
-    let finalMacGrp = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
-    let finalMacSGrp = selectedMachineSubGroup
-      ? selectedMachineSubGroup?.MacSGrp
-      : '';
-    let finalMacCode = selectedMachine ? selectedMachine?.MacCode : '';
+    // let finalMacGrp = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
+    // let finalMacSGrp = selectedMachineSubGroup ? selectedMachineSubGroup?.MacSGrp : '';
+    // let finalMacCode = selectedMachine ? selectedMachine?.MacCode : '';
+
+    let finalMacGrp =
+      selectedMachineGroups && selectedMachineGroups.length > 0
+        ? selectedMachineGroups.map(i => i.MacGrp)
+        : [];
+    let finalMacSGrp =
+      selectedMachineSubGroups && selectedMachineSubGroups.length > 0
+        ? selectedMachineSubGroups.map(i => i.MacSGrp)
+        : [];
+    let finalMacCode =
+      selectedMachines && selectedMachines.length > 0
+        ? selectedMachines.map(i => i.MacCode)
+        : [];
 
     let fd = '';
     let resfd = '';
@@ -436,6 +513,16 @@ const ProductionReport = ({ navigation, token }) => {
     let td = '';
     let restd = '';
     let finaltodate = '';
+
+    let convertedStatus = '';
+    if (productionType == 'all') {
+      convertedStatus = '-1';
+    } else if (productionType == 'running') {
+      convertedStatus = '0';
+    } else if (productionType == 'close') {
+      convertedStatus = '2';
+    }
+    let status = convertedStatus;
 
     if (fd != '') {
       fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
@@ -483,6 +570,8 @@ const ProductionReport = ({ navigation, token }) => {
         maccode: finalMacCode,
         fromdate: finalfromdate,
         todate: finaltodate,
+        productiontype: status,
+        action: 'report',
       };
 
       const headers = {
@@ -491,20 +580,19 @@ const ProductionReport = ({ navigation, token }) => {
         'X-Requested-with': 'XMLHttpRequest',
       };
 
-      console.log('proproductionreport API payload', payload);
+      console.log('prodproductionreport API payload : ', payload);
       console.log(
-        'proproductionreport API URL',
+        'prodproductionreport API URL : ',
         `${API}/api/prodproductionreport`,
       );
-      //console.log("userPtype :", userPtype)
-
       try {
         const response = await axios.post(
           `${API}/api/prodproductionreport`,
           payload,
           { headers },
         );
-        console.log('proproductionreport API response', response);
+
+        console.log('prodproductionreport API response : ', response.data);
 
         if (response.data.success === true && response.data.data.length === 0) {
           Alert.alert('No Data Found');
@@ -530,13 +618,150 @@ const ProductionReport = ({ navigation, token }) => {
         Alert.alert('Server Error');
       } finally {
         setLoading(false);
+
         // handleCriteriaFormClose()
         // setCriteriaFormOpen(false)
       }
     }
   };
 
-  function formatDate(input = '') {
+  const getInfoData = async (row = {}) => {
+    console.log('row', row);
+    console.log('finalPrpCode', finalPrpCode);
+
+    let finalPrpCode = selectedProperty ? selectedProperty?.PrpCode : '';
+    let finalYearNo = selectedYear ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    // let finalMacGrp = selectedMachineGroup ? selectedMachineGroup?.MacGrp : '';
+    // let finalMacSGrp = selectedMachineSubGroup ? selectedMachineSubGroup?.MacSGrp : '';
+    // let finalMacCode = selectedMachine ? selectedMachine?.MacCode : '';
+
+    let finalMacGrp =
+      selectedMachineGroups && selectedMachineGroups.length > 0
+        ? selectedMachineGroups.map(i => i.MacGrp)
+        : [];
+    let finalMacSGrp =
+      selectedMachineSubGroups && selectedMachineSubGroups.length > 0
+        ? selectedMachineSubGroups.map(i => i.MacSGrp)
+        : [];
+    let finalMacCode =
+      selectedMachines && selectedMachines.length > 0
+        ? selectedMachines.map(i => i.MacCode)
+        : [];
+
+    let fd = '';
+    let resfd = '';
+    let finalfromdate = '';
+
+    let td = '';
+    let restd = '';
+    let finaltodate = '';
+
+    let convertedStatus = '';
+    if (productionType == 'all') {
+      convertedStatus = '-1';
+    } else if (productionType == 'running') {
+      convertedStatus = '0';
+    } else if (productionType == 'close') {
+      convertedStatus = '2';
+    }
+    let status = convertedStatus;
+
+    if (fd != '') {
+      fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
+      resfd = fd.split('-');
+      finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+    }
+
+    if (td != '') {
+      td = getToDate ? getToDate.toISOString().split('T')[0] : '';
+      restd = td.split('-');
+      finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
+    }
+
+    const payload = {
+      prptype: '',
+      txntype: 'mob_production_report',
+      prpcode: finalPrpCode,
+      yearno: finalYearNo,
+      strcode: finalStrCode,
+      macgrp: finalMacGrp,
+      macsgrp: finalMacSGrp,
+      maccode: finalMacCode,
+      fromdate: finalfromdate,
+      todate: finaltodate,
+      productiontype: status,
+      action: 'packinginfo',
+      uid: row.uid,
+      vouno: row.vouno,
+      voudate: row.voudate,
+      mgrpname: row.mgrpname,
+      msgrpname: row.msgrpname,
+      macname: row.macname,
+      itmname: row.itmname,
+      mername: row.mername,
+      prodorderqty: row.prodorderqty,
+      doffqty: row.doffqty,
+      packingqty: row.packingqty,
+    };
+
+    const headers = {
+      Authorization: `Bearer ${getToken()}`,
+      'Content-Type': 'application/json',
+      'X-Requested-with': 'XMLHttpRequest',
+    };
+
+    console.log('prodproductionreport API payload : ', payload);
+    console.log( 'prodproductionreport API URL : ', `${API}/api/prodproductionreport`, );
+
+    try {
+      const response = await axios.post(
+        `${API}/api/prodproductionreport`,
+        payload,
+        { headers },
+      );
+
+      console.log('prodproductionreport API response : ', response.data);
+
+      if (response.data.success === true && response.data.data.length === 0) {
+        
+        showWarning('No Data Found');
+
+        setAllInfoData([]);
+
+        return [];
+
+      } else if ( response.data.success === true && response.data.data.length > 0 ) {
+
+        setAllInfoData(response.data.data);
+        
+        return response.data.data;
+
+      } else if (response.data.success === false) {
+
+        showWarning(`${response.data.message}`);
+
+        setAllInfoData([]);
+        return [];
+        
+      } else {
+        
+        showWarning(`${response.data.message}`);
+
+        setAllInfoData([]);
+        return [];
+      }
+    } catch (error) {
+      setAllInfoData([]);
+      return [];
+
+      Alert.alert('Server Error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (input = '') => {
     // Handle empty, null, undefined, or 0
     if (!input || input === 0) return '';
 
@@ -550,7 +775,7 @@ const ProductionReport = ({ navigation, token }) => {
     const day = str.substring(6, 8);
 
     return `${day}/${month}/${year}`;
-  }
+  };
 
   const calcQty = (a = 0, b = 0) => {
     let a1 = typeof a == 'undefined' || a == null || a == '' ? 0 : a;
@@ -563,6 +788,47 @@ const ProductionReport = ({ navigation, token }) => {
 
     return c;
   };
+
+  const toggleSelection = (item, list, setList, key) => {
+    const exists = list.some(i => i[key] === item[key]);
+
+    if (exists) {
+      setList(list.filter(i => i[key] !== item[key]));
+    } else {
+      setList([...list, item]);
+    }
+  };
+
+  const handleInfoPress = async item => {
+    const id = String(item.vouno);
+
+    console.log('clicked id:', id);
+    console.log('expandedId before:', expandedId);
+
+    // toggle close
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+
+    setLoadingId(id);
+
+    console.log('Item :', item);
+    const result = await getInfoData(item);
+    console.log('result :', result);
+
+    setInfoData(prev => ({
+      ...prev,
+      [id]: result,
+    }));
+
+    setLoadingId(null);
+    setExpandedId(id);
+  };
+
+  //   console.log('-------selectedMachineGroups-----------', selectedMachineGroups);
+  //   console.log('-------selectedMachineSubGroups-----------', selectedMachineSubGroups,);
+  //   console.log('-------selectedMachines-------------------', selectedMachines);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F5F7FB' }}>
@@ -600,6 +866,17 @@ const ProductionReport = ({ navigation, token }) => {
         keyExtractor={(i, index) => index.toString()}
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => {
+          let leftTotal = 0;
+          let leftTotal1 = 0;
+          leftTotal1 = parseFloat(item.prodorderqty) - parseFloat(item.doffqty);
+          leftTotal = parseFloat(leftTotal1).toFixed(3);
+
+          let rightTotal = 0;
+          let rightTotal1 = 0;
+          rightTotal1 =
+            parseFloat(item.prodorderqty) - parseFloat(item.packingqty);
+          rightTotal = parseFloat(rightTotal1).toFixed(3);
+
           const scale = new Animated.Value(1);
 
           const onPressIn = () => {
@@ -618,68 +895,252 @@ const ProductionReport = ({ navigation, token }) => {
 
           return (
             <AnimatedTouchable
-              style={[styles.proCard, { transform: [{ scale }] }]}
+              style={[styles.newCard, { transform: [{ scale }] }]}
               activeOpacity={0.9}
               onPressIn={onPressIn}
               onPressOut={onPressOut}
             >
-              {/* TOP GRADIENT STRIP */}
+              {/* HEADER */}
               <LinearGradient
-                colors={['#0F6C7B', '#1399A8']}
-                style={styles.cardTop}
+                colors={['#0F6C7B', '#16A6B6']}
+                style={styles.newHeader}
               >
-                <Text style={styles.voucherText}>#{item.vouno}</Text>
-                <Text style={styles.dateText}>{formatDate(item.voudate)}</Text>
+                <View>
+                  <Text style={styles.quality}>{item.itmname}</Text>
+                  <Text style={styles.subText}>{item.mername}</Text>
+                </View>
+
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.vouno}</Text>
+                </View>
               </LinearGradient>
 
               {/* BODY */}
-              <View style={styles.cardBody}>
-                {/* MACHINE INFO */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Machine Info</Text>
+              <View style={styles.newBody}>
+                {loadingId === String(item.vouno) && (
+                  <View style={styles.cardLoader}>
+                    <ActivityIndicator size="large" color="#0F6C7B" />
+                    <Text style={styles.loadingCardText}>
+                      Loading details...
+                    </Text>
+                  </View>
+                )}
 
-                  <Text style={styles.infoText}>
-                    group : {item.mgrpname} | sub group : {item.msgrpname}
-                  </Text>
+                {/* MACHINE */}
+                <Text style={styles.machine}>{item.macname}</Text>
 
-                  <Text style={styles.machineName}>{item.macname}</Text>
+                <Text style={styles.group}>
+                  GROUP : {item.mgrpname} | SUB GROUP : {item.msgrpname}
+                </Text>
+
+                {/* QTY SECTION */}
+                <View style={styles.statsRow}>
+                  <View style={styles.statBoxLeft}>
+                    <Text style={styles.statValue}>{item.prodorderqty}</Text>
+                    <Text style={styles.statLabel}>Order</Text>
+                  </View>
+
+                  <View style={styles.statBox}>
+                    <Text style={styles.statValue}>{item.doffqty}</Text>
+                    <Text style={styles.statLabel}>Doff</Text>
+                  </View>
+
+                  {/* <View style={styles.statBox}>
+                    <Text style={styles.statValue}>{item.packingqty || 0}</Text>
+                    <Text style={styles.statLabel}>Packing</Text>
+                  </View> */}
+                  <View style={styles.statBox}>
+                    <View style={styles.valueRow}>
+                      <Text style={styles.statValue}>
+                        {item.packingqty || 0}
+                      </Text>
+
+                      {/* <TouchableOpacity
+                        onPress={() =>
+                          setExpandedId(
+                            expandedId === item.vouno ? null : item.vouno,
+                          )
+                        }
+                      > */}
+                      <TouchableOpacity
+                        onPress={() => handleInfoPress(item)}
+                        //   onPress={async () => {
+                        //     const id = item.vouno;
+
+                        //     console.log("expandedId === id :", expandedId,  id)
+                        //     if (expandedId === id) {
+                        //       setExpandedId(null);
+                        //       return;
+                        //     }
+
+                        //     setLoadingId(id);
+
+                        //     const result = await getInfoData(item); // 👈 HERE IT IS CALLED
+
+                        //     setInfoData(prev => ({
+                        //       ...prev,
+                        //       [id]: result,
+                        //     }));
+
+                        //     setLoadingId(null);
+                        //     setExpandedId(id);
+                        //   }}
+                      >
+                        <Icon name="info-outline" size={19} color="#111" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.statLabel}>Packing</Text>
+                  </View>
                 </View>
 
-                {/* DIVIDER */}
-                <View style={styles.divider} />
-
-                {/* QTY GRID */}
-                <View style={styles.qtyRow}>
-                  <View style={styles.qtyBox}>
-                    <Text style={styles.qtyLabel}>Order qty</Text>
-                    <Text style={styles.qtyValue}>{item.prodorderqty}</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statBoxLeft}>
+                    <Text
+                      style={
+                        parseFloat(leftTotal) < 0
+                          ? styles.statValueRed
+                          : styles.statValue
+                      }
+                    >
+                      {leftTotal}
+                    </Text>
                   </View>
 
-                  <View style={styles.qtyBox}>
-                    <Text style={styles.qtyLabel}>Doff</Text>
-                    <Text style={styles.qtyValue}>{item.doffqty}</Text>
-                  </View>
+                  <View style={styles.statBox}></View>
 
-                  <View style={styles.qtyBox}>
-                    <Text style={styles.qtyLabel}>Packing</Text>
-                    <Text style={styles.qtyValue}>{item.packingqty || 0}</Text>
+                  <View style={styles.statBox}>
+                    <Text
+                      style={
+                        parseFloat(rightTotal) < 0
+                          ? styles.statValueRed
+                          : styles.statValue
+                      }
+                    >
+                      {rightTotal}
+                    </Text>
                   </View>
-                </View>
-
-                {/* REMAIN HIGHLIGHT */}
-                <View style={styles.remainBox}>
-                  <Text style={styles.remainLabel}>Remaining</Text>
-                  <Text style={styles.remainValue}>
-                    {calcQty(item.doffqty, item.packingqty)}
-                  </Text>
                 </View>
 
                 {/* FOOTER */}
                 <View style={styles.footer}>
-                  <Text style={styles.footerText}>
-                    Merge: {item.mername || '-'}
+                  <Text style={styles.footerDate}>
+                    {formatDate(item.voudate)}
                   </Text>
                 </View>
+
+                {expandedId === item.vouno && (
+                  <View style={styles.subCard}>
+                    {/* HEADER */}
+                    <View style={styles.subHeader}>
+                      <Text style={styles.subTitle}>Grade Details</Text>
+                      <Icon name="inventory-2" size={16} color="#0F6C7B" />
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    {/* LOADING */}
+                    {loadingId === String(item.vouno) ? (
+                      <Text style={styles.loadingText}>Loading...</Text>
+                    ) : infoData[String(item.vouno)] &&
+                      infoData[String(item.vouno)].length > 0 ? (
+                      <View>
+                        {/* TABLE HEADER */}
+                        <View style={styles.tableHeader}>
+                          <Text style={[styles.th, { flex: 1 }]}>Grade</Text>
+                          <Text
+                            style={[
+                              styles.th,
+                              { width: 100, textAlign: 'right' },
+                            ]}
+                          >
+                            Qty
+                          </Text>
+                        </View>
+
+                        {/* TABLE BODY */}
+                        {infoData[String(item.vouno)].map((row, index) => (
+                          <View
+                            key={index}
+                            style={[
+                              styles.tableRow,
+                              index % 2 === 0 && styles.altRow,
+                            ]}
+                          >
+                            <Text style={[styles.td, { flex: 1 }]}>
+                              {row.grdname}
+                            </Text>
+
+                            <Text
+                              style={[
+                                styles.td,
+                                {
+                                  width: 100,
+                                  textAlign: 'right',
+                                  fontWeight: '600',
+                                },
+                              ]}
+                            >
+                              {row.qty}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.noDataText}>
+                        No grade details found
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* {expandedId === item.vouno && (
+                  <View style={styles.subCard}>
+                    
+                    <View style={styles.subHeader}>
+                      <Text style={styles.subTitle}>Grade Details</Text>
+                      <Icon name="inventory-2" size={16} color="#0F6C7B" />
+                    </View>
+
+                    
+                    <View style={styles.divider} />
+
+                    
+                    <View style={styles.subGrid}>
+                      <View style={styles.subItem}>
+                        <Text style={styles.subLabel}>Order</Text>
+                        <Text style={styles.subValue}>{item.prodorderqty}</Text>
+                      </View>
+
+                      <View style={styles.subItem}>
+                        <Text style={styles.subLabel}>Doff</Text>
+                        <Text style={styles.subValue}>{item.doffqty}</Text>
+                      </View>
+
+                      <View style={styles.subItem}>
+                        <Text style={styles.subLabel}>Packing</Text>
+                        <Text style={styles.subValue}>
+                          {item.packingqty || 0}
+                        </Text>
+                      </View>
+
+                      <View style={styles.subItem}>
+                        <Text style={styles.subLabel}>Balance</Text>
+                        <Text
+                          style={[
+                            styles.subValue,
+                            parseFloat(
+                              calcQty(item.prodorderqty, item.packingqty),
+                            ) < 0
+                              ? styles.negative
+                              : styles.positive,
+                          ]}
+                        >
+                          {calcQty(item.prodorderqty, item.packingqty)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )} */}
               </View>
             </AnimatedTouchable>
           );
@@ -801,13 +1262,66 @@ const ProductionReport = ({ navigation, token }) => {
                 </View>
               </View>
 
+              <Text style={styles.label}>Select type</Text>
+              <View style={styles.radioRow}>
+                {/* RUNNING */}
+                <TouchableOpacity
+                  style={[
+                    styles.radioBox,
+                    productionType === 'running' && styles.radioBoxActive,
+                  ]}
+                  onPress={() => setProductionType('running')}
+                >
+                  <View style={styles.radioOuter}>
+                    {productionType === 'running' && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                  <Text style={styles.radioLabel}>Running</Text>
+                </TouchableOpacity>
+
+                {/* ALL */}
+                <TouchableOpacity
+                  style={[
+                    styles.radioBox,
+                    productionType === 'all' && styles.radioBoxActive,
+                  ]}
+                  onPress={() => setProductionType('all')}
+                >
+                  <View style={styles.radioOuter}>
+                    {productionType === 'all' && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                  <Text style={styles.radioLabel}>All</Text>
+                </TouchableOpacity>
+
+                {/* CLOSE */}
+                <TouchableOpacity
+                  style={[
+                    styles.radioBox,
+                    productionType === 'close' && styles.radioBoxActive,
+                  ]}
+                  onPress={() => setProductionType('close')}
+                >
+                  <View style={styles.radioOuter}>
+                    {productionType === 'close' && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                  <Text style={styles.radioLabel}>Close</Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.label}>Machine group</Text>
               <TouchableOpacity
                 style={styles.inputBox}
                 onPress={getMachineGroupData}
               >
                 <Text numberOfLines={1} style={{ color: '#000' }}>
-                  {selectedMachineGroup?.MGrpName || 'Select machine group'}
+                  {(selectedMachineGroups &&
+                    selectedMachineGroups.map(i => i.MGrpName).join(', ')) ||
+                    'Select machine group'}
                 </Text>
                 <Icon name="keyboard-arrow-down" size={24} />
               </TouchableOpacity>
@@ -818,7 +1332,10 @@ const ProductionReport = ({ navigation, token }) => {
                 onPress={getMachineSubGroupData}
               >
                 <Text numberOfLines={1} style={{ color: '#000' }}>
-                  {selectedMachineSubGroup?.MSGrpName ||
+                  {(selectedMachineSubGroups &&
+                    selectedMachineSubGroups
+                      .map(i => i.MSGrpName)
+                      .join(', ')) ||
                     'Select machine sub group'}
                 </Text>
                 <Icon name="keyboard-arrow-down" size={24} />
@@ -830,7 +1347,9 @@ const ProductionReport = ({ navigation, token }) => {
                 onPress={getMachineData}
               >
                 <Text numberOfLines={1} style={{ color: '#000' }}>
-                  {selectedMachine?.MacName || 'Select machine'}
+                  {(selectedMachines &&
+                    selectedMachines.map(i => i.MacName).join(', ')) ||
+                    'Select machine'}
                 </Text>
                 <Icon name="keyboard-arrow-down" size={24} />
               </TouchableOpacity>
@@ -872,19 +1391,19 @@ const ProductionReport = ({ navigation, token }) => {
         <DateTimePicker
           value={getToDate || new Date()}
           mode="date"
-        //   onChange={(e, d) => {
-        //     console.log('ToDate :', d);
-        //     if (d) setToDate(d);
+          //   onChange={(e, d) => {
+          //     console.log('ToDate :', d);
+          //     if (d) setToDate(d);
 
-        //     setCheckingDatePickerVisible1(false);
-        //   }}
-            onChange={(event, selectedDate) => {
-              if (event.type === 'set' && selectedDate) {
-                setToDate(selectedDate);
-              }
+          //     setCheckingDatePickerVisible1(false);
+          //   }}
+          onChange={(event, selectedDate) => {
+            if (event.type === 'set' && selectedDate) {
+              setToDate(selectedDate);
+            }
 
-              setCheckingDatePickerVisible1(false);
-            }}
+            setCheckingDatePickerVisible1(false);
+          }}
         />
       )}
 
@@ -917,28 +1436,67 @@ const ProductionReport = ({ navigation, token }) => {
               style={{ flex: 1, color: '#000' }}
             />
           </View>
+          {selectedMachineGroups.length > 0 && (
+            <>
+              <Text style={styles.section1}>Selected</Text>
+
+              <View style={styles.selectedBox}>
+                <Text style={styles.selectedText}>
+                  {selectedMachineGroups.map(i => i.MGrpName).join(', ')}
+                </Text>
+
+                <Icon name="check-circle" size={18} color="#0F6C7B" />
+              </View>
+            </>
+          )}
 
           {/* LIST */}
           <FlatList
-            //data={getAllMachineGroups}
-            data={getAllMachineGroups.filter(p =>
-              p.MGrpName.toLowerCase().includes(
-                machineGroupSearch.toLowerCase(),
-              ),
-            )}
+            data={
+              getAllMachineGroups &&
+              getAllMachineGroups.filter(p =>
+                p.MGrpName.toLowerCase().includes(
+                  machineGroupSearch.toLowerCase(),
+                ),
+              )
+            }
             keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.pickerItem}
-                onPress={() => {
-                  setSelectedMachineGroup(item);
-                  setMachineGroupPickerVisible(false);
-                }}
-              >
-                <Text style={{ color: '#000' }}>{item.MGrpName}</Text>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const selected = selectedMachineGroups.some(
+                i => i.MacGrp === item.MacGrp,
+              );
+
+              return (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() =>
+                    toggleSelection(
+                      item,
+                      selectedMachineGroups,
+                      setSelectedMachineGroups,
+                      'MacGrp',
+                    )
+                  }
+                >
+                  <Text style={{ flex: 1, color: '#000' }}>
+                    {item.MGrpName}
+                  </Text>
+
+                  {selected && (
+                    <Icon name="check-circle" size={20} color="#0F6C7B" />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
           />
+        </View>
+        <View style={{ padding: 15 }}>
+          <TouchableOpacity
+            style={styles.applyBtn}
+            onPress={() => setMachineGroupPickerVisible(false)}
+          >
+            <Text style={{ color: '#fff', textAlign: 'center' }}>Done</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
 
@@ -964,7 +1522,7 @@ const ProductionReport = ({ navigation, token }) => {
           <View style={styles.pickerSearch}>
             <Icon name="search" size={18} color="#777" />
             <TextInput
-              placeholder="Search machine group..."
+              placeholder="Search machine sub group..."
               placeholderTextColor="#000"
               value={machineSubGroupSearch}
               onChangeText={setMachineSubGroupSearch}
@@ -972,27 +1530,68 @@ const ProductionReport = ({ navigation, token }) => {
             />
           </View>
 
+          {selectedMachineSubGroups && selectedMachineSubGroups.length > 0 && (
+            <>
+              <Text style={styles.section1}>Selected</Text>
+
+              <View style={styles.selectedBox}>
+                <Text style={styles.selectedText}>
+                  {selectedMachineSubGroups &&
+                    selectedMachineSubGroups.map(i => i.MSGrpName).join(', ')}
+                </Text>
+
+                <Icon name="check-circle" size={18} color="#0F6C7B" />
+              </View>
+            </>
+          )}
+
           {/* LIST */}
           <FlatList
-            //data={getAllMachineSubGroups}
-            data={getAllMachineSubGroups.filter(p =>
-              p.MSGrpName.toLowerCase().includes(
-                machineSubGroupSearch.toLowerCase(),
-              ),
-            )}
+            data={
+              getAllMachineSubGroups &&
+              getAllMachineSubGroups.filter(p =>
+                p.MSGrpName.toLowerCase().includes(
+                  machineSubGroupSearch.toLowerCase(),
+                ),
+              )
+            }
             keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.pickerItem}
-                onPress={() => {
-                  setSelectedMachineSubGroup(item);
-                  setMachineSubGroupPickerVisible(false);
-                }}
-              >
-                <Text style={{ color: '#000' }}>{item.MSGrpName}</Text>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const selected = selectedMachineSubGroups.some(
+                i => i.MacSGrp === item.MacSGrp,
+              );
+
+              return (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() =>
+                    toggleSelection(
+                      item,
+                      selectedMachineSubGroups,
+                      setSelectedMachineSubGroups,
+                      'MacSGrp',
+                    )
+                  }
+                >
+                  <Text style={{ flex: 1, color: '#000' }}>
+                    {item.MSGrpName}
+                  </Text>
+
+                  {selected && (
+                    <Icon name="check-circle" size={20} color="#0F6C7B" />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
           />
+        </View>
+        <View style={{ padding: 15 }}>
+          <TouchableOpacity
+            style={styles.applyBtn}
+            onPress={() => setMachineSubGroupPickerVisible(false)}
+          >
+            <Text style={{ color: '#fff', textAlign: 'center' }}>Done</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
 
@@ -1015,7 +1614,7 @@ const ProductionReport = ({ navigation, token }) => {
           <View style={styles.pickerSearch}>
             <Icon name="search" size={18} color="#777" />
             <TextInput
-              placeholder="Search machine group..."
+              placeholder="Search machine..."
               placeholderTextColor="#000"
               value={machineSearch}
               onChangeText={setMachineSearch}
@@ -1023,27 +1622,69 @@ const ProductionReport = ({ navigation, token }) => {
             />
           </View>
 
+          {selectedMachines && selectedMachines.length > 0 && (
+            <>
+              <Text style={styles.section1}>Selected</Text>
+
+              <View style={styles.selectedBox}>
+                <Text style={styles.selectedText}>
+                  {selectedMachines &&
+                    selectedMachines.map(i => i.MacName).join(', ')}
+                </Text>
+
+                <Icon name="check-circle" size={18} color="#0F6C7B" />
+              </View>
+            </>
+          )}
+
           <FlatList
-            //data={getAllMachines}
-            data={getAllMachines.filter(p =>
-              p.MacName.toLowerCase().includes(machineSearch.toLowerCase()),
-            )}
+            data={
+              getAllMachines &&
+              getAllMachines.filter(p =>
+                p.MacName.toLowerCase().includes(
+                  machineGroupSearch.toLowerCase(),
+                ),
+              )
+            }
             keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.pickerItem}
-                onPress={() => {
-                  setSelectedMachine(item);
-                  setMachinePickerVisible(false);
-                }}
-              >
-                <Text style={{ color: '#000' }}>{item.MacName}</Text>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const selected = selectedMachines.some(
+                i => i.MacCode === item.MacCode,
+              );
+
+              return (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() =>
+                    toggleSelection(
+                      item,
+                      selectedMachines,
+                      setSelectedMachines,
+                      'MacCode',
+                    )
+                  }
+                >
+                  <Text style={{ flex: 1, color: '#000' }}>{item.MacName}</Text>
+
+                  {selected && (
+                    <Icon name="check-circle" size={20} color="#0F6C7B" />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
           />
+        </View>
+        <View style={{ padding: 15 }}>
+          <TouchableOpacity
+            style={styles.applyBtn}
+            onPress={() => setMachinePickerVisible(false)}
+          >
+            <Text style={{ color: '#fff', textAlign: 'center' }}>Done</Text>
+          </TouchableOpacity>
         </View>
       </Modal>
 
+      {/** store */}
       <Modal
         visible={storePickerVisible}
         animationType="slide"
@@ -1079,6 +1720,7 @@ const ProductionReport = ({ navigation, token }) => {
         </View>
       </Modal>
 
+      {/** year */}
       <Modal
         visible={yearPickerVisible}
         animationType="slide"
@@ -1114,7 +1756,7 @@ const ProductionReport = ({ navigation, token }) => {
         </View>
       </Modal>
 
-      {/* PROPERTY PICKER */}
+      {/* PROPERTY */}
       <Modal
         visible={propertyPickerVisible}
         animationType="slide"
@@ -1143,7 +1785,7 @@ const ProductionReport = ({ navigation, token }) => {
           {/* RECENT */}
           {selectedProperty && (
             <>
-              <Text style={styles.section}>Selected</Text>
+              <Text style={styles.section1}>Selected</Text>
 
               <View style={styles.selectedBox}>
                 <Text style={styles.selectedText}>
@@ -1156,9 +1798,12 @@ const ProductionReport = ({ navigation, token }) => {
           )}
 
           <FlatList
-            data={propertyData.filter(p =>
-              p.LngName.toLowerCase().includes(propertySearch.toLowerCase()),
-            )}
+            data={
+              propertyData &&
+              propertyData.filter(p =>
+                p.LngName.toLowerCase().includes(propertySearch.toLowerCase()),
+              )
+            }
             keyExtractor={item => item.PrpCode}
             renderItem={({ item }) => {
               const selected = selectedProperty?.PrpCode === item.PrpCode;
@@ -1911,15 +2556,497 @@ const styles = StyleSheet.create({
     color: '#1B5E20',
   },
 
-  footer: {
-    //marginTop: 5,
-    borderTopWidth: 1,
-    borderColor: '#eee',
-    paddingTop: 0,
-  },
+  //   footer: {
+  //     //marginTop: 5,
+  //     borderTopWidth: 1,
+  //     borderColor: '#eee',
+  //     paddingTop: 0,
+  //   },
 
   footerText: {
     fontSize: 11,
     color: '#161515',
+  },
+
+  footerRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderColor: '#eee',
+    marginTop: 6,
+    paddingTop: 6,
+  },
+
+  qualityBox: {
+    flex: 0.6, // 60%
+    paddingRight: 6,
+  },
+
+  mergeBox: {
+    flex: 0.4, // 40%
+    paddingLeft: 6,
+  },
+  switch: {
+    lineHeight: 1,
+    marginTop: 10,
+  },
+
+  radioContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+
+  //   radioOuter: {
+  //     width: 18,
+  //     height: 18,
+  //     borderRadius: 9,
+  //     borderWidth: 2,
+  //     borderColor: '#0F6C7B',
+  //     justifyContent: 'center',
+  //     alignItems: 'center',
+  //     marginRight: 6,
+  //   },
+
+  //   radioInner: {
+  //     width: 10,
+  //     height: 10,
+  //     borderRadius: 5,
+  //     backgroundColor: '#0F6C7B',
+  //   },
+
+  radioText: {
+    fontSize: 14,
+    color: '#444',
+  },
+
+  radioRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+  },
+
+  //   radioBox: {
+  //     flex: 1, // ✅ equal width
+  //     flexDirection: 'row',
+  //     alignItems: 'center',
+  //     justifyContent: 'center', // ✅ center content
+  //   },
+
+  radioOuter: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#0F6C7B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#0F6C7B',
+  },
+
+  radioLabel: {
+    fontSize: 14,
+    color: '#444',
+  },
+
+  radioBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+
+  radioBoxActive: {
+    backgroundColor: '#E0F7FA',
+  },
+  section1: {
+    marginLeft: 10,
+    marginBottom: 2,
+  },
+
+  newCard: {
+    borderRadius: 18,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+
+  newHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+  },
+
+  quality: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  subText: {
+    color: '#E0F7FA',
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  badge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  newBody: {
+    padding: 14,
+  },
+
+  machine: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+    //textAlign: 'center'
+  },
+
+  group: {
+    fontSize: 12,
+    color: '#777',
+    marginTop: 2,
+    //textAlign: 'center'
+  },
+
+  //   statsRow: {
+  //     flexDirection: 'row',
+  //     justifyContent: 'space-between',
+  //     marginTop: 14,
+  //   },
+
+  statBoxLeft: {
+    flex: 1,
+    backgroundColor: '#F4F7F9',
+    padding: 0,
+    borderRadius: 12,
+    //alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#F4F7F9',
+    padding: 0,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F6C7B',
+  },
+  statValueRed: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF0000',
+  },
+  statValueGreen: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#008000',
+  },
+
+  statLabel: {
+    fontSize: 11,
+    color: '#888',
+    //marginTop: 2,
+  },
+
+  footer: {
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+    paddingTop: 4,
+  },
+
+  footerDate: {
+    fontSize: 12,
+    color: '#555',
+  },
+
+  statBoxOne: {
+    flex: 1,
+    backgroundColor: '#F4F7F9',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginHorizontal: 6,
+  },
+  statBoxTwo: {
+    flex: 1,
+    backgroundColor: '#F4F7F9',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginHorizontal: 6, // spacing between 2 boxes
+  },
+
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // 🔥 pushes left & right
+    alignItems: 'center',
+    marginTop: 5,
+  },
+
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center', // or 'flex-start' if left aligned
+    marginTop: 4,
+  },
+
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F6C7B',
+    marginRight: 6, // 👈 spacing before icon
+  },
+
+  subCard: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: '#F1F8F9',
+    borderRadius: 10,
+  },
+
+  subTitle: {
+    fontWeight: '700',
+    fontSize: 14,
+    marginBottom: 6,
+    color: '#0F6C7B',
+  },
+
+  subText: {
+    fontSize: 12,
+    color: '#333',
+    marginTop: 2,
+  },
+
+  subCard: {
+    marginTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+
+    // subtle shadow (premium feel)
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+
+  subHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  subTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F6C7B',
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 10,
+  },
+
+  subGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+
+  subItem: {
+    width: '48%', // 2 column layout
+    backgroundColor: '#F6F8FA',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+
+  subLabel: {
+    fontSize: 11,
+    color: '#888',
+  },
+
+  subValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111',
+    marginTop: 2,
+  },
+
+  positive: {
+    color: '#2E7D32',
+  },
+
+  negative: {
+    color: '#D32F2F',
+  },
+
+  // subCard: {
+  //   marginTop: 12,
+  //   backgroundColor: '#F8FAFC',
+  //   borderRadius: 12,
+  //   padding: 12,
+  //   borderWidth: 1,
+  //   borderColor: '#E2E8F0',
+  // },
+
+  // subHeader: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  // },
+
+  // subTitle: {
+  //   fontSize: 15,
+  //   fontWeight: '700',
+  //   color: '#0F172A',
+  // },
+
+  // divider: {
+  //   height: 1,
+  //   backgroundColor: '#E2E8F0',
+  //   marginVertical: 10,
+  // },
+
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#0F6C7B',
+    paddingVertical: 10,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+
+  th: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+    paddingHorizontal: 8,
+  },
+
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#fff',
+  },
+
+  altRow: {
+    backgroundColor: '#F9FAFB',
+  },
+
+  td: {
+    fontSize: 13,
+    color: '#111827',
+    paddingHorizontal: 8,
+  },
+
+  loadingText: {
+    textAlign: 'center',
+    paddingVertical: 20,
+    color: '#666',
+  },
+
+  noDataText: {
+    textAlign: 'center',
+    paddingVertical: 20,
+    color: '#999',
+  },
+
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#0F6C7B',
+    paddingVertical: 10,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+
+  th: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+    paddingHorizontal: 10,
+  },
+
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#fff',
+  },
+
+  altRow: {
+    backgroundColor: '#F8FAFC',
+  },
+
+  td: {
+    fontSize: 13,
+    color: '#111827',
+    paddingHorizontal: 10,
+  },
+
+  loadingText: {
+    textAlign: 'center',
+    paddingVertical: 20,
+    color: '#666',
+  },
+
+  noDataText: {
+    textAlign: 'center',
+    paddingVertical: 20,
+    color: '#999',
+  },
+
+  cardLoader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+    borderRadius: 16,
+  },
+
+  loadingCardText: {
+    marginTop: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F6C7B',
   },
 });

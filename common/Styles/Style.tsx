@@ -1439,7 +1439,8 @@ export const checkingScannerStyles = StyleSheet.create({
         marginTop: 5,
         height: 40,
         justifyContent: 'center',
-        width: '100%'
+        width: '100%',
+        color:'#000'
 
 
     },
@@ -2919,7 +2920,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
     },
     fabAdd: {
         position: 'absolute',
-        bottom: 75,
+        bottom: 50,
         left: 20,
         backgroundColor: '#007EA7',
         width: 45,

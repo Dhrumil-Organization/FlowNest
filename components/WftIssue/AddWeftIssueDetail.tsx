@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert, TextInput as RNTextInput, } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, FlatList, ActivityIndicator, Alert, TextInput as RNTextInput, } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { DesignData, ItemData, ItemStatus } from './Modal';
+// import { DesignData, ItemData, ItemStatus } from './Modal';
 import theme from '../../android/app/src/theme';
 import SearchableDropdown from '../Shared/SearchableDropdown';
 import { Switch } from 'react-native';
@@ -27,7 +27,13 @@ const AddWeftIssueDetail = (props) => {
         getAllYearData,
         onLoadPress,
         token,
-        setIsLoading
+        setIsLoading,
+        handleclick,
+        editData,
+        mainUId,
+        isEditMode,
+        isItemdetailvisible,
+        resetFlag
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -39,16 +45,23 @@ const AddWeftIssueDetail = (props) => {
     const [selectedstocktype, setselectedstocktype] = useState([]);
     const [Beamdata, setBeamdata] = useState([]);
     const [Designdata, setDesigndata] = useState([]);
+    const [maindesigndata, setmaindesigndata] = useState([]);
     const [selecteddesign, setselecteddesign] = useState([]);
     const [getStockTypes, setStockTypes] = useState([
         { stktypename: 'In house', StkType: 'I' },
         { stktypename: 'Process house', StkType: 'P' }
     ]);
+    const [showNextModal, setShowNextModal] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
     const [errors, setErrors] = useState({});
+
+    // console.log("maindesigndata", maindesigndata);
 
     let cancelToken: any;
 
-    console.log("FormState.values", FormState.values)
+    // console.log("FormState.values", FormState.values)
+    console.log("Formstate.values.PrpCode", FormState.values.PrpCode);
+    console.log("Formstate.values.YearNo", FormState.values.YearNo);
 
     React.useEffect(() => {
         Animated.timing(slideAnim, {
@@ -68,76 +81,148 @@ const AddWeftIssueDetail = (props) => {
         cancelToken: cancelToken?.token,
     });
 
+    // const soshow = async () => {
+    //     const userPtype = await AsyncStorage.getItem('user_prptype');
+    //     if (!FormState.values.PrpCode || !FormState.values.YearNo) {
+    //         return;
+    //     }
+    //     try {
+    //         setIsLoading(true);
+
+    //         const source = axios.CancelToken.source();
+
+    //         const historyPayload = {
+    //             uid: FormState.values.uid || '0',
+    //             prpcode: FormState.values.PrpCode,
+    //             yearno: FormState.values.YearNo,
+    //             strcode: '012',
+    //             action: 'add',
+    //             txntype: 'beam_weft_issue'
+    //         };
+
+    //         console.log("GET Params:", historyPayload);
+
+    //         const response = await axios.get(
+    //             `${API}/api/warpissueshow`,
+    //             {
+    //                 params: historyPayload,
+    //                 headers: {
+    //                     Authorization: `Bearer ${token}`,
+    //                     Accept: 'application/json',
+    //                 },
+    //                 cancelToken: source.token
+    //             }
+    //         );
+
+    //         // 🔥 DEBUG (keep this for now)
+    //         console.log("FULL RESPONSE:", response.data);
+
+    //         // ✅ correct extraction
+    //         const resData = response?.data?.data || {};
+    //         const mainData = resData?.main?.[0] || {};
+
+    //         // console.log("MAIN DATA:", mainData);
+    //         // console.log("D1:", resData?.d1);
+    //         // console.log("D2:", resData?.d2);
+
+    //         const cleanMainData = Object.fromEntries(
+    //             Object.entries(mainData).filter(([key, value]) => {
+    //                 return value !== null && value !== '';
+    //             })
+    //         );
+    //         if (response?.data?.success) {
+    //             const updatedValues = {
+    //                 ...FormState.values,
+    //                 ...cleanMainData,
+    //                 d1: resData?.d1 || [],
+    //                 d2: resData?.d2 || []
+    //             };
+    //             setFormState(prev => ({
+    //                 ...prev,
+    //                 values: updatedValues
+    //             }));
+    //             checkvoucher(updatedValues);
+    //             fetchbeam(updatedValues);
+    //         }
+    //     } catch (error) {
+    //         if (axios.isCancel(error)) {
+    //             console.log("Request cancelled:", error.message);
+    //         } else {
+    //             console.log("ERROR STATUS:", error?.response?.status);
+    //             console.log("ERROR DATA:", error?.response?.data);
+    //         }
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
+
+    const prp = FormState.values.PrpCode;
+    const year = FormState.values.YearNo;
+
     const soshow = async () => {
-        const userPtype = await AsyncStorage.getItem('user_prptype');
-        if (!FormState.values.PrpCode || !FormState.values.YearNo) {
-            return;
-        }
+        // if (!FormState.values.PrpCode || !FormState.values.YearNo) {
+        //     console.log("❌ Missing values");
+        //     return;
+        // }
+
         try {
             setIsLoading(true);
 
-            const source = axios.CancelToken.source();
-
-            const historyPayload = {
+            const payload = {
                 uid: FormState.values.uid || '0',
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 strcode: '012',
                 action: 'add',
-                txntype: 'weft_selvedge_issue'
+                txntype: 'beam_weft_issue'
             };
 
-            console.log("GET Params:", historyPayload);
+            console.log("🚀 API PAYLOAD:", payload);
 
-            const response = await axios.get(
-                `${API}/api/warpissueshow`,
-                {
-                    params: historyPayload,
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        Accept: 'application/json',
-                    },
-                    cancelToken: source.token
+            const response = await axios.get(`${API}/api/warpissueshow`, {
+                params: payload,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
                 }
-            );
+            });
 
-            // 🔥 DEBUG (keep this for now)
-            console.log("FULL RESPONSE:", response.data);
+            console.log("✅ API RESPONSE:", response.data);
 
-            // ✅ correct extraction
-            const resData = response?.data?.data || {};
-            const mainData = resData?.main?.[0] || {};
-
-            console.log("MAIN DATA:", mainData);
-            console.log("D1:", resData?.d1);
-            console.log("D2:", resData?.d2);
-
-            const cleanMainData = Object.fromEntries(
-                Object.entries(mainData).filter(([key, value]) => {
-                    return value !== null && value !== '';
-                })
-            );
             if (response?.data?.success) {
-                const updatedValues = {
-                    ...FormState.values,
-                    ...cleanMainData,
-                    d1: resData?.d1 || [],
-                    d2: resData?.d2 || []
-                };
+                const resData = response?.data?.data || {};
+                const mainData = resData?.main?.[0] || {};
+
+                // 🔥 SAFE MERGE (NO OVERWRITE IF BLANK)
+                const safeData = {};
+
+                Object.keys(mainData).forEach(key => {
+                    if (mainData[key] !== null && mainData[key] !== '') {
+                        safeData[key] = mainData[key];
+                    }
+                });
+
                 setFormState(prev => ({
                     ...prev,
-                    values: updatedValues
+                    values: {
+                        ...prev.values,   // old safe values
+                        ...safeData,      // only valid values
+
+                        // 🔥 FORCE KEEP (CRITICAL)
+                        PrpCode: prev.values.PrpCode,
+                        YearNo: prev.values.YearNo,
+
+                        d1: resData?.d1 || [],
+                        d2: resData?.d2 || []
+                    }
                 }));
-                checkvoucher(updatedValues);
-                fetchbeam(updatedValues);
+
+                checkvoucher(mainData);
+                fetchbeam(mainData);
             }
+
         } catch (error) {
-            if (axios.isCancel(error)) {
-                console.log("Request cancelled:", error.message);
-            } else {
-                console.log("ERROR STATUS:", error?.response?.status);
-                console.log("ERROR DATA:", error?.response?.data);
-            }
+            console.log("❌ ERROR:", error?.response?.data || error.message);
         } finally {
             setIsLoading(false);
         }
@@ -179,10 +264,11 @@ const AddWeftIssueDetail = (props) => {
                 vouno: values.IssNo || '',
                 suffix: values.suffix || '',
                 month: month,
+                // date: formatDisplayDate(values.IssDate),
                 uid: values.UId,
 
                 // ✅ IMPORTANT: send ISO date directly
-                date: formatDisplayDate(FormState.values.IssDate),
+                date: formatDisplayDate(FormState.values.IssDate) || formatDisplayDate(values.IssDate),
                 module: 'POYIssue',
                 module_no_key: 'IssNo'
             };
@@ -250,11 +336,11 @@ const AddWeftIssueDetail = (props) => {
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 strcode: values.yarnstrcode,
-                txntype: 'weft_selvedge_issue',
+                txntype: 'beam_weft_issue',
                 date: formatDisplayDate(values.IssDate),
                 uid: values.UId
             };
-            console.log("beam Payload:", historyPayload);
+            // console.log("beam Payload:", historyPayload);
             const response = await axios.get(
                 `${API}/api/beam_for_weftissue_help`,
                 getRequestConfig({
@@ -290,7 +376,7 @@ const AddWeftIssueDetail = (props) => {
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 // strcode: values.yarnstrcode,
-                txntype: 'weft_selvedge_issue',
+                txntype: 'beam_weft_issue',
                 date: formatDisplayDate(values.IssDate),
                 uid: values.UId,
                 stktype: values.StkType
@@ -322,15 +408,69 @@ const AddWeftIssueDetail = (props) => {
     };
 
 
+    const fetchdesignwiseitem = async () => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        try {
+            setIsLoading(true);
+            if (cancelToken?.cancel) cancelToken.cancel();
+            cancelToken = axios.CancelToken.source();
+            const historyPayload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                txntype: 'weft_selvedge_issue',
+                dsncode: FormState.values.DsnCode
+            };
+            console.log("designwise_mainitem_for_weftissue_help Payload:", historyPayload);
+            const response = await axios.get(
+                `${API}/api/designwise_mainitem_for_weftissue_help`,
+                getRequestConfig({
+                    params: { ...historyPayload },
+                    cancelToken: cancelToken.token
+                })
+            );
+            console.log("designwise_mainitem_for_weftissue_help API Response:", response);
+            const data = response?.data?.data || [];
+            if (response?.data?.success && data.length > 0) {
+                setmaindesigndata(data);
+            } else {
+                setmaindesigndata([]);
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                console.log("Request cancelled:", error.message);
+            } else {
+                console.log("API beam error:", error);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // useEffect(() => {
+    //     console.log("PrpCode:", FormState.values.PrpCode);
+    //     console.log("YearNo:", FormState.values.YearNo);
+    //         console.log("API CALL HO RAHI HAI");
+    //         soshow();
+    // }, [FormState.values.PrpCode, FormState.values.YearNo]);
+
+    // useEffect(() => {
+    //     console.log("🔥 useEffect TRIGGERED");
+    //     console.log("PrpCode:", FormState.values.PrpCode);
+    //     console.log("YearNo:", FormState.values.YearNo);
+
+    //     if (FormState.values.PrpCode && FormState.values.YearNo) {
+    //         console.log("🚀 API CALL");
+    //         soshow();
+    //     }
+    // }, [FormState.values.PrpCode, FormState.values.YearNo]); // ✅ TEMP for debug // ✅ correct
+
+
     useEffect(() => {
-        if (
-            FormState.values.PrpCode &&
-            FormState.values.YearNo
-        ) {
+        console.log("🔥 useEffect TRIGGERED", prp, year);
+        if (isVisible && prp && year) {
             soshow();
         }
-    }, [FormState.values.PrpCode, FormState.values.YearNo]);
-
+    }, [isVisible, prp, year]);
 
     const handleLoaddata = async () => {
         onLoadPress();
@@ -345,39 +485,112 @@ const AddWeftIssueDetail = (props) => {
             }-${d.getFullYear()}`;
     };
 
-
     const handleSaveNext = () => {
-        const values = FormState.values;
-        let newErrors = {};
-        const validations = [
-            { key: "PrpCode", message: "Please select Property" },
-            { key: "YearNo", message: "Please select Year" },
-            { key: "StkType", message: "Please select Stock Type" },
-            { key: "DsnCode", message: "Please select Design" },
-            { key: "BeamNo", message: "Please select Beam" },
-            { key: "IssNo", message: "Please enter Voucher No" },
-            { key: "month", message: "Invalid Month" }
-        ];
-        validations.forEach(({ key, message }) => {
-            if (!values[key]) {
-                newErrors[key] = message;
-            }
-        });
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
-            const firstError = Object.values(newErrors)[0];
+        if (!selectedItem || !selectedItem.srno) {
             Snackbar.show({
-                text: firstError,
+                text: "Please select item",
                 duration: Snackbar.LENGTH_SHORT,
                 backgroundColor: "#B00020",
                 textColor: "#fff",
             });
             return;
         }
-        setErrors({});
-        onClose();
-        props.onNext();
+        setFormState(prev => ({
+            ...prev,
+            values: {
+                ...prev.values,
+                ItmCode: selectedItem.mitmcode,
+                ItmName: selectedItem.mitmname,
+                srno: selectedItem.srno
+            }
+        }));
+
+        console.log("Selected Item:", selectedItem);
+
+        setShowNextModal(false);
+
+        props.onNext && props.onNext();
     };
+
+    const handleNextPress = async () => {
+
+        const values = FormState.values;
+
+        let newErrors: Record<string, string> = {};
+
+        const validations = [
+            { key: "PrpCode", message: "Please select Property" },
+            { key: "YearNo", message: "Please select Year" },
+            { key: "BeamNo", message: "Please select Beam" },
+            { key: "StkType", message: "Please select Stock Type" },
+            { key: "DsnCode", message: "Please select Design" },
+            // { key: "IssNo", message: "Please enter Voucher No" },
+            // { key: "month", message: "Invalid Month" }
+        ];
+
+        const isEmpty = (val: any) =>
+            val === undefined ||
+            val === null ||
+            val === '' ||
+            val === '0' ||
+            val === 0;
+
+        validations.forEach(({ key, message }) => {
+            if (isEmpty(values[key])) {
+                newErrors[key] = message;
+            }
+        });
+
+        if (Object.keys(newErrors).length > 0) {
+
+            setErrors(newErrors);
+
+            const firstError = Object.values(newErrors)[0];
+
+            Snackbar.show({
+                text: firstError,
+                duration: Snackbar.LENGTH_SHORT,
+                backgroundColor: "#B00020",
+                textColor: "#fff",
+            });
+
+            return;
+        }
+
+        setErrors({});
+
+        // await fetchdesignwiseitem();
+        // isItemdetailvisible(true);
+        setShowNextModal(false);
+        props.onNext && props.onNext();
+    };
+
+    useEffect(() => {
+        if (!FormState.values.IssDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            setFormState(prev => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    IssDate: today.toISOString()
+                }
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
+        console.log("🔥 RESET TRIGGERED");
+
+        setSelectedbeam(null);
+        setselectedstocktype(null);
+        setselecteddesign(null);
+
+        setBeamdata([]);
+        setDesigndata([]);
+
+    }, [resetFlag]);
 
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
@@ -397,7 +610,7 @@ const AddWeftIssueDetail = (props) => {
                             </TouchableOpacity>
                             <Text style={styles.topHeaderTitle}>Weft Issue Detail</Text>
                             <TouchableOpacity onPress={onClose}>
-                                <Icon name="close" size={22} color="#fff" />
+                                {/* <Icon name="close" size={22} color="#fff" /> */}
                             </TouchableOpacity>
                         </View>
 
@@ -465,17 +678,40 @@ const AddWeftIssueDetail = (props) => {
                                                     ? new Date(FormState.values.IssDate)
                                                     : new Date()
                                             }
+                                            // onConfirm={(date) => {
+                                            //     const selectedDate = new Date(date);
+                                            //     selectedDate.setHours(0, 0, 0, 0);
+
+                                            //     setFormState(prev => ({
+                                            //         ...prev,
+                                            //         values: {
+                                            //             ...prev.values,
+                                            //             IssDate: selectedDate.toISOString(),
+                                            //         }
+                                            //     }));
+
+                                            //     setCheckingDatePickerVisible(false);
+                                            // }}
                                             onConfirm={(date) => {
                                                 const selectedDate = new Date(date);
                                                 selectedDate.setHours(0, 0, 0, 0);
 
+                                                const isoDate = selectedDate.toISOString();
+
+                                                // 🔥 updated values bana lo (IMPORTANT)
+                                                const updatedValues = {
+                                                    ...FormState.values,
+                                                    IssDate: isoDate
+                                                };
+
+                                                // ✅ state update
                                                 setFormState(prev => ({
                                                     ...prev,
-                                                    values: {
-                                                        ...prev.values,
-                                                        IssDate: selectedDate.toISOString(),
-                                                    }
+                                                    values: updatedValues
                                                 }));
+
+                                                // 🔥 API call with latest values
+                                                checkvoucher(updatedValues);
 
                                                 setCheckingDatePickerVisible(false);
                                             }}
@@ -675,7 +911,7 @@ const AddWeftIssueDetail = (props) => {
 
                                     <PartyDropdown
                                         data={Designdata}
-                                        placeholder="Select Beam"
+                                        placeholder="Select Design"
                                         labelKey={["DsnCode", "DsnName"]}
                                         valueKey="DsnCode"
                                         pageSize={12}
@@ -686,7 +922,8 @@ const AddWeftIssueDetail = (props) => {
                                             setselecteddesign(item);
                                             const updatedValues = {
                                                 ...FormState.values,
-                                                DsnCode: item?.DsnCode || ""
+                                                DsnCode: item?.DsnCode || "",
+                                                DsnName: item?.DsnName || ""
                                             };
                                             setFormState(prev => ({
                                                 ...prev,
@@ -699,7 +936,8 @@ const AddWeftIssueDetail = (props) => {
                                                     ...prev,
                                                     values: {
                                                         ...prev.values,
-                                                        DsnCode: ""
+                                                        DsnCode: "",
+                                                        DsnName: ""
                                                     }
                                                 }));
                                             } else {
@@ -707,7 +945,8 @@ const AddWeftIssueDetail = (props) => {
                                                     ...prev,
                                                     values: {
                                                         ...prev.values,
-                                                        DsnCode: val?.DsnCode
+                                                        DsnCode: val?.DsnCode,
+                                                        DsnName: val?.DsnName
                                                     }
                                                 }));
                                             }
@@ -717,11 +956,19 @@ const AddWeftIssueDetail = (props) => {
                             </View>
                         </ScrollView>
 
-                        <TouchableOpacity
+                        {/* <TouchableOpacity
                             style={styles.nextButton}
                             onPress={handleSaveNext}
                         >
                             <Text style={styles.nextButtonText}>Save & Next</Text>
+                        </TouchableOpacity> */}
+
+                        <TouchableOpacity
+                            style={styles.nextButton}
+                            // onPress={() => setShowNextModal(true)}
+                            onPress={handleNextPress}
+                        >
+                            <Text style={styles.nextButtonText}>Next</Text>
                         </TouchableOpacity>
                     </Animated.View>
                 </View>
@@ -777,7 +1024,8 @@ const styles = StyleSheet.create({
         marginBottom: 12
     },
     field: {
-        marginTop: 15
+        marginTop: 15,
+        color: '#000'
     },
     label: {
         fontSize: 14,
@@ -794,7 +1042,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#e2e4e8'
+        borderColor: '#e2e4e8',
+        color: '#000'
     },
     inputText: {
         color: '#000',
@@ -818,7 +1067,8 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 8,
         padding: 10,
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
+        color: '#000'
     },
     card: {
         backgroundColor: '#fff',
@@ -891,6 +1141,176 @@ const styles = StyleSheet.create({
         color: '#111827'
     },
     dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
+    overlayContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999
+    },
+
+    overlayCard: {
+        width: '92%',
+        backgroundColor: '#eef2f7',   // 👈 contrast bg
+        borderRadius: 16,
+        padding: 12,
+        maxHeight: '80%'
+    },
+
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 10,
+        color: '#0f172a'
+    },
+
+    indexText: {
+        color: '#fff',
+        fontWeight: '700'
+    },
+
+    cartonNo: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0e7490'
+    },
+
+    subText: {
+        fontSize: 12,
+        color: '#64748b',
+        marginTop: 2
+    },
+
+    rightSection: {
+        alignItems: 'flex-end',
+        justifyContent: 'center'
+    },
+
+    qtyText: {
+        fontSize: 12,
+        color: '#444'
+    },
+
+    cheesText: {
+        fontSize: 12,
+        color: '#0e7490',
+        fontWeight: '600',
+        marginTop: 4
+    },
+
+    primaryBtn: {
+        backgroundColor: '#0e7490',
+        paddingVertical: 12,
+        borderRadius: 20,
+        alignItems: 'center',
+        marginTop: 10
+    },
+
+    primaryText: {
+        color: '#fff',
+        fontWeight: '600'
+    },
+    fullScreenContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#f4f6f8',
+        zIndex: 999
+    },
+
+    fullHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 40,
+        paddingBottom: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#0e7490'
+    },
+
+    headerTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+        marginLeft: 12
+    },
+
+    designCard: {
+        backgroundColor: '#fff',
+        margin: 12,
+        padding: 14,
+        borderRadius: 14,
+        elevation: 3
+    },
+
+    designRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    },
+
+    label: {
+        fontSize: 11,
+        color: '#64748b'
+    },
+
+    value: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0f172a',
+        marginTop: 2
+    },
+
+    listCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        padding: 14,
+        borderRadius: 14,
+        marginBottom: 10,
+        elevation: 2
+    },
+
+    leftSection: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+
+    indexCircle: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#0e7490',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10
+    },
+    selectedCard: {
+        borderWidth: 2,
+        borderColor: '#0e7490',
+        backgroundColor: '#e0f2f1'
+    },
+
+    // indexText: {
+    //     color: '#fff',
+    //     fontWeight: '700'
+    // },
+
+    // cartonNo: {
+    //     fontSize: 14,
+    //     fontWeight: '700',
+    //     color: '#0e7490'
+    // },
+
+    // subText: {
+    //     fontSize: 12,
+    //     color: '#64748b',
+    //     marginTop: 2
+    // }
     // dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
 });
 

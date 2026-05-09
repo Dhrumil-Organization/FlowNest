@@ -426,149 +426,144 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
         } else {
             try {
                 const decodedValue = atob(getMenuApps);
-                // const parsedValue = JSON.parse(decodedValue);
-                const parsedValue = [
-                    {
-                        "title": "",
-                        "pages": [
-                            {
-                                "title": "Mobile App",
-                                "href": "#",
-                                "icon": "",
-                                "children": [
-                                    {
-                                        "title": "Upload",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Credit Limit Request",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Sudamo Production Order",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Purchase Order",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Collection",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "New Account Request",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Sales Order",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Grey Purchase Order",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Production Order Tracking",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Monthly Expense Report",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Inquiry",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Checking Scanner",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Yarn Stock Verification",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Daily Collection Report",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Sales Order(Inactive)",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Item Authorization",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Process complete auth.",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Febric Stock",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Daily Collection Report",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Daily Payment Report",
-                                        "href": "/"
-                                    },
-                                    {
+                const parsedValue = JSON.parse(decodedValue);
+                // const parsedValue = [
+                //     {
+                //         "title": "",
+                //         "pages": [
+                //             {
+                //                 "title": "Mobile App",
+                //                 "href": "#",
+                //                 "icon": "",
+                //                 "children": [
+                //                     {
+                //                         "title": "Upload",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Credit Limit Request",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sudamo Production Order",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Purchase Order",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Collection",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "New Account Request",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Grey Purchase Order",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Production Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Monthly Expense Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Inquiry",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Checking Scanner",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Yarn Stock Verification",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Daily Collection Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order(Inactive)",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Item Authorization",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Process complete auth.",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Febric Stock",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Daily Collection Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Daily Payment Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
 
-                                        "title": "Purchase Order Tracking",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Sales Order Tracking",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Beam Close",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Creel Management System",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Yarn Stock",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Beam Gaiting",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Taka Checking Entry",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Yarn Management System",
-                                        "href": "/"
-                                    },
-                                    {
-                                        "title": "Party Dashboard",
-                                        "href": "/"
-                                    },
-                                    {
+                //                         "title": "Purchase Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order Tracking",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Beam Close",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Creel Management System",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Yarn Stock",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Beam Gaiting",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Taka Checking Entry",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Yarn Management System",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Party Dashboard",
+                //                         "href": "/"
+                //                     },
+                //                     {
 
-                                        "title": "Weft Issue",
-                                        "href": "/"
-                                    },
-                                    {
-
-                                        "title": "Production Report",
-                                        "href": "/"
-                                    },
+                //                         "title": "Weft Issue",
+                //                         "href": "/"
+                //                     },
                                     
-                                ]
-                            }
-                        ]
-                    }
-                ];
+                //                 ]
+                //             }
+                //         ]
+                //     }
+                // ];
                 console.log('Decoded getMenuApps:', parsedValue);
 
                 setDecodedMenuApps(parsedValue);

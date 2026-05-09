@@ -13,6 +13,7 @@ import FullScreenLoader from '../Loader/Loader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import PartyDropdown from '../Shared/PartyDropdown';
+import PartyDropdownforweft from '../Shared/PartyDropdownforweft';
 
 const { height } = Dimensions.get('window');
 
@@ -379,7 +380,8 @@ const AddWeftIssueDetail = (props) => {
                 txntype: 'beam_weft_issue',
                 date: formatDisplayDate(values.IssDate),
                 uid: values.UId,
-                stktype: values.StkType
+                stktype: values.StkType,
+                beamuid: FormState.values.BeamUId
             };
             console.log("Design Payload:", historyPayload);
             const response = await axios.get(
@@ -908,8 +910,7 @@ const AddWeftIssueDetail = (props) => {
 
                                 <View style={styles.field}>
                                     <Text style={styles.label}>Design *</Text>
-
-                                    <PartyDropdown
+                                    <PartyDropdownforweft
                                         data={Designdata}
                                         placeholder="Select Design"
                                         labelKey={["DsnCode", "DsnName"]}
@@ -930,6 +931,7 @@ const AddWeftIssueDetail = (props) => {
                                                 values: updatedValues
                                             }));
                                         }}
+
                                         setSelected={(val) => {
                                             if (!val) {
                                                 setFormState(prev => ({
@@ -952,6 +954,7 @@ const AddWeftIssueDetail = (props) => {
                                             }
                                         }}
                                     />
+
                                 </View>
                             </View>
                         </ScrollView>

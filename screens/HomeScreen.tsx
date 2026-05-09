@@ -558,7 +558,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Weft Issue",
                 //                         "href": "/"
                 //                     },
-                                    
+                //                     {
+                //                         "title": "Sales Order New",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

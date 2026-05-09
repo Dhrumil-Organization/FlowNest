@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, ActivityIndicator, FlatList } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
 import FullScreenLoader from '../Loader/Loader';
@@ -64,9 +64,19 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         values: {}
     });
     const [activeTab, setActiveTab] = useState('manual');
-    const [showManual, setShowManual] = useState(true); // true = manual, false = scanner
+    const [showManual, setShowManual] = useState(true);
+    const [scannerModal, setScannerModal] = useState(false);
+    const [scannerCardData, setScannerCardData] = useState([]);
+    const [scannerLoading, setScannerLoading] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [visibleData, setVisibleData] = useState([]);
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+    const [footerLoading, setFooterLoading] = useState(false);
+    const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+    const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);// true = manual, false = scanner
     // const [isScanning, setIsScanning] = useState(false);
-    console.log("Designdata", Designdata);
+    // console.log("scannerCardData", scannerCardData);
 
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
@@ -183,7 +193,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 prpcode: qrValue.prpcode,
                 yearno: yno
             };
-            //console.log("grade api payload historyPayload :", historyPayload)
+            console.log("grade api payload historyPayload :", historyPayload)
             const response = await axios.get(
                 `${API}/api/get_criterion`, getRequestConfig(
                     {
@@ -191,7 +201,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     }
                 )
             );
-
+            console.log("grade api payload response :", response)
             if (response.data.success && response.data.response.data.length > 0) {
                 setGradeData(response.data.response.data);
             } else {
@@ -619,36 +629,42 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
 
             if (Object.keys(getSavedData).length > 0) {
                 temppayloadObj = {
-                    uid: getSavedData.UId,
+                    uid: getSavedData.UId ?? "0",
                     inwno: "",
                     inwdate: "",
-                    srno: getSavedData.SrNo,
+                    srno: getSavedData.SrNo ?? "0",
                     itmcode: "",
                     itmname: "",
-                    dsncode: getSavedData.DsnCode,
-                    dsnname: getSavedData.DsnName,
+                    dsncode: getSavedData.DsnCode ?? "0",
+                    dsnname: getSavedData.DsnName ?? "",
                     rcno: "",
                     amount: "",
-                    subsr: getSavedData.subsr,
-                    takano: getSavedData.TakaNo,
-                    qty: getSavedData.Qty,
-                    trantype: getSavedData.trantype,
+                    subsr: getSavedData.subsr ?? "0",
+                    takano: getSavedData.TakaNo ?? "",
+                    qty: getSavedData.Qty ?? "0",
+                    trantype: getSavedData.trantype ?? "",
                     ttype: "",
                     dptname: "",
-                    shdcode: getSavedData.shdcode,
-                    shdname: getSavedData.shdname,
+                    shdcode: getSavedData.shdcode ?? "0",
+                    shdname: getSavedData.shdname ?? "",
                     whr: "",
                     yarncostr: "",
                     yard: "",
                     sexecname: "",
                     strcode: "",
-                    unqsrno: ""
+                    unqsrno: "",
+                    grdcode: getSavedData.GrdCode ?? "0",
+                    grdname: getSavedData.GrdName ?? "",
+                    mercode: 0,
+                    mername: "",
+                    denier: "",
+                    prpcode: getSavedData.PrpCode ?? ""
                 }
                 const params = {
                     data: [getSavedData],
                     IskgQty: 0,
                     printype: "Print",
-                    PrintFormat: 1,
+                    PrintFormat: 4,
                     printerName: printer ? printer : '',
                     txntype: 'chekingScanner'
                 };
@@ -1002,6 +1018,241 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         }
 
     }
+
+    const handleScannerList = async () => {
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+
+        try {
+
+            setScannerModal(true);
+            setScannerLoading(true);
+
+            if (cancelToken?.cancel) cancelToken.cancel();
+
+            cancelToken = axios.CancelToken.source();
+
+            const payload = {
+                prptype: userPtype,
+                yearno: getCurrentFinancialYear(),
+                txntype: 'chekingScanner',
+                ShfCode: '',
+                ChkDate: '',
+                PrpCode: '',
+                BeamNo: '',
+            };
+
+            console.log("scanner list Payload:", payload);
+
+            const response = await axios.get(
+                `${API}/api/show_beam_checking`,
+                getRequestConfig({
+                    params: { ...payload },
+                    cancelToken: cancelToken.token
+                })
+            );
+
+            console.log("scanner list API Response:", response);
+
+            const data = response?.data?.data?.main || [];
+
+            console.log("scannerCardData =>", data);
+
+            if (response?.data?.success) {
+
+                setScannerCardData(data);
+
+            } else {
+
+                setScannerCardData([]);
+            }
+
+        } catch (error) {
+
+            if (axios.isCancel(error)) {
+
+                console.log("Request cancelled:", error.message);
+
+            } else {
+
+                console.log("API getshifts error:", error);
+            }
+
+        } finally {
+
+            // 👇 YE IMPORTANT FIX HAI
+            setScannerLoading(false);
+        }
+    };
+
+    const loadMoreData = () => {
+
+        // already loading
+        if (footerLoading) return;
+
+        // all data loaded
+        if (visibleData.length >= scannerCardData.length)
+            return;
+
+        setFooterLoading(true);
+
+        const nextPage = page + 1;
+
+        const newData =
+            scannerCardData.slice(
+                0,
+                nextPage * ITEMS_PER_PAGE
+            );
+
+        setVisibleData(newData);
+
+        setPage(nextPage);
+
+        setFooterLoading(false);
+    };
+
+    const filteredData = scannerCardData.filter(item => {
+
+        const search = searchText.toLowerCase();
+
+        return (
+
+            item?.DsnName?.toLowerCase()?.includes(search) ||
+
+            item?.BeamNo?.toLowerCase()?.includes(search) ||
+
+            item?.TakaNo?.toLowerCase()?.includes(search) ||
+
+            item?.OrdDsnName?.toLowerCase()?.includes(search) ||
+
+            item?.GrdName?.toLowerCase()?.includes(search)
+        );
+    });
+
+    const handledelete = async () => {
+
+        try {
+
+            setShowDeleteAlert(false);
+
+            if (!selectedDeleteItem) {
+
+                console.log("selectedDeleteItem missing");
+
+                return;
+            }
+
+            console.log(
+                "DELETE ITEM =>",
+                selectedDeleteItem
+            );
+
+            setIsLoading(true);
+
+            let infoPyload = {
+
+                ShfCode:
+                    selectedDeleteItem?.ShfCode || '',
+
+                ChkDate:
+                    selectedDeleteItem?.ChkDate || '',
+
+                MacGrp:
+                    selectedDeleteItem?.MacGrp || '',
+
+                PrpCode:
+                    selectedDeleteItem?.PrpCode || '',
+
+                yearno:
+                    selectedDeleteItem?.yearno ||
+                    getCurrentFinancialYear(),
+
+                txntype: 'chekingScanner',
+
+                SrNo:
+                    selectedDeleteItem?.SrNo || '',
+
+                UId:
+                    selectedDeleteItem?.UId || '',
+
+                BeamNo:
+                    selectedDeleteItem?.BeamNo || ''
+            };
+
+            console.log(
+                "DELETE PAYLOAD =>",
+                infoPyload
+            );
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(
+                `${API}/api/delete_checking_detail`,
+                infoPyload,
+                { headers }
+            );
+
+            console.log(
+                "DELETE RESPONSE =>",
+                response.data
+            );
+
+            if (response.data.success) {
+
+                const updatedData =
+                    scannerCardData.filter(
+                        data =>
+                            data.UId !==
+                            selectedDeleteItem.UId
+                    );
+
+                setScannerCardData(updatedData);
+
+                setVisibleData(updatedData);
+
+                Alert.alert(
+                    "Success",
+                    response.data.message ||
+                    "Record deleted successfully"
+                );
+
+                await handleScannerList();
+
+            } else {
+                Alert.alert(
+                    "Warning",
+                    response.data.message
+                );
+            }
+
+        } catch (error) {
+
+            console.log(
+                "DELETE ERROR =>",
+                error
+            );
+
+            Alert.alert(
+                "Error",
+                "Something went wrong"
+            );
+
+        } finally {
+
+            setIsLoading(false);
+        }
+    };
+
+    const openDeletePopup = (item) => {
+
+        setSelectedDeleteItem(item);
+
+        setShowDeleteAlert(true);
+    };
 
     return (
         <>
@@ -1358,9 +1609,27 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             trackColor={{ false: "#ccc", true: "#007EA7" }}
                         />
                     </View>
-                    <TouchableOpacity style={checkingScannerStyles.submitBtn} onPress={handleSubmitScan}>
-                        <Text style={checkingScannerStyles.submitText}>Submit Scan</Text>
-                    </TouchableOpacity>
+                    <View style={checkingScannerStyles.buttonRow}>
+                        <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={handleSubmitScan}>
+                            <Icon
+                                name="save-alt"
+                                size={20}
+                                color="#fff"
+                                style={{ marginRight: 8 }}
+                            />
+                            <Text style={checkingScannerStyles.submitText}>Submit Scan</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={handleScannerList}>
+                            <Icon
+                                name="checklist-rtl"
+                                size={20}
+                                color="#fff"
+                                style={{ marginRight: 8 }}
+                            />
+
+                            <Text style={checkingScannerStyles.submitText}>Scanner List</Text>
+                        </TouchableOpacity>
+                    </View>
                     {getDataSaved && (
                         <View style={{ flexDirection: 'row', marginTop: 10 }}>
                             <TouchableOpacity style={checkingScannerStyles.printBtn} onPress={printSticker}>
@@ -1554,6 +1823,414 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     </View>
                 </View>
             </Modal>
+
+            <Modal
+                visible={scannerModal}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => setScannerModal(false)}
+            >
+
+                <View style={{
+                    flex: 1,
+                    backgroundColor: '#fff'
+                }}>
+
+                    {/* HEADER */}
+                    <View style={checkingScannerStyles.headerContainer}>
+
+                        <View>
+                            <Text style={{
+                                fontSize: 24,
+                                fontWeight: '900',
+                                color: '#111'
+                            }}>
+                                Scanner List
+                            </Text>
+
+                            <Text style={{
+                                color: '#777',
+                                marginTop: 3
+                            }}>
+                                {scannerCardData.length} items
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={checkingScannerStyles.closeButton}
+                            onPress={() => setScannerModal(false)}
+                        >
+                            <Icon
+                                name="close"
+                                size={24}
+                                color="#000"
+                            />
+                        </TouchableOpacity>
+
+                    </View>
+
+                    {/* SEARCH */}
+                    <View style={checkingScannerStyles.searchContainer}>
+
+                        <Icon
+                            name="search"
+                            size={22}
+                            color="#777"
+                        />
+
+                        <TextInput
+                            placeholder="Search scanner data..."
+                            placeholderTextColor="#999"
+                            value={searchText}
+                            onChangeText={setSearchText}
+                            style={{
+                                flex: 1,
+                                marginLeft: 10,
+                                color: '#000'
+                            }}
+                        />
+
+                    </View>
+
+                    {
+                        scannerLoading ? (
+
+                            <View style={{
+                                flex: 1,
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}>
+                                <ActivityIndicator
+                                    size="large"
+                                    color="#007EA7"
+                                />
+                            </View>
+
+                        ) : (
+
+                            <FlatList
+                                data={filteredData}
+                                keyExtractor={(item, index) =>
+                                    index.toString()
+                                }
+                                showsVerticalScrollIndicator={false}
+                                contentContainerStyle={{
+                                    padding: 16,
+                                    paddingBottom: 40
+                                }}
+                                onEndReached={loadMoreData}
+                                onEndReachedThreshold={0.5}
+                                initialNumToRender={10}
+                                maxToRenderPerBatch={10}
+                                windowSize={10}
+                                removeClippedSubviews={true}
+                                ListFooterComponent={() =>
+                                    footerLoading ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color="#007EA7"
+                                            style={{
+                                                marginVertical: 20
+                                            }}
+                                        />
+                                    ) : null
+                                }
+                                renderItem={({ item, index }) => (
+
+                                    <View style={checkingScannerStyles.billCard}>
+                                        <View style={checkingScannerStyles.leftBorder} />
+                                        <View style={checkingScannerStyles.iconContainer}>
+                                            <Icon
+                                                name="qr-code-scanner"
+                                                size={24}
+                                                color="#007EA7"
+                                            />
+                                        </View>
+                                        <View style={{
+                                            flex: 1,
+                                            marginLeft: 14
+                                        }}>
+
+                                            <Text
+                                                numberOfLines={1}
+                                                style={checkingScannerStyles.title}
+                                            >
+                                                {item.DsnName}
+                                            </Text>
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Beam No : {item.BeamNo}
+                                            </Text>
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Taka : {item.TakaNo}
+                                            </Text>
+
+                                            {/* <Text style={checkingScannerStyles.subText}>
+                                                Machine : {item.MacName}
+                                            </Text> */}
+
+                                            {/* <Text style={checkingScannerStyles.subText}>
+                                                Design Code : {item.OrdDsnCode}
+                                            </Text> */}
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Design : {item.OrdDsnName}
+                                            </Text>
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Weight : {item.Wt}
+                                            </Text>
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Avg Weight : {item.AvgWt}
+                                            </Text>
+
+                                            {/* <Text style={checkingScannerStyles.subText}>
+                                                Grade Code : {item.GrdCode}
+                                            </Text> */}
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Grade : {item.GrdName}
+                                            </Text>
+                                            {/* 
+                                            <Text style={checkingScannerStyles.subText}>
+                                                Checker Code : {item.ChkCode}
+                                            </Text>
+
+                                            <Text style={checkingScannerStyles.subText}>
+                                               Checker : {item.ChkName}
+                                            </Text> */}
+
+                                            <View style={{
+                                                marginTop: 8,
+                                                alignSelf: 'flex-start',
+                                                backgroundColor: '#E8F5E9',
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 4,
+                                                borderRadius: 20
+                                            }}>
+                                                <Text style={{
+                                                    color: '#2E7D32',
+                                                    fontWeight: '700',
+                                                    fontSize: 11
+                                                }}>
+                                                    Scanned
+                                                </Text>
+                                            </View>
+
+                                        </View>
+
+                                        {/* RIGHT */}
+                                        <View style={{
+                                            alignItems: 'flex-end',
+                                            justifyContent: 'space-between'
+                                        }}>
+
+                                            <TouchableOpacity
+                                                style={checkingScannerStyles.deleteButton}
+                                                // onPress={() => {
+
+                                                //     const updated =
+                                                //         scannerCardData.filter(
+                                                //             (_, i) => i !== index
+                                                //         );
+
+                                                //     setScannerCardData(updated);
+
+                                                //     setVisibleData(updated);
+                                                // }}
+
+                                                onPress={() => {
+
+                                                    console.log("DELETE CLICK =>", item);
+
+                                                    setSelectedDeleteItem(item);
+
+                                                    setShowDeleteAlert(true);
+                                                }}
+                                            >
+                                                <Icon
+                                                    name="delete-outline"
+                                                    size={20}
+                                                    color="#fff"
+                                                />
+                                            </TouchableOpacity>
+
+                                            <Text style={checkingScannerStyles.qty}>
+                                                {item.Qty}
+                                            </Text>
+
+                                        </View>
+
+                                    </View>
+                                )}
+                            />
+                        )
+                    }
+
+                </View>
+
+            </Modal>
+
+            {
+                showDeleteAlert && (
+
+                    <Modal
+                        transparent={true}
+                        animationType="fade"
+                        visible={showDeleteAlert}
+                        onRequestClose={() => setShowDeleteAlert(false)}
+                    >
+
+                        <View style={{
+                            flex: 1,
+                            backgroundColor: 'rgba(0,0,0,0.45)',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            paddingHorizontal: 25
+                        }}>
+
+                            <View style={{
+                                width: '100%',
+                                backgroundColor: '#fff',
+                                borderRadius: 18,
+                                padding: 20
+                            }}>
+
+                                {/* TITLE */}
+                                <Text style={{
+                                    fontSize: 20,
+                                    fontWeight: '800',
+                                    color: '#111',
+                                    textAlign: 'center'
+                                }}>
+                                    Delete Record
+                                </Text>
+
+                                {/* MESSAGE */}
+                                <Text style={{
+                                    marginTop: 14,
+                                    fontSize: 15,
+                                    color: '#666',
+                                    textAlign: 'center',
+                                    lineHeight: 22
+                                }}>
+                                    Are you sure you want to delete this scanner record?
+                                </Text>
+
+                                {/* BUTTONS */}
+                                <View style={{
+                                    flexDirection: 'row',
+                                    marginTop: 24
+                                }}>
+
+                                    {/* CANCEL */}
+                                    <TouchableOpacity
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: '#EAEAEA',
+                                            paddingVertical: 13,
+                                            borderRadius: 12,
+                                            marginRight: 8,
+                                            alignItems: 'center'
+                                        }}
+                                        onPress={() =>
+                                            setShowDeleteAlert(false)
+                                        }
+                                    >
+                                        <Text style={{
+                                            color: '#333',
+                                            fontWeight: '700',
+                                            fontSize: 15
+                                        }}>
+                                            Cancel
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* DELETE */}
+                                    <TouchableOpacity
+                                        style={{
+                                            flex: 1,
+                                            backgroundColor: '#E53935',
+                                            paddingVertical: 13,
+                                            borderRadius: 12,
+                                            marginLeft: 8,
+                                            alignItems: 'center'
+                                        }}
+                                        // onPress={handledelete}
+                                        onPress={() => {
+
+                                            console.log(
+                                                "CONFIRM DELETE CLICK"
+                                            );
+
+                                            handledelete();
+                                        }}
+                                    >
+                                        <Text style={{
+                                            color: '#fff',
+                                            fontWeight: '700',
+                                            fontSize: 15
+                                        }}>
+                                            Yes, Delete
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                </View>
+
+                            </View>
+
+                        </View>
+
+                    </Modal>
+                )
+            }
+
+            {
+                isLoading && (
+
+                    <Modal
+                        transparent={true}
+                        animationType="fade"
+                    >
+
+                        <View style={{
+                            flex: 1,
+                            backgroundColor: 'rgba(0,0,0,0.35)',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
+
+                            <View style={{
+                                backgroundColor: '#fff',
+                                paddingVertical: 25,
+                                paddingHorizontal: 30,
+                                borderRadius: 18,
+                                alignItems: 'center'
+                            }}>
+
+                                <ActivityIndicator
+                                    size="large"
+                                    color="#007EA7"
+                                />
+
+                                <Text style={{
+                                    marginTop: 14,
+                                    fontSize: 15,
+                                    fontWeight: '700',
+                                    color: '#333'
+                                }}>
+                                    Deleting record...
+                                </Text>
+
+                            </View>
+
+                        </View>
+
+                    </Modal>
+                )
+            }
         </>
     );
 };

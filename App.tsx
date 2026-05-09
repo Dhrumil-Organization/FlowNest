@@ -89,12 +89,14 @@ import YarnManagementSystem from './components/YarnManagementSystem/YarnManageme
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 import PartyDetailScreen from './components/PartyDashboard/PartyDetailScreen';
 import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
-<<<<<<< HEAD
 import ProductionReport from './components/ProductionReport/ProductionReport';
 // import WftIssue from './components/WftIssue/WftIssue';
-=======
 import WftIssue from './components/WftIssue/WftIssue';
->>>>>>> a96c003bcdca247cea777477ccbb55302247747b
+import SalesOrderNew from './components/SalesOrderNew/SalesOrderNew';
+import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
+import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
+import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
+import SalesOrderModule from './components/SalesOrderNew/SalesOrderModule';
 
 const Stack = createNativeStackNavigator();
 
@@ -1104,8 +1106,6 @@ export default function App() {
                         </>
                       )}
                     </Stack.Screen>
-
-<<<<<<< HEAD
                     <Stack.Screen name="Yarn Stock">
                       {props => (
                         <>
@@ -1162,44 +1162,26 @@ export default function App() {
                       name="PartyDetailScreen"
                       component={PartyDetailScreen}
                     />
-                    {/* <Stack.Screen name="Weft Issue">{(props) =>
-=======
-                    <Stack.Screen name="Yarn Stock">{(props) =>
-                      <>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                          <YarnStock {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
-                        </GestureHandlerRootView>
-                      </>
-                    }</Stack.Screen>
-                    <Stack.Screen name="Yarn Management System">{(props) =>
-                      <>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                          <YarnManagementSystem {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} setIsLoggedIn={setIsLoggedIn} rightsMenuApps={getDecodedMenuApps && getDecodedMenuApps[0]?.pages[0]?.children || []} />
-                        </GestureHandlerRootView>
-                      </>
-                    }</Stack.Screen>
-                    <Stack.Screen name="Party Dashboard">{(props) =>
-                      <>
-                        <PartyDashboard {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-
-                      </>
-                    }</Stack.Screen>
-                    <Stack.Screen name="PartyDetailScreen" component={PartyDetailScreen} />
-                     <Stack.Screen name="Weft Issue">{(props) =>
->>>>>>> a96c003bcdca247cea777477ccbb55302247747b
+                    
+                    
+      
+                    
+                    <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
                       </>
-<<<<<<< HEAD
-                    }</Stack.Screen>       
-					
-					*/}
-=======
-                    }</Stack.Screen>                    
-                  </Stack.Navigator>
->>>>>>> a96c003bcdca247cea777477ccbb55302247747b
-
+                    }</Stack.Screen>
+                    <Stack.Screen name="Sales Order New">
+                      {(props) => (
+                        <SalesOrderModule
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
                     <Stack.Screen name="Production Report">
                       {props => (
                         <>
@@ -1213,6 +1195,7 @@ export default function App() {
                       )}
                     </Stack.Screen>
                   </Stack.Navigator>
+
                 </NavigationContainer>
               ) : isConnected === false ? (
                 <OfflineFallback />

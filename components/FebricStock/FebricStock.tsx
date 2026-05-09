@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Modal, TextInput } from 'react-native';
 import { useWindowDimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBar from '../HeaderBar/HeaderBar';
@@ -9,6 +9,7 @@ import { API } from '../../common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import { CardPayload } from './Modal';
 import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
+// import { TextInput } from 'react-native-gesture-handler';
 interface Party {
     parcode: string;
     partyname: string;
@@ -72,7 +73,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
                 setPrpCodeList(response.data.response.data);
 
-            }).catch(error => {});
+            }).catch(error => { });
     };
 
     useEffect(() => { isDrawerVisible && PrpCodeList.length === 0 && fetchPrpCode() }, [isDrawerVisible]);
@@ -120,6 +121,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                 String(item?.MDSNNAME || '').toLowerCase().includes(lowercasedQuery)
                 || String(item?.TOTQTY || '').toLowerCase().includes(lowercasedQuery)
                 || String(item?.SHDNAME || '').toLowerCase().includes(lowercasedQuery)
+                || String(item?.ITMNAME || '').toLowerCase().includes(lowercasedQuery)
             );
 
             setFilteredData(filtered);
@@ -177,8 +179,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             'X-Requested-with': 'XMLHttpRequest',
         };
 
-        console.log("appgreyinstockdata API payload :", payload )
-        console.log("appgreyinstockdata API URL :", `${API}/api/appgreyinstockdata` )
+        console.log("appgreyinstockdata API payload :", payload)
+        console.log("appgreyinstockdata API URL :", `${API}/api/appgreyinstockdata`)
 
         try {
             const response = await axios.get(`${API}/api/appgreyinstockdata`, {
@@ -355,8 +357,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         const result = Object.values(grouped);
 
         result.sort((a, b) => order === 'asc'
-                ? (a.SHDNAME || '').localeCompare(b.SHDNAME || '')
-                : (b.SHDNAME || '').localeCompare(a.SHDNAME || '')
+            ? (a.SHDNAME || '').localeCompare(b.SHDNAME || '')
+            : (b.SHDNAME || '').localeCompare(a.SHDNAME || '')
         );
 
         const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
@@ -370,18 +372,45 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         return [allItem, ...result];
     };
 
+    // const shadeData = useMemo(() => {
+
+    //     if (activeTab === 'grey') {
+
+    //         return getShadeWiseSummary(selectedSubDesign, salesdata, 'yes');
+
+    //     } else {
+
+    //         return getShadeWiseSummary(selectedSubDesign, salesdata, 'no');
+    //     }
+
+    // }, [selectedDesign, selectedSubDesign, salesdata]);
+
     const shadeData = useMemo(() => {
+
+        let data = []
 
         if (activeTab === 'grey') {
 
-            return getShadeWiseSummary(selectedSubDesign, salesdata, 'yes');
+            data = getShadeWiseSummary(selectedSubDesign, salesdata, 'yes');
 
         } else {
 
-            return getShadeWiseSummary(selectedSubDesign, salesdata, 'no');
+            data = getShadeWiseSummary(selectedSubDesign, salesdata, 'no');
         }
 
-    }, [selectedDesign, selectedSubDesign, salesdata]);
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return data;
+
+    }, [selectedDesign, selectedSubDesign, salesdata, activeTab, searchQueryPOT]);
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -437,32 +466,80 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         return [allItem, ...data];
     };
 
-    const displayData = useMemo(
+    // const displayData = useMemo(
 
-        () => {
+    //     () => {
 
-            if (activeTab === 'grey') {
+    //         if (activeTab === 'grey') {
 
-                return addAllCard(greyStockData);
+    //             return addAllCard(greyStockData);
 
-            } else {
+    //         } else {
 
-                return addAllCard(finishStockData);
-            }
+    //             return addAllCard(finishStockData);
+    //         }
 
-        }, [activeTab, greyStockData, finishStockData]
-    );
+    //     }, [activeTab, greyStockData, finishStockData]
+    // );
 
-    const totalQty = useMemo(
+    const displayData = useMemo(() => {
 
-        () => {
+        let baseData = [];
 
-            const data = activeTab === 'grey' ? greyStockData : finishStockData;
+        if (activeTab === 'grey') {
 
-            return data.reduce((sum, item) => sum + parseFloat(item.TOTQTY || 0), 0).toFixed(3);
+            baseData = addAllCard(greyStockData);
 
-        }, [activeTab, greyStockData, finishStockData]
-    );
+        } else {
+
+            baseData = addAllCard(finishStockData);
+        }
+
+        // SEARCH NAHI HAI
+        if (!searchQueryPOT.trim()) {
+            return baseData;
+        }
+
+        const search = searchQueryPOT.toLowerCase();
+
+        // SEARCH FILTER
+        return baseData.filter((item: any) =>
+            String(item?.ITMNAME || '').toLowerCase().includes(search) ||
+            String(item?.TOTQTY || '').toLowerCase().includes(search)
+        );
+
+    }, [activeTab, greyStockData, finishStockData, searchQueryPOT]);
+
+    // const totalQty = useMemo(
+
+    //     () => {
+
+    //         const data = activeTab === 'grey' ? greyStockData : finishStockData;
+
+    //         return data.reduce((sum, item) => sum + parseFloat(item.TOTQTY || 0), 0).toFixed(3);
+
+    //     }, [activeTab, greyStockData, finishStockData]
+    // );
+
+    const totalQty = useMemo(() => {
+        let data = [];
+        if (activeTab === 'grey') {
+            data = greyStockData;
+        } else {
+            data = finishStockData;
+        }
+        if (searchQueryPOT.trim()) {
+            const search = searchQueryPOT.toLowerCase();
+            data = data.filter((item: any) =>
+                String(item?.ITMNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+        return data
+            .reduce((sum, item: any) => sum + parseFloat(item.TOTQTY || 0), 0)
+            .toFixed(3);
+
+    }, [activeTab, greyStockData, finishStockData, searchQueryPOT]);
 
     const detailData = useMemo(() => {
 
@@ -578,21 +655,49 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         return [allItem, ...result];
     };
 
-    const designDataLevel1 = useMemo(
+    // const designDataLevel1 = useMemo(
 
-        () => {
+    //     () => {
 
-            if (activeTab === 'grey') {
+    //         if (activeTab === 'grey') {
 
-                return getAllDesignData(selectedItem, salesdata, 'yes')
+    //             return getAllDesignData(selectedItem, salesdata, 'yes')
 
-            } else {
+    //         } else {
 
-                return getAllDesignData(selectedItem, salesdata, 'no')
-            }
+    //             return getAllDesignData(selectedItem, salesdata, 'no')
+    //         }
 
-        }, [selectedItem, salesdata, finishStockData]
-    )
+    //     }, [selectedItem, salesdata, finishStockData]
+    // )
+
+    const designDataLevel1 = useMemo(() => {
+
+        let data = [];
+
+        if (activeTab === 'grey') {
+
+            data = getAllDesignData(selectedItem, salesdata, 'yes');
+
+        } else {
+
+            data = getAllDesignData(selectedItem, salesdata, 'no');
+        }
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        return data;
+
+    }, [selectedItem, salesdata, finishStockData, activeTab, searchQueryPOT]);
 
     // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
 
@@ -701,22 +806,56 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         return [allItem, ...result];
     };
 
+    // const subDesignDataLevel2 = useMemo(
+
+    //     () => {
+
+    //         if (activeTab === 'grey') {
+
+    //             return getAllSubDesignData(selectedDesign, salesdata, 'yes')
+
+    //         } else {
+
+    //             return getAllSubDesignData(selectedDesign, salesdata, 'no')
+
+    //         }
+
+    //     }, [selectedDesign, salesdata, finishStockData]
+    // )
+
     const subDesignDataLevel2 = useMemo(
 
         () => {
 
+            let data = []
+
             if (activeTab === 'grey') {
 
-                return getAllSubDesignData(selectedDesign, salesdata, 'yes')
+                data = getAllSubDesignData(selectedDesign, salesdata, 'yes')
 
             } else {
 
-                return getAllSubDesignData(selectedDesign, salesdata, 'no')
+                data = getAllSubDesignData(selectedDesign, salesdata, 'no')
 
             }
 
-        }, [selectedDesign, salesdata, finishStockData]
+            if (searchQueryPOT.trim()) {
+
+                const search = searchQueryPOT.toLowerCase();
+
+                data = data.filter((item: any) =>
+                    String(item?.SDSNNAME || '').toLowerCase().includes(search) ||
+                    String(item?.SDSNCODE || '').toLowerCase().includes(search) ||
+                    String(item?.TOTQTY || '').toLowerCase().includes(search)
+                );
+            }
+
+            return data;
+
+        }, [selectedDesign, salesdata, finishStockData, activeTab, searchQueryPOT]
     )
+
+    
 
     return (
         <>
@@ -785,7 +924,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
                                 </View> */}
                                 <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                    {Number(item.TOTQTY || 0).toFixed(3)}
+                                    {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                    {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                        minimumFractionDigits: 3,
+                                        maximumFractionDigits: 3,
+                                    })}
                                 </Text>
                             </TouchableOpacity>
                         )
@@ -797,11 +940,19 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total </Text>
-                        <Text style={{ color: '#fff', fontWeight: 'bold' }}> {Number(totalQty || 0).toFixed(3)} </Text>
+                        <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                            {/* {Number(totalQty || 0).toFixed(3)}  */}
+                            {Number(totalQty || 0).toLocaleString('en-IN', {
+                                minimumFractionDigits: 3,
+                                maximumFractionDigits: 3,
+                            })}
+                        </Text>
                     </View>
                 </View>
             </View>
+
             <Modal visible={isDetailVisible} animationType="slide">
+                {/* <HeaderBar userName={username} placeholder="Search stock..." onSearch={setSearchQueryPOT} /> */}
                 <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
                     <View style={{
                         backgroundColor: theme.BRAND_GRADIENT_END, paddingHorizontal: 15, paddingVertical: 12, flexDirection: 'row',
@@ -813,6 +964,38 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                             style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }} >
                             <Icon name="close" size={18} color="#fff" />
                         </TouchableOpacity>
+                    </View>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#fff',
+                            marginHorizontal: 12,
+                            marginTop: 12,
+                            marginBottom: 5,
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            elevation: 3,
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            height: 48,
+                        }}
+                    >
+                        <Icon name="search" size={22} color="#666" />
+
+                        <TextInput
+                            placeholder="Search stock..."
+                            value={searchQueryPOT}
+                            onChangeText={setSearchQueryPOT}
+                            placeholderTextColor="#999"
+                            style={{
+                                flex: 1,
+                                marginLeft: 10,
+                                color: '#000',
+                                fontSize: 15,
+                                paddingVertical: 0,
+                            }}
+                        />
                     </View>
                     <FlatList
                         //data={detailData}
@@ -845,7 +1028,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
                                     </View> */}
                                     <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                        {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                        {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })}
                                     </Text>
                                 </TouchableOpacity>
                             )}
@@ -857,9 +1044,34 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total</Text>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                {
+                                {/* {
                                     designDataLevel1 && designDataLevel1.length > 0 ? (designDataLevel1[0].TOTQTY).toFixed(3) : 0
                                     //(designDataLevel1 as any[]).reduce((sum, i) => sum + Number(i.TOTQTY || 0), 0).toFixed(3)
+                                } */}
+                                {/* {
+                                    designDataLevel1 && designDataLevel1.length > 0
+                                        ? Number(designDataLevel1[0].TOTQTY || 0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })
+                                        : Number(0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })
+                                } */}
+                                {
+                                    Number(
+                                        designDataLevel1.reduce(
+                                            (sum, item: any) =>
+                                                item?.MDSNCODE !== 'ALL'
+                                                    ? sum + Number(item.TOTQTY || 0)
+                                                    : sum,
+                                            0
+                                        )
+                                    ).toLocaleString('en-IN', {
+                                        minimumFractionDigits: 3,
+                                        maximumFractionDigits: 3,
+                                    })
                                 }
                             </Text>
                         </View>
@@ -878,6 +1090,38 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         <TouchableOpacity onPress={() => setIsSubDesignDetailVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
                             <Icon name="close" size={18} color="#fff" />
                         </TouchableOpacity>
+                    </View>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#fff',
+                            marginHorizontal: 12,
+                            marginTop: 12,
+                            marginBottom: 5,
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            elevation: 3,
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            height: 48,
+                        }}
+                    >
+                        <Icon name="search" size={22} color="#666" />
+
+                        <TextInput
+                            placeholder="Search stock..."
+                            value={searchQueryPOT}
+                            onChangeText={setSearchQueryPOT}
+                            placeholderTextColor="#999"
+                            style={{
+                                flex: 1,
+                                marginLeft: 10,
+                                color: '#000',
+                                fontSize: 15,
+                                paddingVertical: 0,
+                            }}
+                        />
                     </View>
                     <FlatList
                         data={subDesignDataLevel2}
@@ -906,7 +1150,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
                                     </View> */}
                                     <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                        {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                        {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })}
                                     </Text>
                                 </TouchableOpacity>
                             )
@@ -919,8 +1167,33 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total </Text>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                {
+                                {/* {
                                     subDesignDataLevel2 && subDesignDataLevel2.length > 0 ? (subDesignDataLevel2[0].TOTQTY).toFixed(3) : 0
+                                } */}
+                                {/* {
+                                    subDesignDataLevel2 && subDesignDataLevel2.length > 0
+                                        ? Number(subDesignDataLevel2[0].TOTQTY || 0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })
+                                        : Number(0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })
+                                } */}
+                                {
+                                    Number(
+                                        subDesignDataLevel2.reduce(
+                                            (sum, item: any) =>
+                                                item?.SDSNCODE !== 'ALL'
+                                                    ? sum + Number(item.TOTQTY || 0)
+                                                    : sum,
+                                            0
+                                        )
+                                    ).toLocaleString('en-IN', {
+                                        minimumFractionDigits: 3,
+                                        maximumFractionDigits: 3,
+                                    })
                                 }
                             </Text>
                         </View>
@@ -939,6 +1212,38 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         <TouchableOpacity onPress={() => setIsShadeVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
                             <Icon name="close" size={18} color="#fff" />
                         </TouchableOpacity>
+                    </View>
+
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#fff',
+                            marginHorizontal: 12,
+                            marginTop: 12,
+                            marginBottom: 5,
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            elevation: 3,
+                            borderWidth: 1,
+                            borderColor: '#ddd',
+                            height: 48,
+                        }}
+                    >
+                        <Icon name="search" size={22} color="#666" />
+                        <TextInput
+                            placeholder="Search stock..."
+                            value={searchQueryPOT}
+                            onChangeText={setSearchQueryPOT}
+                            placeholderTextColor="#999"
+                            style={{
+                                flex: 1,
+                                marginLeft: 10,
+                                color: '#000',
+                                fontSize: 15,
+                                paddingVertical: 0,
+                            }}
+                        />
                     </View>
                     <FlatList
                         data={shadeData}
@@ -960,7 +1265,11 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
                                     </View> */}
                                     <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                        {Number(item.TOTQTY || 0).toFixed(3)}
+                                        {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                        {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })}
                                     </Text>
                                 </View>
                             )
@@ -973,8 +1282,33 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total </Text>
                             <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                {
+                                {/* {
                                     shadeData && shadeData.length > 0 ? (shadeData[0].TOTQTY).toFixed(3) : 0
+                                } */}
+                                {/* {
+                                    shadeData && shadeData.length > 0
+                                        ? Number(shadeData[0].TOTQTY || 0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })
+                                        : Number(0).toLocaleString('en-IN', {
+                                            minimumFractionDigits: 3,
+                                            maximumFractionDigits: 3,
+                                        })
+                                } */}
+                                {
+                                    Number(
+                                        shadeData.reduce(
+                                            (sum, item: any) =>
+                                                item?.SHDCODE !== 'ALL'
+                                                    ? sum + Number(item.TOTQTY || 0)
+                                                    : sum,
+                                            0
+                                        )
+                                    ).toLocaleString('en-IN', {
+                                        minimumFractionDigits: 3,
+                                        maximumFractionDigits: 3,
+                                    })
                                 }
                                 {/* {
                                     (shadeData as any[]).reduce((sum, i) => sum + Number(i.TOTQTY || 0), 0).toFixed(3)

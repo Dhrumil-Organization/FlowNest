@@ -282,11 +282,13 @@ const APP_SECTIONS = [
         ],
     },
     {
-        title: 'S',
+        title: 'P',
         data: [
-            { id: '33', name: 'Sales Order New', screen: 'Sales Order New', icon: 'shopping-cart-checkout', iconColor: '#48cbef' },
+            { id: '32', name: 'Production Report', screen: 'Production Report', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
+
+
 ];
 
 interface Props {

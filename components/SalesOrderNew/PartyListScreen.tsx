@@ -139,8 +139,6 @@ const PartyListScreen = ({ navigation, route, token }) => {
         loadParties(search);
     }, [search]);
 
-
-
     const selectParty = party => {
         const params = {
             mode: 'ADD',
@@ -154,6 +152,8 @@ const PartyListScreen = ({ navigation, route, token }) => {
                 ParName: party.accountname,
                 City: party.City || '',
                 Address: party.Address || '',
+                SExe: party.sexe || '',
+                SExeName: party.SExeName || ''
             },
         };
 
@@ -223,6 +223,10 @@ const PartyListScreen = ({ navigation, route, token }) => {
                         {item.Address}
                     </Text>
 
+                     <Text style={styles.address}>
+                        {item.SExeName}
+                    </Text>
+
                 </View>
 
                 <Text style={styles.arrow}>›</Text>
@@ -254,7 +258,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
                         value={search}
                         onChangeText={setSearch}
                         placeholder="Search party name or code"
-                        placeholderTextColor="#98A2B3"
+                        placeholderTextColor="#000"
                         style={styles.searchInput}
                     />
                 </View>
@@ -347,12 +351,12 @@ const styles = StyleSheet.create({
     },
     searchIcon: {
         fontSize: 18,
-        color: '#667085',
+        color: '#000',
         marginRight: 8,
     },
     searchInput: {
         flex: 1,
-        color: '#101828',
+        color: '#000',
         fontSize: 14,
     },
     card: {
@@ -384,17 +388,17 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     partyName: {
-        color: '#101828',
+        color: '#000',
         fontSize: 14,
         fontWeight: '700',
     },
     partyCode: {
-        color: '#344054',
+        color: '#000',
         fontSize: 12,
         marginTop: 3,
     },
     city: {
-        color: '#667085',
+        color: '#000',
         fontSize: 12,
         marginTop: 3,
     },
@@ -409,14 +413,14 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 8,
-        color: '#667085',
+        color: '#000',
     },
     emptyBox: {
         paddingTop: 60,
         alignItems: 'center',
     },
     emptyText: {
-        color: '#667085',
+        color: '#000',
         fontSize: 15,
     },
     addBtn: {
@@ -433,7 +437,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     address: {
-        color: '#667085',
+        color: '#000',
         fontSize: 12,
         marginTop: 4,
     },

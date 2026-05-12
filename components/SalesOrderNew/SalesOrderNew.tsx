@@ -161,14 +161,17 @@ const SalesOrderNew = ({ token, navigation }) => {
                 isauth: activeFilters.show_authorized ? 1 : 0,
                 strtype: 'g',
                 txntype: 'sales_order',
-                referrer: 'dashboard',
+                referrer: 'mob_dashboard',
                 atype: 'B',
             };
+
+            console.log("browse payload", payload);
 
             const res = await axios.get(
                 `${API}/api/sosortbrowse`,
                 getRequestConfig({ params: { ...payload } }),
             );
+            console.log("browse res",res)
 
             if (res.data.success === true) {
                 setOrders(res.data.response.data || []);
@@ -221,6 +224,7 @@ const SalesOrderNew = ({ token, navigation }) => {
 
         setFilters(updatedFilters);
         loadOrders(search, true, updatedFilters);
+        setShowFilter(false);
     };
 
     const resetFilter = () => {

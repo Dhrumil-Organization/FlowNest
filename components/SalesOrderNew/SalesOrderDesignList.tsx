@@ -19,19 +19,30 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     const {
         editMode = false,
         editIndex = null,
+        editLineId = null,
         oldRow = null,
         selectedItem = null,
+
+        workingRows = [],
+        party = null,
+        partyData = null,
+        selectedParty = null,
+
         prpcode = '',
         strcode = '012',
         yearno = '',
         token = '',
     } = route?.params || {};
 
+    const finalParty = party || partyData || selectedParty || null;
+
     const [search, setSearch] = useState('');
     const [designs, setDesigns] = useState([]);
     const [loading, setLoading] = useState(false);
 
+
     let cancelToken: any;
+
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -44,47 +55,50 @@ const SalesOrderDesignList = ({ navigation, route }) => {
         cancelToken: cancelToken?.token,
     });
 
-    // const loadDesigns = async () => {
+    //   const loadDesigns = async () => {
     //     if (!selectedItem?.ItmCode) {
-    //         Alert.alert('Required', 'Item is missing.');
-    //         return;
+    //       Alert.alert('Required', 'Item is missing.');
+    //       return;
     //     }
 
     //     try {
-    //         setLoading(true);
+    //       setLoading(true);
 
-    //         const res = await axios.get(`${API}/api/sodesignlist`, {
-    //             headers: {
-    //                 Authorization: `Bearer ${token}`,
-    //                 'Content-Type': 'application/json',
-    //                 Accept: 'application/json',
-    //                 'x-platform': 'mob',
-    //             },
-    //             params: {
-    //                 prpcode,
-    //                 strcode,
-    //                 yearno,
-    //                 itmcode: selectedItem.ItmCode,
-    //                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
-    //                 search,
-    //             },
-    //         });
+    //       const res = await axios.get(`${API}/api/sodesignlist`, {
+    //         headers: {
+    //           Authorization: `Bearer ${token}`,
+    //           'Content-Type': 'application/json',
+    //           Accept: 'application/json',
+    //           'x-platform': 'mob',
+    //         },
+    //         params: {
+    //           prpcode,
+    //           strcode,
+    //           yearno,
+    //           itmcode: selectedItem.ItmCode,
+    //           mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
+    //           search,
+    //         },
+    //       });
 
-    //         const data =
-    //             res.data?.response?.data ||
-    //             res.data?.response ||
-    //             res.data?.data ||
-    //             [];
 
-    //         setDesigns(Array.isArray(data) ? data : []);
+
+    //       const data =
+    //         res.data?.response?.data ||
+    //         res.data?.response ||
+    //         res.data?.data ||
+    //         [];
+
+    //       setDesigns(Array.isArray(data) ? data : []);
     //     } catch (error) {
-    //         console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
-    //         Alert.alert('Error', 'Unable to load design list');
-    //         setDesigns([]);
+    //       console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
+    //       Alert.alert('Error', 'Unable to load design list');
+    //       setDesigns([]);
     //     } finally {
-    //         setLoading(false);
+    //       setLoading(false);
     //     }
-    // };
+    //   };
+
 
     const loadDesigns = async () => {
         const yrno = yearno ? yearno.slice(-2) : '';
@@ -101,6 +115,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 itmcode: selectedItem.ItmCode,
                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
                 search,
+                txntype:'mob_app_sales_order'
             };
             console.log("party type historyPayload:", payload);
 
@@ -125,41 +140,83 @@ const SalesOrderDesignList = ({ navigation, route }) => {
         }
     };
 
+
     useEffect(() => {
         loadDesigns();
     }, []);
+
 
     useEffect(() => {
         const t = setTimeout(() => {
             loadDesigns();
         }, 400);
 
+
         return () => clearTimeout(t);
     }, [search]);
+
 
     const filteredDesigns = useMemo(() => {
         const s = search.toLowerCase();
 
-        return designs.filter(item => {
-            return (
-                toText(item.DsnCode).toLowerCase().includes(s) ||
-                toText(item.DsnName).toLowerCase().includes(s) ||
-                toText(item.DesignName).toLowerCase().includes(s)
+        let arr = [...designs];
+
+        if (editMode && oldRow?.DsnCode) {
+            const oldExists = arr.some(
+                item => String(item.DsnCode) === String(oldRow.DsnCode),
             );
-        });
-    }, [designs, search]);
+
+            if (!oldExists) {
+                arr.unshift({
+                    DsnCode: oldRow.DsnCode,
+                    DsnName: oldRow.DsnName,
+                    DesignName: oldRow.DsnName,
+                    __oldSelected: true,
+                });
+            }
+        }
+
+        arr = arr
+            .filter(item => {
+                return (
+                    toText(item.DsnCode).toLowerCase().includes(s) ||
+                    toText(item.DsnName).toLowerCase().includes(s) ||
+                    toText(item.DesignName).toLowerCase().includes(s)
+                );
+            })
+            .sort((a, b) => {
+                if (editMode && oldRow?.DsnCode) {
+                    if (String(a.DsnCode) === String(oldRow.DsnCode)) return -1;
+                    if (String(b.DsnCode) === String(oldRow.DsnCode)) return 1;
+                }
+                return 0;
+            });
+
+        return arr;
+    }, [designs, search, editMode, oldRow]);
+
 
     const selectDesign = design => {
         navigation.navigate('SalesOrderShadeList', {
             editMode,
             editIndex,
+            editLineId,
             oldRow,
+
             selectedItem,
+
             selectedDesign: {
                 DsnCode: design.DsnCode,
                 DsnName: design.DsnName || design.DesignName || '',
                 Raw: design,
             },
+
+            workingRows,
+
+            party: finalParty,
+            partyData: finalParty,
+            selectedParty: finalParty,
+
             prpcode,
             strcode,
             yearno,
@@ -184,29 +241,30 @@ const SalesOrderDesignList = ({ navigation, route }) => {
         const dsnName = item.DsnName || item.DesignName || '';
 
         const isOld =
-            editMode &&
-            oldRow &&
-            String(oldRow.DsnCode) === String(dsnCode);
-
+            editMode && oldRow && String(oldRow.DsnCode) === String(dsnCode);
         return (
             <TouchableOpacity
                 activeOpacity={0.85}
                 style={[styles.card, isOld && styles.selectedCard]}
                 onPress={() => selectDesign(item)}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.designCode}>{dsnCode}</Text>
-                    <Text style={styles.designName}>{dsnName || '-'}</Text>
-
-                    {isOld && (
-                        <View style={styles.currentBadge}>
-                            <Text style={styles.currentText}>Current Design</Text>
-                        </View>
-                    )}
-                </View>
 
                 <View style={[styles.radio, isOld && styles.radioActive]}>
                     {isOld && <Icon name="check" size={16} color="#fff" />}
                 </View>
+
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.designCode}>{dsnCode}</Text>
+                    <Text style={styles.designName}>{dsnName || '-'}</Text>
+                    {isOld && (
+                        <View style={styles.currentBadge}>
+                            <Text style={styles.currentText}>Selected Old Design</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* <View style={[styles.radio, isOld && styles.radioActive]}>
+                    {isOld && <Icon name="check" size={16} color="#fff" />}
+                </View> */}
             </TouchableOpacity>
         );
     };
@@ -217,11 +275,9 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />
                 </TouchableOpacity>
-
                 <Text style={styles.headerTitle}>
                     {editMode ? 'Modify Design' : 'Select Design'}
                 </Text>
-
                 <View style={{ width: 22 }} />
             </View>
 
@@ -232,7 +288,6 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                         {selectedItem?.ItmCode} - {selectedItem?.ItmName}
                     </Text>
                 </View>
-
                 {editMode && oldRow && (
                     <View style={styles.oldBox}>
                         <Text style={styles.oldLabel}>Current Selected Design</Text>
@@ -251,7 +306,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                         value={search}
                         onChangeText={setSearch}
                         placeholder="Search design code or name"
-                        placeholderTextColor="#98A2B3"
+                        placeholderTextColor="#000"
                         style={styles.searchInput}
                     />
 
@@ -259,7 +314,6 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                         <Icon name="refresh" size={20} color="#13879A" />
                     </TouchableOpacity>
                 </View>
-
                 {loading ? (
                     <View>{renderSkeleton()}</View>
                 ) : (
@@ -271,7 +325,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                         contentContainerStyle={{ paddingBottom: 20 }}
                         ListEmptyComponent={
                             <View style={styles.emptyBox}>
-                                <Icon name="category" size={44} color="#98A2B3" />
+                                <Icon name="category" size={44} color="#000" />
                                 <Text style={styles.emptyTitle}>No design found</Text>
                             </View>
                         }
@@ -313,7 +367,7 @@ const styles = StyleSheet.create({
         borderColor: '#E4E7EF',
     },
     boxLabel: {
-        color: '#667085',
+        color: '#000',
         fontSize: 11,
         fontWeight: '800',
     },
@@ -412,7 +466,8 @@ const styles = StyleSheet.create({
         borderColor: '#98A2B3',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 10,
+        marginLeft: 0,
+        marginRight: 10,
     },
     radioActive: {
         backgroundColor: '#13879A',

@@ -97,6 +97,9 @@ import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
 import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
 import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
 import SalesOrderModule from './components/SalesOrderNew/SalesOrderModule';
+import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
+import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueReturnEntry';
+import CreelIssueReturnModifyEntry from './components/CreelIssueReturn/CreelIssueReturnModifyEntry';
 
 const Stack = createNativeStackNavigator();
 
@@ -1162,10 +1165,10 @@ export default function App() {
                       name="PartyDetailScreen"
                       component={PartyDetailScreen}
                     />
-                    
-                    
-      
-                    
+
+
+
+
                     <Stack.Screen name="Weft Issue">{(props) =>
                       <>
                         <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -1194,7 +1197,18 @@ export default function App() {
                         </>
                       )}
                     </Stack.Screen>
+
+                    <Stack.Screen name="Creel Issue Return">{(props) =>
+                      <>
+                        <CreelIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                      </>
+                    }</Stack.Screen>
+                    <Stack.Screen name="CreelIssueReturnEntry" component={CreelIssueReturnEntry} />
+                    <Stack.Screen name="CreelIssueReturnModifyEntry" component={CreelIssueReturnModifyEntry} />
                   </Stack.Navigator>
+                  {/* </Stack.Navigator> */}
+
 
                 </NavigationContainer>
               ) : isConnected === false ? (

@@ -7,7 +7,6 @@ import {
     TouchableOpacity,
     FlatList,
     TextInput,
-    ActivityIndicator,
     Alert,
 } from 'react-native';
 import axios from 'axios';
@@ -20,18 +19,31 @@ const SalesOrderItemList = ({ navigation, route }) => {
     const {
         editMode = false,
         editIndex = null,
+        editLineId = null,
         oldRow = null,
+
+        workingRows = [],
+
+        party = null,
+        partyData = null,
+        selectedParty = null,
+
         prpcode = '',
         strcode = '012',
         yearno = '',
         token = '',
     } = route?.params || {};
 
+    const finalParty = party || partyData || selectedParty || null;
+
     const [search, setSearch] = useState('');
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    console.log("selectedParty", selectedParty);
+
     let cancelToken: any;
+
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -44,13 +56,11 @@ const SalesOrderItemList = ({ navigation, route }) => {
         cancelToken: cancelToken?.token,
     });
 
-    // console.log("route?.params", route?.params)
-
     // const loadItems = async () => {
     //     try {
     //         setLoading(true);
 
-    //         const res = await axios.get(`${API}/api/getitem`, {
+    //         const res = await axios.get(`${API}/api/soitemlist`, {
     //             headers: {
     //                 Authorization: `Bearer ${token}`,
     //                 'Content-Type': 'application/json',
@@ -64,7 +74,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
     //                 search,
     //             },
     //         });
-    //         console.log("res", res);
+
     //         const data =
     //             res.data?.response?.data ||
     //             res.data?.response ||
@@ -81,7 +91,6 @@ const SalesOrderItemList = ({ navigation, route }) => {
     //     }
     // };
 
-
     const loadItems = async () => {
         // const userPtype = await AsyncStorage.getItem('user_prptype');
         const yrno = yearno ? yearno.slice(-2) : '';
@@ -93,13 +102,13 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 yearno: yrno,
                 search,
             };
-            console.log("party type historyPayload:", payload);
+            console.log("Item historyPayload:", payload);
 
             const res = await axios.get(
                 `${API}/api/getitem`,
                 getRequestConfig({ params: { ...payload } }),
             );
-            console.log("party type Response:", res);
+            console.log("Item List Response:", res);
             const data =
                 res.data?.response?.data ||
                 res.data?.response ||
@@ -131,27 +140,62 @@ const SalesOrderItemList = ({ navigation, route }) => {
     const filteredItems = useMemo(() => {
         const s = search.toLowerCase();
 
-        return items.filter(item => {
-            return (
-                toText(item.ItmCode).toLowerCase().includes(s) ||
-                toText(item.ItmName).toLowerCase().includes(s) ||
-                toText(item.MItmCode).toLowerCase().includes(s)
+        let arr = [...items];
+
+        if (editMode && oldRow?.ItmCode) {
+            const oldExists = arr.some(
+                item => String(item.ItmCode) === String(oldRow.ItmCode),
             );
-        });
-    }, [items, search]);
+
+            if (!oldExists) {
+                arr.unshift({
+                    ItmCode: oldRow.ItmCode,
+                    ItmName: oldRow.ItmName,
+                    MItmCode: oldRow.MItmCode || oldRow.ItmCode,
+                    UOM: oldRow.UOM || '',
+                    Denier: oldrow.Denier || ' ',
+                    __oldSelected: true,
+                });
+            }
+        }
+
+        arr = arr
+            .filter(item => {
+                return (
+                    toText(item.ItmCode).toLowerCase().includes(s) ||
+                    toText(item.ItmName).toLowerCase().includes(s) ||
+                    toText(item.MItmCode).toLowerCase().includes(s)
+                );
+            })
+            .sort((a, b) => {
+                if (editMode && oldRow?.ItmCode) {
+                    if (String(a.ItmCode) === String(oldRow.ItmCode)) return -1;
+                    if (String(b.ItmCode) === String(oldRow.ItmCode)) return 1;
+                }
+                return 0;
+            });
+
+        return arr;
+    }, [items, search, editMode, oldRow]);
 
     const selectItem = item => {
         navigation.navigate('SalesOrderDesignList', {
             editMode,
             editIndex,
+            editLineId,
             oldRow,
             selectedItem: {
                 ItmCode: item.ItmCode,
                 ItmName: item.ItmName,
                 MItmCode: item.MItmCode || item.ItmCode,
-                UOM: item.UOM || item.Denier || '',
+                UOM: item.UOM || '',
+                Denier: item.Denier,
                 Raw: item,
             },
+            workingRows,
+            party: finalParty,
+            partyData: finalParty,
+            selectedParty: finalParty,
             prpcode,
             strcode,
             yearno,
@@ -182,8 +226,12 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 activeOpacity={0.85}
                 style={[styles.card, isOld && styles.selectedCard]}
                 onPress={() => selectItem(item)}>
-                <View style={styles.itemIcon}>
-                    <Icon name="inventory-2" size={22} color="#13879A" />
+                <View style={[styles.itemIcon, isOld && styles.itemIconActive]}>
+                    <Icon
+                        name={isOld ? 'check-circle' : 'inventory-2'}
+                        size={22}
+                        color={isOld ? '#fff' : '#13879A'}
+                    />
                 </View>
 
                 <View style={{ flex: 1 }}>
@@ -192,13 +240,18 @@ const SalesOrderItemList = ({ navigation, route }) => {
                     </Text>
 
                     <Text style={styles.itemSub}>
-                        {item.UOM || item.Denier || '-'}
+                        {item.UOM || '-'}
+                        {/* {item.Denier || '-'} */}
                         {item.MItmCode ? `  •  Main: ${item.MItmCode}` : ''}
+                    </Text>
+
+                    <Text style={styles.itemSub}>
+                        {item.Denier || '-'}
                     </Text>
 
                     {isOld && (
                         <View style={styles.currentBadge}>
-                            <Text style={styles.currentText}>Current Item</Text>
+                            <Text style={styles.currentText}>Selected Old Item</Text>
                         </View>
                     )}
                 </View>
@@ -225,7 +278,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
             <View style={styles.container}>
                 {editMode && oldRow && (
                     <View style={styles.oldBox}>
-                        <Text style={styles.oldLabel}>Current Selected Item</Text>
+                        <Text style={styles.oldLabel}>Currently Saved Item</Text>
                         <Text style={styles.oldTitle}>
                             {oldRow.ItmCode} - {oldRow.ItmName}
                         </Text>
@@ -240,6 +293,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
 
                 <View style={styles.searchBox}>
                     <Icon name="search" size={20} color="#667085" />
+
                     <TextInput
                         value={search}
                         onChangeText={setSearch}
@@ -247,6 +301,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
                         placeholderTextColor="#98A2B3"
                         style={styles.searchInput}
                     />
+
                     <TouchableOpacity onPress={loadItems}>
                         <Icon name="refresh" size={20} color="#13879A" />
                     </TouchableOpacity>
@@ -311,12 +366,12 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     oldTitle: {
-        color: '#101828',
+        color: '#000',
         fontSize: 14,
         fontWeight: '900',
     },
     oldSub: {
-        color: '#667085',
+        color: '#000',
         fontSize: 12,
         marginTop: 3,
         fontWeight: '700',
@@ -334,7 +389,7 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        color: '#101828',
+        color: '#000',
         fontSize: 14,
         marginHorizontal: 8,
     },
@@ -362,13 +417,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 12,
     },
+    itemIconActive: {
+        backgroundColor: '#13879A',
+    },
     itemCode: {
-        color: '#101828',
+        color: '#000',
         fontSize: 14,
         fontWeight: '900',
     },
     itemSub: {
-        color: '#667085',
+        color: '#000',
         fontSize: 12,
         marginTop: 4,
         fontWeight: '600',
@@ -392,7 +450,7 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         marginTop: 10,
-        color: '#667085',
+        color: '#000',
         fontWeight: '800',
     },
     skeletonCard: {

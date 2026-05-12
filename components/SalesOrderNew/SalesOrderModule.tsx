@@ -9,6 +9,9 @@ import { SalesOrderProvider } from './SalesOrderContext';
 import SalesOrderItemList from './SalesOrderItemList';
 import SalesOrderDesignList from './SalesOrderDesignList';
 import SalesOrderShadeList from './SalesOrderShadeList';
+import SalesOrderDetails from './SalesOrderDetails';
+import ItemAddedSuccessScreen from './ItemAddedSuccessScreen';
+import SalesOrderAddAnotherShade from './SalesOrderAddAnotherShade';
 
 
 const Stack = createNativeStackNavigator();
@@ -82,14 +85,39 @@ const SalesOrderModule = props => {
                         />
                     )}
                 </Stack.Screen>
+                <Stack.Screen name="SalesOrderDetails">
+                    {screenProps => (
+                        <SalesOrderDetails
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+                <Stack.Screen name="SalesOrderAddAnotherShade">
+                    {screenProps => (
+                        <SalesOrderAddAnotherShade
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
 
                 
-
+                {/* <Stack.Screen name="ItemAddedSuccessScreen">
+                    {screenProps => (
+                        <ItemAddedSuccessScreen
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen> */}
             </Stack.Navigator>
-
-
-
-
         </SalesOrderProvider>
     );
 };

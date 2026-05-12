@@ -287,6 +287,12 @@ const APP_SECTIONS = [
             { id: '32', name: 'Production Report', screen: 'Production Report', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
+    {
+        title: 'P',
+        data: [
+            { id: '32', name: 'Doff Entry', screen: 'Doff Entry', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
 
 
 ];
@@ -560,6 +566,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     },
                 //                     {
                 //                         "title": "Sales Order New",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Production Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Doff Entry",
                 //                         "href": "/"
                 //                     },
                 //                 ]

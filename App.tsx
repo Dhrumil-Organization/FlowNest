@@ -97,6 +97,7 @@ import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
 import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
 import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
 import SalesOrderModule from './components/SalesOrderNew/SalesOrderModule';
+import DoffEntry from './components/DoffEntry/DoffEntry';
 
 const Stack = createNativeStackNavigator();
 
@@ -1162,18 +1163,21 @@ export default function App() {
                       name="PartyDetailScreen"
                       component={PartyDetailScreen}
                     />
-                    
-                    
-      
-                    
-                    <Stack.Screen name="Weft Issue">{(props) =>
-                      <>
-                        <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
-                      </>
-                    }</Stack.Screen>
+                    <Stack.Screen name="Weft Issue">
+                      {props => (
+                        <>
+                          <WftIssue
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        </>
+                      )}
+                    </Stack.Screen>
                     <Stack.Screen name="Sales Order New">
-                      {(props) => (
+                      {props => (
                         <SalesOrderModule
                           {...props}
                           token={gettoken || ''}
@@ -1194,8 +1198,19 @@ export default function App() {
                         </>
                       )}
                     </Stack.Screen>
+                    <Stack.Screen name="Doff Entry">
+                      {props => (
+                        <>
+                          <DoffEntry
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        </>
+                      )}
+                    </Stack.Screen>
                   </Stack.Navigator>
-
                 </NavigationContainer>
               ) : isConnected === false ? (
                 <OfflineFallback />

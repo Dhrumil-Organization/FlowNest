@@ -19,21 +19,39 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     const {
         editMode = false,
         editIndex = null,
+        editLineId = null,
         oldRow = null,
+
         selectedItem = null,
         selectedDesign = null,
+
+        workingRows = [],
+
+        party = null,
+        partyData = null,
+        selectedParty = null,
+
         prpcode = '',
         strcode = '012',
         yearno = '',
         token = '',
     } = route?.params || {};
 
+    const finalParty =
+        party ||
+        partyData ||
+        selectedParty ||
+        null;
+
     const [search, setSearch] = useState('');
     const [shades, setShades] = useState([]);
+    const [selectedShade, setSelectedShade] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [selectedShades, setSelectedShades] = useState([]);
 
     let cancelToken: any;
+
+    console.log("selectedDesign", selectedDesign);
+
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -46,16 +64,21 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         cancelToken: cancelToken?.token,
     });
 
-    // const loadDesigns = async () => {
+    // const loadShades = async () => {
     //     if (!selectedItem?.ItmCode) {
     //         Alert.alert('Required', 'Item is missing.');
+    //         return;
+    //     }
+
+    //     if (!selectedDesign?.DsnCode) {
+    //         Alert.alert('Required', 'Design is missing.');
     //         return;
     //     }
 
     //     try {
     //         setLoading(true);
 
-    //         const res = await axios.get(`${API}/api/sodesignlist`, {
+    //         const res = await axios.get(`${API}/api/soshadelist`, {
     //             headers: {
     //                 Authorization: `Bearer ${token}`,
     //                 'Content-Type': 'application/json',
@@ -68,6 +91,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //                 yearno,
     //                 itmcode: selectedItem.ItmCode,
     //                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
+    //                 dsncode: selectedDesign.DsnCode,
     //                 search,
     //             },
     //         });
@@ -78,22 +102,45 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //             res.data?.data ||
     //             [];
 
-    //         setDesigns(Array.isArray(data) ? data : []);
+    //         const list = Array.isArray(data) ? data : [];
+    //         setShades(list);
+
+    //         if (editMode && oldRow?.ShdCode) {
+    //             const oldShade = list.find(
+    //                 x => String(x.ShdCode) === String(oldRow.ShdCode),
+    //             );
+
+    //             if (oldShade) {
+    //                 setSelectedShade(oldShade);
+    //             } else {
+    //                 setSelectedShade({
+    //                     ShdCode: oldRow.ShdCode,
+    //                     ShdName: oldRow.ShdName,
+    //                 });
+    //             }
+    //         }
     //     } catch (error) {
-    //         console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
-    //         Alert.alert('Error', 'Unable to load design list');
-    //         setDesigns([]);
+    //         console.log('SHADE LIST ERROR:', error?.response?.data || error.message);
+    //         Alert.alert('Error', 'Unable to load shade list');
+    //         setShades([]);
     //     } finally {
     //         setLoading(false);
     //     }
     // };
 
-    const loadshades = async () => {
+
+    const loadShades = async () => {
         const yrno = yearno ? yearno.slice(-2) : '';
         if (!selectedItem?.ItmCode) {
             Alert.alert('Required', 'Item is missing.');
             return;
         }
+
+        if (!selectedDesign?.DsnCode) {
+            Alert.alert('Required', 'Design is missing.');
+            return;
+        }
+
         try {
             setLoading(true);
             const payload = {
@@ -102,6 +149,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 yearno: yrno,
                 itmcode: selectedItem.ItmCode,
                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
+                dsncode: selectedDesign.DsnCode,
                 search,
             };
             console.log("shade type historyPayload:", payload);
@@ -128,139 +176,143 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     };
 
     useEffect(() => {
-        loadshades();
+        if (editMode && oldRow?.ShdCode) {
+            const oldShade =
+                shades.find(
+                    x => String(x.ShdCode) === String(oldRow.ShdCode),
+                ) || {
+                    ShdCode: oldRow.ShdCode,
+                    ShdName: oldRow.ShdName,
+                    ShadeName: oldRow.ShdName,
+                };
+
+            setSelectedShade(oldShade);
+        }
+    }, [editMode, oldRow, shades]);
+
+    useEffect(() => {
+        loadShades();
     }, []);
 
     useEffect(() => {
         const t = setTimeout(() => {
-            loadshades();
+            loadShades();
         }, 400);
 
         return () => clearTimeout(t);
     }, [search]);
 
-    const filteredshades = useMemo(() => {
+    const filteredShades = useMemo(() => {
         const s = search.toLowerCase();
 
-        return shades.filter(item => {
-            return (
-                toText(item.ShdCode).toLowerCase().includes(s) ||
-                toText(item.ShdName).toLowerCase().includes(s)
-                // toText(item.DesignName).toLowerCase().includes(s)
-            );
-        });
-    }, [shades, search]);
+        let arr = [...shades];
 
-    // const selectshade = shade => {
-    //     navigation.navigate('SalesOrderShadeList', {
-    //         editMode,
-    //         editIndex,
-    //         oldRow,
-    //         selectedItem,
-    //         selectedDesign,
-    //         selectedShade: {
-    //             ShdCode: shade.ShdCode,
-    //             ShdName: shade.ShdName || '',
-    //             Raw: shade,
-    //         },
-    //         prpcode,
-    //         strcode,
-    //         yearno,
-    //         token,
-    //     });
-    // };
-
-    const selectshade = shade => {
-
-        const exists = selectedShades.some(
-            x => String(x.ShdCode) === String(shade.ShdCode)
-        );
-
-        let updatedShades = [];
-
-        if (exists) {
-
-            updatedShades = selectedShades.filter(
-                x => String(x.ShdCode) !== String(shade.ShdCode)
+        if (editMode && oldRow?.ShdCode) {
+            const oldExists = arr.some(
+                item => String(item.ShdCode) === String(oldRow.ShdCode),
             );
 
-        } else {
-
-            updatedShades = [
-                ...selectedShades,
-                {
-                    ShdCode: shade.ShdCode,
-                    ShdName: shade.ShdName || '',
-                    Raw: shade,
-                },
-            ];
-
+            if (!oldExists) {
+                arr.unshift({
+                    ShdCode: oldRow.ShdCode,
+                    ShdName: oldRow.ShdName,
+                    ShadeName: oldRow.ShdName,
+                    __oldSelected: true,
+                });
+            }
         }
 
-        setSelectedShades(updatedShades);
+        arr = arr
+            .filter(item => {
+                return (
+                    toText(item.ShdCode).toLowerCase().includes(s) ||
+                    toText(item.ShdName).toLowerCase().includes(s) ||
+                    toText(item.ShadeName).toLowerCase().includes(s)
+                );
+            })
+            .sort((a, b) => {
+                if (editMode && oldRow?.ShdCode) {
+                    if (String(a.ShdCode) === String(oldRow.ShdCode)) return -1;
+                    if (String(b.ShdCode) === String(oldRow.ShdCode)) return 1;
+                }
+                return 0;
+            });
 
+        return arr;
+    }, [shades, search, editMode, oldRow]);
+
+    const onNext = () => {
+        if (!selectedShade?.ShdCode) {
+            Alert.alert('Required', 'Please select shade.');
+            return;
+        }
+
+        navigation.navigate('SalesOrderDetails', {
+            editMode,
+            editIndex,
+            editLineId,
+            oldRow,
+
+            selectedItem,
+            selectedDesign,
+
+            selectedShade: {
+                ShdCode: selectedShade.ShdCode,
+                ShdName: selectedShade.ShdName || selectedShade.ShadeName || '',
+                Raw: selectedShade,
+            },
+
+            workingRows,
+
+            party: finalParty,
+            partyData: finalParty,
+            selectedParty: finalParty,
+
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
     };
 
     const renderSkeleton = () => {
         return [1, 2, 3, 4, 5, 6].map(i => (
             <View key={i} style={styles.skeletonCard}>
+                <View style={styles.skeletonCircle} />
                 <View style={{ flex: 1 }}>
                     <View style={styles.skeletonLineBig} />
                     <View style={styles.skeletonLineSmall} />
                 </View>
-                <View style={styles.skeletonCircle} />
             </View>
         ));
     };
 
     const renderItem = ({ item }) => {
-        const ShdCode = item.ShdCode;
-        const ShdName = item.ShdName || item.ShdName || '';
+        const shdCode = item.ShdCode;
+        const shdName = item.ShdName || item.ShadeName || '';
+
+        const isSelected = String(selectedShade?.ShdCode) === String(shdCode);
 
         const isOld =
-            editMode &&
-            oldRow &&
-            String(oldRow.ShdCode) === String(ShdCode);
-
-        const isSelected = selectedShades.some(
-            x => String(x.ShdCode) === String(ShdCode)
-        );
+            editMode && oldRow && String(oldRow.ShdCode) === String(shdCode);
 
         return (
             <TouchableOpacity
                 activeOpacity={0.85}
-                style={[styles.card, isOld && styles.selectedCard]}
-                // style={[
-                //     styles.card,
-                //     (isOld || isSelected) && styles.selectedCard
-                // ]}
-                onPress={() => selectshade(item)}
-            >
-                <View style={styles.itemIcon}>
-                    <Icon name="palette" size={22} color="#13879A" />
+                style={[styles.card, isSelected && styles.selectedCard]}
+                onPress={() => setSelectedShade(item)}>
+                <View style={[styles.radio, isSelected && styles.radioActive]}>
+                    {isSelected && <Icon name="check" size={16} color="#fff" />}
                 </View>
+
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.designCode}>{ShdCode}</Text>
-                    <Text style={styles.designName}>{ShdName || '-'}</Text>
+                    <Text style={styles.shadeName}>{shdName || '-'}</Text>
+                    <Text style={styles.shadeCode}>{shdCode}</Text>
 
                     {isOld && (
                         <View style={styles.currentBadge}>
-                            <Text style={styles.currentText}>Current Shade</Text>
+                            <Text style={styles.currentText}>Selected Old Shade</Text>
                         </View>
-                    )}
-                </View>
-
-                <View
-                    // style={[styles.radio, isOld && styles.radioActive]}
-                    style={[
-                        styles.radio,
-                        (isOld || isSelected) && styles.radioActive
-                    ]}
-                >
-                    {/* {isOld && <Icon name="check" size={16} color="#fff" />} */}
-
-                    {(isOld || isSelected) && (
-                        <Icon name="check" size={16} color="#fff" />
                     )}
                 </View>
             </TouchableOpacity>
@@ -287,11 +339,8 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     <Text style={styles.boxTitle}>
                         {selectedItem?.ItmCode} - {selectedItem?.ItmName}
                     </Text>
-                </View>
 
-
-                <View style={styles.itemBox}>
-                    <Text style={styles.boxLabel}>Selected Design</Text>
+                    <Text style={[styles.boxLabel, { marginTop: 8 }]}>Selected Design</Text>
                     <Text style={styles.boxTitle}>
                         {selectedDesign?.DsnCode} - {selectedDesign?.DsnName}
                     </Text>
@@ -304,13 +353,13 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                             {oldRow.ShdCode} - {oldRow.ShdName}
                         </Text>
                         <Text style={styles.oldSub}>
-                            Shade: {oldRow.ShdCode} {oldRow.ShdName}
+                            Qty: {oldRow.Qty} | Pcs: {oldRow.Pcs} | Rate: ₹ {oldRow.Rate}
                         </Text>
                     </View>
                 )}
 
                 <View style={styles.searchBox}>
-                    <Icon name="search" size={20} color="#667085" />
+                    <Icon name="search" size={20} color="#000" />
                     <TextInput
                         value={search}
                         onChangeText={setSearch}
@@ -319,7 +368,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                         style={styles.searchInput}
                     />
 
-                    <TouchableOpacity onPress={loadshades}>
+                    <TouchableOpacity onPress={loadShades}>
                         <Icon name="refresh" size={20} color="#13879A" />
                     </TouchableOpacity>
                 </View>
@@ -328,48 +377,23 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     <View>{renderSkeleton()}</View>
                 ) : (
                     <FlatList
-                        data={filteredshades}
-                        keyExtractor={(item, index) => `${item.DsnCode}_${index}`}
+                        data={filteredShades}
+                        keyExtractor={(item, index) => `${item.ShdCode}_${index}`}
                         renderItem={renderItem}
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ paddingBottom: 20 }}
+                        contentContainerStyle={{ paddingBottom: 90 }}
                         ListEmptyComponent={
                             <View style={styles.emptyBox}>
-                                <Icon name="category" size={44} color="#98A2B3" />
-                                <Text style={styles.emptyTitle}>No design found</Text>
+                                <Icon name="palette" size={44} color="#98A2B3" />
+                                <Text style={styles.emptyTitle}>No shade found</Text>
                             </View>
                         }
                     />
-
                 )}
-            </View>
 
-            <View style={styles.bottomBar}>
-
-                <Text style={styles.selectedCount}>
-                    {selectedShades.length} shades selected
-                </Text>
-
-                <TouchableOpacity
-                    style={styles.nextBtn}
-                    onPress={() => {
-
-                        if (selectedShades.length === 0) {
-                            Alert.alert('Select Shade', 'Please select at least one shade');
-                            return;
-                        }
-
-                        navigation.navigate('NextScreen', {
-                            selectedShades,
-                        });
-
-                    }}
-                >
-                    <Text style={styles.nextText}>
-                        Next
-                    </Text>
+                <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
+                    <Text style={styles.nextText}>Next</Text>
                 </TouchableOpacity>
-
             </View>
         </SafeAreaView>
     );
@@ -406,7 +430,7 @@ const styles = StyleSheet.create({
         borderColor: '#E4E7EF',
     },
     boxLabel: {
-        color: '#667085',
+        color: '#000',
         fontSize: 11,
         fontWeight: '800',
     },
@@ -473,12 +497,26 @@ const styles = StyleSheet.create({
         borderColor: '#13879A',
         backgroundColor: '#F0FBFC',
     },
-    designCode: {
+    radio: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#98A2B3',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    radioActive: {
+        backgroundColor: '#13879A',
+        borderColor: '#13879A',
+    },
+    shadeName: {
         color: '#101828',
         fontSize: 14,
         fontWeight: '900',
     },
-    designName: {
+    shadeCode: {
         color: '#667085',
         fontSize: 12,
         marginTop: 4,
@@ -497,20 +535,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '900',
     },
-    radio: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 1,
-        borderColor: '#98A2B3',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 10,
-    },
-    radioActive: {
-        backgroundColor: '#13879A',
-        borderColor: '#13879A',
-    },
     emptyBox: {
         marginTop: 80,
         alignItems: 'center',
@@ -519,6 +543,22 @@ const styles = StyleSheet.create({
         marginTop: 10,
         color: '#667085',
         fontWeight: '800',
+    },
+    nextBtn: {
+        position: 'absolute',
+        left: 14,
+        right: 14,
+        bottom: 14,
+        backgroundColor: '#13879A',
+        height: 52,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    nextText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '900',
     },
     skeletonCard: {
         backgroundColor: '#fff',
@@ -529,6 +569,13 @@ const styles = StyleSheet.create({
         borderColor: '#E6ECF2',
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    skeletonCircle: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#E5E7EB',
+        marginRight: 12,
     },
     skeletonLineBig: {
         height: 14,
@@ -542,47 +589,5 @@ const styles = StyleSheet.create({
         width: '45%',
         borderRadius: 8,
         backgroundColor: '#EEF2F6',
-    },
-    skeletonCircle: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        backgroundColor: '#E5E7EB',
-    },
-
-    bottomBar: {
-        paddingTop: 10,
-        paddingBottom: 10,
-    },
-
-    selectedCount: {
-        color: '#000',
-        fontSize: 14,
-        fontWeight: '700',
-        marginBottom: 10,
-        paddingLeft: 14
-    },
-
-    nextBtn: {
-        height: 45,
-        backgroundColor: '#16A34A',
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    nextText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '900',
-    },
-    itemIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        backgroundColor: '#E7F6F8',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
     },
 });

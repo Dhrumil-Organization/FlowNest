@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,16 +9,12 @@ import {
     TextInput,
     Alert,
     ScrollView,
-    ActivityIndicator,
 } from 'react-native';
 import axios from 'axios';
-import { useSalesOrder } from './SalesOrderContext';
-import { API } from '../../common/API/dynamicAPI';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-const API_BASE_URL = 'https://erp.sharpskillit.com/api';
-
-// 🔥 CHANGE THIS TO YOUR ACTUAL LOAD API
-const LOAD_SO_API_URL = `${API}/api/YOUR_LOAD_SO_API`;
+import { useFocusEffect } from '@react-navigation/native';
+import { API } from '../../common/API/dynamicAPI';
+import { useSalesOrder } from './SalesOrderContext';
 
 const money = value => {
     return Number(value || 0).toLocaleString('en-IN', {
@@ -27,216 +23,347 @@ const money = value => {
     });
 };
 
-const toNumber = value => {
-    const n = Number(value || 0);
+const num = v => {
+    const n = parseFloat(String(v || 0).replace(/,/g, ''));
     return isNaN(n) ? 0 : n;
 };
 
+const createLineId = () =>
+    `LINE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+const makeRowKey = row =>
+    `${row.ItmCode}_${row.DsnCode}_${row.ShdCode}`;
+
+const reSrNo = rows =>
+    rows.map((row, index) => ({
+        ...row,
+        SrNo: index + 1,
+        LineId: row.LineId || createLineId(),
+    }));
+
+const normalizeRows = orderItems => {
+    if (!Array.isArray(orderItems)) return [];
+
+    const rows = [];
+
+    orderItems.forEach(item => {
+        if (Array.isArray(item.Shades)) {
+            item.Shades.forEach(shade => {
+                rows.push({
+                    LineId: item.LineId || shade.LineId || createLineId(),
+                    SrNo: rows.length + 1,
+
+                    ItmCode: item.ItmCode,
+                    ItmName: item.ItmName,
+                    MItmCode: item.MItmCode || item.ItmCode,
+
+                    DsnCode: item.DsnCode,
+                    DsnName: item.DsnName || '',
+
+                    ShdCode: shade.ShdCode,
+                    ShdName: shade.ShdName,
+
+                    Qty: num(shade.Qty),
+                    Pcs: num(shade.Pcs),
+                    Rate: num(shade.Rate),
+                    Amount: num(shade.Amount),
+                    Remark: shade.Remark || '',
+                });
+            });
+        } else if (item.ItmCode && item.DsnCode && item.ShdCode) {
+            rows.push({
+                ...item,
+                LineId: item.LineId || createLineId(),
+                SrNo: rows.length + 1,
+                Qty: num(item.Qty),
+                Pcs: num(item.Pcs),
+                Rate: num(item.Rate),
+                Amount: num(item.Amount),
+            });
+        }
+    });
+
+    return rows;
+};
+
 const OrderSummaryScreen = ({ navigation, route }) => {
-    const { salesOrderParams } = useSalesOrder();
+    const salesOrder = useSalesOrder();
 
-    const routeParty = route?.params?.partyData || route?.params?.party || null;
+    const {
+        mode: contextMode = 'ADD',
+        uid: contextUid = 0,
+        party: contextParty = null,
+        orderItems: contextItems = [],
+        headerData = {},
+        clearOrder,
+    } = salesOrder || {};
 
-    const [mode, setMode] = useState('ADD');
-    const [uid, setUid] = useState('');
-    const [prpcode, setPrpcode] = useState('');
-    const [strcode, setStrcode] = useState('');
-    const [yearno, setYearno] = useState('');
-    const [token, setToken] = useState('');
+    const {
+        mode: routeMode,
+        uid: routeUid,
+        party: routeParty,
+        partyData,
+        selectedParty,
+        prpcode = '',
+        strcode = '012',
+        yearno = '',
+        token = '',
+    } = route?.params || {};
 
-    const [party, setParty] = useState(routeParty);
-    const [headerData, setHeaderData] = useState({});
-    const [orderItems, setOrderItems] = useState([]);
+    const mode = routeMode || contextMode || 'ADD';
+    const uid = routeUid || contextUid || 0;
 
-    const [discount, setDiscount] = useState('0');
-    const [tax, setTax] = useState('0');
-    const [remark, setRemark] = useState('');
+    const party =
+        routeParty ||
+        partyData ||
+        selectedParty ||
+        contextParty ||
+        headerData?.Party ||
+        headerData?.party ||
+        null;
+
+    const [rows, setRows] = useState(() => reSrNo(normalizeRows(contextItems)));
+
+    const [discount, setDiscount] = useState(
+        String(headerData?.DiscountAmount || '0'),
+    );
+    const [tax, setTax] = useState(String(headerData?.TaxPercent || '0'));
+    const [remark, setRemark] = useState(headerData?.Remark || '');
     const [saving, setSaving] = useState(false);
     const [loadingOrder, setLoadingOrder] = useState(false);
-
-    console.log("partyData", routeParty)
-
-    useEffect(() => {
-        const p = {
-            ...(salesOrderParams || {}),
-            ...(route?.params || {}),
-        };
-
-        if (p.mode === 'EDIT' || p.mode === 'VIEW') {
-            setMode(p.mode);
-            setUid(p.uid || '');
-            setPrpcode(p.prpcode || '');
-            setStrcode(p.strcode || '012');
-            setYearno(p.yearno || '');
-            setToken(p.token || '');
-
-            loadOrderFromBackend(p);
-        } else {
-            setMode('ADD');
-            setUid(0);
-            setPrpcode(p.prpcode || '');
-            setStrcode(p.strcode || '012');
-            setYearno(p.yearno || '');
-            setToken(p.token || '');
-            setParty(p.partyData || routeParty);
-
-            setHeaderData({});
-            setOrderItems([]);
-            setDiscount('0');
-            setTax('0');
-            setRemark('');
-        }
-    }, [salesOrderParams, route?.params]);
-
-    const convertD1ToOrderItems = d1Rows => {
-        return (d1Rows || []).map(row => ({
-            SrNo: row.SrNo,
-            UId: row.UId,
-            StrCode: row.StrCode,
-
-            ItmCode: row.ItmCode,
-            ItmName: row.ItmName,
-
-            DsnCode: row.DsnCode,
-            DsnName: row.DsnName,
-
-            ShdCode: row.ShdCode,
-            ShdName: row.ShdName,
-
-            Qty: toNumber(row.Qty),
-            Pcs: toNumber(row.QtyPcs),
-            Rate: toNumber(row.UnitRate),
-            Amount: toNumber(row.Amount),
-
-            UOM: row.UOM,
-            Denier: row.Denier,
-            HsnCode: row.HsnCode,
-            HSNName: row.HSNName,
-
-            Raw: row,
-        }));
+    const [soDate, setSoDate] = useState('');
+    const [soNo, setSoNo] = useState('');
+    const [rawMain, setRawMain] = useState(null);
+    const [rawTax, setRawTax] = useState([]);
+    const [rawExp, setRawExp] = useState(null);
+    const [rawExtra, setRawExtra] = useState({});
+    const toNumber = value => {
+        const n = Number(value || 0);
+        return isNaN(n) ? 0 : n;
     };
 
-    const loadOrderFromBackend = async params => {
-        try {
-            setLoadingOrder(true);
+    useFocusEffect(
+        useCallback(() => {
+            const p = route?.params || {};
 
-            const res = await axios.get(`${API}/api/soshow`, {
-                headers: {
-                    Authorization: `Bearer ${params.token}`,
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'x-platform': 'mob',
-                },
-                params: {
-                    uid: params.uid,
-                    prpcode: params.prpcode,
-                    strcode: params.strcode,
-                    yearno: params.yearno,
-                    mode: params.mode,
-                },
+            if (!Array.isArray(p.completedRows)) return;
+
+            setRows(prev => {
+                let next = [...prev];
+
+                // ==================================================
+                // EDIT MODE
+                // ==================================================
+                // During edit we receive FULL updated rows
+                // so replace everything safely
+                // ==================================================
+
+                if (p.editMode) {
+                    next = reSrNo(
+                        (p.completedRows || []).map(row => ({
+                            ...row,
+                            LineId: row.LineId || createLineId(),
+                        })),
+                    );
+                }
+
+                // ==================================================
+                // ADD MODE
+                // ==================================================
+                // During add we receive ONLY new rows
+                // so append/merge with old rows
+                // ==================================================
+
+                else {
+                    (p.completedRows || []).forEach(rawRow => {
+                        const newRow = {
+                            ...rawRow,
+                            LineId: rawRow.LineId || createLineId(),
+                        };
+
+                        // prevent duplicate same LineId
+                        const lineExists = next.findIndex(
+                            x => String(x.LineId) === String(newRow.LineId),
+                        );
+
+                        if (lineExists >= 0) {
+                            next[lineExists] = {
+                                ...newRow,
+                            };
+
+                            return;
+                        }
+
+                        // merge same item/design/shade
+                        const existsIndex = next.findIndex(
+                            oldRow =>
+                                makeRowKey(oldRow) === makeRowKey(newRow),
+                        );
+
+                        if (existsIndex >= 0) {
+                            const newQty =
+                                num(next[existsIndex].Qty) +
+                                num(newRow.Qty);
+
+                            const newPcs =
+                                num(next[existsIndex].Pcs) +
+                                num(newRow.Pcs);
+
+                            next[existsIndex] = {
+                                ...next[existsIndex],
+                                Qty: newQty,
+                                Pcs: newPcs,
+                                Rate: num(newRow.Rate),
+                                Amount: newQty * num(newRow.Rate),
+                                Remark:
+                                    newRow.Remark ||
+                                    next[existsIndex].Remark ||
+                                    '',
+                            };
+                        } else {
+                            next.push(newRow);
+                        }
+                    });
+
+                    next = reSrNo(next);
+                }
+
+                return next;
             });
 
-            console.log("res ::", res)
-
-            const data = res.data.response || res.data.data || res.data;
-
-            const main = data.main?.[0] || null;
-            const d1 = data.d1 || [];
-
-            if (!main) {
-                Alert.alert('Error', 'Sales order header not found.');
-                return;
-            }
-
-            setHeaderData(main);
-
-            setParty({
-                ParCode: main.ParCode,
-                ParName: main.ParName,
-                City: main.city || main.DCity || main.Station || '',
-                Address: main.address || main.DAdd || '',
+            navigation.setParams({
+                completedRows: undefined,
+                completedRow: undefined,
+                editMode: undefined,
+                editIndex: undefined,
+                editLineId: undefined,
+                oldRow: undefined,
+                originalKey: undefined,
             });
+        }, [route?.params, navigation]),
+    );
 
-            setMode(params.mode || 'EDIT');
-            setUid(main.UId || params.uid);
-            setPrpcode(main.PrpCode || params.prpcode);
-            setStrcode(main.StrCode || params.strcode);
-            setYearno(params.yearno || '');
-
-            setDiscount(String(toNumber(main.DisAmt || main.TDisAmt || main.NDisAmt)));
-            setTax('0');
-            setRemark(main.Remark || '');
-
-            setOrderItems(convertD1ToOrderItems(d1));
-        } catch (error) {
-            console.log('LOAD SO ERROR:', error?.response?.data || error.message);
-            Alert.alert(
-                'Error',
-                error?.response?.data?.message || 'Unable to load sales order data',
-            );
-        } finally {
-            setLoadingOrder(false);
-        }
-    };
-
-    const removeItem = index => {
-        if (mode === 'VIEW') return;
-
-        const updated = [...orderItems];
-        updated.splice(index, 1);
-        setOrderItems(updated);
-    };
+    // const totals = useMemo(() => {
+    //     return {
+    //         itemCount: rows.length,
+    //         shadeCount: rows.length,
+    //         totalQty: rows.reduce((s, x) => s + num(x.Qty), 0),
+    //         totalPcs: rows.reduce((s, x) => s + num(x.Pcs), 0),
+    //         totalAmount: rows.reduce((s, x) => s + num(x.Amount), 0),
+    //     };
+    // }, [rows]);
 
     const totals = useMemo(() => {
+        const totalQty = rows.reduce(
+            (s, x) => s + num(x.Qty),
+            0,
+        );
+        const totalPcs = rows.reduce(
+            (s, x) => s + num(x.Pcs),
+            0,
+        );
+        const totalAmount = rows.reduce(
+            (s, x) => s + num(x.Amount),
+            0,
+        );
         return {
-            itemCount: orderItems.length,
-            totalPcs: orderItems.reduce((sum, item) => {
-                return sum + toNumber(item.Pcs);
-            }, 0),
-            totalQty: orderItems.reduce((sum, item) => {
-                return sum + toNumber(item.Qty);
-            }, 0),
-            totalAmount: orderItems.reduce((sum, item) => {
-                return sum + toNumber(item.Amount);
-            }, 0),
+            itemCount: rows.length,
+            shadeCount: rows.length,
+            totalQty: totalQty.toFixed(3),
+            totalPcs,
+            totalAmount: totalAmount.toFixed(2),
         };
-    }, [orderItems]);
 
-    const discountAmt = toNumber(discount);
-    const taxPercent = toNumber(tax);
-    const taxAmt = ((totals.totalAmount - discountAmt) * taxPercent) / 100;
-    const grandTotal = totals.totalAmount - discountAmt + taxAmt;
+    }, [rows]);
+
+    const discountAmt = num(discount);
+    const taxPercent = num(tax);
+    const taxableAmount = totals.totalAmount - discountAmt;
+    const taxAmt = (taxableAmount * taxPercent) / 100;
+    const grandTotal = taxableAmount + taxAmt;
+    const fmt = (value, dec = 2) => num(value).toFixed(dec);
+
+    const addItem = () => {
+        navigation.navigate('SalesOrderItemList', {
+            editMode: false,
+            editIndex: null,
+            editLineId: null,
+            oldRow: null,
+
+            // IMPORTANT: send current rows also
+            workingRows: rows,
+
+            party,
+            partyData: party,
+            selectedParty: party,
+
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
+
+    const editRow = row => {
+        navigation.navigate('SalesOrderItemList', {
+            editMode: true,
+            editIndex: rows.findIndex(x => x.LineId === row.LineId),
+            editLineId: row.LineId,
+            oldRow: row,
+
+            // IMPORTANT: send full current order rows
+            workingRows: rows,
+
+            party,
+            partyData: party,
+            selectedParty: party,
+
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
+
+    const removeRow = row => {
+        Alert.alert('Delete Row', 'Are you sure you want to delete this shade?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => {
+                    setRows(prev =>
+                        reSrNo(prev.filter(x => String(x.LineId) !== String(row.LineId))),
+                    );
+                },
+            },
+        ]);
+    };
 
     const validateBeforeSave = () => {
-        if (mode === 'VIEW') {
-            Alert.alert('View Mode', 'You cannot save in view mode.');
-            return false;
-        }
-
-        if (!party) {
+        if (!party?.ParCode) {
             Alert.alert('Required', 'Please select party.');
             return false;
         }
 
-        if (orderItems.length === 0) {
+        if (rows.length === 0) {
             Alert.alert('Required', 'Please add at least one item.');
             return false;
         }
 
-        for (const item of orderItems) {
-            if (toNumber(item.Qty) <= 0) {
-                Alert.alert('Invalid Qty', `${item.ItmName} - ${item.ShdName}`);
+        for (const row of rows) {
+            if (!row.ItmCode || !row.DsnCode || !row.ShdCode) {
+                Alert.alert('Invalid Row', 'Item/design/shade missing.');
                 return false;
             }
 
-            if (toNumber(item.Pcs) <= 0) {
-                Alert.alert('Invalid Pcs', `${item.ItmName} - ${item.ShdName}`);
+            if (num(row.Qty) <= 0) {
+                Alert.alert('Invalid Qty', `${row.ItmName} - ${row.ShdName}`);
                 return false;
             }
 
-            if (toNumber(item.Rate) <= 0) {
-                Alert.alert('Invalid Rate', `${item.ItmName} - ${item.ShdName}`);
+            if (num(row.Rate) <= 0) {
+                Alert.alert('Invalid Rate', `${row.ItmName} - ${row.ShdName}`);
                 return false;
             }
         }
@@ -244,51 +371,326 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         return true;
     };
 
-    const saveOrder = async () => {
-        if (!validateBeforeSave()) return;
+    useEffect(() => {
+        if ((mode === 'EDIT' || mode === 'VIEW') && Number(uid) > 0) {
+            loadOrderFromBackend();
+        }
 
+    }, [mode, uid]);
+
+    const convertD1ToOrderItems = d1Rows => {
+        return (d1Rows || []).map((row, index) => ({
+            LineId: `DB_${row.UId}_${row.SrNo || index + 1}`,
+
+            SrNo: Number(row.SrNo || index + 1),
+            UId: row.UId,
+            StrCode: row.StrCode,
+
+            ItmCode: String(row.ItmCode || ''),
+            ItmName: row.ItmName || '',
+            MItmCode: row.MItmCode || row.ItmCode || '',
+
+            DsnCode: String(row.DsnCode || ''),
+            DsnName: row.DsnName || '',
+
+            ShdCode: String(row.ShdCode || ''),
+            ShdName: row.ShdName || '',
+
+            Qty: num(row.Qty),
+            Pcs: num(row.QtyPcs),
+            Rate: num(row.UnitRate),
+            Amount: num(row.Amount),
+
+            UOM: row.UOM || '',
+            Denier: row.Denier || '',
+            HsnCode: row.HsnCode || '',
+            HSNName: row.HSNName || '',
+
+            Remark:
+                row.Remark1 ||
+                row.Remark ||
+                '',
+
+            Raw: row,
+        }));
+    };
+
+    const loadOrderFromBackend = async () => {
         try {
-            setSaving(true);
+            if (!uid) return;
 
-            const payload = {
-                Mode: mode,
-                UId: uid,
-                PrpCode: prpcode,
-                StrCode: strcode,
-                YearNo: yearno,
-                ParCode: party.ParCode,
-                ParName: party.ParName,
-                GrossAmount: totals.totalAmount,
-                DiscountAmount: discountAmt,
-                TaxPercent: taxPercent,
-                TaxAmount: taxAmt,
-                NetAmount: grandTotal,
-                Remark: remark,
-                Items: orderItems,
-            };
+            setLoadingOrder(true);
 
-            const res = await axios.post(`${API_BASE_URL}/sales-order/save`, payload, {
+            const res = await axios.get(`${API}/api/mobappshow`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                     'x-platform': 'mob',
                 },
+                params: {
+                    uid,
+                    prpcode,
+                    strcode,
+                    yearno,
+                    mode,
+                },
             });
 
-            if (res.data.status === true) {
-                Alert.alert(
-                    'Success',
-                    res.data.message || 'Sales order saved successfully',
-                    [
-                        {
-                            text: 'OK',
-                            onPress: () => navigation.goBack(),
-                        },
-                    ],
-                );
+            console.log('mobappshow res =>', res?.data);
+
+            const data =
+                res?.data?.response ||
+                res?.data?.data ||
+                res?.data ||
+                {};
+
+            const main = Array.isArray(data?.main)
+                ? data.main[0] || {}
+                : data?.main || {};
+
+            const d1 = Array.isArray(data?.d1)
+                ? data.d1
+                : [];
+
+            if (!main?.UId) {
+                Alert.alert('Error', 'Sales order not found');
+                return;
+            }
+
+            // keep full backend raw data for edit save
+            setRawMain(main);
+            setRawTax(Array.isArray(data?.tax) ? data.tax : []);
+            setRawExp(Array.isArray(data?.exp) ? data.exp[0] || null : data?.exp || null);
+
+            setRawExtra({
+                taxacc: data?.taxacc || [],
+                crlimit: data?.crlimit || [],
+                prpdetail: data?.prpdetail || [],
+                lockdata: data?.lockdata || null,
+                modulerights: data?.modulerights || [],
+                defshdcode: data?.defshdcode || '',
+            });
+
+            const convertedRows = convertD1ToOrderItems(d1);
+            setRows(reSrNo(convertedRows));
+
+            setDiscount(String(num(main.DisAmt || main.TDisAmt || main.NDisAmt || 0)));
+            setTax(String(num(main.TaxPercent || main.TaxPer || 0)));
+            setRemark(main.Remark || '');
+            setSoDate(main.SODate || '');
+            setSoNo(main.SONo || '');
+
+            const loadedParty = {
+                ParCode: main.ParCode || '',
+                ParName: main.ParName || '',
+                SExe: main.SExe || '',
+                SExeName: main.SExeName || '',
+                City: main.city || main.DCity || main.Station || '',
+                Address: main.address || main.DAdd || '',
+            };
+
+            navigation.setParams({
+                party: loadedParty,
+                partyData: loadedParty,
+                selectedParty: loadedParty,
+            });
+        } catch (error) {
+            console.log('LOAD SO ERROR =>', error?.response?.data || error);
+
+            Alert.alert(
+                'Error',
+                error?.response?.data?.message || 'Unable to load sales order',
+            );
+        } finally {
+            setLoadingOrder(false);
+        }
+    };
+
+    const buildMainPayload = () => {
+        const base = uid > 0 && rawMain ? { ...rawMain } : {};
+        const yno = yearno ? yearno.slice(-2) : '';
+        return {
+            ...base,
+
+            UId: uid || base.UId || 0,
+            Mode: mode,
+
+            PrpCode: prpcode || base.PrpCode || '',
+            StrCode: strcode || base.StrCode || '012',
+            YearNo: yno || base.YearNo || '',
+
+            ParCode: party?.ParCode || base.ParCode || '',
+            ParName: party?.ParName || base.ParName || '',
+
+            SExe: party?.SExe || base.SExe || '',
+            SExeName: party?.SExeName || base.SExeName || '',
+
+            GrsAmt: fmt(totals.totalAmount),
+            DisAmt: fmt(discountAmt),
+            NDisAmt: fmt(discountAmt),
+            TDisAmt: fmt(discountAmt),
+
+            TaxAmt: fmt(taxAmt),
+            NTaxAmt: fmt(taxAmt),
+            TTaxAmt: fmt(taxAmt),
+            GSTAmt: fmt(taxAmt),
+
+            NetAmt: fmt(grandTotal),
+            D1NetAmt: base.D1NetAmt || '.00',
+
+            Remark: remark || '',
+
+            DAdd: party?.Address || base.DAdd || '',
+            DCity: party?.City || base.DCity || '',
+            Station: party?.City || base.Station || '',
+
+            Status: base.Status || 'P',
+            EntType: base.EntType || 'G2',
+            TaxStru: base.TaxStru || '123',
+
+            SONo: uid > 0 ? base.SONo : '',
+            SODate: uid > 0 ? base.SODate : '',
+            DueDay: base.DueDay || '',
+            DueDate: base.DueDate || '',
+        };
+    };
+
+    const buildD1Payload = () => {
+        return reSrNo(rows).map((row, index) => {
+            const raw = row.Raw || {};
+
+            return {
+                ...raw,
+
+                UId: uid || raw.UId || 0,
+                SrNo: index + 1,
+                StrCode: row.StrCode || raw.StrCode || strcode || '012',
+
+                ItmCode: row.ItmCode || '',
+                MItmCode: row.MItmCode || raw.MItmCode || row.ItmCode || '',
+                ItmName: row.ItmName || raw.ItmName || '',
+
+                DsnCode: row.DsnCode || '',
+                DsnName: row.DsnName || raw.DsnName || '',
+
+                ShdCode: row.ShdCode || '',
+                ShdName: row.ShdName || raw.ShdName || '',
+
+                Denier: row.Denier || '',
+                UOM: row.UOM || raw.UOM || '',
+
+                Qty: fmt(row.Qty, 3),
+                QtyPcs: String(num(row.Pcs)),
+                UnitRate: fmt(row.Rate, 5),
+                Amount: fmt(row.Amount),
+
+                Remark1: row.Remark || raw.Remark1 || '',
+                Remark2: raw.Remark2 || '',
+                Remark3: raw.Remark3 || '',
+                Remark4: raw.Remark4 || '',
+                Remark5: raw.Remark5 || '',
+
+                PkgQty: raw.PkgQty || '1.000',
+                PkgRate: raw.PkgRate || '.00000',
+                AmtCalc: raw.AmtCalc || 'U',
+
+                MerCode: raw.MerCode || '0',
+                GrdCode: raw.GrdCode || '0',
+
+                DisPer: raw.DisPer || '.00',
+                DisAmt: raw.DisAmt || '.00',
+
+                CGSTPer: raw.CGSTPer || '.00',
+                CGSTAmt: raw.CGSTAmt || '.00',
+                SGSTPer: raw.SGSTPer || '.00',
+                SGSTAmt: raw.SGSTAmt || '.00',
+                IGSTPer: raw.IGSTPer || '.00',
+                IGSTAmt: raw.IGSTAmt || '.00',
+
+                D1NetAmt: raw.D1NetAmt || '.00',
+                HsnCode: row.HsnCode || raw.HsnCode || '',
+                HSNName: row.HSNName || raw.HSNName || '',
+            };
+        });
+    };
+
+    const buildTaxPayload = () => {
+        if (uid > 0 && Array.isArray(rawTax)) {
+            return rawTax.map(t => ({ ...t }));
+        }
+
+        return [];
+    };
+
+    const buildExpPayload = () => {
+        if (uid > 0 && rawExp) {
+            return { ...rawExp };
+        }
+
+        return {};
+    };
+    const saveOrder = async () => {
+        if (!validateBeforeSave()) return;
+
+        try {
+            setSaving(true);
+            const payload = {
+                Mode: mode,
+                UId: uid || 0,
+                main: buildMainPayload(),
+                d1: buildD1Payload(),
+                tax: buildTaxPayload(),
+                exp: buildExpPayload(),
+                extra: rawExtra,
+            };
+
+            // const payload = {
+            //     Mode: mode,
+            //     UId: uid,
+
+            //     PrpCode: prpcode,
+            //     StrCode: strcode,
+            //     YearNo: yearno,
+
+            //     ParCode: party.ParCode,
+            //     ParName: party.ParName,
+
+            //     GrossAmount: totals.totalAmount,
+            //     DiscountAmount: discountAmt,
+            //     TaxPercent: taxPercent,
+
+            //     TaxAmount: taxAmt,
+            //     NetAmount: grandTotal,
+            //     Remark: remark,
+
+            //     Rows: reSrNo(rows),
+            // };
+
+            console.log("save payload", payload);
+
+            const res = await axios.post(`${API}/api/mobappsave`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'x-platform': 'mob',
+                },
+            });
+
+            console.log("Save response..", res);
+
+            if (res.data?.status === true) {
+                if (typeof clearOrder === 'function') {
+                    clearOrder();
+                }
+
+                navigation.navigate('SalesOrderSaveSuccess', {
+                    orderNo: res.data?.order_no || res.data?.OrderNo,
+                    dateTime: res.data?.date_time,
+                });
             } else {
-                Alert.alert('Save Failed', res.data.message || 'Unable to save order');
+                Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
         } catch (error) {
             console.log('SAVE ORDER ERROR:', error?.response?.data || error.message);
@@ -301,136 +703,106 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         }
     };
 
-    // const renderShade = shade => {
-    //     return (
-    //         <View style={styles.shadeRow}>
-    //             <View style={styles.dot} />
-    //             <Text style={styles.shadeName}>{shade.ShdName}</Text>
-    //             <Text style={styles.shadeText}>{shade.Qty}</Text>
-    //             <Text style={styles.shadeText}>{shade.Pcs}</Text>
-    //             <Text style={styles.shadeText}>{money(shade.Rate)}</Text>
-    //             <Text style={styles.amountText}>{money(shade.Amount)}</Text>
-    //         </View>
-    //     );
-    // };
-    const editD1Row = (item, index) => {
-        if (mode === 'VIEW') return;
-
-        navigation.navigate('SalesOrderItemList', {
-            editMode: true,
-            editIndex: index,
-            oldRow: item,
-            prpcode,
-            strcode,
-            yearno,
-            token,
-        });
-    };
-    const renderItem = ({ item, index }) => {
+    const renderRow = ({ item, index }) => {
         return (
             <View style={styles.itemCard}>
-                <View style={styles.itemTop}>
+                <View style={styles.singleRowTop}>
                     <View style={styles.itemNo}>
-                        <Text style={styles.itemNoText}>{item.SrNo || index + 1}</Text>
+                        <Text style={styles.itemNoText}>{index + 1}</Text>
                     </View>
 
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName} numberOfLines={1}>
+                        <Text style={styles.itemName}>
                             {item.ItmCode} - {item.ItmName}
                         </Text>
 
-                        <Text style={styles.designText} numberOfLines={1}>
-                            Design : {item.DsnCode} {item.DsnName ? `- ${item.DsnName}` : ''}
+                        <Text style={styles.designText}>
+                            Design : {item.DsnCode} - {item.DsnName || '-'}
                         </Text>
 
-                        <Text style={styles.designText} numberOfLines={1}>
-                            Shade : {item.ShdCode} {item.ShdName ? `- ${item.ShdName}` : ''}
+                        <Text style={styles.designText}>
+                            Shade : {item.ShdCode} - {item.ShdName || '-'}
                         </Text>
+
+                        {!!item.Remark && (
+                            <Text style={styles.remarkText}>
+                                Remark : {item.Remark}
+                            </Text>
+                        )}
                     </View>
 
-                    {mode !== 'VIEW' && (
-                        <View style={styles.actionBox}>
-                            <TouchableOpacity
-                                style={styles.iconBtn}
-                                onPress={() => editD1Row(item, index)}>
-                                <Icon name="more-vert" size={22} color="#13879A" />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity onPress={() => removeItem(index)}>
-                                <Text style={styles.deleteText}>Delete</Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
+                    <TouchableOpacity
+                        style={styles.menuBtn}
+                        onPress={() => {
+                            Alert.alert('Row Action', 'Choose action', [
+                                {
+                                    text: 'Edit',
+                                    onPress: () => editRow(item),
+                                },
+                                {
+                                    text: 'Delete',
+                                    style: 'destructive',
+                                    onPress: () => removeRow(item),
+                                },
+                                {
+                                    text: 'Cancel',
+                                    style: 'cancel',
+                                },
+                            ]);
+                        }}>
+                        <Icon name="more-vert" size={24} color="#000" />
+                    </TouchableOpacity>
                 </View>
 
-                <View style={styles.rowInfoBox}>
-                    <View style={styles.rowInfoItem}>
-                        <Text style={styles.rowInfoLabel}>Qty</Text>
-                        <Text style={styles.rowInfoValue}>{item.Qty}</Text>
+                <View style={styles.singleRowBottom}>
+                    <View style={styles.singleCell}>
+                        <Text style={styles.cellLabel}>Qty</Text>
+                        <Text style={styles.cellValue}>{item.Qty}</Text>
                     </View>
 
-                    <View style={styles.rowInfoItem}>
-                        <Text style={styles.rowInfoLabel}>Pcs</Text>
-                        <Text style={styles.rowInfoValue}>{item.Pcs}</Text>
+                    <View style={styles.singleCell}>
+                        <Text style={styles.cellLabel}>Pcs</Text>
+                        <Text style={styles.cellValue}>{item.Pcs}</Text>
                     </View>
 
-                    <View style={styles.rowInfoItem}>
-                        <Text style={styles.rowInfoLabel}>Rate</Text>
-                        <Text style={styles.rowInfoValue}>₹ {money(item.Rate)}</Text>
+                    <View style={styles.singleCell}>
+                        <Text style={styles.cellLabel}>Rate</Text>
+                        <Text style={styles.cellValue}>₹ {money(item.Rate)}</Text>
                     </View>
 
-                    <View style={styles.rowAmountItem}>
-                        <Text style={styles.rowInfoLabel}>Amount</Text>
-                        <Text style={styles.rowAmount}>₹ {money(item.Amount)}</Text>
+                    <View style={styles.singleCell}>
+                        <Text style={styles.cellLabel}>Amount</Text>
+                        <Text style={styles.amountValue}>₹ {money(item.Amount)}</Text>
                     </View>
                 </View>
             </View>
         );
     };
 
-    if (loadingOrder) {
-        return (
-            <SafeAreaView style={styles.safe}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Text style={styles.back}>‹</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Order Summary</Text>
-                    <View style={{ width: 35 }} />
-                </View>
-
-                <View style={styles.loader}>
-                    <ActivityIndicator size="large" color="#13879A" />
-                    <Text style={styles.loadingText}>Loading sales order...</Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
     return (
         <SafeAreaView style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.back}>‹</Text>
+                    <Icon name="arrow-back-ios-new" size={20} color="#fff" />
                 </TouchableOpacity>
+
                 <Text style={styles.headerTitle}>
-                    {mode === 'ADD'
-                        ? 'New Sales Order'
-                        : mode === 'VIEW'
-                            ? 'View Sales Order'
-                            : 'Modify Sales Order'}
+                    {mode === 'EDIT' || uid > 0
+                        ? 'Modify Sales Order'
+                        : 'New Sales Order'}
                 </Text>
-                <View style={{ width: 35 }} />
+
+                <View style={{ width: 22 }} />
             </View>
 
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
                 <View style={styles.orderInfoCard}>
                     <View>
                         <Text style={styles.orderNo}>
-                            SO No : {headerData?.SONo || headerData?.OrderNo || 'New'}
+                            SO No : {headerData?.SONo || soNo || 'New'}
                         </Text>
                         <Text style={styles.orderDate}>
-                            SO Date : {headerData?.SODate || headerData?.OrderDate || '-'}
+                            SO Date : {headerData?.SODate || soDate || '-'}
                         </Text>
                     </View>
 
@@ -438,48 +810,63 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         <Text style={styles.modeText}>{mode}</Text>
                     </View>
                 </View>
-
                 <View style={styles.partyCard}>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.partyName}>{party?.ParName || '-'}</Text>
                         <Text style={styles.partySub}>
                             {party?.ParCode || '-'} | {party?.City || '-'}
                         </Text>
+                        <Text style={styles.partySub}>
+                            {party?.SExeName || '-'}
+                        </Text>
                     </View>
 
-                    {mode === 'ADD' && (
+                    {mode !== 'EDIT' && uid <= 0 && (
                         <TouchableOpacity
                             style={styles.changeBtn}
-                            onPress={() => navigation.navigate('PartyListScreen', {
-                                prpcode,
-                                strcode,
-                                yearno,
-                                token,
-                            })}>
+                            onPress={() => navigation.navigate('SalesOrderPartyList')}>
                             <Text style={styles.changeText}>Change</Text>
                         </TouchableOpacity>
                     )}
                 </View>
 
+                <View style={styles.modeCard}>
+                    <Text style={styles.modeText}>
+                        Mode:{' '}
+                        {mode === 'EDIT' || uid > 0
+                            ? 'Modify Saved Order'
+                            : 'New Order'}
+                    </Text>
+                    <Text style={styles.modeText}>UId: {uid || 0}</Text>
+                </View>
+
                 <View style={styles.totalCard}>
                     <View style={styles.totalBox}>
                         <Text style={styles.totalValue}>{totals.itemCount}</Text>
-                        <Text style={styles.totalLabel}>Items</Text>
+                        <Text style={styles.totalLabel}>Rows</Text>
                     </View>
+
+                    <View style={styles.totalBox}>
+                        <Text style={styles.totalValue}>{totals.totalQty}</Text>
+                        <Text style={styles.totalLabel}>Qty</Text>
+                    </View>
+
                     <View style={styles.totalBox}>
                         <Text style={styles.totalValue}>{totals.totalPcs}</Text>
-                        <Text style={styles.totalLabel}>Total Pcs</Text>
+                        <Text style={styles.totalLabel}>Pcs</Text>
                     </View>
+
                     <View style={styles.totalBox}>
                         <Text style={styles.totalValue}>₹ {money(totals.totalAmount)}</Text>
                         <Text style={styles.totalLabel}>Amount</Text>
                     </View>
                 </View>
 
-                <Text style={styles.sectionTitle}>Items List</Text>
+                <Text style={styles.sectionTitle}>Items / Design / Shade Rows</Text>
 
-                {orderItems.length === 0 ? (
+                {rows.length === 0 ? (
                     <View style={styles.emptyBox}>
+                        <Icon name="inventory-2" size={44} color="#98A2B3" />
                         <Text style={styles.emptyTitle}>No items added</Text>
                         <Text style={styles.emptySub}>
                             Tap Add Item to start creating sales order.
@@ -487,22 +874,26 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     </View>
                 ) : (
                     <FlatList
-                        data={orderItems}
+                        data={rows}
                         keyExtractor={(item, index) =>
-                            `${item.UId}_${item.SrNo}_${item.ItmCode}_${item.DsnCode}_${item.ShdCode}_${index}`
+                            `${item.LineId}_${index}`
                         }
-                        renderItem={renderItem}
+                        renderItem={renderRow}
                         scrollEnabled={false}
                     />
                 )}
 
                 <View style={styles.calculationCard}>
                     <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Gross Amount</Text>
+                        <Text style={styles.staticAmount}>₹ {money(totals.totalAmount)}</Text>
+                    </View>
+
+                    <View style={styles.inputRow}>
                         <Text style={styles.inputLabel}>Discount ₹</Text>
                         <TextInput
                             value={discount}
                             onChangeText={setDiscount}
-                            editable={mode !== 'VIEW'}
                             keyboardType="numeric"
                             style={styles.smallInput}
                         />
@@ -513,21 +904,24 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         <TextInput
                             value={tax}
                             onChangeText={setTax}
-                            editable={mode !== 'VIEW'}
                             keyboardType="numeric"
                             style={styles.smallInput}
                         />
                     </View>
 
+                    <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Tax Amount</Text>
+                        <Text style={styles.staticAmount}>₹ {money(taxAmt)}</Text>
+                    </View>
+
                     <View style={styles.grandRow}>
-                        <Text style={styles.grandLabel}>Grand Total</Text>
+                        <Text style={styles.grandLabel}>Net Amount</Text>
                         <Text style={styles.grandAmount}>₹ {money(grandTotal)}</Text>
                     </View>
 
                     <TextInput
                         value={remark}
                         onChangeText={setRemark}
-                        editable={mode !== 'VIEW'}
                         placeholder="Remark Optional"
                         placeholderTextColor="#98A2B3"
                         multiline
@@ -535,39 +929,29 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     />
                 </View>
 
-                <View style={{ height: 90 }} />
+                <View style={{ height: 100 }} />
             </ScrollView>
 
-            {mode !== 'VIEW' && (
-                <View style={styles.footer}>
-                    {/* <TouchableOpacity
-                        style={styles.addBtn}
-                        onPress={() => navigation.navigate('SalesOrderItemList', {
-                            prpcode,
-                            strcode,
-                            yearno,
-                            token,
-                        })}>
-                        <Text style={styles.addBtnText}>＋ Add Item</Text>
-                    </TouchableOpacity> */}
-                    <TouchableOpacity
-                        activeOpacity={0.85}
-                        style={styles.fab}
-                        onPress={() => navigation.navigate('SalesOrderItemList')}>
+            <View style={styles.footer}>
+                <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+                    <Text style={styles.addBtnText}>＋ Add Item</Text>
+                </TouchableOpacity>
 
-                        <Icon name="add" size={30} color="#fff" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.saveBtn}
-                        onPress={saveOrder}
-                        disabled={saving}>
-                        <Text style={styles.saveBtnText}>
-                            {saving ? 'Saving...' : mode === 'ADD' ? 'Save Order' : 'Update Order'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            )}
+                <TouchableOpacity
+                    style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+                    // onPress={saveOrder}
+                    // disabled={saving}
+                    disabled={true}
+                >
+                    <Text style={styles.saveBtnText}>
+                        {saving
+                            ? 'Saving...'
+                            : mode === 'EDIT' || uid > 0
+                                ? 'Update Order'
+                                : 'Save Order'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
         </SafeAreaView>
     );
 };
@@ -575,7 +959,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 export default OrderSummaryScreen;
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#f5f7fb' },
+    safe: { flex: 1, backgroundColor: '#F5F7FB' },
     header: {
         height: 56,
         backgroundColor: '#13879A',
@@ -583,23 +967,245 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 14,
     },
-    back: { color: '#fff', fontSize: 34, width: 35 },
     headerTitle: {
         flex: 1,
         color: '#fff',
         fontSize: 16,
-        fontWeight: '800',
+        fontWeight: '900',
         textAlign: 'center',
     },
     container: { flex: 1, padding: 14 },
-    loader: {
+    partyCard: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+    },
+    partyName: { fontSize: 16, color: '#000', fontWeight: '900' },
+    partySub: { fontSize: 12, color: '#000', marginTop: 4 },
+    changeBtn: {
+        backgroundColor: '#E7F6F8',
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+    },
+    changeText: { color: '#13879A', fontWeight: '900' },
+    modeCard: {
+        backgroundColor: '#fff',
+        marginTop: 10,
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    modeText: {
+        color: '#475467',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    totalCard: {
+        marginTop: 12,
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        flexDirection: 'row',
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+    },
+    totalBox: {
         flex: 1,
+        paddingVertical: 14,
+        alignItems: 'center',
+        borderRightWidth: 1,
+        borderRightColor: '#EDF0F5',
+    },
+    totalValue: { fontSize: 13, color: '#13879A', fontWeight: '900' },
+    totalLabel: { fontSize: 10, color: '#000', marginTop: 4 },
+    sectionTitle: {
+        marginTop: 18,
+        marginBottom: 8,
+        color: '#000',
+        fontWeight: '900',
+        fontSize: 15,
+    },
+    emptyBox: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#000',
+        marginTop: 8,
+    },
+    emptySub: { fontSize: 12, color: '#000', marginTop: 6 },
+    itemCard: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+    },
+    itemNo: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#E7F6F8',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    itemNoText: { color: '#13879A', fontWeight: '900' },
+    itemName: { color: '#000', fontWeight: '900', fontSize: 13 },
+    designText: {
+        color: '#000',
+        fontSize: 12,
+        marginTop: 3,
+        fontWeight: '700',
+    },
+    calculationCard: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+        marginTop: 6,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    inputLabel: { flex: 1, color: '#000', fontWeight: '800' },
+    smallInput: {
+        width: 130,
+        height: 42,
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+        borderRadius: 9,
+        paddingHorizontal: 10,
+        textAlign: 'right',
+        color: '#000',
+        backgroundColor: '#fff',
+    },
+    staticAmount: {
+        color: '#000',
+        fontWeight: '900',
+    },
+    grandRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderTopColor: '#EDF0F5',
+        paddingTop: 12,
+        marginTop: 6,
+    },
+    grandLabel: {
+        flex: 1,
+        color: '#000',
+        fontWeight: '900',
+        fontSize: 15,
+    },
+    grandAmount: {
+        color: '#16A34A',
+        fontWeight: '900',
+        fontSize: 16,
+    },
+    remarkInput: {
+        marginTop: 14,
+        minHeight: 80,
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+        borderRadius: 10,
+        padding: 10,
+        color: '#000',
+        textAlignVertical: 'top',
+    },
+    footer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        padding: 14,
+        backgroundColor: '#fff',
+        flexDirection: 'row',
+        gap: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#E4E7EF',
+    },
+    addBtn: {
+        flex: 1,
+        height: 48,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#13879A',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    addBtnText: { color: '#13879A', fontWeight: '900' },
+    saveBtn: {
+        flex: 1,
+        height: 48,
+        borderRadius: 10,
+        backgroundColor: '#13879A',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    loadingText: {
-        marginTop: 10,
-        color: '#667085',
+    saveBtnText: { color: '#fff', fontWeight: '900' },
+    singleRowTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    singleRowBottom: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: '#EDF0F5',
+        paddingTop: 12,
+    },
+    singleCell: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    cellLabel: {
+        color: '#000',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    cellValue: {
+        color: '#000',
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 4,
+    },
+    amountValue: {
+        color: '#16A34A',
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 4,
+    },
+    menuBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    remarkText: {
+        color: '#000',
+        fontSize: 11,
+        marginTop: 5,
         fontWeight: '700',
     },
     orderInfoCard: {
@@ -629,251 +1235,5 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
-    },
-    modeText: {
-        color: '#13879A',
-        fontSize: 11,
-        fontWeight: '900',
-    },
-    partyCard: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-    },
-    partyName: { fontSize: 16, color: '#101828', fontWeight: '800' },
-    partySub: { fontSize: 12, color: '#667085', marginTop: 4 },
-    changeBtn: {
-        backgroundColor: '#ecfdf3',
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-    },
-    changeText: { color: '#027a48', fontWeight: '700' },
-    totalCard: {
-        marginTop: 12,
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        flexDirection: 'row',
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-    },
-    totalBox: {
-        flex: 1,
-        paddingVertical: 14,
-        alignItems: 'center',
-        borderRightWidth: 1,
-        borderRightColor: '#edf0f5',
-    },
-    totalValue: { fontSize: 15, color: '#13879A', fontWeight: '900' },
-    totalLabel: { fontSize: 11, color: '#667085', marginTop: 4 },
-    sectionTitle: {
-        marginTop: 18,
-        marginBottom: 8,
-        color: '#101828',
-        fontWeight: '900',
-        fontSize: 15,
-    },
-    emptyBox: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 24,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-    },
-    emptyTitle: { fontSize: 16, fontWeight: '800', color: '#101828' },
-    emptySub: { fontSize: 12, color: '#667085', marginTop: 6 },
-    itemCard: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 12,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-    },
-    itemTop: { flexDirection: 'row', alignItems: 'flex-start' },
-    itemNo: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: '#E7F6F8',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    itemNoText: { color: '#13879A', fontWeight: '900' },
-    itemName: { color: '#101828', fontWeight: '800', fontSize: 13 },
-    designText: { color: '#667085', fontSize: 12, marginTop: 3 },
-    deleteText: { color: '#dc2626', fontWeight: '700' },
-    tableHeader: {
-        marginTop: 12,
-        flexDirection: 'row',
-        backgroundColor: '#f8fafc',
-        paddingVertical: 8,
-        paddingHorizontal: 6,
-        borderRadius: 8,
-    },
-    th: { flex: 1, color: '#667085', fontSize: 11, fontWeight: '800' },
-    shadeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 9,
-        paddingHorizontal: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f2f5',
-    },
-    dot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#13879A',
-        marginRight: 8,
-    },
-    shadeName: { flex: 2, color: '#344054', fontSize: 12 },
-    shadeText: { flex: 1, color: '#344054', fontSize: 12 },
-    amountText: { flex: 1, color: '#101828', fontSize: 12, fontWeight: '800' },
-    calculationCard: {
-        backgroundColor: '#fff',
-        borderRadius: 14,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-        marginTop: 6,
-    },
-    inputRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    inputLabel: { flex: 1, color: '#344054', fontWeight: '700' },
-    smallInput: {
-        width: 130,
-        height: 42,
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-        borderRadius: 9,
-        paddingHorizontal: 10,
-        textAlign: 'right',
-        color: '#101828',
-        backgroundColor: '#fff',
-    },
-    grandRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#edf0f5',
-        paddingTop: 12,
-        marginTop: 6,
-    },
-    grandLabel: { flex: 1, color: '#101828', fontWeight: '900', fontSize: 15 },
-    grandAmount: { color: '#16a34a', fontWeight: '900', fontSize: 16 },
-    remarkInput: {
-        marginTop: 14,
-        minHeight: 80,
-        borderWidth: 1,
-        borderColor: '#e4e7ef',
-        borderRadius: 10,
-        padding: 10,
-        color: '#101828',
-        textAlignVertical: 'top',
-    },
-    footer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        padding: 14,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        gap: 10,
-        borderTopWidth: 1,
-        borderTopColor: '#e4e7ef',
-    },
-    addBtn: {
-        flex: 1,
-        height: 48,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#13879A',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-    },
-    addBtnText: { color: '#13879A', fontWeight: '900' },
-    saveBtn: {
-        flex: 1,
-        height: 48,
-        borderRadius: 10,
-        backgroundColor: '#13879A',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    saveBtnText: { color: '#fff', fontWeight: '900' },
-    rowInfoBox: {
-        marginTop: 12,
-        flexDirection: 'row',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        paddingVertical: 10,
-        paddingHorizontal: 8,
-    },
-    rowInfoItem: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    rowAmountItem: {
-        flex: 1.4,
-        alignItems: 'flex-end',
-    },
-    rowInfoLabel: {
-        color: '#667085',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    rowInfoValue: {
-        color: '#101828',
-        fontSize: 13,
-        fontWeight: '900',
-        marginTop: 4,
-    },
-    rowAmount: {
-        color: '#16A34A',
-        fontSize: 14,
-        fontWeight: '900',
-        marginTop: 4,
-    },
-    actionBox: {
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        marginLeft: 8,
-    },
-    iconBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: '#E7F6F8',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 4,
-    },
-    fab: {
-        position: 'absolute',
-        right: 22,
-        bottom: 24,
-        width: 58,
-        height: 58,
-        borderRadius: 29,
-        backgroundColor: '#13879A',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 8,
     },
 });

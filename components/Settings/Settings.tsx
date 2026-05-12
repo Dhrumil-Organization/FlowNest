@@ -423,7 +423,7 @@ const SettingsScreen: React.FC<Props> = ({ token, isConnected, navigation }) => 
                 <SettingsRow
                     icon="app-settings-alt"
                     title="Application Version"
-                    subtitle={'v7.2.5'}
+                    subtitle={'v7.2.6'}
                     // onPress={''}
                     
                 />

@@ -420,7 +420,7 @@ const LoginScreen: React.FC<Props> = ({
             }
           }
         } else {
-          Alert.alert('❌ Error', `${response.data.response.message}`);
+          Alert.alert('❌ Error', `${response.data.message}`);
         }
       } else {
         Alert.alert('❌ Error', `${response.data.message}`);

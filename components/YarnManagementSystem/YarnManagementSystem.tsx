@@ -1518,7 +1518,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                     cancelToken: cancelToken.token
                 })
             );
-            console.log("Master API Response:", response);
+            console.log("Master API Response:", response, historyPayload);
 
             const data = response?.data?.data?.data || [];
             const mapped = response?.data?.data?.mapped_data || [];
@@ -1787,6 +1787,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
 
                             <View style={yarnmanagementsystemstyle.inputBox}>
                                 <TextInput
+                                    style={{ color: 'black' }}
                                     value={subitemform.WNameCode || ''}
                                     placeholder="Yarn Main Code"
                                     editable={false}   // 🔥 readonly
@@ -1802,11 +1803,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                             {blendList.length === 0 ? (
                                 <View style={{ flexDirection: 'row', gap: 10 }}>
                                     <View style={[yarnmanagementsystemstyle.inputBox, { flex: 2 }]}>
-                                        <TextInput placeholder="Blend..." editable={false} />
+                                        <TextInput style={{ color: 'black' }} placeholder="Blend..." editable={false} />
                                     </View>
 
                                     <View style={[yarnmanagementsystemstyle.inputBox, { flex: 1 }]}>
-                                        <TextInput placeholder="%" keyboardType="numeric" />
+                                        <TextInput style={{ color: 'black' }} placeholder="%" keyboardType="numeric" />
                                     </View>
                                 </View>
                             ) : (
@@ -1816,6 +1817,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                         {/* Blend Name */}
                                         <View style={[yarnmanagementsystemstyle.inputBox, { flex: 2 }]}>
                                             <TextInput
+                                                style={{ color: 'black' }}
                                                 placeholder="Blend..."
                                                 value={item.name}
                                                 editable={false}
@@ -1825,6 +1827,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                         {/* Percentage */}
                                         <View style={[yarnmanagementsystemstyle.inputBox, { flex: 1 }]}>
                                             <TextInput
+                                                style={{ color: 'black' }}
                                                 placeholder="%"
                                                 value={item.per}
                                                 keyboardType="numeric"
@@ -1908,6 +1911,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                             /> */}
                             <View style={yarnmanagementsystemstyle.inputBox}>
                                 <TextInput
+                                    style={{ color: 'black' }}
                                     placeholder="Count..."
                                     value={subitemform.count_no || ''}
                                     editable={true}
@@ -2042,6 +2046,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                             /> */}
                             <View style={yarnmanagementsystemstyle.inputBox}>
                                 <TextInput
+                                    style={{ color: 'black' }}
                                     placeholder="Others..."
                                     value={subitemform.others || ''}
                                     editable={true}
@@ -3268,6 +3273,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                                                                     fetchBlendcount();
                                                                     fetchBlendply();
                                                                     fetchOthresdata();
+                                                                    fetchyarntype();
+
                                                                     const selectedBlendId = item?.WBlend;
                                                                     const blendObj = mapped.find(
                                                                         b =>

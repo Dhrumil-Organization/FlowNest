@@ -1210,6 +1210,18 @@ export default function App() {
                     }</Stack.Screen>
                     <Stack.Screen name="CreelIssueReturnEntry" component={CreelIssueReturnEntry} />
                     <Stack.Screen name="CreelIssueReturnModifyEntry" component={CreelIssueReturnModifyEntry} />
+                    <Stack.Screen name="Doff Entry">
+                      {props => (
+                        <>
+                          <DoffEntry
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        </>
+                      )}
+                    </Stack.Screen>
                   </Stack.Navigator>
                   {/* </Stack.Navigator> */}
 

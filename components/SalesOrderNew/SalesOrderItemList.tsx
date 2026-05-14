@@ -17,6 +17,10 @@ const toText = v => String(v || '').trim();
 
 const SalesOrderItemList = ({ navigation, route }) => {
     const {
+        mode = 'ADD',
+        uid = 0,
+        soNo = '',
+        soDate = '',
         editMode = false,
         editIndex = null,
         editLineId = null,
@@ -100,7 +104,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 prpcode,
                 strcode,
                 yearno: yrno,
-                search,
+                // search,
             };
             console.log("Item historyPayload:", payload);
 
@@ -129,57 +133,137 @@ const SalesOrderItemList = ({ navigation, route }) => {
         loadItems();
     }, []);
 
-    useEffect(() => {
-        const t = setTimeout(() => {
-            loadItems();
-        }, 400);
+    // useEffect(() => {
+    //     const t = setTimeout(() => {
+    //         loadItems();
+    //     }, 400);
 
-        return () => clearTimeout(t);
-    }, [search]);
+    //     return () => clearTimeout(t);
+    // }, [search]);
+
+    // const filteredItems = useMemo(() => {
+    //     const s = search.toLowerCase();
+
+    //     let arr = [...items];
+
+    //     if (editMode && oldRow?.ItmCode) {
+    //         const oldExists = arr.some(
+    //             item => String(item.ItmCode) === String(oldRow.ItmCode),
+    //         );
+
+    //         if (!oldExists) {
+    //             arr.unshift({
+    //                 ItmCode: oldRow.ItmCode,
+    //                 ItmName: oldRow.ItmName,
+    //                 MItmCode: oldRow.MItmCode || oldRow.ItmCode,
+    //                 __oldSelected: true,
+    //             });
+    //         }
+    //     }
+
+    //     arr = arr
+    //         .filter(item => {
+    //             return (
+    //                 toText(item.ItmCode).toLowerCase().includes(s) ||
+    //                 toText(item.ItmName).toLowerCase().includes(s) ||
+    //                 toText(item.MItmCode).toLowerCase().includes(s)
+    //             );
+    //         })
+    //         .sort((a, b) => {
+    //             if (editMode && oldRow?.ItmCode) {
+    //                 if (String(a.ItmCode) === String(oldRow.ItmCode)) return -1;
+    //                 if (String(b.ItmCode) === String(oldRow.ItmCode)) return 1;
+    //             }
+    //             return 0;
+    //         });
+
+    //     return arr;
+    // }, [items, search, editMode, oldRow]);
+
 
     const filteredItems = useMemo(() => {
         const s = search.toLowerCase();
-
-        let arr = [...items];
-
+        let arr: any[] = [...items];
         if (editMode && oldRow?.ItmCode) {
             const oldExists = arr.some(
-                item => String(item.ItmCode) === String(oldRow.ItmCode),
+                (item) =>
+                    String(item.ItmCode) === String(oldRow.ItmCode)
             );
-
             if (!oldExists) {
                 arr.unshift({
                     ItmCode: oldRow.ItmCode,
                     ItmName: oldRow.ItmName,
                     MItmCode: oldRow.MItmCode || oldRow.ItmCode,
-                    UOM: oldRow.UOM || '',
-                    Denier: oldrow.Denier || ' ',
                     __oldSelected: true,
                 });
             }
         }
+        // arr = arr
+        //     .filter((item) => {
 
-        arr = arr
-            .filter(item => {
-                return (
-                    toText(item.ItmCode).toLowerCase().includes(s) ||
-                    toText(item.ItmName).toLowerCase().includes(s) ||
-                    toText(item.MItmCode).toLowerCase().includes(s)
-                );
-            })
+        //         return (
+        //             toText(item.ItmCode)
+        //                 .toLowerCase()
+        //                 .includes(s)
+
+        //             ||
+
+        //             toText(item.ItmName)
+        //                 .toLowerCase()
+        //                 .includes(s)
+
+        //             ||
+
+        //             toText(item.MItmCode)
+        //                 .toLowerCase()
+        //                 .includes(s)
+        //         );
+        //     })
+        arr = arr.filter((item) => {
+
+            const fullText = `
+        ${toText(item.ItmCode)}
+        ${toText(item.ItmName)}
+        ${toText(item.MItmCode)}
+        ${toText(item.UOM)}
+        ${toText(item.Denier)}
+        ${toText(item.HsnCode)}
+    `.toLowerCase();
+
+            return fullText.includes(s.toLowerCase());
+        })
             .sort((a, b) => {
+
                 if (editMode && oldRow?.ItmCode) {
-                    if (String(a.ItmCode) === String(oldRow.ItmCode)) return -1;
-                    if (String(b.ItmCode) === String(oldRow.ItmCode)) return 1;
+
+                    if (
+                        String(a.ItmCode) ===
+                        String(oldRow.ItmCode)
+                    ) {
+                        return -1;
+                    }
+
+                    if (
+                        String(b.ItmCode) ===
+                        String(oldRow.ItmCode)
+                    ) {
+                        return 1;
+                    }
                 }
+
                 return 0;
             });
 
         return arr;
+
     }, [items, search, editMode, oldRow]);
 
     const selectItem = item => {
         navigation.navigate('SalesOrderDesignList', {
+            mode,
+            uid,
+            soNo,
+            soDate,
             editMode,
             editIndex,
             editLineId,
@@ -190,6 +274,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 MItmCode: item.MItmCode || item.ItmCode,
                 UOM: item.UOM || '',
                 Denier: item.Denier,
+                HsnCode: item.HsnCode,
                 Raw: item,
             },
             workingRows,

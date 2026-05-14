@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View, Text, StyleSheet, SafeAreaView, TextInput,
     TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
@@ -29,7 +30,7 @@ const todayYmd = () => {
     return `${yyyy}${mm}${dd}`;
 };
 
-const SalesOrderNew = ({ token, navigation }) => {
+const SalesOrderNew = ({ token, navigation, route }) => {
     const { startNewOrder, loadExistingOrder } = useSalesOrder();
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
     const [yearPickerVisible, setYearPickerVisible] = useState(false);
@@ -58,7 +59,9 @@ const SalesOrderNew = ({ token, navigation }) => {
     const [showFromPicker, setShowFromPicker] = useState(false);
     const [showToPicker, setShowToPicker] = useState(false);
     let cancelToken: any;
-
+    const skipSearchApiRef = useRef(false);
+    const didInitialLoadRef = useRef(false);
+    const [deleting, setDeleting] = useState(false);
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -69,16 +72,75 @@ const SalesOrderNew = ({ token, navigation }) => {
         params: props.params,
         cancelToken: cancelToken?.token,
     });
+    useFocusEffect(
+        useCallback(() => {
+
+            if (!route?.params?.refreshAfterDelete) {
+                return;
+            }
+
+            const p = route?.params || {};
+
+            const nextFilters = {
+                ...filters,
+
+                prpcode:
+                    p.prpcode ||
+                    filters.prpcode ||
+                    '',
+
+                yearno:
+                    p.yearno ||
+                    filters.yearno ||
+                    '',
+
+                strcode:
+                    p.strcode ||
+                    filters.strcode ||
+                    '012',
+            };
+
+            skipSearchApiRef.current = true;
+
+            setFilters(nextFilters);
+
+            setSearch('');
+
+            setShowFilter(false);
+
+            loadOrders('', false, nextFilters);
+
+            navigation.setParams({
+                refreshAfterDelete: undefined,
+                refreshKey: undefined,
+                prpcode: undefined,
+                yearno: undefined,
+                strcode: undefined,
+            });
+
+        }, [route?.params?.refreshKey])
+    );
+    // useEffect(() => {
+    //     const load = async () => {
+    //         const data = await fetchPropertyData(token);
+    //         setPropertyData(data || []);
+    //         console.log("data ::", data)
+    //         if (data?.length) {
+    //             setSelectedProperty(data[0]);
+    //         }
+    //     };
+    //     load();
+    // }, []);
 
     useEffect(() => {
         const load = async () => {
             const data = await fetchPropertyData(token);
+
             setPropertyData(data || []);
-            console.log("data ::", data)
-            if (data?.length) {
-                setSelectedProperty(data[0]);
-            }
+
+            console.log("data ::", data);
         };
+
         load();
     }, []);
 
@@ -148,7 +210,12 @@ const SalesOrderNew = ({ token, navigation }) => {
                 setLoading(true);
             }
 
-            const yearno = selectedYear ? selectedYear.slice(-2) : '';
+            const yearno =
+                activeFilters.yearno
+                    ? String(activeFilters.yearno).slice(-2)
+                    : selectedYear
+                        ? selectedYear.slice(-2)
+                        : '';
 
             const payload = {
                 search: text,
@@ -162,7 +229,8 @@ const SalesOrderNew = ({ token, navigation }) => {
                 strtype: 'g',
                 txntype: 'sales_order',
                 referrer: 'mob_dashboard',
-                atype: 'B',
+                // atype: 'B',
+                atype: activeFilters.show_authorized ? 'm' : 'b',
             };
 
             console.log("browse payload", payload);
@@ -171,7 +239,7 @@ const SalesOrderNew = ({ token, navigation }) => {
                 `${API}/api/sosortbrowse`,
                 getRequestConfig({ params: { ...payload } }),
             );
-            console.log("browse res",res)
+            console.log("browse res", res)
 
             if (res.data.success === true) {
                 setOrders(res.data.response.data || []);
@@ -189,17 +257,44 @@ const SalesOrderNew = ({ token, navigation }) => {
     };
 
     useEffect(() => {
+
+        if (didInitialLoadRef.current) {
+            return;
+        }
+
+        didInitialLoadRef.current = true;
+
+        if (route?.params?.refreshAfterDelete) {
+            return;
+        }
+
         loadOrders('');
+
     }, []);
 
+
+    // =====================================================
+    // SEARCH API
+    // =====================================================
+
     useEffect(() => {
+
+        if (!didInitialLoadRef.current) {
+            return;
+        }
+
+        if (skipSearchApiRef.current) {
+            skipSearchApiRef.current = false;
+            return;
+        }
+
         const delay = setTimeout(() => {
             loadOrders(search);
         }, 500);
 
         return () => clearTimeout(delay);
-    }, [search]);
 
+    }, [search]);
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         loadOrders(search);
@@ -331,6 +426,72 @@ const SalesOrderNew = ({ token, navigation }) => {
 
     };
 
+    const deleteOrder = async () => {
+        const yno = yearno ? yearno.slice(-2) : '';
+        try {
+            setDeleting(true);
+            const payload = {
+                Mode: mode,
+                uid: uid || 0,
+                prpcode: prpcode,
+                yearno: yno,
+                strcode: '012'
+            };
+            console.log("save payload", payload);
+
+            const res = await axios.post(`${API}/api/sodelete`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'x-platform': 'mob',
+                },
+            });
+
+            console.log("Save response..", res);
+
+            if (res.data?.success === true) {
+                if (typeof clearOrder === 'function') {
+                    clearOrder();
+                }
+
+                setDeleteModalVisible(false);
+                setDeleteSuccessVisible(true);
+
+                setTimeout(() => {
+                    setDeleteSuccessVisible(false);
+
+                    navigation.reset({
+                        index: 0,
+                        routes: [
+                            {
+                                name: "SalesOrderBrowse",
+                                params: {
+                                    refreshAfterDelete: true,
+                                    refreshKey: Date.now(),
+
+                                    prpcode,
+                                    yearno,
+                                    strcode,
+                                },
+                            },
+                        ],
+                    });
+                }, 1200);
+            } else {
+                Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
+            }
+        } catch (error) {
+            console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
+            Alert.alert(
+                'Error',
+                error?.res?.data?.message || 'Something went wrong while saving',
+            );
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     const renderItem = ({ item }) => {
         return (
             <TouchableOpacity
@@ -351,16 +512,20 @@ const SalesOrderNew = ({ token, navigation }) => {
                     <View
                         style={[
                             styles.proStatusBadge,
-                            item.StatusName === 'Approved' && styles.proApprovedBadge,
+                            item.AuthStatus === 'Authorised'
+                                ? styles.proApprovedBadge
+                                : styles.proPendingBadge,
                         ]}
                     >
                         <Text
                             style={[
                                 styles.proStatusText,
-                                item.StatusName === 'Approved' && styles.proApprovedText,
+                                item.AuthStatus === 'Authorised'
+                                    ? styles.proApprovedText
+                                    : styles.proPendingText,
                             ]}
                         >
-                            {item.StatusName || 'Pending'}
+                            {item.AuthStatus || 'Pending'}
                         </Text>
                     </View>
                 </View>
@@ -584,6 +749,15 @@ const SalesOrderNew = ({ token, navigation }) => {
                                     color="#000"
                                 />
                             </TouchableOpacity>
+                            {/* <TouchableOpacity
+                                onPress={() => {
+                                    // setSelectedDeleteItem(item);
+                                    // setDeleteModal(true);
+                                }}
+                                style={styles.deleteBtn}
+                            >
+                                <Icon name="delete" size={18} color="#fff" />
+                            </TouchableOpacity> */}
                             <Text style={styles.pickerTitle}>
                                 Select Property
                             </Text>
@@ -684,13 +858,40 @@ const SalesOrderNew = ({ token, navigation }) => {
                     </View>
 
                 </Modal>
-                <TouchableOpacity
+
+                {/* <TouchableOpacity
                     activeOpacity={0.85}
                     style={styles.fab}
                     onPress={addNewSalesOrder}
                 >
                     <Icon name="add" size={30} color="#fff" />
+                </TouchableOpacity> */}
+
+                <TouchableOpacity
+                    activeOpacity={selectedProperty ? 0.85 : 1}
+                    style={[
+                        styles.fab,
+                        !selectedProperty && {
+                            backgroundColor: '#B0B0B0',
+                        },
+                    ]}
+                    disabled={!selectedProperty}
+                    onPress={() => {
+
+                        if (!selectedProperty?.PrpCode) {
+                            Alert.alert(
+                                'Required',
+                                'Please select property first'
+                            );
+                            return;
+                        }
+
+                        addNewSalesOrder();
+                    }}
+                >
+                    <Icon name="add" size={30} color="#fff" />
                 </TouchableOpacity>
+
                 {opening && (
                     <View style={styles.overlay}>
                         <ActivityIndicator size="large" color="#fff" />
@@ -1041,14 +1242,13 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginTop: 3,
     },
-    proStatusBadge: {
-        backgroundColor: '#FFF7ED',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
+    proApprovedStatusText: {
+        color: '#027A48',
+        fontSize: 11,
+        fontWeight: '900',
     },
     proStatusText: {
-        color: '#C2410C',
+        // color: '#C2410C',
         fontSize: 11,
         fontWeight: '900',
     },
@@ -1057,7 +1257,24 @@ const styles = StyleSheet.create({
     },
     proApprovedText: {
         color: '#027A48',
+        fontWeight: '800',
     },
+    // PENDING
+    proPendingBadge: {
+        backgroundColor: '#FFEDD5', // light orange
+    },
+
+    proPendingText: {
+        color: '#C2410C', // dark orange
+        fontWeight: '800',
+    },
+    proStatusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 5,
+        borderRadius: 20,
+        alignSelf: 'flex-start',
+    },
+
     partyBlock: {
         marginTop: 12,
     },
@@ -1171,5 +1388,15 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: '#F1F5F9',
         marginTop: 16,
+    },
+    deleteBtn: {
+        marginTop: -25,
+        backgroundColor: "#EF4444",
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        justifyContent: "center",
+        alignItems: "center",
+        alignSelf: "flex-end"
     },
 });

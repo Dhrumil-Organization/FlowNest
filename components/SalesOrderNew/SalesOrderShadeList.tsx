@@ -17,6 +17,10 @@ const toText = v => String(v || '').trim();
 
 const SalesOrderShadeList = ({ navigation, route }) => {
     const {
+        mode = 'ADD',
+        uid = 0,
+        soNo = '',
+        soDate = '',
         editMode = false,
         editIndex = null,
         editLineId = null,
@@ -150,7 +154,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 itmcode: selectedItem.ItmCode,
                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
                 dsncode: selectedDesign.DsnCode,
-                search,
+                // search,
             };
             console.log("shade type historyPayload:", payload);
 
@@ -194,13 +198,13 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         loadShades();
     }, []);
 
-    useEffect(() => {
-        const t = setTimeout(() => {
-            loadShades();
-        }, 400);
+    // useEffect(() => {
+    //     const t = setTimeout(() => {
+    //         loadShades();
+    //     }, 400);
 
-        return () => clearTimeout(t);
-    }, [search]);
+    //     return () => clearTimeout(t);
+    // }, [search]);
 
     const filteredShades = useMemo(() => {
         const s = search.toLowerCase();
@@ -222,14 +226,16 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             }
         }
 
-        arr = arr
-            .filter(item => {
-                return (
-                    toText(item.ShdCode).toLowerCase().includes(s) ||
-                    toText(item.ShdName).toLowerCase().includes(s) ||
-                    toText(item.ShadeName).toLowerCase().includes(s)
-                );
-            })
+        arr = arr.filter((item) => {
+
+            const fullText = `
+        ${toText(item.ShdCode)}
+        ${toText(item.ShdName)}
+        ${toText(item.ShadeName)}
+    `.toLowerCase();
+
+            return fullText.includes(s.toLowerCase());
+        })
             .sort((a, b) => {
                 if (editMode && oldRow?.ShdCode) {
                     if (String(a.ShdCode) === String(oldRow.ShdCode)) return -1;
@@ -248,6 +254,10 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         }
 
         navigation.navigate('SalesOrderDetails', {
+            mode,
+            uid,
+            soNo,
+            soDate,
             editMode,
             editIndex,
             editLineId,

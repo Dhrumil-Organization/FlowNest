@@ -299,6 +299,13 @@ const APP_SECTIONS = [
             { id: '32', name: 'Creel Issue Return', screen: 'Creel Issue Return', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
+    {
+
+        title: 'P',
+        data: [
+            { id: '32', name: 'Doff Entry', screen: 'Doff Entry', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+        ],
+    },
 
 ];
 
@@ -575,6 +582,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     },
                 //                     {
                 //                         "title": "Creel Issue Return",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Production Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Doff Entry",
                 //                         "href": "/"
                 //                     },
                 //                 ]

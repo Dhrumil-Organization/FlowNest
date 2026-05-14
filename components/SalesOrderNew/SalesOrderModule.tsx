@@ -12,8 +12,10 @@ import SalesOrderShadeList from './SalesOrderShadeList';
 import SalesOrderDetails from './SalesOrderDetails';
 import ItemAddedSuccessScreen from './ItemAddedSuccessScreen';
 import SalesOrderAddAnotherShade from './SalesOrderAddAnotherShade';
+import SalesOrderSaveSuccess from './SalesOrderSaveSuccess';
+import PdfViewerScreen from './PdfViewerScreen';
 
-
+``
 const Stack = createNativeStackNavigator();
 
 const SalesOrderModule = props => {
@@ -117,6 +119,28 @@ const SalesOrderModule = props => {
                         />
                     )}
                 </Stack.Screen> */}
+
+                <Stack.Screen name="SalesOrderSaveSuccess">
+                    {screenProps => (
+                        <SalesOrderSaveSuccess
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+                <Stack.Screen name="PdfViewerScreen">
+                    {screenProps => (
+                        <PdfViewerScreen
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+
             </Stack.Navigator>
         </SalesOrderProvider>
     );

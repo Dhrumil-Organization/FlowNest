@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,12 @@ const makeRowKey = row => `${row.ItmCode}_${row.DsnCode}_${row.ShdCode}`;
 const createLineId = () =>
   `LINE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-const SalesOrderDetails = ({navigation, route}) => {
+const SalesOrderDetails = ({ navigation, route }) => {
   const {
+    mode = 'ADD',
+    uid = 0,
+    soNo = '',
+    soDate = '',
     editMode = false,
     editIndex = null,
     editLineId = null,
@@ -45,6 +49,11 @@ const SalesOrderDetails = ({navigation, route}) => {
   } = route?.params || {};
 
   const finalParty = party || partyData || selectedParty || null;
+  const stableUid =
+    Number(uid || oldRow?.UId || workingRows?.[0]?.UId || 0);
+
+  const stableMode =
+    stableUid > 0 ? 'EDIT' : mode;
 
   const [qty, setQty] = useState('');
   const [pcs, setPcs] = useState('');
@@ -97,7 +106,8 @@ const SalesOrderDetails = ({navigation, route}) => {
 
     const newRow = {
       LineId: lineId,
-
+      UId: stableUid,
+      Mode: stableMode,
       SrNo:
         editMode && oldRow?.SrNo
           ? oldRow.SrNo
@@ -129,22 +139,22 @@ const SalesOrderDetails = ({navigation, route}) => {
     let updatedRows = [];
 
     if (editMode && oldRow) {
-		  const editLineId = oldRow.LineId || newRow.LineId;
+      const editLineId = oldRow.LineId || newRow.LineId;
 
-		  let replaced = false;
+      let replaced = false;
 
-		  updatedRows = workingRows.map(row => {
-			if (String(row.LineId) === String(editLineId)) {
-			  replaced = true;
-			  return {...newRow, LineId: editLineId};
-			}
-			return row;
-		  });
+      updatedRows = workingRows.map(row => {
+        if (String(row.LineId) === String(editLineId)) {
+          replaced = true;
+          return { ...newRow, LineId: editLineId };
+        }
+        return row;
+      });
 
-		  if (!replaced) {
-			updatedRows = [...workingRows, newRow];
-		  }
-		} else {
+      if (!replaced) {
+        updatedRows = [...workingRows, newRow];
+      }
+    } else {
       const existsIndex = workingRows.findIndex(
         x => makeRowKey(x) === makeRowKey(newRow),
       );
@@ -161,6 +171,10 @@ const SalesOrderDetails = ({navigation, route}) => {
     }
 
     navigation.navigate('SalesOrderAddAnotherShade', {
+      mode: stableMode,
+      uid: stableUid,
+      soNo,
+      soDate,
       editMode,
       editIndex,
       editLineId: lineId,
@@ -195,7 +209,7 @@ const SalesOrderDetails = ({navigation, route}) => {
           {editMode ? 'Modify Details' : 'Enter Details'}
         </Text>
 
-        <View style={{width: 22}} />
+        <View style={{ width: 22 }} />
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -272,7 +286,7 @@ const SalesOrderDetails = ({navigation, route}) => {
 export default SalesOrderDetails;
 
 const styles = StyleSheet.create({
-  safe: {flex: 1, backgroundColor: '#F5F7FB'},
+  safe: { flex: 1, backgroundColor: '#F5F7FB' },
   header: {
     height: 56,
     backgroundColor: '#13879A',
@@ -287,7 +301,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
   },
-  container: {flex: 1, padding: 14},
+  container: { flex: 1, padding: 14 },
   infoBox: {
     backgroundColor: '#fff',
     borderRadius: 14,

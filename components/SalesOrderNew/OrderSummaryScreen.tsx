@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,7 @@ import {
     TextInput,
     Alert,
     ScrollView,
+    Modal
 } from 'react-native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -56,6 +57,8 @@ const normalizeRows = orderItems => {
                     ItmCode: item.ItmCode,
                     ItmName: item.ItmName,
                     MItmCode: item.MItmCode || item.ItmCode,
+                    Denier: item.Denier || '',
+                    HsnCode: item.HsnCode || '',
 
                     DsnCode: item.DsnCode,
                     DsnName: item.DsnName || '',
@@ -86,6 +89,101 @@ const normalizeRows = orderItems => {
     return rows;
 };
 
+const SkeletonBox = ({ width = "100%", height = 16, radius = 8, style }) => {
+    return (
+        <View
+            style={[
+                {
+                    width,
+                    height,
+                    borderRadius: radius,
+                    backgroundColor: "#E4E7EF",
+                },
+                style,
+            ]}
+        />
+    );
+};
+
+const OrderSummarySkeleton = () => {
+    return (
+        <SafeAreaView style={styles.safe}>
+            <View style={styles.header}>
+                <SkeletonBox width={24} height={20} />
+                <SkeletonBox width={160} height={18} style={{ marginLeft: 50 }} />
+            </View>
+
+            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+                <View style={styles.orderInfoCard}>
+                    <View>
+                        <SkeletonBox width={150} height={18} />
+                        <SkeletonBox width={120} height={14} style={{ marginTop: 10 }} />
+                    </View>
+                    <SkeletonBox width={70} height={28} radius={20} />
+                </View>
+
+                <View style={styles.partyCard}>
+                    <View style={{ flex: 1 }}>
+                        <SkeletonBox width="75%" height={18} />
+                        <SkeletonBox width="55%" height={14} style={{ marginTop: 10 }} />
+                        <SkeletonBox width="40%" height={14} style={{ marginTop: 10 }} />
+                    </View>
+                </View>
+
+                <View style={styles.modeCard}>
+                    <SkeletonBox width={130} height={14} />
+                    <SkeletonBox width={80} height={14} />
+                </View>
+
+                <View style={styles.totalCard}>
+                    {[1, 2, 3, 4].map(i => (
+                        <View key={i} style={styles.totalBox}>
+                            <SkeletonBox width={45} height={16} />
+                            <SkeletonBox width={35} height={10} style={{ marginTop: 8 }} />
+                        </View>
+                    ))}
+                </View>
+
+                <SkeletonBox width={190} height={18} style={{ marginTop: 22, marginBottom: 12 }} />
+
+                {[1, 2, 3].map(i => (
+                    <View key={i} style={styles.itemCard}>
+                        <View style={styles.singleRowTop}>
+                            <SkeletonBox width={28} height={28} radius={14} style={{ marginRight: 10 }} />
+                            <View style={{ flex: 1 }}>
+                                <SkeletonBox width="85%" height={16} />
+                                <SkeletonBox width="65%" height={13} style={{ marginTop: 8 }} />
+                                <SkeletonBox width="55%" height={13} style={{ marginTop: 8 }} />
+                            </View>
+                        </View>
+
+                        <View style={styles.singleRowBottom}>
+                            {[1, 2, 3, 4].map(j => (
+                                <View key={j} style={styles.singleCell}>
+                                    <SkeletonBox width={34} height={10} />
+                                    <SkeletonBox width={50} height={14} style={{ marginTop: 8 }} />
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                ))}
+
+                <View style={styles.calculationCard}>
+                    {[1, 2, 3, 4].map(i => (
+                        <View key={i} style={styles.inputRow}>
+                            <SkeletonBox width={120} height={16} />
+                            <SkeletonBox width={130} height={42} radius={9} />
+                        </View>
+                    ))}
+                    <SkeletonBox width="100%" height={80} radius={10} style={{ marginTop: 14 }} />
+                </View>
+
+                <View style={{ height: 100 }} />
+            </ScrollView>
+        </SafeAreaView>
+    );
+};
+
 const OrderSummaryScreen = ({ navigation, route }) => {
     const salesOrder = useSalesOrder();
 
@@ -101,6 +199,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const {
         mode: routeMode,
         uid: routeUid,
+        skipReload = false,
         party: routeParty,
         partyData,
         selectedParty,
@@ -108,11 +207,25 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         strcode = '012',
         yearno = '',
         token = '',
+        soNo: routeSoNo = '',
+        soDate: routeSoDate = '',
     } = route?.params || {};
 
-    const mode = routeMode || contextMode || 'ADD';
-    const uid = routeUid || contextUid || 0;
+    const initialMode = routeMode || contextMode || 'ADD';
+    const initialUid = routeUid || contextUid || 0;
 
+    const [screenMode, setScreenMode] = useState(initialMode);
+    const [screenUid, setScreenUid] = useState(initialUid);
+
+    const mode = screenMode;
+    const uid = screenUid;
+
+    const [isViewMode, setIsViewMode] = useState(mode === "VIEW");
+    const [autoLocked, setAutoLocked] = useState(0);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
+    const hasLoadedOrderRef = useRef(false);
+    const [pdfLoading, setPdfLoading] = useState(false);
     const party =
         routeParty ||
         partyData ||
@@ -130,13 +243,60 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [tax, setTax] = useState(String(headerData?.TaxPercent || '0'));
     const [remark, setRemark] = useState(headerData?.Remark || '');
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [loadingOrder, setLoadingOrder] = useState(false);
-    const [soDate, setSoDate] = useState('');
-    const [soNo, setSoNo] = useState('');
+    const [soDate, setSoDate] = useState(routeSoDate || headerData?.SODate || '');
+    const [soNo, setSoNo] = useState(routeSoNo || headerData?.SONo || '');
     const [rawMain, setRawMain] = useState(null);
     const [rawTax, setRawTax] = useState([]);
     const [rawExp, setRawExp] = useState(null);
     const [rawExtra, setRawExtra] = useState({});
+
+    console.log("soNo", soNo);
+
+    console.log("autoLocked", autoLocked);
+
+    useEffect(() => {
+        if (skipReload) {
+            hasLoadedOrderRef.current = true;
+            return;
+        }
+
+        if (hasLoadedOrderRef.current) {
+            return;
+        }
+
+        if ((mode === 'EDIT' || mode === 'VIEW') && Number(uid) > 0) {
+            hasLoadedOrderRef.current = true;
+            loadOrderFromBackend();
+        }
+    }, [mode, uid, skipReload]);
+
+    useEffect(() => {
+        const p = route?.params || {};
+
+        const nextUid = Number(
+            p.uid ||
+            p.completedRow?.UId ||
+            p.completedRows?.[0]?.UId ||
+            screenUid ||
+            0
+        );
+
+        const nextMode =
+            nextUid > 0 || p.mode === 'EDIT' || screenMode === 'EDIT'
+                ? 'EDIT'
+                : p.mode || screenMode || 'ADD';
+
+        if (nextMode !== screenMode) {
+            setScreenMode(nextMode);
+        }
+
+        if (nextUid !== Number(screenUid || 0)) {
+            setScreenUid(nextUid);
+        }
+    }, [route?.params]);
+
     const toNumber = value => {
         const n = Number(value || 0);
         return isNaN(n) ? 0 : n;
@@ -284,13 +444,19 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const fmt = (value, dec = 2) => num(value).toFixed(dec);
 
     const addItem = () => {
+        const stableUid = Number(uid || route?.params?.uid || rawMain?.UId || 0);
+        const stableMode = stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
+
         navigation.navigate('SalesOrderItemList', {
+            mode: stableMode,
+            uid: stableUid,
+            soNo,
+            soDate,
             editMode: false,
             editIndex: null,
             editLineId: null,
             oldRow: null,
 
-            // IMPORTANT: send current rows also
             workingRows: rows,
 
             party,
@@ -305,13 +471,19 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     };
 
     const editRow = row => {
+        const stableUid = Number(uid || row?.UId || route?.params?.uid || rawMain?.UId || 0);
+        const stableMode = stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
+
         navigation.navigate('SalesOrderItemList', {
+            mode: stableMode,
+            uid: stableUid,
+            soNo,
+            soDate,
             editMode: true,
             editIndex: rows.findIndex(x => x.LineId === row.LineId),
             editLineId: row.LineId,
             oldRow: row,
 
-            // IMPORTANT: send full current order rows
             workingRows: rows,
 
             party,
@@ -339,6 +511,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             },
         ]);
     };
+
 
     const validateBeforeSave = () => {
         if (!party?.ParCode) {
@@ -370,13 +543,6 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
         return true;
     };
-
-    useEffect(() => {
-        if ((mode === 'EDIT' || mode === 'VIEW') && Number(uid) > 0) {
-            loadOrderFromBackend();
-        }
-
-    }, [mode, uid]);
 
     const convertD1ToOrderItems = d1Rows => {
         return (d1Rows || []).map((row, index) => ({
@@ -457,6 +623,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 Alert.alert('Error', 'Sales order not found');
                 return;
             }
+            setAutoLocked(
+                Number(main?.IsAuth));
+            const isLocked =
+                Number(main?.IsAuth || 0) !== 0;
+
+            setIsViewMode(mode === "VIEW" || isLocked);
 
             // keep full backend raw data for edit save
             setRawMain(main);
@@ -510,6 +682,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const buildMainPayload = () => {
         const base = uid > 0 && rawMain ? { ...rawMain } : {};
         const yno = yearno ? yearno.slice(-2) : '';
+        console.log('Edit Mode ', base.SONo, rawMain);
         return {
             ...base,
 
@@ -537,7 +710,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             GSTAmt: fmt(taxAmt),
 
             NetAmt: fmt(grandTotal),
-            D1NetAmt: base.D1NetAmt || '.00',
+            D1NetAmt: fmt(totals.totalAmount) || '.00',
 
             Remark: remark || '',
 
@@ -577,8 +750,19 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 ShdCode: row.ShdCode || '',
                 ShdName: row.ShdName || raw.ShdName || '',
 
-                Denier: row.Denier || '',
-                UOM: row.UOM || raw.UOM || '',
+                // Denier: row.Denier || '',
+                Denier:
+                    row.Denier ||
+                    row.Denier ||
+                    raw.Denier ||
+                    '',
+
+                UOM:
+                    row.UOM ||
+                    row.UOM ||
+                    raw.UOM ||
+                    '',
+                // UOM: row.UOM || raw.UOM || '',
 
                 Qty: fmt(row.Qty, 3),
                 QtyPcs: String(num(row.Pcs)),
@@ -608,8 +792,13 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 IGSTPer: raw.IGSTPer || '.00',
                 IGSTAmt: raw.IGSTAmt || '.00',
 
-                D1NetAmt: raw.D1NetAmt || '.00',
-                HsnCode: row.HsnCode || raw.HsnCode || '',
+                D1NetAmt: fmt(row.Amount) || '.00',
+                // HsnCode: row.HsnCode || raw.HsnCode || '',
+                HsnCode:
+                    row.HsnCode ||
+                    row.HsnCode ||
+                    raw.HsnCode ||
+                    '',
                 HSNName: row.HSNName || raw.HSNName || '',
             };
         });
@@ -630,6 +819,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
         return {};
     };
+
     const saveOrder = async () => {
         if (!validateBeforeSave()) return;
 
@@ -680,29 +870,170 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
             console.log("Save response..", res);
 
-            if (res.data?.status === true) {
+            if (res.data?.success === true) {
                 if (typeof clearOrder === 'function') {
                     clearOrder();
                 }
+                console.log("SONO---", res?.data?.response?.sono);
+                console.log("SONO.....", soNo);
 
-                navigation.navigate('SalesOrderSaveSuccess', {
-                    orderNo: res.data?.order_no || res.data?.OrderNo,
-                    dateTime: res.data?.date_time,
+                navigation.replace("SalesOrderSaveSuccess", {
+                    orderNo: res?.data?.response?.sono || soNo || '-',
+
+                    uid: res?.data?.response?.uid || uid,
+                    prpcode: res?.data?.response?.PrpCode || prpcode,
+                    yearno: res?.data?.response?.YearNo || yearno,
+                    strcode: res?.data?.response?.StrCode || strcode,
+                    party,
+                    partyData: party,
+                    selectedParty: party,
+                    token,
+                    dateTime: new Date().toLocaleString("en-IN", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                    }),
                 });
             } else {
                 Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
         } catch (error) {
-            console.log('SAVE ORDER ERROR:', error?.response?.data || error.message);
+            console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
             Alert.alert(
                 'Error',
-                error?.response?.data?.message || 'Something went wrong while saving',
+                error?.res?.data?.message || 'Something went wrong while saving',
             );
         } finally {
             setSaving(false);
         }
     };
 
+    const deleteOrder = async () => {
+        const yno = yearno ? yearno.slice(-2) : '';
+        try {
+            setDeleting(true);
+            const payload = {
+                Mode: mode,
+                uid: uid || 0,
+                prpcode: prpcode,
+                yearno: yno,
+                strcode: '012'
+            };
+            console.log("save payload", payload);
+
+            const res = await axios.post(`${API}/api/sodelete`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'x-platform': 'mob',
+                },
+            });
+
+            console.log("Save response..", res);
+
+            if (res.data?.success === true) {
+                if (typeof clearOrder === 'function') {
+                    clearOrder();
+                }
+
+                setDeleteModalVisible(false);
+                setDeleteSuccessVisible(true);
+
+                setTimeout(() => {
+                    setDeleteSuccessVisible(false);
+
+                    navigation.reset({
+                        index: 0,
+                        routes: [
+                            {
+                                name: "SalesOrderBrowse",
+                                params: {
+                                    refreshAfterDelete: true,
+                                    refreshKey: Date.now(),
+
+                                    prpcode,
+                                    yearno,
+                                    strcode,
+                                },
+                            },
+                        ],
+                    });
+                }, 1200);
+            } else {
+                Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
+            }
+        } catch (error) {
+            console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
+            Alert.alert(
+                'Error',
+                error?.res?.data?.message || 'Something went wrong while saving',
+            );
+        } finally {
+            setDeleting(false);
+        }
+    };
+const printSalesOrderPdf = async (format = 'A4') => {
+    try {
+        setPdfLoading(true);
+
+        const payload = {
+            prpcode,
+            yearno,
+            strcode,
+            uid,
+            printTypes: ['sales_order'],
+            printFormat: format,
+        };
+
+        const res = await axios.post(
+            `${API}/api/saleschallanmultiprintnew`,
+            payload,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'x-platform': 'mob',
+                },
+            }
+        );
+
+        console.log('PDF RESPONSE =>', res?.data);
+
+        if (res?.data?.success === true) {
+            const pdfUrl = res?.data?.results?.sales_order;
+
+            if (!pdfUrl) {
+                Alert.alert('PDF Error', 'PDF URL not found.');
+                return;
+            }
+
+            navigation.navigate('PdfViewerScreen', {
+                pdfUrl,
+                title: 'Sales Order Print',
+            });
+        } else {
+            Alert.alert(
+                'PDF Failed',
+                res?.data?.message || 'PDF generation failed.'
+            );
+        }
+    } catch (error) {
+        console.log('PDF ERROR =>', error?.response?.data || error.message);
+
+        Alert.alert(
+            'Error',
+            error?.response?.data?.message || 'Unable to generate PDF.'
+        );
+    } finally {
+        setPdfLoading(false);
+    }
+};
     const renderRow = ({ item, index }) => {
         return (
             <View style={styles.itemCard}>
@@ -749,7 +1080,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                                     style: 'cancel',
                                 },
                             ]);
-                        }}>
+                        }}
+                        disabled={isViewMode}
+                    >
                         <Icon name="more-vert" size={24} color="#000" />
                     </TouchableOpacity>
                 </View>
@@ -779,6 +1112,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         );
     };
 
+    if (loadingOrder) {
+        return <OrderSummarySkeleton />;
+    }
+
     return (
         <SafeAreaView style={styles.safe}>
             <View style={styles.header}>
@@ -787,9 +1124,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
 
                 <Text style={styles.headerTitle}>
-                    {mode === 'EDIT' || uid > 0
-                        ? 'Modify Sales Order'
-                        : 'New Sales Order'}
+                    {Number(autoLocked) == 1 ? 'Authorised Sales Order'
+                        : mode === 'EDIT' || uid > 0
+                            ? 'Modify Sales Order'
+                            : 'New Sales Order'}
                 </Text>
 
                 <View style={{ width: 22 }} />
@@ -799,7 +1137,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 <View style={styles.orderInfoCard}>
                     <View>
                         <Text style={styles.orderNo}>
-                            SO No : {headerData?.SONo || soNo || 'New'}
+                            SO No : {headerData?.SONo || soNo || '-'}
                         </Text>
                         <Text style={styles.orderDate}>
                             SO Date : {headerData?.SODate || soDate || '-'}
@@ -807,7 +1145,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     </View>
 
                     <View style={styles.modeBadge}>
-                        <Text style={styles.modeText}>{mode}</Text>
+                        <Text style={styles.modeText}>{Number(autoLocked) == 1 ? 'VIEW' : initialMode}</Text>
                     </View>
                 </View>
                 <View style={styles.partyCard}>
@@ -824,13 +1162,30 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     {mode !== 'EDIT' && uid <= 0 && (
                         <TouchableOpacity
                             style={styles.changeBtn}
-                            onPress={() => navigation.navigate('SalesOrderPartyList')}>
+                            onPress={() => navigation.navigate('PartyListScreen', {
+                                editMode: false,
+                                editIndex: null,
+                                editLineId: null,
+                                oldRow: null,
+
+                                // IMPORTANT: send current rows also
+                                workingRows: rows,
+
+                                party,
+                                partyData: party,
+                                selectedParty: party,
+
+                                prpcode,
+                                strcode,
+                                yearno,
+                                token,
+                            })}>
                             <Text style={styles.changeText}>Change</Text>
                         </TouchableOpacity>
                     )}
                 </View>
 
-                <View style={styles.modeCard}>
+                {/* <View style={styles.modeCard}>
                     <Text style={styles.modeText}>
                         Mode:{' '}
                         {mode === 'EDIT' || uid > 0
@@ -838,7 +1193,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             : 'New Order'}
                     </Text>
                     <Text style={styles.modeText}>UId: {uid || 0}</Text>
-                </View>
+                </View> */}
 
                 <View style={styles.totalCard}>
                     <View style={styles.totalBox}>
@@ -896,6 +1251,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             onChangeText={setDiscount}
                             keyboardType="numeric"
                             style={styles.smallInput}
+                            editable={!isViewMode}
                         />
                     </View>
 
@@ -906,6 +1262,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             onChangeText={setTax}
                             keyboardType="numeric"
                             style={styles.smallInput}
+                            editable={!isViewMode}
                         />
                     </View>
 
@@ -926,6 +1283,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         placeholderTextColor="#98A2B3"
                         multiline
                         style={styles.remarkInput}
+                        editable={!isViewMode}
                     />
                 </View>
 
@@ -933,15 +1291,15 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             </ScrollView>
 
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.addBtn} onPress={addItem}>
+                <TouchableOpacity style={styles.addBtn} onPress={addItem} disabled={isViewMode}>
                     <Text style={styles.addBtnText}>＋ Add Item</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-                    // onPress={saveOrder}
-                    // disabled={saving}
-                    disabled={true}
+                    onPress={saveOrder}
+                    disabled={saving || isViewMode}
+                // disabled={true}
                 >
                     <Text style={styles.saveBtnText}>
                         {saving
@@ -951,7 +1309,91 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                                 : 'Save Order'}
                     </Text>
                 </TouchableOpacity>
+                {!Number(autoLocked) && (
+                    <TouchableOpacity
+                        style={[styles.deleteBtn, saving && { opacity: 0.6 }]}
+                        onPress={() => setDeleteModalVisible(true)}
+                        disabled={saving || isViewMode}
+                    // disabled={true}
+                    >
+                        <Text style={styles.saveBtnText}>
+                            {deleting
+                                ? 'Deleting...'
+                                : 'Delete Order'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+                <TouchableOpacity
+    style={styles.saveBtn}
+    onPress={() => printSalesOrderPdf('A4')}
+    disabled={pdfLoading}
+>
+    <Text style={styles.saveBtnText}>
+        {pdfLoading ? 'Opening PDF...' : 'Print'}
+    </Text>
+</TouchableOpacity>
             </View>
+            <Modal
+                visible={deleteModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setDeleteModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.confirmModal}>
+                        <View style={styles.deleteIconCircle}>
+                            <Icon name="delete-outline" size={36} color="#DC2626" />
+                        </View>
+
+                        <Text style={styles.modalTitle}>Delete Sales Order?</Text>
+
+                        <Text style={styles.modalMessage}>
+                            Are you sure you want to delete SO No {soNo || '-'}?
+                            This action cannot be undone.
+                        </Text>
+
+                        <View style={styles.modalBtnRow}>
+                            <TouchableOpacity
+                                style={styles.noBtn}
+                                onPress={() => setDeleteModalVisible(false)}
+                                disabled={deleting}
+                            >
+                                <Text style={styles.noBtnText}>No, Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.yesDeleteBtn}
+                                onPress={deleteOrder}
+                                disabled={deleting}
+                            >
+                                <Text style={styles.yesDeleteText}>
+                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={deleteSuccessVisible}
+                transparent
+                animationType="fade"
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.successModal}>
+                        <View style={styles.successIconCircle}>
+                            <Icon name="check" size={40} color="#16A34A" />
+                        </View>
+
+                        <Text style={styles.successTitle}>Deleted Successfully</Text>
+
+                        <Text style={styles.successMessage}>
+                            Sales order has been deleted.
+                        </Text>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
@@ -1161,6 +1603,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    deleteBtn: {
+        flex: 1,
+        height: 48,
+        borderRadius: 10,
+        backgroundColor: '#ec8787',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     saveBtnText: { color: '#fff', fontWeight: '900' },
     singleRowTop: {
         flexDirection: 'row',
@@ -1235,5 +1685,116 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 22,
+    },
+
+    confirmModal: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 22,
+        alignItems: 'center',
+    },
+
+    deleteIconCircle: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: '#FEE2E2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#111827',
+        textAlign: 'center',
+    },
+
+    modalMessage: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 10,
+        lineHeight: 22,
+    },
+
+    modalBtnRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 24,
+        width: '100%',
+    },
+
+    noBtn: {
+        flex: 1,
+        height: 50,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+
+    noBtnText: {
+        color: '#374151',
+        fontWeight: '900',
+    },
+
+    yesDeleteBtn: {
+        flex: 1,
+        height: 50,
+        borderRadius: 14,
+        backgroundColor: '#DC2626',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    yesDeleteText: {
+        color: '#fff',
+        fontWeight: '900',
+    },
+
+    successModal: {
+        width: '85%',
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 26,
+        alignItems: 'center',
+    },
+
+    successIconCircle: {
+        width: 78,
+        height: 78,
+        borderRadius: 39,
+        backgroundColor: '#DCFCE7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+
+    successTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#166534',
+        textAlign: 'center',
+    },
+
+    successMessage: {
+        fontSize: 14,
+        color: '#475467',
+        fontWeight: '700',
+        textAlign: 'center',
+        marginTop: 8,
     },
 });

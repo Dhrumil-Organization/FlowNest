@@ -11,6 +11,10 @@ import { CommonActions } from '@react-navigation/native';
 
 const SalesOrderAddAnotherShade = ({ navigation, route }) => {
     const {
+        mode = 'ADD',
+        uid = 0,
+        soNo = '',
+        soDate = '',
         editMode = false,
         editIndex = null,
         editLineId = null,
@@ -50,6 +54,11 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
 
     const onYes = () => {
         navigation.navigate('SalesOrderShadeList', {
+            mode,
+            uid,
+            soNo,
+            soDate,
+
             editMode: false,
             editIndex: null,
             editLineId: null,
@@ -85,7 +94,18 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
                     'OrderSummaryScreen',
                 ].includes(r.name),
         );
+        const stableUid = Number(
+            uid ||
+            workingRows?.[0]?.UId ||
+            lastRow?.UId ||
+            oldRow?.UId ||
+            0
+        );
 
+        const stableMode =
+            stableUid > 0 || mode === 'EDIT'
+                ? 'EDIT'
+                : 'ADD';
         navigation.dispatch(
             CommonActions.reset({
                 index: keepRoutes.length,
@@ -94,6 +114,11 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
                     {
                         name: 'OrderSummaryScreen',
                         params: {
+                            mode: stableMode,
+                            uid: stableUid,
+                            skipReload: true,
+                            soNo,
+                            soDate,
                             completedRows: workingRows,
                             completedRow: lastRow,
 

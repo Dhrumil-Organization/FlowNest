@@ -17,6 +17,10 @@ const toText = v => String(v || '').trim();
 
 const SalesOrderDesignList = ({ navigation, route }) => {
     const {
+        mode = 'ADD',
+        uid = 0,
+        soNo = '',
+        soDate = '',
         editMode = false,
         editIndex = null,
         editLineId = null,
@@ -55,6 +59,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
         cancelToken: cancelToken?.token,
     });
 
+    console.log("selectedItem", selectedItem);
     //   const loadDesigns = async () => {
     //     if (!selectedItem?.ItmCode) {
     //       Alert.alert('Required', 'Item is missing.');
@@ -114,8 +119,8 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 yearno: yrno,
                 itmcode: selectedItem.ItmCode,
                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
-                search,
-                txntype:'mob_app_sales_order'
+                // search,
+                txntype: 'mob_app_sales_order'
             };
             console.log("party type historyPayload:", payload);
 
@@ -146,14 +151,14 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     }, []);
 
 
-    useEffect(() => {
-        const t = setTimeout(() => {
-            loadDesigns();
-        }, 400);
+    // useEffect(() => {
+    //     const t = setTimeout(() => {
+    //         loadDesigns();
+    //     }, 400);
 
 
-        return () => clearTimeout(t);
-    }, [search]);
+    //     return () => clearTimeout(t);
+    // }, [search]);
 
 
     const filteredDesigns = useMemo(() => {
@@ -176,14 +181,24 @@ const SalesOrderDesignList = ({ navigation, route }) => {
             }
         }
 
-        arr = arr
-            .filter(item => {
-                return (
-                    toText(item.DsnCode).toLowerCase().includes(s) ||
-                    toText(item.DsnName).toLowerCase().includes(s) ||
-                    toText(item.DesignName).toLowerCase().includes(s)
-                );
-            })
+        // arr = arr
+        //     .filter(item => {
+        //         return (
+        //             toText(item.DsnCode).toLowerCase().includes(s) ||
+        //             toText(item.DsnName).toLowerCase().includes(s) ||
+        //             toText(item.DesignName).toLowerCase().includes(s)
+        //         );
+        //     })
+        arr = arr.filter((item) => {
+
+            const fullText = `
+        ${toText(item.DsnCode)}
+        ${toText(item.DsnName)}
+        ${toText(item.DesignName)}
+    `.toLowerCase();
+
+            return fullText.includes(s.toLowerCase());
+        })
             .sort((a, b) => {
                 if (editMode && oldRow?.DsnCode) {
                     if (String(a.DsnCode) === String(oldRow.DsnCode)) return -1;
@@ -198,6 +213,10 @@ const SalesOrderDesignList = ({ navigation, route }) => {
 
     const selectDesign = design => {
         navigation.navigate('SalesOrderShadeList', {
+            mode,
+            uid,
+            soNo,
+            soDate,
             editMode,
             editIndex,
             editLineId,

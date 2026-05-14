@@ -100,6 +100,7 @@ import SalesOrderModule from './components/SalesOrderNew/SalesOrderModule';
 import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
 import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueReturnEntry';
 import CreelIssueReturnModifyEntry from './components/CreelIssueReturn/CreelIssueReturnModifyEntry';
+import DoffEntry from './components/DoffEntry/DoffEntry';
 
 const Stack = createNativeStackNavigator();
 
@@ -1166,17 +1167,20 @@ export default function App() {
                       component={PartyDetailScreen}
                     />
 
-
-
-
-                    <Stack.Screen name="Weft Issue">{(props) =>
-                      <>
-                        <WftIssue {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-
-                      </>
-                    }</Stack.Screen>
+                    <Stack.Screen name="Weft Issue">
+                      {props => (
+                        <>
+                          <WftIssue
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        </>
+                      )}
+                    </Stack.Screen>
                     <Stack.Screen name="Sales Order New">
-                      {(props) => (
+                      {props => (
                         <SalesOrderModule
                           {...props}
                           token={gettoken || ''}
@@ -1206,6 +1210,18 @@ export default function App() {
                     }</Stack.Screen>
                     <Stack.Screen name="CreelIssueReturnEntry" component={CreelIssueReturnEntry} />
                     <Stack.Screen name="CreelIssueReturnModifyEntry" component={CreelIssueReturnModifyEntry} />
+                    <Stack.Screen name="Doff Entry">
+                      {props => (
+                        <>
+                          <DoffEntry
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        </>
+                      )}
+                    </Stack.Screen>
                   </Stack.Navigator>
                   {/* </Stack.Navigator> */}
 

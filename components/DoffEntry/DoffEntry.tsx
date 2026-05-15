@@ -11,10 +11,7 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Picker } from '@react-native-picker/picker';
 import {
   fetchAllPropertyData,
   fetchAllYeardata,
@@ -24,8 +21,9 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import theme from '../../android/app/src/theme';
+import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 
-const DoffEntry = ({ navigation, token }) => {
+const DoffEntry = ({ navigation, token, username }) => {
   const [filterVisible, setFilterVisible] = useState(false);
   const [doffAddFormVisible, setDoffAddFormVisible] = useState(false);
   const [doffUpdateFormVisible, setDoffUpdateFormVisible] = useState(false);
@@ -68,12 +66,7 @@ const DoffEntry = ({ navigation, token }) => {
   const [tempone, setTempone] = useState('');
   const [temptwo, setTemptwo] = useState('');
   const [tempthree, setTempthree] = useState('');
-
-  // const [startTime, setStartTime] = useState(new Date());
-  // const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-
   const [endTime, setEndTime] = useState(new Date());
-
   const [totcones, setTotcones] = useState('');
   const [totchees, setTotchees] = useState('');
   const [totgrsqty, setTotgrsqty] = useState('');
@@ -86,7 +79,6 @@ const DoffEntry = ({ navigation, token }) => {
   // For Date Picker
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-
   // For Time Picker
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState(new Date());
@@ -97,23 +89,15 @@ const DoffEntry = ({ navigation, token }) => {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   // 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [itemToUpdate, setItemToUpdate] = useState(null);
   // 
   const [editableDoffData, setEditableDoffData] = useState({});
-  const [editingDoffId, setEditingDoffId] = useState(null); // To track which doff is being edited
-  const [showStartDateTimePicker, setShowStartDateTimePicker] = useState(false);
-  const [showEndDateTimePicker, setShowEndDateTimePicker] = useState(false);
-  const [editingField, setEditingField] = useState(null); // 'start' or 'end'
   // 
-  const [dateTimeModalVisible, setDateTimeModalVisible] = useState(false);
-  const [tempSelectedDate, setTempSelectedDate] = useState(null);
-  const [tempSelectedTime, setTempSelectedTime] = useState(null);
-  const [selectedDateTimeField, setSelectedDateTimeField] = useState(null); // 'start' or 'end'
-  const [selectedDoffId, setSelectedDoffId] = useState(null); // Track which doff is being edited
-  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
-  const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [minDate, setMinDate] = useState(new Date());
   const [maxDate, setMaxDate] = useState(new Date(new Date().getFullYear() + 10, 11, 31)); // Current year + 10 years
+  const [pickerVisibility, setPickerVisibility] = useState({});
 
   const [alertData, setAlertData] = useState({
     visible: false,
@@ -145,6 +129,20 @@ const DoffEntry = ({ navigation, token }) => {
     });
   };
 
+  const showPicker = (doffId, field) => {
+    setPickerVisibility(prev => ({
+      ...prev,
+      [doffId]: { ...prev[doffId], [field]: true }
+    }));
+  };
+
+  const hidePicker = (doffId, field) => {
+    setPickerVisibility(prev => ({
+      ...prev,
+      [doffId]: { ...prev[doffId], [field]: false }
+    }));
+  };
+
   useEffect(() => {
     const load = async () => {
       const data = await fetchAllPropertyData(token);
@@ -157,6 +155,30 @@ const DoffEntry = ({ navigation, token }) => {
       load();
     }, 2000);
   }, [token]);
+
+  useEffect(() => {
+    if (getAllDoffData.length > 0) {
+      const initialData = {};
+      getAllDoffData.forEach((item, index) => {
+        const doffId = item.uid || index;
+        initialData[doffId] = {
+          startreading: item.startreading || '',
+          endreading: item.endreading || '',
+          startdate: item.startdate || '',   // Already YYYYMMDD from API
+          starttime: item.starttime || '',
+          enddate: item.enddate || '',
+          endtime: item.endtime || '',
+          totcones: item.totcones || '',  // Add this
+          totchees: item.totchees || '',  // Add this
+          totnetqty: item.totnetqty || '',  // Add this
+          tottareqty: item.tottareqty || '',  // Add this
+          totgrsqty: item.totgrsqty || '',  // Add this
+          islastdoff: item.islastdoff || '0',
+        };
+      });
+      setEditableDoffData(initialData);
+    }
+  }, [getAllDoffData]);
 
   useEffect(() => {
     const currentYear = new Date().getFullYear();
@@ -227,6 +249,15 @@ const DoffEntry = ({ navigation, token }) => {
       storeFunc();
     }
   }, [selectedYear]);
+
+  // Display date from YYYYMMDD string as DD/MM/YYYY
+  const getDisplayDateFromYYYYMMDD = (dateStr) => {
+    if (!dateStr || dateStr.length !== 8) return '-';
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    return `${day}/${month}/${year}`;
+  };
 
   // Helper function for date formatting dd/mm/yyyy
   const formatDateDDMMYYYY = (date) => {
@@ -316,12 +347,6 @@ const DoffEntry = ({ navigation, token }) => {
 
     setMachinePickerVisible(true);
   };
-
-  //   useEffect(() => {
-  //     if (selectedMachines) {
-  //       showData();
-  //     }
-  //   }, [selectedMachines]);
 
   const showData = async (selectedMachines) => {
     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
@@ -511,193 +536,113 @@ const DoffEntry = ({ navigation, token }) => {
     }
   };
 
-  const handleDoffUpdate = async (item, editedData) => {
-    try {
-      let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
-      let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
-      let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
-
-      // Prepare the payload with edited data
-      const finalPayload = {
-        prpcode: prp3,
-        yearno: yearnumber3,
-        strcode: finalStrCode,
-        txntype: 'mobile_doff_entry',
-        maccode: item?.maccode,
-        uid: item?.uid,
-        productionuid: item?.productionuid,
-        startdate: editedData.startdate || item.startdate,
-        starttime: editedData.starttime || item.starttime,
-        enddate: editedData.enddate || item.enddate,
-        endtime: editedData.endtime || item.endtime,
-        startreading: editedData.startreading || item.startreading,
-        // Include other fields from item that should be preserved
-        ...Object.fromEntries(
-          Object.entries(item).filter(([key]) => !['startdate', 'starttime', 'enddate', 'endtime', 'startreading'].includes(key))
-        )
-      };
-
-      console.log('📤 doff Update PAYLOAD:', finalPayload);
-
-      const response = await axios.post(
-        `${API}/api/proddoffupdate`, // Make sure this is the correct endpoint
-        finalPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      console.log('📥 Doff Update RESPONSE:', response.data);
-
-      if (response.data.success) {
-        const data = response.data.data.main;
-        showSuccess('Doff updated successfully');
-        setAllDoffData(data);
-        // Reset editable data for this doff
-        setEditableDoffData(prev => {
-          const newData = { ...prev };
-          delete newData[item.uid || getAllDoffData.indexOf(item)];
-          return newData;
-        });
-      } else {
-        showWarning(response.data.message || 'Failed to update doff');
-      }
-    } catch (error) {
-      console.log('❌ API Error:', error);
-      showError('API failed: ' + (error.response?.data?.message || error.message));
-    }
-  };
-
-  // const handleDoffDelete = async (item) => {
-  //   // doffAdd();
-  //   console.log('===handleDoffDelete===', item);
-  //   // Merged payload create karo
-  //   const mergedPayload = createMergedPayload(getAllDoffDataNew, getSelectedFilteredMachine);
-
-  //   // Format date and time
-  //   //  const formattedStartDate = formatDateDDMMYYYY(startDate);
-  //   //  const formattedStartTime = formatTimeWithDot(startTime);
-  //   //  const combinedDateTime = combineDateTime(startDate, startTime);
-  //   let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
-  //   let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
-  //   let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
-  //   // Final payload
-  //   const finalPayload = {
-  //     // ...mergedPayload,
-  //     //  startdate: formattedStartDate,
-  //     //  starttime: formattedStartTime,
-  //     //  startdatetime: combinedDateTime.toISOString(),
-  //     //  shfcode: '0',
-  //     //  d1: [],
-  //     //  d2: [],
-  //     prpcode: prp3,
-  //     yearno: yearnumber3,
-  //     strcode: finalStrCode,
-  //     txntype: 'mobile_doff_entry',
-  //     maccode: item?.maccode,
-  //     uid: item?.uid,
-  //     productionuid: item?.productionuid
-  //   };
-
-  //   // Only add machine fields if they are not already in mergedPayload
-  //   // if (getSelectedFilteredMachine && getSelectedFilteredMachine[0]) {
-  //   //   const machine = getSelectedFilteredMachine[0];
-
-  //   //   // Sirf wahi fields add karo jo mergedPayload mein null/empty hain
-  //   //   // if (!finalPayload.maccode) finalPayload.maccode = machine.MacCode || null;
-  //   //   // if (!finalPayload.macname) finalPayload.macname = machine.MacName || null;
-  //   //   // if (!finalPayload.macspeed) finalPayload.macspeed = machine.MacSpeed || null;
-  //   //   // if (!finalPayload.macspindle) finalPayload.macspindle = machine.MacSpindle || null;
-  //   //   // if (!finalPayload.powerconsumption) finalPayload.powerconsumption = machine.powerconsumption || null;
-  //   // }
-
-  //   console.log('📤 doff Delete PAYLOAD:', finalPayload);
-
-  //   try {
-  //     const response = await axios.post(
-  //       `${API}/api/proddoffdelete`,
-  //       finalPayload,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           'Content-Type': 'application/json'
-  //         }
-  //       }
-  //     );
-
-  //     console.log('📥 Doff Delete RESPONSE:', finalPayload, response.data);
-
-  //     if (response.data.success) {
-  //       const data = response.data.data.main;
-  //       showSuccess('Doff deleted successfully');
-  //       setAllDoffData(data);
-  //     } else {
-  //       showWarning(response.data.message || 'Failed to delete doff');
-  //     }
-
-  //   } catch (error) {
-  //     console.log('❌ API Error:', error);
-  //     showError('API failed: ' + (error.response?.data?.message || error.message));
-  //   }
-  //   // showSuccess('Doff updated successfully');
-  // }
   const handleDoffDelete = (item) => {
     setItemToDelete(item); // Store the item to delete
     setShowDeleteConfirm(true); // Show confirmation modal
   };
 
+  const handleDoffUpdate = (item) => {
+    setItemToUpdate(item); // Store the item to delete
+    setShowUpdateConfirm(true); // Show confirmation modal
+  };
   console.log('===getAllDoffData===', getAllDoffDataNew, getSelectedFilteredMachine);
+  // const (editableDoffData[selectedDoffId] || {}) =
+  //   editableDoffData[selectedDoffId] || {};
+
+  const calculateSums = () => {
+    const sums = {
+      totcones: 0,
+      totchees: 0,
+      totgrsqty: 0,
+      tottareqty: 0,
+      totnetqty: 0,
+    };
+
+    getAllDoffData.forEach(item => {
+      sums.totcones += parseFloat(item.totcones || 0);
+      sums.totnetqty += parseFloat(item.totnetqty || 0);
+    });
+
+    return sums;
+  };
+
+  const sums = calculateSums();
 
   return (
     <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'Doff Entry'}
+        subHeader={'Manage your doff records'}
+        noBorderRadius={true}
+      />
+      <TouchableOpacity style={styles.listIconContainer} onPress={() => setFilterVisible(true)}>
+        <Icon name="list" size={24} color="#fff" />
+      </TouchableOpacity>
       <View style={{ flex: 1, backgroundColor: '#F5F7FB' }}>
-        {/* Top Header */}
-        <LinearGradient
-          colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-          style={styles.topHeader}
-        >
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backBtn}
-          >
-            <Icon name="arrow-back-ios-new" size={18} color="#fff" />
-          </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>Doff Entry</Text>
-
-          <TouchableOpacity onPress={() => setFilterVisible(true)}>
-            <Icon name="tune" size={22} color="#fff" />
-          </TouchableOpacity>
-        </LinearGradient>
         {getAllDoffData && getAllDoffData.length > 0 || selectedProperty?.PrpCode ? (
           <>
+            {/* Machine Info Card (Compact) */}
             <View style={styles.machineInfoCard}>
-              <View style={styles.machineInfoRow}>
-                <Text style={styles.machineInfoLabel}>Machine No:</Text>
-                <Text style={styles.machineInfoValue}>
-                  {getSelectedFilteredMachine[0]?.MacName || 'N/A'}
-                </Text>
-              </View>
-              <View style={styles.machineInfoRow}>
-                <Text style={styles.machineInfoLabel}>Item Name:</Text>
-                <Text style={styles.machineInfoValue}>
-                  {getSelectedFilteredMachine[0]?.itmname || 'N/A'}
-                </Text>
-              </View>
-              <View style={styles.machineInfoRow}>
-                <Text style={styles.machineInfoLabel}>Merge No:</Text>
-                <Text style={styles.machineInfoValue}>
-                  {getSelectedFilteredMachine[0]?.mername || 'N/A'}
-                </Text>
-              </View>
-              <View style={styles.machineInfoRow}>
-                <Text style={styles.machineInfoLabel}>Shade:</Text>
-                <Text style={styles.machineInfoValue}>
-                  {getSelectedFilteredMachine[0]?.shade || 'N/A'}
-                </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.machineInfoScroll}
+              >
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Machine No:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.MacName || 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>R.C. No:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.prodno || 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>R.C. Date:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.proddate ? getDisplayDateFromYYYYMMDD(getSelectedFilteredMachine[0]?.proddate) : 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Item Name:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.itmname || 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Merge No:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.mername || 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Shade:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.shade || 'N/A'}
+                  </Text>
+                </View>
+              </ScrollView>
+            </View>
+            <View style={styles.summaryCard}>
+              {/* <Text style={styles.summaryTitle}>Doff Summary</Text> */}
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Total Tubes:</Text>
+                  <Text style={styles.summaryValue}>{sums.totcones.toFixed(2)}</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Total Net Wt.:</Text>
+                  <Text style={styles.summaryValue}>{sums.totnetqty.toFixed(2)}</Text>
+                </View>
               </View>
             </View>
             <View style={styles.accordionContainer}>
@@ -716,36 +661,6 @@ const DoffEntry = ({ navigation, token }) => {
 
               {expanded && (
                 <View style={styles.accordionContent}>
-                  {/* Machine Info Card */}
-                  {/* <View style={styles.machineInfoCard}>
-                <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Machine No:</Text>
-                  <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.MacName || 'N/A'}
-                  </Text>
-                </View>
-                <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Item Name:</Text>
-                  <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.itmname || 'N/A'}
-                  </Text>
-                </View>
-                <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Merge No:</Text>
-                  <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.mername || 'N/A'}
-                  </Text>
-                </View>
-                <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Shade:</Text>
-                  <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.shade || 'N/A'}
-                  </Text>
-                </View>
-              </View> */}
-
-                  {/* Date Time Picker */}
-                  {/* Date Picker Section */}
                   {/* Date & Time Picker Section */}
                   <View style={styles.fieldContainer}>
                     <Text style={styles.label}>Start Date & Time</Text>
@@ -858,143 +773,100 @@ const DoffEntry = ({ navigation, token }) => {
 
         <ScrollView contentContainerStyle={{ padding: 8 }}>
           <FlatList
+            // key={refreshKey}
             data={getAllDoffData}
-            keyExtractor={(item, index) => index.toString()}
+            keyExtractor={(item, index) => `${item.uid || index}`}
             contentContainerStyle={{ padding: 8 }}
-            // renderItem={({ item, index }) => {
-            //   const compactData = [
-            //     { label: 'Mach Speed', value: item.macactspeed },
-            //     { label: 'Spindles', value: item.macspindle },
-
-            //     { label: 'Act. Spin', value: item.macactspindle },
-            //     {
-            //       label: 'Idle Spin',
-            //       value:
-            //         parseFloat(item.macspindle || 0) -
-            //         parseFloat(item.macactspindle || 0),
-            //     },
-
-            //     { label: 'Unit Start', value: item.startreading },
-            //     { label: 'Temp 1', value: item.tempone },
-
-            //     { label: 'Temp 2', value: item.temptwo },
-            //     { label: 'Temp 3', value: item.tempthree },
-
-            //     {
-            //       label: 'Start',
-            //       value: `${item.startdate} ${item.starttime}`,
-            //     },
-
-            //     {
-            //       label: 'End',
-            //       value: `${item.enddate} ${item.endtime}`,
-            //     },
-
-            //     { label: 'Tubes', value: item.totcones },
-            //     { label: 'Chees', value: item.totchees },
-
-            //     { label: 'Gross', value: item.totgrsqty },
-            //     { label: 'Tare', value: item.tottareqty },
-
-            //     { label: 'Net', value: item.totnetqty },
-            //     { label: 'Tot Unit', value: item.powerconsumption },
-            //   ];
-
-            //   return (
-            //     <View style={styles.compactCard}>
-            //       {/* Header */}
-            //       <View style={styles.compactHeader}>
-            //         <Text style={styles.compactTitle}>Doff #{index + 1}</Text>
-
-            //         <View style={styles.shiftBadgeContainer}>
-            //           <View style={styles.shiftBadge}>
-            //             <Text style={styles.shiftText}>
-            //               {item.shfname || 'Shift'}
-            //             </Text>
-            //           </View>
-            //           <TouchableOpacity
-            //             style={styles.smallDeleteBtn}
-            //             // onPress={() => setDoffUpdateFormVisible(true)}
-            //             onPress={() => handleDoffDelete(item)}
-            //           >
-            //             <Icon name="delete" size={20} color="red" />
-            //           </TouchableOpacity>
-            //         </View>
-
-            //       </View>
-
-            //       {/* Compact Grid */}
-            //       <View style={styles.compactGrid}>
-            //         {compactData.map((row, i) => (
-            //           <View key={i} style={styles.compactItem}>
-            //             <Text style={styles.compactLabel}>{row.label}</Text>
-
-            //             <Text numberOfLines={1} style={styles.compactValue}>
-            //               {row.value || '-'}
-            //             </Text>
-            //           </View>
-            //         ))}
-            //       </View>
-
-            //       {/* Footer */}
-            //       <View style={styles.compactFooter}>
-            //         <View style={styles.switchRow}>
-            //           <Text style={styles.lastDoffText}>Last Doff</Text>
-
-            //           <Switch
-            //             value={false}
-            //             trackColor={{ false: '#ccc', true: '#0F6C7B' }}
-            //             thumbColor="#fff"
-            //           />
-            //         </View>
-
-            //         <TouchableOpacity
-            //           style={styles.smallUpdateBtn}
-            //           // onPress={() => setDoffUpdateFormVisible(true)}
-            //           onPress={() => handleDoffUpdate(item)}
-            //         >
-            //           <Text style={styles.smallUpdateText}>UPDATE</Text>
-            //         </TouchableOpacity>
-            //       </View>
-            //     </View>
-            //   );
-            // }}
+            extraData={editableDoffData}
             renderItem={({ item, index }) => {
-              // Initialize editable data for this doff if not already set
               const doffId = item.uid || index;
-              if (!editableDoffData[doffId]) {
-                setEditableDoffData(prev => ({
-                  ...prev,
-                  [doffId]: {
-                    startreading: item.startreading || '',
-                    startdate: item.startdate || '',
-                    starttime: item.starttime || '',
-                    enddate: item.enddate || '',
-                    endtime: item.endtime || '',
-                  }
-                }));
-              }
-
               const currentEditableData = editableDoffData[doffId] || {};
 
-              const handleFieldChange = (field, value) => {
-                setEditableDoffData(prev => ({
-                  ...prev,
-                  [doffId]: {
-                    ...prev[doffId],
-                    [field]: value
+              // --- Editable Text Component (prevents focus loss) ---
+              const EditableText = ({ field, value, placeholder }) => {
+                const [localValue, setLocalValue] = useState(value);
+                useEffect(() => {
+                  setLocalValue(value);
+                }, [value]);
+                return (
+                  <TextInput
+                    style={styles.dateTimePickerButton}
+                    value={localValue}
+                    onChangeText={setLocalValue}
+                    onBlur={() => {
+                      if (localValue !== value) {
+                        handleFieldChange(field, localValue);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    placeholder={placeholder}
+                    placeholderTextColor="#999"
+                  />
+                );
+              };
+
+              // --- Display helpers ---
+              const getDisplayDate = (dateStr) => {
+                if (dateStr && dateStr.length === 8) {
+                  // YYYYMMDD -> DD/MM/YYYY
+                  return `${dateStr.substring(6, 8)}/${dateStr.substring(4, 6)}/${dateStr.substring(0, 4)}`;
+                }
+                return '-';
+              };
+              const getDisplayTime = (timeStr) => timeStr || '--:--';
+
+              // --- Field change handler (only updates state, no refreshKey increment) ---
+              const validateDates = (startDateStr, endDateStr) => {
+                // if (!startDateStr && !endDateStr) return { valid: true, message: '' };
+                if (!startDateStr) return { valid: true, message: '' }; // Both empty is okay
+                // if (startDateStr && !endDateStr) {
+                //   return { valid: false, message: 'End date is required if start date is provided.' };
+                // }
+                if (startDateStr && endDateStr) {
+                  const startDate = parseYYYYMMDD(startDateStr);
+                  const endDate = parseYYYYMMDD(endDateStr);
+                  if (endDate < startDate) {
+                    return { valid: false, message: 'End date must be after or equal to start date.' };
                   }
-                }));
+                }
+                return { valid: true, message: '' };
               };
 
-              const formatDateForPicker = (dateStr) => {
-                if (!dateStr) return new Date();
-                const day = dateStr.substring(0, 2);
-                const month = dateStr.substring(2, 4) - 1; // Months are 0-indexed in JS
-                const year = dateStr.substring(4, 8);
-                return new Date(year, month, day);
-              };
+              const handleFieldChange = (field, value) => {
+                const newEditableData = {
+                  ...editableDoffData,
+                  [doffId]: { ...currentEditableData, [field]: value },
+                };
 
+                // If field is 'startdate' or 'enddate', validate
+                if (field === 'startdate' || field === 'enddate') {
+                  const startDate = newEditableData[doffId]?.startdate || item.startdate;
+                  const endDate = newEditableData[doffId]?.enddate || item.enddate;
+
+                  const validation = validateDates(startDate, endDate);
+                  if (!validation.valid) {
+                    showWarning(validation.message);
+                    return; // Do not update state if invalid
+                  }
+                }
+
+                setEditableDoffData(newEditableData);
+              };
+              // --- Date/Time picker helpers (using YYYYMMDD) ---
+              const parseYYYYMMDD = (dateStr) => {
+                if (!dateStr || dateStr.length !== 8) return new Date();
+                return new Date(
+                  parseInt(dateStr.substring(0, 4), 10),
+                  parseInt(dateStr.substring(4, 6), 10) - 1,
+                  parseInt(dateStr.substring(6, 8), 10)
+                );
+              };
+              const formatDateYYYYMMDD = (date) => {
+                const y = date.getFullYear();
+                const m = (date.getMonth() + 1).toString().padStart(2, '0');
+                const d = date.getDate().toString().padStart(2, '0');
+                return `${y}${m}${d}`;
+              };
               const formatTimeForPicker = (timeStr) => {
                 if (!timeStr) return new Date();
                 const [hours, minutes] = timeStr.split('.').map(Number);
@@ -1003,493 +875,266 @@ const DoffEntry = ({ navigation, token }) => {
                 return date;
               };
 
-              const handleDateTimeChange = (fieldPrefix, date, type) => {
-                if (type === 'date') {
-                  const formattedDate = formatDateDDMMYYYY(date).replace(/\//g, '');
-                  handleFieldChange(`${fieldPrefix}date`, formattedDate);
-                } else if (type === 'time') {
-                  const formattedTime = formatTimeWithDot(date);
-                  handleFieldChange(`${fieldPrefix}time`, formattedTime);
-                }
-              };
-
-              // const compactData = [
-              //   { label: 'Mach Speed', value: item.macactspeed },
-              //   { label: 'Spindles', value: item.macspindle },
-              //   { label: 'Act. Spin', value: item.macactspindle },
-              //   {
-              //     label: 'Idle Spin',
-              //     value: parseFloat(item.macspindle || 0) - parseFloat(item.macactspindle || 0),
-              //   },
-              //   {
-              //     label: 'Unit Start',
-              //     value: currentEditableData.startreading,
-              //     editable: true,
-              //     field: 'startreading',
-              //     type: 'text'
-              //   },
-              //   { label: 'Temp 1', value: item.tempone },
-              //   { label: 'Temp 2', value: item.temptwo },
-              //   { label: 'Temp 3', value: item.tempthree },
-              //   {
-              //     label: 'Start',
-              //     value: `${currentEditableData.startdate} ${currentEditableData.starttime}`,
-              //     editable: true,
-              //     field: 'start',
-              //     type: 'datetime'
-              //   },
-              //   {
-              //     label: 'End',
-              //     value: `${currentEditableData.enddate} ${currentEditableData.endtime}`,
-              //     editable: true,
-              //     field: 'end',
-              //     type: 'datetime'
-              //   },
-              //   { label: 'Tubes', value: item.totcones },
-              //   { label: 'Chees', value: item.totchees },
-              //   { label: 'Gross', value: item.totgrsqty },
-              //   { label: 'Tare', value: item.tottareqty },
-              //   { label: 'Net', value: item.totnetqty },
-              //   { label: 'Tot Unit', value: item.powerconsumption },
-              // ];
-              const compactData = [
+              // --- Static grid data (no editable fields here) ---
+              const getCompactData = () => [
                 { label: 'Mach Speed', value: item.macactspeed },
                 { label: 'Spindles', value: item.macspindle },
                 { label: 'Act. Spin', value: item.macactspindle },
-                {
-                  label: 'Idle Spin',
-                  value: parseFloat(item.macspindle || 0) - parseFloat(item.macactspindle || 0),
-                },
-                {
-                  label: 'Unit Start',
-                  value: currentEditableData.startreading,
-                  editable: true,
-                  field: 'startreading',
-                  type: 'text'
-                },
+                { label: 'Idle Spin', value: parseFloat(item.macspindle || 0) - parseFloat(item.macactspindle || 0) },
                 { label: 'Temp 1', value: item.tempone },
                 { label: 'Temp 2', value: item.temptwo },
                 { label: 'Temp 3', value: item.tempthree },
-                {
-                  label: 'Start',
-                  value: `${formatDateDDMMYYYY(formatDateForPicker(currentEditableData.startdate))} ${currentEditableData.starttime}`,
-                  editable: true,
-                  field: 'start',
-                  type: 'datetime'
-                },
-                {
-                  label: 'End',
-                  value: `${formatDateDDMMYYYY(formatDateForPicker(currentEditableData.enddate))} ${currentEditableData.endtime}`,
-                  editable: true,
-                  field: 'end',
-                  type: 'datetime'
-                },
-                { label: 'Tubes', value: item.totcones },
-                { label: 'Chees', value: item.totchees },
-                { label: 'Gross', value: item.totgrsqty },
-                { label: 'Tare', value: item.tottareqty },
-                { label: 'Net', value: item.totnetqty },
-                { label: 'Tot Unit', value: item.powerconsumption },
               ];
 
+              const compactData = getCompactData();
               return (
-                <View style={styles.compactCard}>
+                <View style={item.islastdoff === '1' ? styles.compactCardLast : styles.compactCard}>
                   {/* Header */}
                   <View style={styles.compactHeader}>
                     <Text style={styles.compactTitle}>Doff #{index + 1}</Text>
                     <View style={styles.shiftBadgeContainer}>
-                      <View style={styles.shiftBadge}>
-                        <Text style={styles.shiftText}>{item.shfname || 'Shift'}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.smallDeleteBtn}
-                        onPress={() => handleDoffDelete(item)}
-                      >
+                      <TouchableOpacity onPress={() => handleDoffDelete(item)}>
                         <Icon name="delete" size={20} color="red" />
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  {/* Compact Grid */}
-                  <View style={styles.compactGrid}>
+                  {/* Static Grid */}
+                  {/* <View style={styles.compactGrid}>
                     {compactData.map((row, i) => (
                       <View key={i} style={styles.compactItem}>
                         <Text style={styles.compactLabel}>{row.label}</Text>
-                        {/* {row.editable ? (
-                          row.type === 'text' ? (
-                            <TextInput
-                              style={[styles.compactValue, { color: '#0F172A' }]}
-                              value={row.value || ''}
-                              onChangeText={(text) => handleFieldChange(row.field, text)}
-                              keyboardType="numeric"
-                              placeholderTextColor="#999"
-                            />
-                          ) : (
-                            <TouchableOpacity
-                              style={{ flex: 1 }}
-                              onPress={() => {
-                                setEditingDoffId(doffId);
-                                setEditingField(row.field);
-                                if (row.field === 'start') {
-                                  setShowStartDateTimePicker(true);
-                                } else {
-                                  setShowEndDateTimePicker(true);
-                                }
-                              }}
-                            >
-                              <Text numberOfLines={1} style={styles.compactValue}>
-                                {row.value || '-'}
-                              </Text>
-                            </TouchableOpacity>
-                          )
-                        ) : (
-                          <Text numberOfLines={1} style={styles.compactValue}>
-                            {row.value || '-'}
-                          </Text>
-                        )} */}
-                        {row.editable ? (
-                          row.type === 'text' ? (
-                            <TextInput
-                              style={[styles.compactValue, { color: '#0F172A' }]}
-                              value={row.value || ''}
-                              onChangeText={(text) => handleFieldChange(row.field, text)}
-                              keyboardType="numeric"
-                              placeholderTextColor="#999"
-                            />
-                          ) : row.type === 'datetime' ? (
-                            <TouchableOpacity
-                              style={{ flex: 1 }}
-                              onPress={() => {
-                                setSelectedDoffId(doffId);
-                                setSelectedDateTimeField(row.field); // 'start' or 'end'
-                                setTempSelectedDate(null); // Reset temp values
-                                setTempSelectedTime(null);
-                                setDateTimeModalVisible(true);
-                              }}
-                            >
-                              <Text numberOfLines={1} style={styles.compactValue}>
-                                {row.value || '-'}
-                              </Text>
-                            </TouchableOpacity>
-                          ) : null
-                        ) : (
-                          <Text numberOfLines={1} style={styles.compactValue}>
-                            {row.value || '-'}
-                          </Text>
-                        )}
+                        <Text style={styles.compactValue}>{row.value || '-'}</Text>
                       </View>
                     ))}
+                  </View> */}
+
+                  <View style={styles.dateTimeRow}>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>No. Of Tubes</Text>
+                      <EditableText
+                        field="totcones"
+                        value={
+                          currentEditableData.totcones !== undefined
+                            ? currentEditableData.totcones
+                            : (item.totcones || '')
+                        }
+                        // placeholder="Enter cone weight"
+                      />
+                    </View>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Chees</Text>
+                      <EditableText
+                        field="totchees"
+                        value={
+                          currentEditableData.totchees !== undefined
+                            ? currentEditableData.totchees
+                            : (item.totchees || '')
+                        }
+                        // placeholder="Enter cone weight"
+                      />
+                    </View>
                   </View>
 
-                  {/* Date/Time Picker Modal (Single Modal for Date + Time) */}
-                  {/* Date/Time Modal */}
-                  {/* Date/Time Modal */}
-                  <Modal
-                    visible={dateTimeModalVisible}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => {
-                      setDateTimeModalVisible(false);
-                      setTempSelectedDate(null);
-                      setTempSelectedTime(null);
-                    }}
-                  >
-                    <View style={{
-                      flex: 1,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(0,0,0,0.5)',
-                    }}>
-                      <View style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 15,
-                        padding: 20,
-                        width: '85%',
-                      }}>
-                        {/* Title */}
-                        <Text style={{
-                          fontSize: 18,
-                          fontWeight: '600',
-                          color: '#000',
-                          marginBottom: 15,
-                          textAlign: 'center',
-                        }}>
-                          Select {selectedDateTimeField === 'start' ? 'Start' : 'End'} Date & Time
+                  {/* Start Date & Time */}
+                  <View style={styles.dateTimeRow}>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Start Date</Text>
+                      <TouchableOpacity
+                        style={styles.dateTimePickerButton}
+                        onPress={() => showPicker(doffId, 'startDate')}
+                      >
+                        <Text style={styles.compactValue}>
+                          {getDisplayDate(currentEditableData.startdate || item.startdate)}
                         </Text>
-
-                        {/* Date Field (Clickable) */}
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: '#F3F4F6',
-                            borderRadius: 8,
-                            padding: 12,
-                            marginBottom: 10,
-                          }}
-                          onPress={() => {
-                            setShowDatePickerModal(true);
-                          }}
-                        >
-                          <Icon name="date-range" size={20} color="#666" />
-                          <Text style={{ marginLeft: 10, color: '#000' }}>
-                            {tempSelectedDate
-                              ? formatDateDDMMYYYY(tempSelectedDate)
-                              : currentEditableData[`${selectedDateTimeField}date`]
-                                ? formatDateDDMMYYYY(formatDateForPicker(currentEditableData[`${selectedDateTimeField}date`]))
-                                : formatDateDDMMYYYY(new Date()) // Show current date if none selected
-                            }
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Time Field (Clickable) */}
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: '#F3F4F6',
-                            borderRadius: 8,
-                            padding: 12,
-                            marginBottom: 15,
-                          }}
-                          onPress={() => {
-                            // Show time picker
-                            setShowTimePickerModal(true);
-                          }}
-                        >
-                          <Icon name="schedule" size={20} color="#666" />
-                          <Text style={{ marginLeft: 10, color: '#000' }}>
-                            {tempSelectedTime ? formatTimeWithDot(tempSelectedTime) : currentEditableData[`${selectedDateTimeField}time`] || 'Select Time'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Selected Date/Time Preview */}
-                        <View style={{
-                          flexDirection: 'row',
-                          justifyContent: 'center',
-                          marginBottom: 15,
-                        }}>
-                          <Text style={{ fontSize: 14, color: '#444' }}>Selected: </Text>
-                          <Text style={{ fontSize: 16, fontWeight: '600', color: '#000' }}>
-                            {tempSelectedDate || currentEditableData[`${selectedDateTimeField}date`]
-                              ? `${tempSelectedDate
-                                ? formatDateDDMMYYYY(tempSelectedDate)
-                                : formatDateDDMMYYYY(formatDateForPicker(currentEditableData[`${selectedDateTimeField}date`]))
-                              } ${tempSelectedTime
-                                ? formatTimeWithDot(tempSelectedTime)
-                                : currentEditableData[`${selectedDateTimeField}time`] || '00.00'
-                              }`
-                              : `${formatDateDDMMYYYY(new Date())} 00.00` // Default to current date and 00.00 if none selected
-                            }
-                          </Text>
-                        </View>
-
-                        {/* Buttons */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-                          <TouchableOpacity
-                            onPress={() => {
-                              setDateTimeModalVisible(false);
-                              setTempSelectedDate(null);
-                              setTempSelectedTime(null);
-                            }}
-                            style={{
-                              backgroundColor: '#ccc',
-                              paddingHorizontal: 20,
-                              paddingVertical: 10,
-                              borderRadius: 8,
-                            }}
-                          >
-                            <Text style={{ color: '#000', fontWeight: '600' }}>Cancel</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={() => {
-                              if (tempSelectedDate || currentEditableData[`${selectedDateTimeField}date`]) {
-                                // Update the editable data with selected date (or existing if none selected)
-                                handleFieldChange(
-                                  `${selectedDateTimeField}date`,
-                                  tempSelectedDate
-                                    ? formatDateDDMMYYYY(tempSelectedDate).replace(/\//g, '')
-                                    : currentEditableData[`${selectedDateTimeField}date`]
-                                );
-                                handleFieldChange(
-                                  `${selectedDateTimeField}time`,
-                                  tempSelectedTime
-                                    ? formatTimeWithDot(tempSelectedTime)
-                                    : currentEditableData[`${selectedDateTimeField}time`] || '00.00'
-                                );
-                              }
-                              setDateTimeModalVisible(false);
-                              setTempSelectedDate(null);
-                              setTempSelectedTime(null);
-                            }}
-                            style={{
-                              backgroundColor: '#0F6C7B',
-                              paddingHorizontal: 20,
-                              paddingVertical: 10,
-                              borderRadius: 8,
-                            }}
-                          >
-                            <Text style={{ color: '#fff', fontWeight: '600' }}>OK</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Date Picker Modal */}
-                    {/* <Modal
-                      visible={showDatePickerModal}
-                      transparent
-                      animationType="fade"
-                      onRequestClose={() => setShowDatePickerModal(false)}
-                    > */}
-                    {/* Date Picker Modal */}
-                    {showDatePickerModal && (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+                      </TouchableOpacity>
+                      {pickerVisibility[doffId]?.startDate && (
                         <DateTimePicker
-                          value={tempSelectedDate || formatDateForPicker(currentEditableData[`${selectedDateTimeField}date`]) || new Date()}
+                          value={parseYYYYMMDD(currentEditableData.startdate || item.startdate)}
                           mode="date"
                           display="default"
+                          // Inside your DateTimePicker onChange for startDate
                           onChange={(event, date) => {
-                            setShowDatePickerModal(false);
+                            hidePicker(doffId, 'startDate');
                             if (event.type === 'set' && date) {
-                              setTempSelectedDate(date);
+                              const formatted = formatDateYYYYMMDD(date);
+                              const endDate = currentEditableData.enddate || item.enddate;
+
+                              const validation = validateDates(formatted, endDate);
+                              if (!validation.valid) {
+                                showWarning(validation.message);
+                                return;
+                              }
+
+                              handleFieldChange('startdate', formatted);
                             }
                           }}
                           textColor="#000"
-                          minimumDate={minDate} // Current date
-                          maximumDate={maxDate} // Current year + 10 years
-                          locale="en-IN"
+                          minimumDate={minDate}
+                          maximumDate={maxDate}
                         />
-                      </View>
-                    )}
-                    {/* </Modal> */}
-
-                    {/* Time Picker Modal */}
-                    {/* <Modal
-                    visible={showTimePickerModal}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setShowTimePickerModal(false)}
-                  > */}
-                    {showTimePickerModal && (
-                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+                      )}
+                    </View>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Start Time</Text>
+                      <TouchableOpacity
+                        style={styles.dateTimePickerButton}
+                        onPress={() => showPicker(doffId, 'startTime')}
+                      >
+                        <Text style={styles.compactValue}>
+                          {getDisplayTime(currentEditableData.starttime || item.starttime)}
+                        </Text>
+                      </TouchableOpacity>
+                      {pickerVisibility[doffId]?.startTime && (
                         <DateTimePicker
-                          value={tempSelectedTime || formatTimeForPicker(currentEditableData[`${selectedDateTimeField}time`]) || new Date()}
+                          value={formatTimeForPicker(currentEditableData.starttime || item.starttime)}
                           mode="time"
                           display="default"
                           is24Hour={true}
                           onChange={(event, time) => {
-                            setShowTimePickerModal(false);
+                            hidePicker(doffId, 'startTime');
                             if (event.type === 'set' && time) {
-                              setTempSelectedTime(time);
+                              const formatted = formatTimeWithDot(time);
+                              handleFieldChange('starttime', formatted);
+                              // setRefreshKey(prev => prev + 1);
                             }
                           }}
                           textColor="#000"
                         />
-                      </View>
-                    )}
-                    {/* </Modal> */}
-                  </Modal>
+                      )}
+                    </View>
+                  </View>
 
-                  {/* Date/Time Pickers */}
-                  {/* {editingDoffId === doffId && editingField === 'start' && showStartDateTimePicker && (
-                    <>
-                      <Modal
-                        visible={showStartDateTimePicker}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setShowStartDateTimePicker(false)}
+                  {/* End Date & Time (fixed to use YYYYMMDD) */}
+                  <View style={styles.dateTimeRow}>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>End Date</Text>
+                      <TouchableOpacity
+                        style={styles.dateTimePickerButton}
+                        onPress={() => showPicker(doffId, 'endDate')}
                       >
-                        <View style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                          <DateTimePicker
-                            value={formatDateForPicker(currentEditableData.startdate)}
-                            mode="date"
-                            display="default"
-                            onChange={(event, date) => {
-                              setShowStartDateTimePicker(false);
-                              if (event.type === 'set' && date) {
-                                handleDateTimeChange('start', date, 'date');
-                                setShowStartDateTimePicker(true); // Keep picker open for time selection
-                              }
-                            }}
-                            textColor="#000"
-                          />
-                          <DateTimePicker
-                            value={formatTimeForPicker(currentEditableData.starttime)}
-                            mode="time"
-                            display="default"
-                            is24Hour={true}
-                            onChange={(event, time) => {
-                              setShowStartDateTimePicker(false);
-                              if (event.type === 'set' && time) {
-                                handleDateTimeChange('start', time, 'time');
-                              }
-                            }}
-                            textColor="#000"
-                          />
-                        </View>
-                      </Modal>
-                    </>
-                  )}
+                        <Text style={styles.compactValue}>
+                          {getDisplayDate(currentEditableData.enddate || item.enddate)}
+                        </Text>
+                      </TouchableOpacity>
+                      {pickerVisibility[doffId]?.endDate && (
+                        <DateTimePicker
+                          value={parseYYYYMMDD(currentEditableData.enddate || item.enddate)}
+                          mode="date"
+                          display="default"
+                          // Inside your DateTimePicker onChange for endDate
+                          onChange={(event, date) => {
+                            hidePicker(doffId, 'endDate');
+                            if (event.type === 'set' && date) {
+                              const formatted = formatDateYYYYMMDD(date);
+                              const startDate = currentEditableData.startdate || item.startdate;
 
-                  {editingDoffId === doffId && editingField === 'end' && showEndDateTimePicker && (
-                    <>
-                      <Modal
-                        visible={showEndDateTimePicker}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setShowEndDateTimePicker(false)}
+                              const validation = validateDates(startDate, formatted);
+                              if (!validation.valid) {
+                                showWarning(validation.message);
+                                return;
+                              }
+
+                              handleFieldChange('enddate', formatted);
+                            }
+                          }}
+                          textColor="#000"
+                          minimumDate={minDate}
+                          maximumDate={maxDate}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>End Time</Text>
+                      <TouchableOpacity
+                        style={styles.dateTimePickerButton}
+                        onPress={() => showPicker(doffId, 'endTime')}
                       >
-                        <View style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                          <View style={{ marginBottom: 10, zIndex: 20 }} >
-                            <DateTimePicker
-                              value={formatDateForPicker(currentEditableData.enddate)}
-                              mode="date"
-                              display="default"
-                              onChange={(event, date) => {
-                                setShowEndDateTimePicker(false);
-                                if (event.type === 'set' && date) {
-                                  handleDateTimeChange('end', date, 'date');
-                                  setShowEndDateTimePicker(true); // Keep picker open for time selection
-                                }
-                              }}
-                              textColor="#000"
-                            />
-                          </View>
-                          <View style={{ marginBottom: 10, zIndex: 10 }} >
-                            <DateTimePicker
-                              value={formatTimeForPicker(currentEditableData.endtime)}
-                              mode="time"
-                              display="default"
-                              is24Hour={true}
-                              onChange={(event, time) => {
-                                setShowEndDateTimePicker(false);
-                                if (event.type === 'set' && time) {
-                                  handleDateTimeChange('end', time, 'time');
-                                }
-                              }}
-                              textColor="#000"
-                            />
-                          </View>
-                        </View>
-                      </Modal>
-                    </>
-                  )} */}
+                        <Text style={styles.compactValue}>
+                          {getDisplayTime(currentEditableData.endtime || item.endtime)}
+                        </Text>
+                      </TouchableOpacity>
+                      {pickerVisibility[doffId]?.endTime && (
+                        <DateTimePicker
+                          value={formatTimeForPicker(currentEditableData.endtime || item.endtime)}
+                          mode="time"
+                          display="default"
+                          is24Hour={true}
+                          onChange={(event, time) => {
+                            hidePicker(doffId, 'endTime');
+                            if (event.type === 'set' && time) {
+                              const formatted = formatTimeWithDot(time);
+                              handleFieldChange('endtime', formatted);
+                              // setRefreshKey(prev => prev + 1);
+                            }
+                          }}
+                          textColor="#000"
+                        />
+                      )}
+                    </View>
+                  </View>
+
+
+                  <View style={styles.dateTimeRow}>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Gross Wt.</Text>
+                      <EditableText
+                        field="totgrsqty"
+                        value={
+                          currentEditableData.totgrsqty !== undefined
+                            ? currentEditableData.totgrsqty
+                            : (item.totgrsqty || '')
+                        }
+                        // placeholder="Enter cone weight"
+                      />
+                    </View>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Net Wt.</Text>
+                      <EditableText
+                        field="totnetqty"
+                        value={
+                          currentEditableData.totnetqty !== undefined
+                            ? currentEditableData.totnetqty
+                            : (item.totnetqty || '')
+                        }
+                        // placeholder="Enter cone weight"
+                      />
+                    </View>
+                    <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Tar Wt.</Text>
+                      <EditableText
+                        field="tottareqty"
+                        value={
+                          currentEditableData.tottareqty !== undefined
+                            ? currentEditableData.tottareqty
+                            : (item.tottareqty || '')
+                        }
+                        // placeholder="Enter cone weight"
+                      />
+                    </View>
+                  </View>
 
                   {/* Footer */}
                   <View style={styles.compactFooter}>
                     <View style={styles.switchRow}>
                       <Text style={styles.lastDoffText}>Last Doff</Text>
                       <Switch
-                        value={item.islastdoff === '1' || item.islastdoff === 1}
+                        value={
+                          currentEditableData.islastdoff !== undefined
+                            ? currentEditableData.islastdoff === '1' || currentEditableData.islastdoff === 1 || currentEditableData.islastdoff === true
+                            : (item.islastdoff === '1' || item.islastdoff === 1)
+                        }
+                        onValueChange={(newValue) => {
+                          // Store as '1' for true, '0' for false
+                          handleFieldChange('islastdoff', newValue ? '1' : '0');
+                        }}
                         trackColor={{ false: '#ccc', true: '#0F6C7B' }}
                         thumbColor="#fff"
                       />
                     </View>
                     <TouchableOpacity
                       style={styles.smallUpdateBtn}
-                      onPress={() => handleDoffUpdate(item, currentEditableData)}
+                      onPress={() => handleDoffUpdate(item)}
                     >
                       <Text style={styles.smallUpdateText}>UPDATE</Text>
                     </TouchableOpacity>
@@ -1497,138 +1142,6 @@ const DoffEntry = ({ navigation, token }) => {
                 </View>
               );
             }}
-          // renderItem={({ item }) => (
-
-          //   <View style={styles.summaryCard}>
-
-          //     <View style={styles.cardTop}>
-          //       <Text style={styles.doffNo}>Doff No : 1</Text>
-
-          //       <View style={styles.shiftBadge}>
-          //         <Text style={styles.shiftText}>
-          //           {item.shfname || 'Shift'}
-          //         </Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Machine Speed</Text>
-          //         <Text style={styles.infoValue}>{item.macactspeed}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>No. of Spindles</Text>
-          //         <Text style={styles.infoValue}>{item.macspindle}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Act. Spindles</Text>
-          //         <Text style={styles.infoValue}>{item.macactspindle}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Idle Spindles</Text>
-          //         <Text style={styles.infoValue}>{parseFloat(item.macspindle) - parseFloat(item.macactspindle)}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Unit Start</Text>
-          //         <Text style={styles.infoValue}>{item.startreading}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Temp. One</Text>
-          //         <Text style={styles.infoValue}>{item.tempone}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Temp. Two</Text>
-          //         <Text style={styles.infoValue}>{item.temptwo}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Temp. Three</Text>
-          //         <Text style={styles.infoValue}>{item.tempthree}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.singleInfo}>
-          //       <Text style={styles.infoLabel}>Start Datetime</Text>
-          //       <Text style={styles.infoValue}>{item.startdate}: {item.starttime}</Text>
-          //     </View>
-
-          //     <View style={styles.divider} />
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>End Datetime</Text>
-          //         <Text style={styles.infoValue}>{item.enddate}: {item.endtime}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>No. of Tubes</Text>
-          //         <Text style={styles.infoValue}>{item.totcones}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Chees</Text>
-          //         <Text style={styles.infoValue}>{item.totchees}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Gross Wt.</Text>
-          //         <Text style={styles.infoValue}>{item.totgrsqty}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Tar. Wt.</Text>
-          //         <Text style={styles.infoValue}>{item.tottareqty}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Net Wt.</Text>
-          //         <Text style={styles.infoValue}>{item.totnetqty}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.infoGrid}>
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Unit End</Text>
-          //         <Text style={styles.infoValue}>{item.endreading}</Text>
-          //       </View>
-
-          //       <View style={styles.infoBox}>
-          //         <Text style={styles.infoLabel}>Tot. Unit</Text>
-          //         <Text style={styles.infoValue}>{item.powerconsumption}</Text>
-          //       </View>
-          //     </View>
-
-          //     <View style={styles.switchRow}>
-          //       <Text style={styles.switchText}>Is last Doff [islastdoff] ?</Text>
-
-          //       <Switch
-          //         value={false}
-          //         trackColor={{ false: '#ccc', true: '#0F6C7B' }}
-          //         thumbColor="#fff"
-          //       />
-          //     </View>
-
-          //     <TouchableOpacity style={styles.updateButton}>
-          //       <Text style={styles.updateButtonText}>UPDATE</Text>
-          //     </TouchableOpacity>
-          //   </View>
-          // )}
           />
         </ScrollView >
       </View >
@@ -1826,14 +1339,6 @@ const DoffEntry = ({ navigation, token }) => {
                     setSelectedMachines(item);
                     setMachinePickerVisible(false);
                   }}
-                //   onPress={() =>
-                //     toggleSelection(
-                //       item,
-                //       selectedMachines,
-                //       setSelectedMachines,
-                //       'MacCode',
-                //     )
-                //   }
                 >
                   <Text style={{ flex: 1, color: '#000' }}>{item.MacName}</Text>
 
@@ -1926,19 +1431,6 @@ const DoffEntry = ({ navigation, token }) => {
         </View>
       </Modal>
 
-      {/* {showStartTimePicker && (
-        <DateTimePicker
-          value={getDate || new Date()}
-          mode="date"
-          onChange={(event, selectedDate) => {
-            if (event.type === 'set' && selectedDate) {
-              setDate(selectedDate);
-            }
-            setShowStartTimePicker(false);
-          }}
-        />
-      )} */}
-
       {/* FILTER MODAL */}
       <Modal
         transparent
@@ -2029,553 +1521,6 @@ const DoffEntry = ({ navigation, token }) => {
           </View>
         </View>
       </Modal>
-
-      {/** Doff Add Form modal */}
-      <Modal
-        transparent
-        visible={doffAddFormVisible}
-        animationType="fade"
-        statusBarTranslucent={true}
-      >
-        <View style={styles.overlay}>
-          <View style={styles.sheet}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 20 }}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={styles.title}>Start doff form</Text>
-                <TouchableOpacity onPress={() => setDoffAddFormVisible(false)}>
-                  <Icon name="close" size={20} style={{ color: '#000' }} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.label}>Property</Text>
-              <TouchableOpacity
-                style={styles.inputBoxProperty}
-                onPress={() => setPropertyPickerVisible(true)}
-              >
-                <Text numberOfLines={1} style={{ color: '#000' }}>
-                  {selectedProperty?.LngName || 'Select property'}
-                </Text>
-                <Icon name="keyboard-arrow-down" size={24} />
-              </TouchableOpacity>
-
-              <View style={styles.row}>
-                {/* Year */}
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Year</Text>
-                  <TouchableOpacity
-                    style={styles.bigInput}
-                    onPress={() => setYearPickerVisible(true)}
-                  >
-                    <Text numberOfLines={1} style={styles.inputText}>
-                      {selectedYear || 'Year'}
-                    </Text>
-                    <Icon name="keyboard-arrow-down" size={20} />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Store */}
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Store</Text>
-                  <TouchableOpacity
-                    style={styles.bigInput}
-                    onPress={() => setStorePickerVisible(true)}
-                  >
-                    <Text numberOfLines={1} style={styles.inputText}>
-                      {selectedStore?.StrName || 'Select Store'}
-                    </Text>
-                    <Icon name="keyboard-arrow-down" size={20} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Machine */}
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Machine</Text>
-                <TouchableOpacity
-                  style={styles.inputBox}
-                  onPress={getMachineData}
-                >
-                  <Text numberOfLines={1} style={{ color: '#000' }}>
-                    {selectedMachines?.MacName || 'Select machine'}
-                    {/* {(selectedMachines &&
-                      selectedMachines.map(i => i.MacName).join(', ')) ||
-                      'Select machine'} */}
-                  </Text>
-                  <Icon name="keyboard-arrow-down" size={24} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Machine Speed + Spindles */}
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Machine Speed</Text>
-                  <TextInput
-                    value={macactspeed}
-                    onChangeText={setMacactspeed}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>No. of Spindles</Text>
-                  <TextInput
-                    value={macspindle}
-                    onChangeText={setMacspindle}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Act. spindles</Text>
-                  <TextInput
-                    value={macactspindle}
-                    onChangeText={setMacactspindle}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Idle spindles</Text>
-                  <TextInput
-                    value={macidlespindle}
-                    onChangeText={setMacidlespindle}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Unit start</Text>
-                  <TextInput
-                    value={startreading}
-                    onChangeText={setStartreading}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Temp. one</Text>
-                  <TextInput
-                    value={tempone}
-                    onChangeText={setTempone}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Temp. two</Text>
-                  <TextInput
-                    value={temptwo}
-                    onChangeText={setTemptwo}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Temp. three</Text>
-                  <TextInput
-                    value={tempthree}
-                    onChangeText={setTempthree}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Start Time</Text>
-
-                  <TouchableOpacity
-                    style={styles.inputField}
-                    onPress={() => setShowStartTimePicker(true)}
-                  >
-                    <Text style={{ color: '#000' }}>
-                      {startTime
-                        ? startTime.toLocaleString() // full date + time
-                        : 'Select Start Time'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.applyBtn}
-                onPress={() => {
-                  //savedata();
-                  setDoffAddFormVisible(false);
-                }}
-              >
-                <Text style={{ color: '#fff' }}>Save</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/**doff update form */}
-      {/* <Modal
-        transparent
-        visible={doffUpdateFormVisible}
-        animationType="fade"
-        statusBarTranslucent={true}
-      >
-        <View style={styles.overlayUpdateForm}>
-          <View style={styles.sheetUpdateForm}>
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 50 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.modalHeader}>
-                <Text style={styles.title}>Update doff form</Text>
-                <TouchableOpacity
-                  onPress={() => setDoffUpdateFormVisible(false)}
-                >
-                  <Icon name="close" size={20} style={{ color: '#000' }} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.label}>Property</Text>
-              <TouchableOpacity
-                style={styles.inputBoxProperty}
-                onPress={() => setPropertyPickerVisible(true)}
-              >
-                <Text numberOfLines={1} style={{ color: '#000' }}>
-                  {selectedProperty?.LngName || 'Select property'}
-                </Text>
-                <Icon name="keyboard-arrow-down" size={24} />
-              </TouchableOpacity>
-
-              <View style={styles.row}>
-                
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Year</Text>
-                  <TouchableOpacity
-                    style={styles.bigInput}
-                    onPress={() => setYearPickerVisible(true)}
-                  >
-                    <Text numberOfLines={1} style={styles.inputText}>
-                      {selectedYear || 'Year'}
-                    </Text>
-                    <Icon name="keyboard-arrow-down" size={20} />
-                  </TouchableOpacity>
-                </View>
-
-                
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Store</Text>
-                  <TouchableOpacity
-                    style={styles.bigInput}
-                    onPress={() => setStorePickerVisible(true)}
-                  >
-                    <Text numberOfLines={1} style={styles.inputText}>
-                      {selectedStore?.StrName || 'Select Store'}
-                    </Text>
-                    <Icon name="keyboard-arrow-down" size={20} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              
-              <View style={styles.fieldContainer}>
-                <Text style={styles.label}>Machine</Text>
-                <TouchableOpacity
-                  style={styles.inputBox}
-                  onPress={getMachineData}
-                >
-                  <Text numberOfLines={1} style={{ color: '#000' }}>
-                    {selectedMachines?.MacName || 'Select machine'}
-                  </Text>
-                  <Icon name="keyboard-arrow-down" size={24} />
-                </TouchableOpacity>
-              </View>
-
-              
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Machine Speed</Text>
-                  <TextInput
-                    value={macactspeed}
-                    onChangeText={setMacactspeed}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>No. of Spindles</Text>
-                  <TextInput
-                    value={macspindle}
-                    onChangeText={setMacspindle}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Act. spindles</Text>
-                  <TextInput
-                    value={macactspindle}
-                    onChangeText={setMacactspindle}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Idle spindles</Text>
-                  <TextInput
-                    value={macidlespindle}
-                    onChangeText={setMacidlespindle}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Unit start</Text>
-                  <TextInput
-                    value={startreading}
-                    onChangeText={setStartreading}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Temp. one</Text>
-                  <TextInput
-                    value={tempone}
-                    onChangeText={setTempone}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Temp. two</Text>
-                  <TextInput
-                    value={temptwo}
-                    onChangeText={setTemptwo}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Temp. three</Text>
-                  <TextInput
-                    value={tempthree}
-                    onChangeText={setTempthree}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Start Time</Text>
-
-                  <TouchableOpacity
-                    style={styles.inputField}
-                    onPress={() => setShowStartTimePicker(true)}
-                  >
-                    <Text style={{ color: '#000' }}>
-                      {startTime
-                        ? startTime.toLocaleString() // full date + time
-                        : 'Select start time'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>End Time</Text>
-
-                  <TouchableOpacity
-                    style={styles.inputField}
-                    onPress={() => setShowEndTimePicker(true)}
-                  >
-                    <Text style={{ color: '#000' }}>
-                      {endTime ? endTime.toLocaleString() : 'Select end time'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>No. of tubes</Text>
-                  <TextInput
-                    value={totcones}
-                    onChangeText={setTotcones}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Chees</Text>
-                  <TextInput
-                    value={totchees}
-                    onChangeText={setTotchees}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Gross wt.</Text>
-                  <TextInput
-                    value={totgrsqty}
-                    onChangeText={setTotgrsqty}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Tar. Wt.</Text>
-                  <TextInput
-                    value={totchees}
-                    onChangeText={setTotchees}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Net wt.</Text>
-                  <TextInput
-                    value={totnetqty}
-                    onChangeText={setTotnetqty}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Unit end</Text>
-                  <TextInput
-                    value={endreading}
-                    onChangeText={setEndreading}
-                    placeholder="Enter spindles"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.row}>
-                <View style={styles.halfField}>
-                  <Text style={styles.label}>Tot. unit</Text>
-                  <TextInput
-                    value={powerconsumption}
-                    onChangeText={setPowerconsumption}
-                    placeholder="Enter speed"
-                    keyboardType="numeric"
-                    style={styles.inputField}
-                    placeholderTextColor="#999"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.switchRow}>
-                <Text style={styles.switchText}>
-                  Is last Doff [islastdoff] ?
-                </Text>
-
-                <Switch
-                  value={false}
-                  trackColor={{ false: '#ccc', true: '#0F6C7B' }}
-                  thumbColor="#fff"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.applyBtn}
-                onPress={() => {
-                  //savedata();
-                  setDoffUpdateFormVisible(false);
-                }}
-              >
-                <Text style={{ color: '#fff' }}>Update</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal> */}
 
       <Modal
         transparent
@@ -2907,7 +1852,7 @@ const DoffEntry = ({ navigation, token }) => {
       <Modal
         transparent
         visible={showDeleteConfirm}
-        animationType="fade"
+        animationType="slide"
         statusBarTranslucent={true}
       >
         <View
@@ -3013,14 +1958,149 @@ const DoffEntry = ({ navigation, token }) => {
         </View>
       </Modal>
 
-      {/* <TouchableOpacity
-        style={styles.fabAdd}
-        onPress={() => {
-          setDoffAddFormVisible(true);
-        }}
+      <Modal
+        transparent
+        visible={showUpdateConfirm}
+         animationType="slide"
+        statusBarTranslucent={true}
       >
-        <Icon name="add" size={20} color="#fff" />
-      </TouchableOpacity> */}
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+          }}
+        >
+          <View
+            style={{
+              width: '85%',
+              backgroundColor: '#fff',
+              borderRadius: 15,
+              padding: 20,
+              alignItems: 'center',
+            }}
+          >
+            <Icon name="warning" size={40} color="#FFA000" />
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '600',
+                marginTop: 10,
+                color: '#000',
+              }}
+            >
+              Confirm Update
+            </Text>
+            <Text style={{ textAlign: 'center', marginTop: 8, color: '#444' }}>
+              Are you sure you want to update this doff entry?
+            </Text>
+
+            <View style={{ flexDirection: 'row', marginTop: 20, gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => setShowUpdateConfirm(false)}
+                style={{
+                  backgroundColor: '#ccc',
+                  paddingHorizontal: 25,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: '#000', fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  setShowUpdateConfirm(false);
+                  try {
+                    let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
+                    let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+                    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+
+                    // Get the latest edited data for this doff
+                    const doffId = itemToUpdate.uid || getAllDoffData.indexOf(itemToUpdate);
+                    const latestEditedData = editableDoffData[doffId] || {};
+
+                    // Prepare the payload with the latest edited data
+                    const finalPayload = {
+                      prpcode: prp3,
+                      yearno: yearnumber3,
+                      strcode: finalStrCode,
+                      txntype: 'mobile_doff_entry',
+                      maccode: itemToUpdate?.maccode,
+                      uid: itemToUpdate?.uid,
+                      productionuid: itemToUpdate?.productionuid,
+                      // Use the latest edited data
+                      startdate: latestEditedData.startdate || itemToUpdate.startdate,
+                      starttime: latestEditedData.starttime || itemToUpdate.starttime,
+                      enddate: latestEditedData.enddate || itemToUpdate.enddate,
+                      endtime: latestEditedData.endtime || itemToUpdate.endtime,
+
+                      startreading: latestEditedData.startreading || itemToUpdate.startreading,
+                      endreading: latestEditedData.endreading || itemToUpdate.endreading,
+                      totcones: latestEditedData.totcones || itemToUpdate.totcones,  // Add this
+                      totchees: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
+                      totnetqty: latestEditedData.totnetqty || itemToUpdate.totnetqty,  // Add this
+                      tottareqty: latestEditedData.tottareqty || itemToUpdate.tottareqty,  // Add this
+                      totgrsqty: latestEditedData.totgrsqty || itemToUpdate.totgrsqty,  // Add this
+                      islastdoff: latestEditedData.islastdoff || itemToUpdate.islastdoff,  // Add this
+                      d1: [],
+                      d2: [],
+                      // Include all other fields from the original itemToUpdate
+                      ...Object.fromEntries(
+                        Object.entries(itemToUpdate).filter(([key]) =>
+                          !['startdate', 'starttime', 'enddate', 'endtime', 'totcones', 'totchees', 'totnetqty', 'tottareqty', 'totgrsqty', 'islastdoff'].includes(key)
+                        )
+                      )
+                    };
+
+                    console.log('📤 doff Update PAYLOAD:', finalPayload);
+
+                    const response = await axios.post(
+                      `${API}/api/proddoffedit`,
+                      finalPayload,
+                      {
+                        headers: {
+                          Authorization: `Bearer ${token}`,
+                          'Content-Type': 'application/json'
+                        }
+                      }
+                    );
+
+                    console.log('📤 doff Update response:', response);
+
+                    if (response.data.success) {
+                      const data = response.data.data.main;
+                      showSuccess('Doff updated successfully');
+                      setAllDoffData(data);
+                      // Clear the editable data for this doff after successful update
+                      setEditableDoffData(prev => {
+                        const newData = { ...prev };
+                        delete newData[doffId];
+                        return newData;
+                      });
+                    } else {
+                      showWarning(response.data.message || 'Failed to update doff');
+                    }
+                  } catch (error) {
+                    console.log('❌ API Error:', error);
+                    showError('API failed: ' + (error.response?.data?.message || error.message));
+                  }
+                }}
+                style={{
+                  backgroundColor: '#F44336',
+                  paddingHorizontal: 25,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </>
   );
 };
@@ -3084,7 +2164,7 @@ const styles = StyleSheet.create({
 
   accordionContainer: {
     marginHorizontal: 16,
-    marginVertical: 10,
+    marginVertical: 0,
     borderRadius: 10,
     overflow: 'hidden',
     elevation: 2,
@@ -3554,6 +2634,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
+  compactCardLast: {
+    backgroundColor: '#e4e1e1',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 69, 69, 0.41)',
+  },
+
   compactHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3669,4 +2759,105 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  dateTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 6,
+  },
+  dateTimePickerButton: {
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+
+  machineInfoCard: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    // borderRadius: 8,
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
+    // padding: 8, // Reduced padding
+    // marginHorizontal: 5,
+    marginVertical: 0,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderWidth: 1.5,
+    borderColor: theme.BRAND_GRADIENT_START
+  },
+  machineInfoScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  machineInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4, // Reduced margin
+  },
+  machineInfoLabel: {
+    fontSize: 12, // Smaller font
+    fontWeight: '600',
+    color: '#4B5563',
+    marginRight: 4,
+  },
+  machineInfoValue: {
+    fontSize: 12, // Smaller font
+    color: '#1F2937',
+  },
+
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 8,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderWidth: 1.5,
+    borderColor: theme.BRAND_GRADIENT_START
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  summaryItem: {
+    width: '48%',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    // marginBottom: 2,
+  },
+  summaryValue: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0F6C7B',
+  },
+
+  listIconContainer: {
+    position: 'absolute',
+    top: 145,
+    right: 25,
+    zIndex: 1,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 4,
+  },
 });

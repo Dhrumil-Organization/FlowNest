@@ -290,7 +290,7 @@ const APP_SECTIONS = [
     {
         title: 'S',
         data: [
-            { id: '33', name: 'Sales Order New', screen: 'Sales Order New', icon: 'shopping-cart-checkout', iconColor: '#48cbef' },
+            { id: '33', name: 'Sales Order Entry', screen: 'Sales Order Entry', icon: 'shopping-cart-checkout', iconColor: '#48cbef' },
         ],
     },
     {
@@ -577,11 +577,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Sales Order New",
+                //                         "title": "Sales Order Entry",
                 //                         "href": "/"
                 //                     },
                 //                     {
                 //                         "title": "Creel Issue Return",
+                //                         "href": "/"
+                //                     },
+                //                      {
+                //                         "title": "Production Report",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Doff Entry",
                 //                         "href": "/"
                 //                     },
                 //                 ]

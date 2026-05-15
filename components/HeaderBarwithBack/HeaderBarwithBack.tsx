@@ -31,6 +31,7 @@ const HeaderBarwithBack: React.FC<HeaderProps> = ({
   header,
   subHeader,
   backNavigateScreen = 'Home',
+  noBorderRadius = false
 }) => {
   const [isAvatarBarVisible, setIsAvatarBarVisible] = useState(false);
   const navigation = useNavigation<any>();
@@ -54,7 +55,7 @@ const HeaderBarwithBack: React.FC<HeaderProps> = ({
       colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={styles.gradient}
+      style={noBorderRadius === true ? styles.noBordergradient : styles.gradient}
     >
       <SafeAreaView style={styles.safe}>
         {/* Top row: Back + Title + (optional avatar/actions on right) */}
@@ -103,6 +104,12 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
+    elevation: 6,
+  },
+  noBordergradient: {
+    paddingBottom: 12,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     elevation: 6,
   },
   safe: {

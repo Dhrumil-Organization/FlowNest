@@ -765,7 +765,11 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                         </View> */}
 
                                         <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                            {Number(item.TOTQTY || 0).toFixed(3)}
+                                            {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                            {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                                minimumFractionDigits: 3,
+                                                maximumFractionDigits: 3,
+                                            })}
                                         </Text>
                                     </TouchableOpacity>
                                 )
@@ -777,7 +781,13 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                         }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total </Text>
-                                <Text style={{ color: '#fff', fontWeight: 'bold' }}> {Number(totalQty || 0).toFixed(3)} </Text>
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                                    {/* {Number(totalQty || 0).toFixed(3)} */}
+                                    {Number(totalQty || 0).toLocaleString('en-IN', {
+                                        minimumFractionDigits: 3,
+                                        maximumFractionDigits: 3,
+                                    })}
+                                </Text>
                             </View>
                         </View>
                     </View>
@@ -856,8 +866,15 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                                 }} >
                                                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>{Number(item.TOTQTY || 0).toFixed(3)}</Text>
                                             </View> */}
-                                            <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                            {/* <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
                                                 {Number(item.TOTQTY || 0).toFixed(3)}
+                                            </Text> */}
+                                            <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+                                                {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                                {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                                    minimumFractionDigits: 3,
+                                                    maximumFractionDigits: 3,
+                                                })}
                                             </Text>
                                         </TouchableOpacity>
                                     )}
@@ -869,9 +886,19 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total</Text>
                                     <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                        {
+                                        {/* {
                                             subItemData && subItemData.length > 0 ? (subItemData[0].TOTQTY).toFixed(3) : 0
+                                        } */}
+                                        {
+                                            subItemData && subItemData.length > 0
+                                                ? Number(subItemData[0].TOTQTY)
+                                                    .toLocaleString('en-IN', {
+                                                        minimumFractionDigits: 3,
+                                                        maximumFractionDigits: 3,
+                                                    })
+                                                : '0.000'
                                         }
+
                                         {/* subItemData.reduce((sum, i) => sum + Number(i.TOTQTY || 0), 0) */}
                                     </Text>
                                 </View>
@@ -947,7 +974,12 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}> {Number(item.TOTQTY || 0).toFixed(3)} </Text>
                                             </View> */}
                                             <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                                {Number(item.TOTQTY || 0).toFixed(3)}
+                                                {/* {Number(item.TOTQTY || 0).toFixed(3)}
+                                                 */}
+                                                {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                                    minimumFractionDigits: 3,
+                                                    maximumFractionDigits: 3,
+                                                })}
                                             </Text>
                                         </TouchableOpacity>
                                     )
@@ -960,8 +992,16 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total </Text>
                                     <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                        {
+                                        {/* {
                                             mergeData && mergeData.length > 0 ? (mergeData[0].TOTQTY).toFixed(3) : 0
+                                        } */}
+                                        {
+                                            mergeData && mergeData.length > 0
+                                                ? Number(mergeData[0].TOTQTY || 0).toLocaleString('en-IN', {
+                                                    minimumFractionDigits: 3,
+                                                    maximumFractionDigits: 3,
+                                                })
+                                                : '0.000'
                                         }
                                     </Text>
                                 </View>
@@ -1034,7 +1074,11 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                             </View> */}
 
                                             <Text style={{ color: '#333', fontSize: 14, fontWeight: '600', flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
-                                                {Number(item.TOTQTY || 0).toFixed(3)}
+                                                {/* {Number(item.TOTQTY || 0).toFixed(3)} */}
+                                                {Number(item.TOTQTY || 0).toLocaleString('en-IN', {
+                                                    minimumFractionDigits: 3,
+                                                    maximumFractionDigits: 3,
+                                                })}
                                             </Text>
                                         </View>
                                     )
@@ -1047,8 +1091,16 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Text style={{ color: '#fff', fontWeight: 'bold' }}> Total </Text>
                                     <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                                        {
+                                        {/* {
                                             shadeData && shadeData.length > 0 ? (shadeData[0].TOTQTY).toFixed(3) : 0
+                                        } */}
+                                        {
+                                            shadeData && shadeData.length > 0
+                                                ? Number(shadeData[0].TOTQTY || 0).toLocaleString('en-IN', {
+                                                    minimumFractionDigits: 3,
+                                                    maximumFractionDigits: 3,
+                                                })
+                                                : '0.000'
                                         }
                                         {/* {
                                                 (shadeData as any[]).reduce((sum, i) => sum + Number(i.TOTQTY || 0), 0).toFixed(3)

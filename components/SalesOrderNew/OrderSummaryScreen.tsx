@@ -240,6 +240,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [discount, setDiscount] = useState(
         String(headerData?.DiscountAmount || '0'),
     );
+    const [ddays, setDdays] = useState(
+        String(headerData?.DDays || '0'),
+    );
     const [tax, setTax] = useState(String(headerData?.TaxPercent || '0'));
     const [remark, setRemark] = useState(headerData?.Remark || '');
     const [saving, setSaving] = useState(false);
@@ -519,6 +522,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             return false;
         }
 
+        if (!ddays || ddays == '0') {
+            Alert.alert('Required', 'Delivery Days cannot be blank.');
+            return false;
+        }
+
         if (rows.length === 0) {
             Alert.alert('Required', 'Please add at least one item.');
             return false;
@@ -586,6 +594,35 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             if (!uid) return;
 
             setLoadingOrder(true);
+            const yno = yearno ? yearno.slice(-2) : '';
+
+            // const res = await axios.get(`${API}/api/mobappshow`, {
+            //     headers: {
+            //         Authorization: `Bearer ${token}`,
+            //         'Content-Type': 'application/json',
+            //         Accept: 'application/json',
+            //         'x-platform': 'mob',
+            //     },
+            //     params: {
+            //         uid,
+            //         prpcode,
+            //         strcode,
+            //         yearno,
+            //         mode,
+            //     },
+            // });
+            // console.log('mobappshow params =>', params);
+            // console.log('mobappshow res =>', res);
+
+            const params = {
+                uid,
+                prpcode,
+                strcode,
+                yearno: yno,
+                mode,
+            };
+
+            console.log('mobappshow params =>', params);
 
             const res = await axios.get(`${API}/api/mobappshow`, {
                 headers: {
@@ -594,16 +631,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     Accept: 'application/json',
                     'x-platform': 'mob',
                 },
-                params: {
-                    uid,
-                    prpcode,
-                    strcode,
-                    yearno,
-                    mode,
-                },
+                params,
             });
 
-            console.log('mobappshow res =>', res?.data);
+            console.log('mobappshow res =>', res);
 
             const data =
                 res?.data?.response ||
@@ -648,6 +679,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             setRows(reSrNo(convertedRows));
 
             setDiscount(String(num(main.DisAmt || main.TDisAmt || main.NDisAmt || 0)));
+            setDdays(main.DDays)
             setTax(String(num(main.TaxPercent || main.TaxPer || 0)));
             setRemark(main.Remark || '');
             setSoDate(main.SODate || '');
@@ -713,6 +745,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             D1NetAmt: fmt(totals.totalAmount) || '.00',
 
             Remark: remark || '',
+            DDays: ddays || '',
 
             DAdd: party?.Address || base.DAdd || '',
             DCity: party?.City || base.DCity || '',
@@ -976,64 +1009,64 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             setDeleting(false);
         }
     };
-const printSalesOrderPdf = async (format = 'A4') => {
-    try {
-        setPdfLoading(true);
+    const printSalesOrderPdf = async (format = 'A4') => {
+        try {
+            setPdfLoading(true);
 
-        const payload = {
-            prpcode,
-            yearno,
-            strcode,
-            uid,
-            printTypes: ['sales_order'],
-            printFormat: format,
-        };
-
-        const res = await axios.post(
-            `${API}/api/saleschallanmultiprintnew`,
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'x-platform': 'mob',
-                },
-            }
-        );
-
-        console.log('PDF RESPONSE =>', res?.data);
-
-        if (res?.data?.success === true) {
-            const pdfUrl = res?.data?.results?.sales_order;
-
-            if (!pdfUrl) {
-                Alert.alert('PDF Error', 'PDF URL not found.');
-                return;
-            }
-
-            navigation.navigate('PdfViewerScreen', {
-                pdfUrl,
-                title: 'Sales Order Print',
-            });
-        } else {
-            Alert.alert(
-                'PDF Failed',
-                res?.data?.message || 'PDF generation failed.'
+            const payload = {
+                prpcode,
+                yearno,
+                strcode,
+                uid,
+                printTypes: ['sales_order'],
+                printFormat: format,
+            };
+            console.log("payload:", payload);
+            const res = await axios.post(
+                `${API}/api/saleschallanmultiprintnew`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'x-platform': 'mob',
+                    },
+                }
             );
-        }
-    } catch (error) {
-        console.log('PDF ERROR =>', error?.response?.data || error.message);
+            console.log("res", res)
+            console.log('PDF RESPONSE =>', res?.data);
 
-        Alert.alert(
-            'Error',
-            error?.response?.data?.message || 'Unable to generate PDF.'
-        );
-    } finally {
-        setPdfLoading(false);
-    }
-};
+            if (res?.data?.success === true) {
+                const pdfUrl = res?.data?.results?.sales_order;
+
+                if (!pdfUrl) {
+                    Alert.alert('PDF Error', 'PDF URL not found.');
+                    return;
+                }
+
+                navigation.navigate('PdfViewerScreen', {
+                    pdfUrl,
+                    title: 'Sales Order Print',
+                });
+            } else {
+                Alert.alert(
+                    'PDF Failed',
+                    res?.data?.message || 'PDF generation failed.'
+                );
+            }
+        } catch (error) {
+            console.log('PDF ERROR =>', error?.response?.data || error.message);
+
+            Alert.alert(
+                'Error',
+                error?.response?.data?.message || 'Unable to generate PDF.'
+            );
+        } finally {
+            setPdfLoading(false);
+        }
+    };
     const renderRow = ({ item, index }) => {
         return (
             <View style={styles.itemCard}>
@@ -1184,6 +1217,18 @@ const printSalesOrderPdf = async (format = 'A4') => {
                         </TouchableOpacity>
                     )}
                 </View>
+                <View style={styles.partyCard1}>
+                    <View style={styles.inputRow}>
+                        <Text style={styles.inputLabel}>Delivery Days</Text>
+                        <TextInput
+                            value={ddays}
+                            onChangeText={setDdays}
+                            keyboardType="numeric"
+                            style={styles.smallInput1}
+                            editable={!isViewMode}
+                        />
+                    </View>
+                </View>
 
                 {/* <View style={styles.modeCard}>
                     <Text style={styles.modeText}>
@@ -1313,7 +1358,7 @@ const printSalesOrderPdf = async (format = 'A4') => {
                     <TouchableOpacity
                         style={[styles.deleteBtn, saving && { opacity: 0.6 }]}
                         onPress={() => setDeleteModalVisible(true)}
-                        disabled={saving || isViewMode}
+                        disabled={saving || isViewMode || screenMode == 'ADD'}
                     // disabled={true}
                     >
                         <Text style={styles.saveBtnText}>
@@ -1323,15 +1368,15 @@ const printSalesOrderPdf = async (format = 'A4') => {
                         </Text>
                     </TouchableOpacity>
                 )}
-                <TouchableOpacity
-    style={styles.saveBtn}
-    onPress={() => printSalesOrderPdf('A4')}
-    disabled={pdfLoading}
->
-    <Text style={styles.saveBtnText}>
-        {pdfLoading ? 'Opening PDF...' : 'Print'}
-    </Text>
-</TouchableOpacity>
+                {/* <TouchableOpacity
+                    style={styles.saveBtn}
+                    onPress={() => printSalesOrderPdf('A4')}
+                    disabled={pdfLoading}
+                >
+                    <Text style={styles.saveBtnText}>
+                        {pdfLoading ? 'Opening PDF...' : 'Print'}
+                    </Text>
+                </TouchableOpacity> */}
             </View>
             <Modal
                 visible={deleteModalVisible}
@@ -1425,6 +1470,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#E4E7EF',
+    },
+    partyCard1: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+        marginTop: 12,
     },
     partyName: { fontSize: 16, color: '#000', fontWeight: '900' },
     partySub: { fontSize: 12, color: '#000', marginTop: 4 },
@@ -1536,6 +1591,17 @@ const styles = StyleSheet.create({
         borderRadius: 9,
         paddingHorizontal: 10,
         textAlign: 'right',
+        color: '#000',
+        backgroundColor: '#fff',
+    },
+    smallInput1: {
+        width: 130,
+        height: 42,
+        borderWidth: 1,
+        borderColor: '#E4E7EF',
+        borderRadius: 9,
+        paddingHorizontal: 10,
+        textAlign: 'left',
         color: '#000',
         backgroundColor: '#fff',
     },

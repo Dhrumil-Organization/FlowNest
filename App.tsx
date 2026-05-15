@@ -1179,7 +1179,7 @@ export default function App() {
                         </>
                       )}
                     </Stack.Screen>
-                    <Stack.Screen name="Sales Order New">
+                    <Stack.Screen name="Sales Order Entry">
                       {props => (
                         <SalesOrderModule
                           {...props}

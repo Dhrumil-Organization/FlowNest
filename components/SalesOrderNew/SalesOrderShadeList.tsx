@@ -247,43 +247,72 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         return arr;
     }, [shades, search, editMode, oldRow]);
 
-    const onNext = () => {
-        if (!selectedShade?.ShdCode) {
-            Alert.alert('Required', 'Please select shade.');
-            return;
-        }
+    // const onNext = () => {
+    //     // if (!selectedShade?.ShdCode) {
+    //     //     Alert.alert('Required', 'Please select shade.');
+    //     //     return;
+    //     // }
 
-        navigation.navigate('SalesOrderDetails', {
-            mode,
-            uid,
-            soNo,
-            soDate,
-            editMode,
-            editIndex,
-            editLineId,
-            oldRow,
+    //     navigation.navigate('SalesOrderDetails', {
+    //         mode,
+    //         uid,
+    //         soNo,
+    //         soDate,
+    //         editMode,
+    //         editIndex,
+    //         editLineId,
+    //         oldRow,
 
-            selectedItem,
-            selectedDesign,
+    //         selectedItem,
+    //         selectedDesign,
 
-            selectedShade: {
-                ShdCode: selectedShade.ShdCode,
-                ShdName: selectedShade.ShdName || selectedShade.ShadeName || '',
-                Raw: selectedShade,
-            },
+    //         selectedShade: {
+    //             ShdCode: selectedShade.ShdCode,
+    //             ShdName: selectedShade.ShdName || selectedShade.ShadeName || '',
+    //             Raw: selectedShade,
+    //         },
 
-            workingRows,
+    //         workingRows,
 
-            party: finalParty,
-            partyData: finalParty,
-            selectedParty: finalParty,
+    //         party: finalParty,
+    //         partyData: finalParty,
+    //         selectedParty: finalParty,
 
-            prpcode,
-            strcode,
-            yearno,
-            token,
-        });
-    };
+    //         prpcode,
+    //         strcode,
+    //         yearno,
+    //         token,
+    //     });
+    // };
+
+    const onNext = (item) => {
+    const shadeData = item || selectedShade;
+    navigation.navigate('SalesOrderDetails', {
+        mode,
+        uid,
+        soNo,
+        soDate,
+        editMode,
+        editIndex,
+        editLineId,
+        oldRow,
+        selectedItem,
+        selectedDesign,
+        selectedShade: {
+            ShdCode: shadeData.ShdCode,
+            ShdName: shadeData.ShdName || shadeData.ShadeName || '',
+            Raw: shadeData,
+        },
+        workingRows,
+        party: finalParty,
+        partyData: finalParty,
+        selectedParty: finalParty,
+        prpcode,
+        strcode,
+        yearno,
+        token,
+    });
+};
 
     const renderSkeleton = () => {
         return [1, 2, 3, 4, 5, 6].map(i => (
@@ -310,7 +339,12 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             <TouchableOpacity
                 activeOpacity={0.85}
                 style={[styles.card, isSelected && styles.selectedCard]}
-                onPress={() => setSelectedShade(item)}>
+                onPress={() => onNext(item)}
+                // onPress={() => {
+                //     setSelectedShade(item);
+                //     onNext();
+                // }}
+            >
                 <View style={[styles.radio, isSelected && styles.radioActive]}>
                     {isSelected && <Icon name="check" size={16} color="#fff" />}
                 </View>
@@ -401,9 +435,9 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     />
                 )}
 
-                <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
+                {/* <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
                     <Text style={styles.nextText}>Next</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
         </SafeAreaView>
     );

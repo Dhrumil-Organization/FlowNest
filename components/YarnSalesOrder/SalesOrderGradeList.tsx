@@ -15,7 +15,7 @@ import { API } from '../../common/API/dynamicAPI';
 
 const toText = v => String(v || '').trim();
 
-const SalesOrderDesignList = ({ navigation, route }) => {
+const SalesOrderGradeList = ({ navigation, route }) => {
     const {
         mode = 'ADD',
         uid = 0,
@@ -33,7 +33,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
         selectedParty = null,
 
         prpcode = '',
-        strcode = '012',
+        strcode = '002',
         yearno = '',
         token = '',
     } = route?.params || {};
@@ -117,18 +117,20 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 prpcode,
                 strcode,
                 yearno: yrno,
-                itmcode: selectedItem.ItmCode,
-                mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
-                // search,
+                ItmCode: selectedItem.ItmCode,
+                ttype: ['8', '3', '30', '2', '34', '83', '42'],
+                fetch: '',
+                MerCode: '',
+                ShdCode: '',
                 txntype: 'mob_app_sales_order'
             };
             console.log("party type historyPayload:", payload);
 
             const res = await axios.get(
-                `${API}/api/getdesign`,
+                `${API}/api/getgrade`,
                 getRequestConfig({ params: { ...payload } }),
             );
-            console.log("party type Response:", res);
+            console.log("getgrade Response:", res);
             const data =
                 res.data?.response?.data ||
                 res.data?.response ||
@@ -137,8 +139,8 @@ const SalesOrderDesignList = ({ navigation, route }) => {
 
             setDesigns(Array.isArray(data) ? data : []);
         } catch (error) {
-            console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load design list');
+            console.log('getgrade ERROR:', error?.response?.data || error.message);
+            Alert.alert('Error', 'Unable to load getgrade');
             setDesigns([]);
         } finally {
             setLoading(false);
@@ -166,16 +168,16 @@ const SalesOrderDesignList = ({ navigation, route }) => {
 
         let arr = [...designs];
 
-        if (editMode && oldRow?.DsnCode) {
+        if (editMode && oldRow?.GrdCode) {
             const oldExists = arr.some(
-                item => String(item.DsnCode) === String(oldRow.DsnCode),
+                item => String(item.GrdCode) === String(oldRow.GrdCode),
             );
 
             if (!oldExists) {
                 arr.unshift({
-                    DsnCode: oldRow.DsnCode,
-                    DsnName: oldRow.DsnName,
-                    DesignName: oldRow.DsnName,
+                    GrdCode: oldRow.GrdCode,
+                    GrdName: oldRow.GrdName,
+                    GradeName: oldRow.GrdName,
                     __oldSelected: true,
                 });
             }
@@ -184,25 +186,25 @@ const SalesOrderDesignList = ({ navigation, route }) => {
         // arr = arr
         //     .filter(item => {
         //         return (
-        //             toText(item.DsnCode).toLowerCase().includes(s) ||
-        //             toText(item.DsnName).toLowerCase().includes(s) ||
-        //             toText(item.DesignName).toLowerCase().includes(s)
+        //             toText(item.GrdCode).toLowerCase().includes(s) ||
+        //             toText(item.GrdName).toLowerCase().includes(s) ||
+        //             toText(item.GradeName).toLowerCase().includes(s)
         //         );
         //     })
         arr = arr.filter((item) => {
 
             const fullText = `
-        ${toText(item.DsnCode)}
-        ${toText(item.DsnName)}
-        ${toText(item.DesignName)}
+        ${toText(item.GrdCode)}
+        ${toText(item.GrdName)}
+        ${toText(item.GradeName)}
     `.toLowerCase();
 
             return fullText.includes(s.toLowerCase());
         })
             .sort((a, b) => {
-                if (editMode && oldRow?.DsnCode) {
-                    if (String(a.DsnCode) === String(oldRow.DsnCode)) return -1;
-                    if (String(b.DsnCode) === String(oldRow.DsnCode)) return 1;
+                if (editMode && oldRow?.GrdCode) {
+                    if (String(a.GrdCode) === String(oldRow.GrdCode)) return -1;
+                    if (String(b.GrdCode) === String(oldRow.GrdCode)) return 1;
                 }
                 return 0;
             });
@@ -211,7 +213,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     }, [designs, search, editMode, oldRow]);
 
 
-    const selectDesign = design => {
+    const selectDesign = grade => {
         navigation.navigate('SalesOrderShadeList', {
             mode,
             uid,
@@ -224,10 +226,10 @@ const SalesOrderDesignList = ({ navigation, route }) => {
 
             selectedItem,
 
-            selectedDesign: {
-                DsnCode: design.DsnCode,
-                DsnName: design.DsnName || design.DesignName || '',
-                Raw: design,
+            selectedGrade: {
+                GrdCode: grade.GrdCode,
+                GrdName: grade.GrdName || grade.GradeName || '',
+                Raw: grade,
             },
 
             workingRows,
@@ -256,11 +258,11 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     };
 
     const renderItem = ({ item }) => {
-        const dsnCode = item.DsnCode;
-        const dsnName = item.DsnName || item.DesignName || '';
+        const grdcode = item.GrdCode;
+        const grdname = item.GrdName || item.GradeName || '';
 
         const isOld =
-            editMode && oldRow && String(oldRow.DsnCode) === String(dsnCode);
+            editMode && oldRow && String(oldRow.GrdCode) === String(grdcode);
         return (
             <TouchableOpacity
                 activeOpacity={0.85}
@@ -272,11 +274,11 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 </View>
 
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.designCode}>{dsnCode}</Text>
-                    <Text style={styles.designName}>{dsnName || '-'}</Text>
+                    <Text style={styles.designCode}>{grdcode}</Text>
+                    <Text style={styles.designName}>{grdname || '-'}</Text>
                     {isOld && (
                         <View style={styles.currentBadge}>
-                            <Text style={styles.currentText}>Selected Old Design</Text>
+                            <Text style={styles.currentText}>Selected Old Grade</Text>
                         </View>
                     )}
                 </View>
@@ -295,7 +297,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>
-                    {editMode ? 'Modify Design' : 'Select Design'}
+                    {editMode ? 'Modify Grade' : 'Select Grade'}
                 </Text>
                 <View style={{ width: 22 }} />
             </View>
@@ -309,9 +311,9 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 </View>
                 {editMode && oldRow && (
                     <View style={styles.oldBox}>
-                        <Text style={styles.oldLabel}>Current Selected Design</Text>
+                        <Text style={styles.oldLabel}>Current Selected Grade</Text>
                         <Text style={styles.oldTitle}>
-                            {oldRow.DsnCode} - {oldRow.DsnName}
+                            {oldRow.GrdCode} - {oldRow.GrdName}
                         </Text>
                         <Text style={styles.oldSub}>
                             Shade: {oldRow.ShdCode} {oldRow.ShdName}
@@ -324,7 +326,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                     <TextInput
                         value={search}
                         onChangeText={setSearch}
-                        placeholder="Search design code or name"
+                        placeholder="Search Grade code or name"
                         placeholderTextColor="#000"
                         style={styles.searchInput}
                     />
@@ -338,14 +340,14 @@ const SalesOrderDesignList = ({ navigation, route }) => {
                 ) : (
                     <FlatList
                         data={filteredDesigns}
-                        keyExtractor={(item, index) => `${item.DsnCode}_${index}`}
+                        keyExtractor={(item, index) => `${item.GrdCode}_${index}`}
                         renderItem={renderItem}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 20 }}
                         ListEmptyComponent={
                             <View style={styles.emptyBox}>
                                 <Icon name="category" size={44} color="#000" />
-                                <Text style={styles.emptyTitle}>No design found</Text>
+                                <Text style={styles.emptyTitle}>No Grade found</Text>
                             </View>
                         }
                     />
@@ -355,7 +357,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     );
 };
 
-export default SalesOrderDesignList;
+export default SalesOrderGradeList;
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#F5F7FB' },

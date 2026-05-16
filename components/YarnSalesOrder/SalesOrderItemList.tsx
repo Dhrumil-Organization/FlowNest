@@ -33,7 +33,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
         selectedParty = null,
 
         prpcode = '',
-        strcode = '012',
+        strcode = '002',
         yearno = '',
         token = '',
     } = route?.params || {};
@@ -104,6 +104,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 prpcode,
                 strcode,
                 yearno: yrno,
+                txntype: 'yarn_sales_order',
                 // search,
             };
             console.log("Item historyPayload:", payload);
@@ -259,7 +260,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
     }, [items, search, editMode, oldRow]);
 
     const selectItem = item => {
-        navigation.navigate('SalesOrderDesignList', {
+        navigation.navigate('SalesOrderGradeList', {
             mode,
             uid,
             soNo,

@@ -34,7 +34,7 @@ const createLineId = () =>
     `LINE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const makeRowKey = row =>
-    `${row.ItmCode}_${row.DsnCode}_${row.ShdCode}`;
+    `${row.ItmCode}_${row.GrdCode}_${row.ShdCode}`;
 
 const reSrNo = rows =>
     rows.map((row, index) => ({
@@ -61,8 +61,8 @@ const normalizeRows = orderItems => {
                     Denier: item.Denier || '',
                     HsnCode: item.HsnCode || '',
 
-                    DsnCode: item.DsnCode,
-                    DsnName: item.DsnName || '',
+                    GrdCode: item.GrdCode,
+                    GrdName: item.GrdName || '',
 
                     ShdCode: shade.ShdCode,
                     ShdName: shade.ShdName,
@@ -74,7 +74,7 @@ const normalizeRows = orderItems => {
                     Remark: shade.Remark || '',
                 });
             });
-        } else if (item.ItmCode && item.DsnCode && item.ShdCode) {
+        } else if (item.ItmCode && item.GrdCode && item.ShdCode) {
             rows.push({
                 ...item,
                 LineId: item.LineId || createLineId(),
@@ -205,7 +205,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         partyData,
         selectedParty,
         prpcode = '',
-        strcode = '012',
+        strcode = '002',
         yearno = '',
         token = '',
         soNo: routeSoNo = '',
@@ -538,7 +538,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         }
 
         for (const row of rows) {
-            if (!row.ItmCode || !row.DsnCode || !row.ShdCode) {
+            if (!row.ItmCode || !row.GrdCode || !row.ShdCode) {
                 Alert.alert('Invalid Row', 'Item/design/shade missing.');
                 return false;
             }
@@ -569,8 +569,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             ItmName: row.ItmName || '',
             MItmCode: row.MItmCode || row.ItmCode || '',
 
-            DsnCode: String(row.DsnCode || ''),
-            DsnName: row.DsnName || '',
+            GrdCode: String(row.GrdCode || ''),
+            GrdName: row.GrdName || '',
 
             ShdCode: String(row.ShdCode || ''),
             ShdName: row.ShdName || '',
@@ -727,7 +727,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             Mode: mode,
 
             PrpCode: prpcode || base.PrpCode || '',
-            StrCode: strcode || base.StrCode || '012',
+            StrCode: strcode || base.StrCode || '002',
             YearNo: yno || base.YearNo || '',
 
             ParCode: party?.ParCode || base.ParCode || '',
@@ -776,14 +776,14 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
                 UId: uid || raw.UId || 0,
                 SrNo: index + 1,
-                StrCode: row.StrCode || raw.StrCode || strcode || '012',
+                StrCode: row.StrCode || raw.StrCode || strcode || '002',
 
                 ItmCode: row.ItmCode || '',
                 MItmCode: row.MItmCode || raw.MItmCode || row.ItmCode || '',
                 ItmName: row.ItmName || raw.ItmName || '',
 
-                DsnCode: row.DsnCode || '',
-                DsnName: row.DsnName || raw.DsnName || '',
+                GrdCode: row.GrdCode || '',
+                GrdName: row.GrdName || raw.GrdName || '',
 
                 ShdCode: row.ShdCode || '',
                 ShdName: row.ShdName || raw.ShdName || '',
@@ -958,7 +958,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 uid: uid || 0,
                 prpcode: prpcode,
                 yearno: yno,
-                strcode: '012'
+                strcode: '002'
             };
             console.log("save payload", payload);
 
@@ -1087,7 +1087,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         </Text>
 
                         <Text style={styles.designText}>
-                            Design : {item.DsnCode} - {item.DsnName || '-'}
+                            Grade : {item.GrdCode} - {item.GrdName || '-'}
                         </Text>
 
                         <Text style={styles.designText}>

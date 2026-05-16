@@ -21,7 +21,7 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
         oldRow = null,
 
         selectedItem = null,
-        selectedDesign = null,
+        selectedGrade = null,
 
         lastRow = null,
         workingRows = [],
@@ -31,7 +31,7 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
         selectedParty = null,
 
         prpcode = '',
-        strcode = '012',
+        strcode = '002',
         yearno = '',
         token = '',
     } = route?.params || {};
@@ -65,7 +65,7 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
             oldRow: null,
 
             selectedItem,
-            selectedDesign,
+            selectedGrade,
 
             workingRows,
 
@@ -87,7 +87,7 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
             r =>
                 ![
                     'SalesOrderItemList',
-                    'SalesOrderDesignList',
+                    'SalesOrderGradeList',
                     'SalesOrderShadeList',
                     'SalesOrderDetails',
                     'SalesOrderAddAnotherShade',

@@ -27,7 +27,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         oldRow = null,
 
         selectedItem = null,
-        selectedDesign = null,
+        selectedGrade = null,
 
         workingRows = [],
 
@@ -36,7 +36,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         selectedParty = null,
 
         prpcode = '',
-        strcode = '012',
+        strcode = '002',
         yearno = '',
         token = '',
     } = route?.params || {};
@@ -54,7 +54,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
     let cancelToken: any;
 
-    console.log("selectedDesign", selectedDesign);
+    console.log("selectedGrade", selectedGrade);
 
 
     const getRequestConfig = (props: any) => ({
@@ -74,7 +74,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //         return;
     //     }
 
-    //     if (!selectedDesign?.DsnCode) {
+    //     if (!selectedGrade?.DsnCode) {
     //         Alert.alert('Required', 'Design is missing.');
     //         return;
     //     }
@@ -95,7 +95,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //                 yearno,
     //                 itmcode: selectedItem.ItmCode,
     //                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
-    //                 dsncode: selectedDesign.DsnCode,
+    //                 dsncode: selectedGrade.DsnCode,
     //                 search,
     //             },
     //         });
@@ -140,8 +140,8 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             return;
         }
 
-        if (!selectedDesign?.DsnCode) {
-            Alert.alert('Required', 'Design is missing.');
+        if (!selectedGrade?.GrdCode) {
+            Alert.alert('Required', 'Grade is missing.');
             return;
         }
 
@@ -153,7 +153,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 yearno: yrno,
                 itmcode: selectedItem.ItmCode,
                 mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
-                dsncode: selectedDesign.DsnCode,
+                // dsncode: selectedGrade.GrdCode,
                 // search,
             };
             console.log("shade type historyPayload:", payload);
@@ -264,7 +264,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //         oldRow,
 
     //         selectedItem,
-    //         selectedDesign,
+    //         selectedGrade,
 
     //         selectedShade: {
     //             ShdCode: selectedShade.ShdCode,
@@ -297,7 +297,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         editLineId,
         oldRow,
         selectedItem,
-        selectedDesign,
+        selectedGrade,
         selectedShade: {
             ShdCode: shadeData.ShdCode,
             ShdName: shadeData.ShdName || shadeData.ShadeName || '',
@@ -384,9 +384,9 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                         {selectedItem?.ItmCode} - {selectedItem?.ItmName}
                     </Text>
 
-                    <Text style={[styles.boxLabel, { marginTop: 8 }]}>Selected Design</Text>
+                    <Text style={[styles.boxLabel, { marginTop: 8 }]}>Selected Grade</Text>
                     <Text style={styles.boxTitle}>
-                        {selectedDesign?.DsnCode} - {selectedDesign?.DsnName}
+                        {selectedGrade?.GrdCode} - {selectedGrade?.GrdName}
                     </Text>
                 </View>
 

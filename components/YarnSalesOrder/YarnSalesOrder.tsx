@@ -100,7 +100,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
                 strcode:
                     p.strcode ||
                     filters.strcode ||
-                    '012',
+                    '002',
             };
 
             skipSearchApiRef.current = true;
@@ -225,11 +225,11 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
                 prpcode: activeFilters.prpcode,
                 prptype: userPtype,
                 yearno: yearno,
-                strcode: '012',
+                strcode: '002',
                 fromdate: activeFilters.fromdate,
                 todate: activeFilters.todate,
                 isauth: activeFilters.show_authorized ? 1 : 0,
-                strtype: 'g',
+                strtype: 'Y',
                 txntype: 'sales_order',
                 referrer: 'mob_dashboard',
                 // atype: 'B',
@@ -347,7 +347,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
             mode: 'ADD',
             uid: 0,
             prpcode: filters.prpcode || selectedProperty?.PrpCode || '',
-            strcode: filters.strcode || '012',
+            strcode: filters.strcode || '002',
             yearno: filters.yearno || selectedYear?.slice(-2) || '',
             token: token,
         };
@@ -363,7 +363,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
             mode: 'EDIT',
             uid: order.UId,
             prpcode: order.PrpCode,
-            strcode: order.StrCode || filters.strcode || '012',
+            strcode: order.StrCode || filters.strcode || '002',
             yearno: selectedYear?.slice(-2),
             token: token,
         };
@@ -441,7 +441,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
                 uid: item.UId || 0,
                 prpcode: item.PrpCode,
                 yearno: yno,
-                strcode: item.StrCode || '012'
+                strcode: item.StrCode || '002'
             };
             console.log("delete payload", payload);
 

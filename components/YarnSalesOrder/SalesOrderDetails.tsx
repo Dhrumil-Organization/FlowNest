@@ -16,7 +16,7 @@ const num = v => {
   return isNaN(n) ? 0 : n;
 };
 
-const makeRowKey = row => `${row.ItmCode}_${row.DsnCode}_${row.ShdCode}`;
+const makeRowKey = row => `${row.ItmCode}_${row.GrdCode}_${row.ShdCode}`;
 
 const createLineId = () =>
   `LINE_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -33,7 +33,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
     oldRow = null,
 
     selectedItem = null,
-    selectedDesign = null,
+    selectedGrade = null,
     selectedShade = null,
 
     workingRows = [],
@@ -43,7 +43,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
     selectedParty = null,
 
     prpcode = '',
-    strcode = '012',
+    strcode = '002',
     yearno = '',
     token = '',
   } = route?.params || {};
@@ -79,8 +79,8 @@ const SalesOrderDetails = ({ navigation, route }) => {
       return;
     }
 
-    if (!selectedDesign?.DsnCode) {
-      Alert.alert('Required', 'Design missing');
+    if (!selectedGrade?.GrdCode) {
+      Alert.alert('Required', 'Grade missing');
       return;
     }
 
@@ -121,8 +121,8 @@ const SalesOrderDetails = ({ navigation, route }) => {
       ItmName: selectedItem?.ItmName || '',
       MItmCode: selectedItem?.MItmCode || selectedItem?.ItmCode || '',
 
-      DsnCode: selectedDesign?.DsnCode || '',
-      DsnName: selectedDesign?.DsnName || '',
+      GrdCode: selectedGrade?.GrdCode || '',
+      GrdName: selectedGrade?.GrdName || '',
 
       ShdCode: selectedShade?.ShdCode || '',
       ShdName: selectedShade?.ShdName || '',
@@ -133,7 +133,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
       Amount: num(amount),
       Remark: remark,
 
-      RowKey: `${selectedItem?.ItmCode || ''}_${selectedDesign?.DsnCode || ''}_${selectedShade?.ShdCode || ''}`,
+      RowKey: `${selectedItem?.ItmCode || ''}_${selectedGrade?.GrdCode || ''}_${selectedShade?.ShdCode || ''}`,
     };
 
     let updatedRows = [];
@@ -181,7 +181,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
       oldRow,
 
       selectedItem,
-      selectedDesign,
+      selectedGrade,
       selectedShade,
 
       lastRow: newRow,
@@ -221,7 +221,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
           <Text style={styles.label}>Design</Text>
           <Text style={styles.value}>
-            {selectedDesign?.DsnCode} - {selectedDesign?.DsnName}
+            {selectedGrade?.GrdCode} - {selectedGrade?.GrdName}
           </Text>
 
           <Text style={styles.label}>Shade</Text>

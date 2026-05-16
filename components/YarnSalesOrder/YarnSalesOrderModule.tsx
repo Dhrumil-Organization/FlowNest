@@ -7,7 +7,7 @@ import OrderSummaryScreen from './OrderSummaryScreen';
 
 import { SalesOrderProvider } from './SalesOrderContext';
 import SalesOrderItemList from './SalesOrderItemList';
-import SalesOrderDesignList from './SalesOrderDesignList';
+import SalesOrderGradeList from './SalesOrderGradeList';
 import SalesOrderShadeList from './SalesOrderShadeList';
 import SalesOrderDetails from './SalesOrderDetails';
 import ItemAddedSuccessScreen from './ItemAddedSuccessScreen';
@@ -67,9 +67,9 @@ const YarnSalesOrderModule = props => {
                         />
                     )}
                 </Stack.Screen>
-                <Stack.Screen name="SalesOrderDesignList">
+                <Stack.Screen name="SalesOrderGradeList">
                     {screenProps => (
-                        <SalesOrderDesignList
+                        <SalesOrderGradeList
                             {...screenProps}
                             token={props.token}
                             isConnected={props.isConnected}

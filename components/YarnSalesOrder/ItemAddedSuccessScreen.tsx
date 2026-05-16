@@ -52,7 +52,7 @@ const ItemAddedSuccessScreen = ({ navigation, route }) => {
       // item: {
       //   ItmCode: selectedItem?.ItmCode,
       //   ItmName: selectedItem?.ItmName,
-      //   DsnCode: selectedDesign?.DsnCode,
+      //   DsnCode: selectedGrade?.DsnCode,
       //   Shades: selectedShades?.length || 0,
       //   Qty: qty,
       //   Pcs: pcs,

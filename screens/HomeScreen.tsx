@@ -593,7 +593,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Doff Entry",
                 //                         "href": "/"
                 //                     },
-
+                //                     {
+                //                         "title": "Yarn Sales Order",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

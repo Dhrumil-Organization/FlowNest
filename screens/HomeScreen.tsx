@@ -306,7 +306,12 @@ const APP_SECTIONS = [
             { id: '32', name: 'Doff Entry', screen: 'Doff Entry', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
-
+    {
+        title: 'Y',
+        data: [
+            { id: '34', name: 'Yarn Sales Order', screen: 'Yarn Sales Order', icon: 'shopping-cart-checkout', iconColor: '#4169E1' },
+        ],
+    },
 ];
 
 interface Props {
@@ -589,7 +594,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Doff Entry",
+                //                         "title": "Yarn Sales Order",
                 //                         "href": "/"
                 //                     },
                 //                 ]

@@ -1472,7 +1472,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 const localPath = pdfUrl.startsWith('file://') ? pdfUrl.replace('file://', '') : pdfUrl;
                 const fileName = localPath.split('/').pop() || `document_${Date.now()}.pdf`;
                 const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-
+                console.log("localPath", localPath);
                 try {
                     await RNFS.copyFile(localPath, destPath);
                     if (ToastAndroid) {

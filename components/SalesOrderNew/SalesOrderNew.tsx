@@ -62,6 +62,9 @@ const SalesOrderNew = ({ token, navigation, route }) => {
     const skipSearchApiRef = useRef(false);
     const didInitialLoadRef = useRef(false);
     const [deleting, setDeleting] = useState(false);
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
+    const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -426,18 +429,21 @@ const SalesOrderNew = ({ token, navigation, route }) => {
 
     };
 
-    const deleteOrder = async () => {
-        const yno = yearno ? yearno.slice(-2) : '';
+    const deleteOrder = async (item) => {
+        // const yno = yearno ? yearno.slice(-2) : '';
+        const yno = selectedYear
+            ? selectedYear.slice(-2)
+            : '';
         try {
             setDeleting(true);
             const payload = {
-                Mode: mode,
-                uid: uid || 0,
-                prpcode: prpcode,
+                Mode: '',
+                uid: item.UId || 0,
+                prpcode: item.PrpCode,
                 yearno: yno,
-                strcode: '012'
+                strcode: item.StrCode || '012'
             };
-            console.log("save payload", payload);
+            console.log("delete payload", payload);
 
             const res = await axios.post(`${API}/api/sodelete`, payload, {
                 headers: {
@@ -451,33 +457,9 @@ const SalesOrderNew = ({ token, navigation, route }) => {
             console.log("Save response..", res);
 
             if (res.data?.success === true) {
-                if (typeof clearOrder === 'function') {
-                    clearOrder();
-                }
-
                 setDeleteModalVisible(false);
                 setDeleteSuccessVisible(true);
 
-                setTimeout(() => {
-                    setDeleteSuccessVisible(false);
-
-                    navigation.reset({
-                        index: 0,
-                        routes: [
-                            {
-                                name: "SalesOrderBrowse",
-                                params: {
-                                    refreshAfterDelete: true,
-                                    refreshKey: Date.now(),
-
-                                    prpcode,
-                                    yearno,
-                                    strcode,
-                                },
-                            },
-                        ],
-                    });
-                }, 1200);
             } else {
                 Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
             }
@@ -529,7 +511,6 @@ const SalesOrderNew = ({ token, navigation, route }) => {
                         </Text>
                     </View>
                 </View>
-
                 <View style={styles.partyBlock}>
                     <View style={styles.partyMetaRow}>
                         <Icon name="badge" size={14} color="#667085" />
@@ -540,6 +521,27 @@ const SalesOrderNew = ({ token, navigation, route }) => {
                         {item.ParName || '-'}
                     </Text>
                 </View>
+
+                {/* <TouchableOpacity
+                    onPress={() => {
+                        setSelectedDeleteItem(item);
+                        setDeleteModalVisible(true);
+                    }}
+                    style={styles.deleteBtn}
+                >
+                    <Icon name="delete" size={18} color="#fff" />
+                </TouchableOpacity> */}
+                {item.AuthStatus !== 'Authorised' && (
+                    <TouchableOpacity
+                        onPress={() => {
+                            setSelectedDeleteItem(item);
+                            setDeleteModalVisible(true);
+                        }}
+                        style={styles.deleteBtn}
+                    >
+                        <Icon name="delete" size={18} color="#fff" />
+                    </TouchableOpacity>
+                )}
 
                 <View style={styles.proDivider} />
 
@@ -749,15 +751,6 @@ const SalesOrderNew = ({ token, navigation, route }) => {
                                     color="#000"
                                 />
                             </TouchableOpacity>
-                            {/* <TouchableOpacity
-                                onPress={() => {
-                                    // setSelectedDeleteItem(item);
-                                    // setDeleteModal(true);
-                                }}
-                                style={styles.deleteBtn}
-                            >
-                                <Icon name="delete" size={18} color="#fff" />
-                            </TouchableOpacity> */}
                             <Text style={styles.pickerTitle}>
                                 Select Property
                             </Text>
@@ -936,6 +929,108 @@ const SalesOrderNew = ({ token, navigation, route }) => {
                     }}
                 />
             )}
+
+            <Modal
+                visible={deleteModalVisible}
+                transparent
+                animationType="fade"
+                // onRequestClose={() => setDeleteModalVisible(false)}
+                onRequestClose={() => {
+                    setDeleteModalVisible(false)
+                    setSelectedDeleteItem(null);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.confirmModal}>
+                        <View style={styles.deleteIconCircle}>
+                            <Icon name="delete-outline" size={36} color="#DC2626" />
+                        </View>
+
+                        <Text style={styles.modalTitle}>Delete Sales Order?</Text>
+
+                        <Text style={styles.modalMessage}>
+                            Are you sure you want to delete SO No {selectedDeleteItem?.SONo || '-'}?
+                            This action cannot be undone.
+                        </Text>
+
+                        <View style={styles.modalBtnRow}>
+                            <TouchableOpacity
+                                style={styles.noBtn}
+                                onPress={() => setDeleteModalVisible(false)}
+                                disabled={deleting}
+                            >
+                                <Text style={styles.noBtnText}>No, Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.yesDeleteBtn}
+                                // onPress={deleteOrder}
+                                // onPress={() => {
+                                //     setDeleteModalVisible(false);
+
+                                //     if (selectedDeleteItem) {
+                                //         deleteOrder(selectedDeleteItem);
+                                //     }
+                                // }}
+                                onPress={() => {
+                                    if (selectedDeleteItem) {
+                                        deleteOrder(selectedDeleteItem);
+                                    }
+                                }}
+                                disabled={deleting}
+                            >
+                                <Text style={styles.yesDeleteText}>
+                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={deleteSuccessVisible}
+                transparent
+                animationType="fade"
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.successModal}>
+                        <View style={styles.successIconCircle}>
+                            <Icon name="check" size={40} color="#16A34A" />
+                        </View>
+
+                        <Text style={styles.successTitle}>Deleted Successfully</Text>
+
+                        <Text style={styles.successMessage}>
+                            Sales order has been deleted.
+                        </Text>
+                        <TouchableOpacity
+                            style={{
+                                marginTop: 20,
+                                backgroundColor: '#16A34A',
+                                paddingVertical: 10,
+                                paddingHorizontal: 30,
+                                borderRadius: 10,
+                            }}
+                            onPress={() => {
+                                setDeleteSuccessVisible(false);
+                                loadOrders();
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#fff',
+                                    fontWeight: '700',
+                                    fontSize: 15,
+                                }}
+                            >
+                                OK
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
         </SafeAreaView>
     );
 };
@@ -1398,5 +1493,116 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         alignSelf: "flex-end"
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.55)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 22,
+    },
+
+    confirmModal: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 22,
+        alignItems: 'center',
+    },
+
+    deleteIconCircle: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: '#FEE2E2',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#111827',
+        textAlign: 'center',
+    },
+
+    modalMessage: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 10,
+        lineHeight: 22,
+    },
+
+    modalBtnRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 24,
+        width: '100%',
+    },
+
+    noBtn: {
+        flex: 1,
+        height: 50,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+
+    noBtnText: {
+        color: '#374151',
+        fontWeight: '900',
+    },
+
+    yesDeleteBtn: {
+        flex: 1,
+        height: 50,
+        borderRadius: 14,
+        backgroundColor: '#DC2626',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    yesDeleteText: {
+        color: '#fff',
+        fontWeight: '900',
+    },
+
+    successModal: {
+        width: '85%',
+        backgroundColor: '#fff',
+        borderRadius: 22,
+        padding: 26,
+        alignItems: 'center',
+    },
+
+    successIconCircle: {
+        width: 78,
+        height: 78,
+        borderRadius: 39,
+        backgroundColor: '#DCFCE7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+
+    successTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#166534',
+        textAlign: 'center',
+    },
+
+    successMessage: {
+        fontSize: 14,
+        color: '#475467',
+        fontWeight: '700',
+        textAlign: 'center',
+        marginTop: 8,
     },
 });

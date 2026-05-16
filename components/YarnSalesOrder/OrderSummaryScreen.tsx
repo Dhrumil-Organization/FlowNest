@@ -818,7 +818,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 AmtCalc: raw.AmtCalc || 'U',
 
                 MerCode: raw.MerCode || '0',
-                GrdCode: raw.GrdCode || '0',
+                MerName: raw.MerName || '0',
 
                 DisPer: raw.DisPer || '.00',
                 DisAmt: raw.DisAmt || '.00',

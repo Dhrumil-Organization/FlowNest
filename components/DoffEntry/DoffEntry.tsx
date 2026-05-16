@@ -10,6 +10,7 @@ import {
   FlatList,
   Switch,
   Alert,
+  Dimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {
@@ -22,6 +23,7 @@ import { API } from '../../common/API/dynamicAPI';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import theme from '../../android/app/src/theme';
 import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
+import { set } from 'lodash';
 
 const DoffEntry = ({ navigation, token, username }) => {
   const [filterVisible, setFilterVisible] = useState(false);
@@ -34,16 +36,27 @@ const DoffEntry = ({ navigation, token, username }) => {
     MacCode: '',
   });
   const [expanded, setExpanded] = useState(false);
+  const [expandedEnd, setExpandedEnd] = useState(false);
   const [getAllPropertyData, setAllPropertyData] = useState([]);
+  const [getAllMerData, setAllMerData] = useState([]);
+  const [getAllItmData, setAllItmData] = useState([]);
   const [getAllYearData, setAllYearData] = useState([]);
   const [getAllStoreData, setAllStoreData] = useState([]);
   const [txnType, setTxnType] = useState('mobile_doff_entry');
 
   const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
+  const [merPickerVisible, setMerPickerVisible] = useState(false);
+  const [itmPickerVisible, setItmPickerVisible] = useState(false);
 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [propertySearch, setPropertySearch] = useState('');
+  const [selectedMer, setSelectedMer] = useState(null);
+  const [merSearch, setMerSearch] = useState('');
+  const [selectedItm, setSelectedItm] = useState(null);
+  const [itmSearch, setItmSearch] = useState('');
   const [recentProps, setRecentProps] = useState([]);
+  const [recentPropsmer, setRecentPropsmer] = useState([]);
+  const [recentPropsitm, setRecentPropsitm] = useState([]);
 
   const [yearPickerVisible, setYearPickerVisible] = useState(false);
   const [selectedYear, setSelectedYear] = useState('');
@@ -88,6 +101,11 @@ const DoffEntry = ({ navigation, token, username }) => {
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   // 
+  const [startDateEnd, setStartDateEnd] = useState(new Date());
+  const [startTimeEnd, setStartTimeEnd] = useState(new Date());
+  const [showStartDatePickerEnd, setShowStartDatePickerEnd] = useState(false);
+  const [showStartTimePickerEnd, setShowStartTimePickerEnd] = useState(false);
+  // 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -98,6 +116,30 @@ const DoffEntry = ({ navigation, token, username }) => {
   const [minDate, setMinDate] = useState(new Date());
   const [maxDate, setMaxDate] = useState(new Date(new Date().getFullYear() + 10, 11, 31)); // Current year + 10 years
   const [pickerVisibility, setPickerVisibility] = useState({});
+  // 
+  const [hasLastDoff, setHasLastDoff] = useState(false);
+  const [isAnyEndEmpty, setIsAnyEndEmpty] = useState(false);
+  // 
+  const { width } = Dimensions.get('window');
+  const [numColumns, setNumColumns] = useState(
+    width >= 1200 ? 3 : width >= 600 ? 2 : 1
+  );
+  const [firstIncompleteDoff, setFirstIncompleteDoff] = useState(null);
+
+  // Add this useEffect to handle orientation changes
+  useEffect(() => {
+    const onChange = ({ window }) => {
+      setNumColumns(window.width >= 1200 ? 3 : window.width >= 600 ? 2 : 1);
+    };
+
+    // Add event listener
+    Dimensions.addEventListener('change', onChange);
+
+    // Cleanup function to remove the listener
+    return () => {
+      Dimensions.removeEventListener?.('change', onChange);
+    };
+  }, []);
 
   const [alertData, setAlertData] = useState({
     visible: false,
@@ -180,6 +222,44 @@ const DoffEntry = ({ navigation, token, username }) => {
     }
   }, [getAllDoffData]);
 
+  // useEffect(() => {
+  //   if (getAllDoffData.length > 0) {
+  //     // Check if any item has islastdoff set to '1', 1, or true
+  //     const anyLastDoff = getAllDoffData.some(item => {
+  //       return item.islastdoff === '1' || item.islastdoff === 1 || item.islastdoff === true;
+  //     });
+  //     setHasLastDoff(anyLastDoff);
+  //   } else {
+  //     setHasLastDoff(false); // Reset if no data
+  //   }
+  // }, [getAllDoffData]);
+  useEffect(() => {
+    if (getAllDoffData.length > 0) {
+      // Check for anyLastDoff
+      const anyLastDoff = getAllDoffData.some(item => {
+        return item.islastdoff === '1' || item.islastdoff === 1 || item.islastdoff === true;
+      });
+      setHasLastDoff(anyLastDoff);
+
+      // Check for anyEndEmpty
+      const anyEndEmpty = getAllDoffData.some(item => {
+        return !item.enddate || !item.endtime;
+      });
+      setIsAnyEndEmpty(anyEndEmpty);
+      // Find the first item with empty enddate or endtime
+      const incompleteDoff = getAllDoffData.find(item => {
+        return !item.enddate || !item.endtime;
+      });
+
+      setFirstIncompleteDoff(incompleteDoff);
+      console.log('First incomplete Doff:', incompleteDoff); // Log the first incomplete 
+    } else {
+      setHasLastDoff(false);
+      setIsAnyEndEmpty(false);
+      setFirstIncompleteDoff(null);
+    }
+  }, [getAllDoffData]);
+
   useEffect(() => {
     const currentYear = new Date().getFullYear();
     setMinDate(new Date(currentYear, 0, 1)); // Jan 1 of current year
@@ -204,7 +284,7 @@ const DoffEntry = ({ navigation, token, username }) => {
   }, [selectedProperty]);
 
   useEffect(() => {
-    if (selectedMachines && getAllMachines.length > 0) {
+    if (selectedMachines) {
       // Extract MacName from selectedMachines (assuming it's an object or array)
       const selectedMacNames = Array.isArray(selectedMachines)
         ? selectedMachines.map(machine => machine.MacName)
@@ -220,7 +300,7 @@ const DoffEntry = ({ navigation, token, username }) => {
     }
   }, [selectedMachines]);
 
-  console.log("getSelectedFilteredMachine:", getSelectedFilteredMachine);
+  console.log("getSelectedFilteredMachine:", getSelectedFilteredMachine, selectedMachines);
 
   useEffect(() => {
     if (
@@ -239,6 +319,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       if (Object.keys(selectedYear).length > 0) {
         yr = selectedYear.YearNo;
       }
+      console.log("Store Call prp:", prp, "yr:", yr);
 
       const storeFunc = async () => {
         const allstoredata = await fetchAllStoredata(token, prp, yr, txnType);
@@ -248,7 +329,7 @@ const DoffEntry = ({ navigation, token, username }) => {
 
       storeFunc();
     }
-  }, [selectedYear]);
+  }, [selectedYear, selectProperty, selectedProperty]);
 
   // Display date from YYYYMMDD string as DD/MM/YYYY
   const getDisplayDateFromYYYYMMDD = (dateStr) => {
@@ -283,6 +364,14 @@ const DoffEntry = ({ navigation, token, username }) => {
 
   const selectProperty = item => {
     setSelectedProperty(item);
+    setSelectedStore('');
+    // setSelectedYear('');
+    setSelectedMer(null);
+    setSelectedItm(null);
+    setSelectedMachines(null);
+    setAllMerData([]);
+    setAllItmData([]);
+    setAllMachines([]);
 
     const updated = [
       item,
@@ -291,10 +380,159 @@ const DoffEntry = ({ navigation, token, username }) => {
     setRecentProps(updated.slice(0, 3));
   };
 
+  const selectMerge = item => {
+    setSelectedMer(item);
+    setSelectedItm(null);
+    setSelectedMachines(null);
+    setAllItmData([]);
+    setAllMachines([]);
+
+    const updated = [
+      item,
+      ...recentPropsmer.filter(p => p.mercode !== item.mercode),
+    ];
+    setRecentPropsmer(updated.slice(0, 3));
+  };
+
+  const selectItem = item => {
+    setSelectedItm(item);
+
+    const updated = [
+      item,
+      ...recentPropsitm.filter(p => p.itmcode !== item.itmcode),
+    ];
+    setRecentPropsitm(updated.slice(0, 3));
+  };
+
+  const getMergeData = async () => {
+    let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
+    let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+
+    if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
+      showWarning('Please select property');
+      return;
+    } else if (
+      typeof yearnumber3 == 'undefined' ||
+      yearnumber3 == null ||
+      yearnumber3 == ''
+    ) {
+      showWarning('Please select yaer');
+      return;
+    } else if (
+      typeof finalStrCode == 'undefined' ||
+      finalStrCode == null ||
+      finalStrCode == ''
+    ) {
+      showWarning('Please select store');
+      return;
+    }
+
+    try {
+      const payload = {
+        fetch: 'mer',
+        txntype: 'mobile_doff_entry',
+        prptype: '',
+        prpcode: prp3,
+        yearno: yearnumber3,
+        strcode: finalStrCode,
+        limit: '',
+      };
+      const respo = await axios.get(`${API}/api/get_criterion`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        params: payload,
+      });
+      console.log("merge respo:", respo);
+
+      if (respo.data.success && respo.data.response.data.length > 0) {
+        console.log('merge API success:', respo);
+        setAllMerData(respo.data.response.data);
+      } else {
+        console.log('merge API success false:', respo?.data);
+      }
+    } catch (error) {
+      console.log('merge api error:', error);
+    }
+
+    setMerPickerVisible(true);
+  };
+
+  const getItmData = async () => {
+    let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
+    let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+
+    if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
+      showWarning('Please select property');
+      return;
+    } else if (
+      typeof yearnumber3 == 'undefined' ||
+      yearnumber3 == null ||
+      yearnumber3 == ''
+    ) {
+      showWarning('Please select yaer');
+      return;
+    } else if (
+      typeof finalStrCode == 'undefined' ||
+      finalStrCode == null ||
+      finalStrCode == ''
+    ) {
+      showWarning('Please select store');
+      return;
+    } else if (
+      typeof finalmerCode == 'undefined' ||
+      finalmerCode == null ||
+      finalmerCode == ''
+    ) {
+      showWarning('Please select Merge');
+      return;
+    }
+
+    try {
+      const payload = {
+        fetch: 'itm',
+        txntype: 'mobile_doff_entry',
+        prptype: '',
+        prpcode: prp3,
+        yearno: yearnumber3,
+        strcode: finalStrCode,
+        mercode: finalmerCode,
+        limit: '',
+      };
+      const respo = await axios.get(`${API}/api/get_criterion`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        params: payload,
+      });
+      console.log("itm respo:", respo);
+
+      if (respo.data.success && respo.data.response.data.length > 0) {
+        console.log('itm API success:', respo);
+        setAllItmData(respo.data.response.data);
+      } else {
+        console.log('itm API success false:', respo?.data);
+      }
+    } catch (error) {
+      console.log('itm api error:', error);
+    }
+
+    setItmPickerVisible(true);
+  };
+
   const getMachineData = async () => {
     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+    let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
 
     if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
       showWarning('Please select property');
@@ -323,6 +561,8 @@ const DoffEntry = ({ navigation, token, username }) => {
         prpcode: prp3,
         yearno: yearnumber3,
         strcode: finalStrCode,
+        mercode: finalmerCode,
+        itmcode: finalitmCode,
         limit: '',
       };
       const respo = await axios.get(`${API}/api/get_criterion`, {
@@ -333,7 +573,7 @@ const DoffEntry = ({ navigation, token, username }) => {
         },
         params: payload,
       });
-      console.log("mac respo:", respo);
+      console.log("mac respo:", respo, payload);
 
       if (respo.data.success && respo.data.response.data.length > 0) {
         console.log('machine API success:', respo);
@@ -353,6 +593,9 @@ const DoffEntry = ({ navigation, token, username }) => {
     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
     let finalMacCode = selectedMachines?.MacCode || '';
+    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+    let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
+
     if (typeof prp3 == 'undefined' || prp3 == '' || prp3 == null) {
       showWarning('please select property');
     } else if (
@@ -383,6 +626,8 @@ const DoffEntry = ({ navigation, token, username }) => {
           strcode: finalStrCode,
           limit: '',
           maccode: finalMacCode,
+          mercode: finalmerCode,
+          itmcode: finalitmCode,
           productionuid: selectedMachines?.productionuid || '',
         };
         const respo = await axios.get(`${API}/api/proddoffshow`, {
@@ -394,9 +639,11 @@ const DoffEntry = ({ navigation, token, username }) => {
           params: payload,
         });
         console.log('proddoffshow api response : ', respo.data.data, payload);
-        if (respo.data.success && respo.data.data?.main?.length > 0) {
+        if (respo.data.success) {
+          setFilterVisible(false);
           console.log('proddoffshow api response : ', respo);
           setAllDoffData(respo.data.data.main);
+          console.log('proddoffshow api response new: ', respo.data.data.mainnew);
           setAllDoffDataNew(respo.data.data.mainnew);
         } else {
           console.log('API response issue:', respo.data);
@@ -414,6 +661,7 @@ const DoffEntry = ({ navigation, token, username }) => {
     if (!firstData || !firstData[0]) {
       return {};
     }
+    console.log('firstData', firstData, 'secondData', secondData);
 
     // First data se base object lo
     const firstObject = firstData[0];
@@ -479,9 +727,12 @@ const DoffEntry = ({ navigation, token, username }) => {
     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+    let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
     // Final payload
     const finalPayload = {
       ...mergedPayload,
+      totcones: mergedPayload.totchees || 0,
       startdate: formattedStartDate,
       starttime: formattedStartTime,
       startdatetime: combinedDateTime.toISOString(),
@@ -491,6 +742,8 @@ const DoffEntry = ({ navigation, token, username }) => {
       prpcode: prp3,
       yearno: yearnumber3,
       strcode: finalStrCode,
+      mercode: finalmerCode,
+      itmcode: finalitmCode,
       txntype: 'mobile_doff_entry'
     };
 
@@ -526,10 +779,103 @@ const DoffEntry = ({ navigation, token, username }) => {
         const data = response.data.data.main;
         showSuccess('Doff added successfully');
         setAllDoffData(data);
+        setAllDoffDataNew(response.data.data.mainnew);
       } else {
         showWarning(response.data.message || 'Failed to add doff');
       }
 
+    } catch (error) {
+      console.log('❌ API Error:', error);
+      showError('API failed: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+
+  const doffUpdateEnd = async () => {
+    // Merged payload create karo
+    let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
+    let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
+    let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+    let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
+    const formattedStartDateEnd = formatDateDDMMYYYY(startDateEnd);
+    const formattedStartTimeEnd = formatTimeWithDot(startTimeEnd);
+
+    // Get the latest edited data for this doff
+    const doffId = firstIncompleteDoff.uid || getAllDoffData.indexOf(firstIncompleteDoff);
+    const latestEditedData = editableDoffData[doffId] || {};
+
+    try {
+
+
+      // Prepare the payload with the latest edited data
+      const finalPayload = {
+        prpcode: prp3,
+        yearno: yearnumber3,
+        strcode: finalStrCode,
+        mercode: finalmerCode,
+        itmcode: finalitmCode,
+        txntype: 'mobile_doff_entry',
+        maccode: firstIncompleteDoff?.maccode,
+        uid: firstIncompleteDoff?.uid,
+        productionuid: firstIncompleteDoff?.productionuid,
+        // Use the latest edited data
+        startdate: firstIncompleteDoff.startdate,
+        starttime: firstIncompleteDoff.starttime,
+        // enddate: firstIncompleteDoff.enddate,
+        // endtime: firstIncompleteDoff.endtime,
+        // enddate: latestEditedData.enddate || itemToUpdate.enddate,
+        // endtime: latestEditedData.endtime || itemToUpdate.endtime,
+        enddate: formattedStartDateEnd,
+        endtime: formattedStartTimeEnd,
+
+        startreading: firstIncompleteDoff.startreading,
+        endreading: firstIncompleteDoff.endreading,
+        totcones: firstIncompleteDoff.totchees,  // Add this
+        totchees: firstIncompleteDoff.totchees,  // Add this
+        totnetqty: firstIncompleteDoff.totnetqty,  // Add this
+        tottareqty: firstIncompleteDoff.tottareqty,  // Add this
+        totgrsqty: firstIncompleteDoff.totgrsqty,  // Add this
+        islastdoff: firstIncompleteDoff.islastdoff,  // Add this
+        d1: [],
+        d2: [],
+        // Include all other fields from the original firstIncompleteDoff
+        ...Object.fromEntries(
+          Object.entries(firstIncompleteDoff).filter(([key]) =>
+            !['enddate', 'endtime', 'totcones'].includes(key)
+          )
+        )
+      };
+
+      console.log('📤 doff End Update PAYLOAD:', finalPayload);
+
+      const response = await axios.post(
+        `${API}/api/proddoffedit`,
+        finalPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('📤 doff End  Update response:', response);
+
+      if (response.data.success) {
+        const data = response.data.data.main;
+        showSuccess('Doff updated successfully');
+        setAllDoffData(data);
+        setAllDoffDataNew(response.data.data.mainnew);
+        // Clear the editable data for this doff after successful update
+        setEditableDoffData(prev => {
+          const newData = { ...prev };
+          delete newData[doffId];
+          return newData;
+        });
+      } else {
+        showWarning(response.data.message || 'Failed to update doff');
+      }
     } catch (error) {
       console.log('❌ API Error:', error);
       showError('API failed: ' + (error.response?.data?.message || error.message));
@@ -561,6 +907,7 @@ const DoffEntry = ({ navigation, token, username }) => {
     getAllDoffData.forEach(item => {
       sums.totcones += parseFloat(item.totcones || 0);
       sums.totnetqty += parseFloat(item.totnetqty || 0);
+      sums.totchees += parseFloat(item.totchees || 0);
     });
 
     return sums;
@@ -577,7 +924,7 @@ const DoffEntry = ({ navigation, token, username }) => {
         noBorderRadius={true}
       />
       <TouchableOpacity style={styles.listIconContainer} onPress={() => setFilterVisible(true)}>
-        <Icon name="list" size={24} color="#fff" />
+        <Icon name="list" size={20} color="#fff" />
       </TouchableOpacity>
       <View style={{ flex: 1, backgroundColor: '#F5F7FB' }}>
         {getAllDoffData && getAllDoffData.length > 0 || selectedProperty?.PrpCode ? (
@@ -590,12 +937,40 @@ const DoffEntry = ({ navigation, token, username }) => {
                 contentContainerStyle={styles.machineInfoScroll}
               >
                 <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Machine No:</Text>
+                  <Text style={styles.machineInfoLabel}>M/C:</Text>
                   <Text style={styles.machineInfoValue}>
                     {getSelectedFilteredMachine[0]?.MacName || 'N/A'}
                   </Text>
                 </View>
                 <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Qlty:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.itmname || 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Mer:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.mername || 'N/A'}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Shd:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {getSelectedFilteredMachine[0]?.shade || 'N/A'}
+                  </Text>
+                </View>
+              </ScrollView>
+            </View>
+            <View style={styles.machineInfoCardNew}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.machineInfoScroll}
+              >
                 <View style={styles.machineInfoRow}>
                   <Text style={styles.machineInfoLabel}>R.C. No:</Text>
                   <Text style={styles.machineInfoValue}>
@@ -611,29 +986,36 @@ const DoffEntry = ({ navigation, token, username }) => {
                 </View>
                 <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
                 <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Item Name:</Text>
+                  <Text style={styles.machineInfoLabel}>Qty:</Text>
                   <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.itmname || 'N/A'}
-                  </Text>
-                </View>
-                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
-                <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Merge No:</Text>
-                  <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.mername || 'N/A'}
-                  </Text>
-                </View>
-                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
-                <View style={styles.machineInfoRow}>
-                  <Text style={styles.machineInfoLabel}>Shade:</Text>
-                  <Text style={styles.machineInfoValue}>
-                    {getSelectedFilteredMachine[0]?.shade || 'N/A'}
+                    {getSelectedFilteredMachine[0]?.prodqty ? Number(getSelectedFilteredMachine[0]?.prodqty).toFixed(3) : 'N/A'}
                   </Text>
                 </View>
               </ScrollView>
             </View>
-            <View style={styles.summaryCard}>
-              {/* <Text style={styles.summaryTitle}>Doff Summary</Text> */}
+            <View style={styles.machineInfoCardNew}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.machineInfoScroll}
+              >
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Total Chees:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {sums.totchees.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={{ width: 2, borderWidth: 1, borderColor: '#ccc', height: '100%' }}></View>
+                <View style={styles.machineInfoRow}>
+                  <Text style={styles.machineInfoLabel}>Total Net Wt.:</Text>
+                  <Text style={styles.machineInfoValue}>
+                    {sums.totnetqty.toFixed(3)}
+                  </Text>
+                </View>
+              </ScrollView>
+            </View>
+            {/* <View style={styles.summaryCard}>
+              
               <View style={styles.summaryGrid}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Total Tubes:</Text>
@@ -644,112 +1026,234 @@ const DoffEntry = ({ navigation, token, username }) => {
                   <Text style={styles.summaryValue}>{sums.totnetqty.toFixed(2)}</Text>
                 </View>
               </View>
-            </View>
+            </View> */}
             <View style={styles.accordionContainer}>
-              <TouchableOpacity
-                style={styles.accordionHeader}
-                activeOpacity={0.8}
-                onPress={() => setExpanded(!expanded)}
-              >
-                <Text style={styles.accordionTitle}>Start Doff</Text>
-                <Icon
-                  name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-                  size={24}
-                  color="#fff"
-                />
-              </TouchableOpacity>
+              {hasLastDoff ? (null) :
+                <TouchableOpacity
+                  style={styles.accordionHeader}
+                  activeOpacity={0.8}
+                  onPress={() => setExpanded(!expanded)}
+                >
+                  <Text style={styles.accordionTitle}>Start Doff</Text>
+                  <Icon
+                    name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                    size={24}
+                    color="#fff"
+                  />
+                </TouchableOpacity>
+              }
+              {hasLastDoff ? (null) :
+                <>
 
-              {expanded && (
-                <View style={styles.accordionContent}>
-                  {/* Date & Time Picker Section */}
-                  <View style={styles.fieldContainer}>
-                    <Text style={styles.label}>Start Date & Time</Text>
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                      {/* Date Picker Button */}
-                      <TouchableOpacity
-                        style={styles.dateTimeInput}
-                        onPress={() => setShowStartDatePicker(true)}
-                      >
-                        <Icon name="date-range" size={20} color="#666" />
-                        <Text style={styles.dateTimeText}>
-                          {formatDateDDMMYYYY(startDate)}
-                        </Text>
-                      </TouchableOpacity>
+                  {expanded && (
+                    <View style={styles.accordionContent}>
+                      {/* Date & Time Picker Section */}
+                      <View style={styles.fieldContainer}>
+                        <Text style={styles.label}>Start Date & Time</Text>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          {/* Date Picker Button */}
+                          <TouchableOpacity
+                            style={styles.dateTimeInput}
+                            onPress={() => setShowStartDatePicker(true)}
+                          >
+                            <Icon name="date-range" size={20} color="#666" />
+                            <Text style={styles.dateTimeText}>
+                              {formatDateDDMMYYYY(startDate)}
+                            </Text>
+                          </TouchableOpacity>
 
-                      {/* Time Picker Button */}
+                          {/* Time Picker Button */}
+                          <TouchableOpacity
+                            style={styles.dateTimeInput}
+                            onPress={() => setShowStartTimePicker(true)}
+                          >
+                            <Icon name="schedule" size={20} color="#666" />
+                            <Text style={styles.dateTimeText}>
+                              {formatTimeWithDot(startTime)}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Date Picker Modal */}
+                      {showStartDatePicker && (
+                        <DateTimePicker
+                          value={startDate}
+                          mode="date"
+                          display="default"
+                          onChange={(event, date) => {
+                            setShowStartDatePicker(false);
+                            if (event.type === 'set' && date) {
+                              setStartDate(date);
+                            }
+                          }}
+                          minimumDate={new Date()}
+                          textColor="#000"
+                          locale="en-IN"
+                        />
+                      )}
+
+                      {/* Time Picker Modal */}
+                      {showStartTimePicker && (
+                        <DateTimePicker
+                          value={startTime}
+                          mode="time"
+                          display="default"
+                          is24Hour={true}
+                          onChange={(event, time) => {
+                            setShowStartTimePicker(false);
+                            if (event.type === 'set' && time) {
+                              setStartTime(time);
+                            }
+                          }}
+                          textColor="#000"
+                          locale="en-IN"
+                        />
+                      )}
+
+                      {/* Save Button */}
                       <TouchableOpacity
-                        style={styles.dateTimeInput}
-                        onPress={() => setShowStartTimePicker(true)}
+                        style={styles.saveButton}
+                        onPress={() => {
+                          if (!getSelectedFilteredMachine[0]) {
+                            showWarning("Please select a machine first");
+                            return;
+                          }
+                          console.log(
+                            "Selected Machine Data:",
+                            getSelectedFilteredMachine[0],
+                            "Start Date:",
+                            selectedDate || new Date(),
+                            "Start Time:",
+                            selectedTime || new Date(),
+                            "Combined DateTime:",
+                            getDate || new Date()
+                          );
+                          doffAdd();
+                        }}
                       >
-                        <Icon name="schedule" size={20} color="#666" />
-                        <Text style={styles.dateTimeText}>
-                          {formatTimeWithDot(startTime)}
-                        </Text>
+                        <Text style={styles.saveButtonText}>START</Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
-
-                  {/* Date Picker Modal */}
-                  {showStartDatePicker && (
-                    <DateTimePicker
-                      value={startDate}
-                      mode="date"
-                      display="default"
-                      onChange={(event, date) => {
-                        setShowStartDatePicker(false);
-                        if (event.type === 'set' && date) {
-                          setStartDate(date);
-                        }
-                      }}
-                      minimumDate={new Date()}
-                      textColor="#000"
-                      locale="en-IN"
-                    />
                   )}
+                </>
+              }
+            </View>
+            <View style={styles.accordionContainer}>
+              {hasLastDoff ? (null) :
+                isAnyEndEmpty ?
+                  <>
+                    <TouchableOpacity
+                      style={styles.accordionHeader}
+                      activeOpacity={0.8}
+                      onPress={() => setExpandedEnd(!expandedEnd)}
+                    >
+                      <Text style={styles.accordionTitle}>End Doff</Text>
+                      <Icon
+                        name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                        size={24}
+                        color="#fff"
+                      />
+                    </TouchableOpacity>
+                  </>
+                  : null
+              }
 
-                  {/* Time Picker Modal */}
-                  {showStartTimePicker && (
-                    <DateTimePicker
-                      value={startTime}
-                      mode="time"
-                      display="default"
-                      is24Hour={true}
-                      onChange={(event, time) => {
-                        setShowStartTimePicker(false);
-                        if (event.type === 'set' && time) {
-                          setStartTime(time);
-                        }
-                      }}
-                      textColor="#000"
-                      locale="en-IN"
-                    />
+              {hasLastDoff ? (null) :
+                <>
+                  {expandedEnd && (
+                    <View style={styles.accordionContent}>
+                      {/* Date & Time Picker Section */}
+                      <View style={styles.fieldContainer}>
+                        <Text style={styles.label}>End Date & Time</Text>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          {/* Date Picker Button */}
+                          <TouchableOpacity
+                            style={styles.dateTimeInput}
+                            onPress={() => setShowStartDatePickerEnd(true)}
+                          >
+                            <Icon name="date-range" size={20} color="#666" />
+                            <Text style={styles.dateTimeText}>
+                              {formatDateDDMMYYYY(startDate)}
+                            </Text>
+                          </TouchableOpacity>
+
+                          {/* Time Picker Button */}
+                          <TouchableOpacity
+                            style={styles.dateTimeInput}
+                            onPress={() => setShowStartTimePickerEnd(true)}
+                          >
+                            <Icon name="schedule" size={20} color="#666" />
+                            <Text style={styles.dateTimeText}>
+                              {formatTimeWithDot(startTime)}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Date Picker Modal */}
+                      {showStartDatePickerEnd && (
+                        <DateTimePicker
+                          value={startDateEnd}
+                          mode="date"
+                          display="default"
+                          onChange={(event, date) => {
+                            setShowStartDatePickerEnd(false);
+                            if (event.type === 'set' && date) {
+                              setStartDateEnd(date);
+                            }
+                          }}
+                          minimumDate={new Date()}
+                          textColor="#000"
+                          locale="en-IN"
+                        />
+                      )}
+
+                      {/* Time Picker Modal */}
+                      {showStartTimePickerEnd && (
+                        <DateTimePicker
+                          value={startTimeEnd}
+                          mode="time"
+                          display="default"
+                          is24Hour={true}
+                          onChange={(event, time) => {
+                            setShowStartTimePickerEnd(false);
+                            if (event.type === 'set' && time) {
+                              setStartTimeEnd(time);
+                            }
+                          }}
+                          textColor="#000"
+                          locale="en-IN"
+                        />
+                      )}
+
+                      {/* Save Button */}
+                      <TouchableOpacity
+                        style={styles.saveButton}
+                        onPress={() => {
+                          if (!getSelectedFilteredMachine[0]) {
+                            showWarning("Please select a machine first");
+                            return;
+                          }
+                          console.log(
+                            "Selected Machine Data:",
+                            getSelectedFilteredMachine[0],
+                            "Start Date:",
+                            selectedDate || new Date(),
+                            "Start Time:",
+                            selectedTime || new Date(),
+                            "Combined DateTime:",
+                            getDate || new Date()
+                          );
+                          doffUpdateEnd();
+                        }}
+                      >
+                        <Text style={styles.saveButtonText}>START</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
-
-                  {/* Save Button */}
-                  <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={() => {
-                      if (!getSelectedFilteredMachine[0]) {
-                        showWarning("Please select a machine first");
-                        return;
-                      }
-                      console.log(
-                        "Selected Machine Data:",
-                        getSelectedFilteredMachine[0],
-                        "Start Date:",
-                        selectedDate || new Date(),
-                        "Start Time:",
-                        selectedTime || new Date(),
-                        "Combined DateTime:",
-                        getDate || new Date()
-                      );
-                      doffAdd();
-                    }}
-                  >
-                    <Text style={styles.saveButtonText}>START</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                </>
+              }
             </View>
           </>
         ) : (
@@ -777,7 +1281,9 @@ const DoffEntry = ({ navigation, token, username }) => {
             data={getAllDoffData}
             keyExtractor={(item, index) => `${item.uid || index}`}
             contentContainerStyle={{ padding: 8 }}
+            numColumns={numColumns}
             extraData={editableDoffData}
+            key={`flatlist-${numColumns}`}
             renderItem={({ item, index }) => {
               const doffId = item.uid || index;
               const currentEditableData = editableDoffData[doffId] || {};
@@ -891,7 +1397,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                 <View style={item.islastdoff === '1' ? styles.compactCardLast : styles.compactCard}>
                   {/* Header */}
                   <View style={styles.compactHeader}>
-                    <Text style={styles.compactTitle}>Doff #{index + 1}</Text>
+                    <Text style={styles.compactTitle}>Doff #{item.doffno}</Text>
                     <View style={styles.shiftBadgeContainer}>
                       <TouchableOpacity onPress={() => handleDoffDelete(item)}>
                         <Icon name="delete" size={20} color="red" />
@@ -909,7 +1415,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                     ))}
                   </View> */}
 
-                  <View style={styles.dateTimeRow}>
+                  {/* <View style={styles.dateTimeRow}>
                     <View style={styles.halfField}>
                       <Text style={styles.compactLabel}>No. Of Tubes</Text>
                       <EditableText
@@ -919,7 +1425,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                             ? currentEditableData.totcones
                             : (item.totcones || '')
                         }
-                        // placeholder="Enter cone weight"
+
                       />
                     </View>
                     <View style={styles.halfField}>
@@ -931,10 +1437,10 @@ const DoffEntry = ({ navigation, token, username }) => {
                             ? currentEditableData.totchees
                             : (item.totchees || '')
                         }
-                        // placeholder="Enter cone weight"
+                      // placeholder="Enter cone weight"
                       />
                     </View>
-                  </View>
+                  </View> */}
 
                   {/* Start Date & Time */}
                   <View style={styles.dateTimeRow}>
@@ -1077,6 +1583,18 @@ const DoffEntry = ({ navigation, token, username }) => {
 
                   <View style={styles.dateTimeRow}>
                     <View style={styles.halfField}>
+                      <Text style={styles.compactLabel}>Chees</Text>
+                      <EditableText
+                        field="totchees"
+                        value={
+                          currentEditableData.totchees !== undefined
+                            ? currentEditableData.totchees
+                            : (item.totchees || '')
+                        }
+                      // placeholder="Enter cone weight"
+                      />
+                    </View>
+                    <View style={styles.halfField}>
                       <Text style={styles.compactLabel}>Gross Wt.</Text>
                       <EditableText
                         field="totgrsqty"
@@ -1085,7 +1603,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                             ? currentEditableData.totgrsqty
                             : (item.totgrsqty || '')
                         }
-                        // placeholder="Enter cone weight"
+                      // placeholder="Enter cone weight"
                       />
                     </View>
                     <View style={styles.halfField}>
@@ -1097,10 +1615,10 @@ const DoffEntry = ({ navigation, token, username }) => {
                             ? currentEditableData.totnetqty
                             : (item.totnetqty || '')
                         }
-                        // placeholder="Enter cone weight"
+                      // placeholder="Enter cone weight"
                       />
                     </View>
-                    <View style={styles.halfField}>
+                    {/* <View style={styles.halfField}>
                       <Text style={styles.compactLabel}>Tar Wt.</Text>
                       <EditableText
                         field="tottareqty"
@@ -1109,9 +1627,10 @@ const DoffEntry = ({ navigation, token, username }) => {
                             ? currentEditableData.tottareqty
                             : (item.tottareqty || '')
                         }
-                        // placeholder="Enter cone weight"
+                      // placeholder="Enter cone weight"
                       />
-                    </View>
+                    </View> */}
+
                   </View>
 
                   {/* Footer */}
@@ -1204,6 +1723,142 @@ const DoffEntry = ({ navigation, token, username }) => {
                   }}
                 >
                   <Text style={{ flex: 1, color: '#000' }}>{item.LngName}</Text>
+                  {selected && (
+                    <Icon name="check-circle" size={20} color="#0F6C7B" />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={merPickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setMerPickerVisible(false)}>
+              <Icon name="arrow-back-ios" size={20} style={{ color: '#000' }} />
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Select Merge</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <View style={styles.pickerSearch}>
+            <Icon name="search" size={18} color="#777" />
+            <TextInput
+              placeholder="Search merge..."
+              placeholderTextColor="#000"
+              value={merSearch}
+              onChangeText={setMerSearch}
+              style={{ flex: 1, color: '#000' }}
+            />
+          </View>
+
+          {selectedMer && (
+            <>
+              <Text style={styles.section1}>Selected</Text>
+
+              <View style={styles.selectedBox}>
+                <Text style={styles.selectedText}>
+                  {selectedMer.mername}
+                </Text>
+
+                <Icon name="check-circle" size={18} color="#0F6C7B" />
+              </View>
+            </>
+          )}
+
+          <FlatList
+            data={
+              getAllMerData &&
+              getAllMerData.filter(p =>
+                p.mername.toLowerCase().includes(merSearch.toLowerCase()),
+              )
+            }
+            keyExtractor={item => item.mercode}
+            renderItem={({ item }) => {
+              const selected = selectedMer?.mercode === item.mercode;
+              return (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    selectMerge(item);
+                    setMerPickerVisible(false);
+                  }}
+                >
+                  <Text style={{ flex: 1, color: '#000' }}>{item.mername}</Text>
+                  {selected && (
+                    <Icon name="check-circle" size={20} color="#0F6C7B" />
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={itmPickerVisible}
+        animationType="slide"
+        statusBarTranslucent={true}
+      >
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          <View style={styles.pickerHeader}>
+            <TouchableOpacity onPress={() => setItmPickerVisible(false)}>
+              <Icon name="arrow-back-ios" size={20} style={{ color: '#000' }} />
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Select Item</Text>
+            <View style={{ width: 20 }} />
+          </View>
+
+          <View style={styles.pickerSearch}>
+            <Icon name="search" size={18} color="#777" />
+            <TextInput
+              placeholder="Search item..."
+              placeholderTextColor="#000"
+              value={itmSearch}
+              onChangeText={setItmSearch}
+              style={{ flex: 1, color: '#000' }}
+            />
+          </View>
+
+          {selectedItm && (
+            <>
+              <Text style={styles.section1}>Selected</Text>
+
+              <View style={styles.selectedBox}>
+                <Text style={styles.selectedText}>
+                  {selectedItm.itmname}
+                </Text>
+
+                <Icon name="check-circle" size={18} color="#0F6C7B" />
+              </View>
+            </>
+          )}
+
+          <FlatList
+            data={
+              getAllItmData &&
+              getAllItmData.filter(p =>
+                p.itmname.toLowerCase().includes(merSearch.toLowerCase()),
+              )
+            }
+            keyExtractor={item => item.itmcode}
+            renderItem={({ item }) => {
+              const selected = selectedItm?.itmcode === item.itmcode;
+              return (
+                <TouchableOpacity
+                  style={styles.pickerItem}
+                  onPress={() => {
+                    selectItem(item);
+                    setItmPickerVisible(false);
+                  }}
+                >
+                  <Text style={{ flex: 1, color: '#000' }}>{item.itmname}</Text>
                   {selected && (
                     <Icon name="check-circle" size={20} color="#0F6C7B" />
                   )}
@@ -1492,6 +2147,28 @@ const DoffEntry = ({ navigation, token, username }) => {
                 </View>
               </View>
 
+              <Text style={styles.label}>Merge</Text>
+              <TouchableOpacity
+                style={styles.inputBoxProperty}
+                onPress={getMergeData}
+              >
+                <Text numberOfLines={1} style={{ color: '#000' }}>
+                  {selectedMer?.mername || 'Select merge'}
+                </Text>
+                <Icon name="keyboard-arrow-down" size={24} />
+              </TouchableOpacity>
+
+              <Text style={styles.label}>Item</Text>
+              <TouchableOpacity
+                style={styles.inputBoxProperty}
+                onPress={getItmData}
+              >
+                <Text numberOfLines={1} style={{ color: '#000' }}>
+                  {selectedItm?.itmname || 'Select item'}
+                </Text>
+                <Icon name="keyboard-arrow-down" size={24} />
+              </TouchableOpacity>
+
               {/* Machine */}
               <View style={styles.fieldContainer}>
                 <Text style={styles.label}>Machine</Text>
@@ -1512,7 +2189,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                 style={styles.applyBtn}
                 onPress={() => {
                   showData(selectedMachines);
-                  setFilterVisible(false);
+                  // setFilterVisible(false);
                 }}
               >
                 <Text style={{ color: '#fff' }}>Load data</Text>
@@ -1908,11 +2585,15 @@ const DoffEntry = ({ navigation, token, username }) => {
                     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
                     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
                     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+                    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+                    let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
 
                     const finalPayload = {
                       prpcode: prp3,
                       yearno: yearnumber3,
                       strcode: finalStrCode,
+                      mercode: finalmerCode,
+                      itmcode: finalitmCode,
                       txntype: 'mobile_doff_entry',
                       maccode: itemToDelete?.maccode,
                       uid: itemToDelete?.uid,
@@ -1936,6 +2617,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                       const data = response.data.data.main;
                       showSuccess('Doff deleted successfully');
                       setAllDoffData(data);
+                      setAllDoffDataNew(response.data.data.mainnew);
                     } else {
                       showWarning(response.data.message || 'Failed to delete doff');
                     }
@@ -1961,7 +2643,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       <Modal
         transparent
         visible={showUpdateConfirm}
-         animationType="slide"
+        animationType="slide"
         statusBarTranslucent={true}
       >
         <View
@@ -2016,6 +2698,8 @@ const DoffEntry = ({ navigation, token, username }) => {
                     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
                     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
                     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
+                    let finalmerCode = selectedMer ? selectedMer?.mercode : '';
+                    let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
 
                     // Get the latest edited data for this doff
                     const doffId = itemToUpdate.uid || getAllDoffData.indexOf(itemToUpdate);
@@ -2026,6 +2710,8 @@ const DoffEntry = ({ navigation, token, username }) => {
                       prpcode: prp3,
                       yearno: yearnumber3,
                       strcode: finalStrCode,
+                      mercode: finalmerCode,
+                      itmcode: finalitmCode,
                       txntype: 'mobile_doff_entry',
                       maccode: itemToUpdate?.maccode,
                       uid: itemToUpdate?.uid,
@@ -2038,7 +2724,7 @@ const DoffEntry = ({ navigation, token, username }) => {
 
                       startreading: latestEditedData.startreading || itemToUpdate.startreading,
                       endreading: latestEditedData.endreading || itemToUpdate.endreading,
-                      totcones: latestEditedData.totcones || itemToUpdate.totcones,  // Add this
+                      totcones: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
                       totchees: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
                       totnetqty: latestEditedData.totnetqty || itemToUpdate.totnetqty,  // Add this
                       tottareqty: latestEditedData.tottareqty || itemToUpdate.tottareqty,  // Add this
@@ -2073,6 +2759,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                       const data = response.data.data.main;
                       showSuccess('Doff updated successfully');
                       setAllDoffData(data);
+                      setAllDoffDataNew(response.data.data.mainnew);
                       // Clear the editable data for this doff after successful update
                       setEditableDoffData(prev => {
                         const newData = { ...prev };
@@ -2164,7 +2851,8 @@ const styles = StyleSheet.create({
 
   accordionContainer: {
     marginHorizontal: 16,
-    marginVertical: 0,
+    // marginVertical: 0,
+    marginTop: 5,
     borderRadius: 10,
     overflow: 'hidden',
     elevation: 2,
@@ -2346,6 +3034,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 15,
+    marginTop: 27,
   },
 
   pickerTitle: { fontSize: 16, fontWeight: '600', color: '#000' },
@@ -2632,6 +3321,8 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     elevation: 2,
+    flex: 1, // <-- This makes the card take equal width in a row
+    marginHorizontal: 4, // <-- Add horizontal margin for spacing
   },
 
   compactCardLast: {
@@ -2642,6 +3333,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 69, 69, 0.41)',
+    flex: 1,
+    marginHorizontal: 4,
   },
 
   compactHeader: {
@@ -2789,6 +3482,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.BRAND_GRADIENT_START
   },
+  machineInfoCardNew: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    // padding: 8, // Reduced padding
+    marginHorizontal: 15,
+    marginVertical: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderWidth: 1.5,
+    borderColor: theme.BRAND_GRADIENT_START
+  },
   machineInfoScroll: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2852,12 +3561,12 @@ const styles = StyleSheet.create({
 
   listIconContainer: {
     position: 'absolute',
-    top: 145,
+    top: 178.5,
     right: 25,
     zIndex: 1,
     backgroundColor: theme.BRAND_GRADIENT_END,
     color: '#fff',
     borderRadius: 3,
-    padding: 4,
+    padding: 3,
   },
 });

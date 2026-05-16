@@ -223,7 +223,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
                         {item.Address}
                     </Text>
 
-                     <Text style={styles.address}>
+                    <Text style={styles.address}>
                         {item.SExeName}
                     </Text>
 
@@ -285,10 +285,16 @@ const PartyListScreen = ({ navigation, route, token }) => {
                         }
                     />
                 )}
-                {/* 
-                <TouchableOpacity style={styles.addBtn}>
+
+                {/* <TouchableOpacity style={styles.addBtn}>
                     <Text style={styles.addBtnText}>＋ Add New Party</Text>
                 </TouchableOpacity> */}
+                <TouchableOpacity
+                    style={styles.addBtn}
+                    onPress={() => navigation.navigate('AddNewPartyScreen')}
+                >
+                    <Text style={styles.addBtnText}>＋ Add New Party</Text>
+                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );

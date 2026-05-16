@@ -3127,7 +3127,7 @@ export const yarnmanagementsystemstyle = StyleSheet.create({
     },
     noDataText: {
         fontSize: 14,
-        color: '#999',
+        color: '#000',
         fontWeight: '500'
     },
     selectedItemBox: {

@@ -101,6 +101,8 @@ import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
 import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueReturnEntry';
 import CreelIssueReturnModifyEntry from './components/CreelIssueReturn/CreelIssueReturnModifyEntry';
 import DoffEntry from './components/DoffEntry/DoffEntry';
+import YarnSalesOrderModule from './components/YarnSalesOrder/YarnSalesOrderModule';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -1222,6 +1224,18 @@ export default function App() {
                         </>
                       )}
                     </Stack.Screen>
+                    <Stack.Screen name="Yarn Sales Order">
+                      {props => (
+                        <YarnSalesOrderModule
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+
+                    
                   </Stack.Navigator>
                   {/* </Stack.Navigator> */}
 

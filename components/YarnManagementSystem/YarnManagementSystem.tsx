@@ -2327,7 +2327,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
                         }}
                         onPress={() => setshowbrwosecard(false)}
                     >
-                        <Text style={{ fontWeight: '600' }}>Cancel</Text>
+                        <Text style={{ fontWeight: '600',color:'#000' }}>Cancel</Text>
                     </TouchableOpacity>
 
                 </View>

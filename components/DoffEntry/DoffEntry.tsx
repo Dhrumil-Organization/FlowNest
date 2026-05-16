@@ -733,6 +733,7 @@ const DoffEntry = ({ navigation, token, username }) => {
     const finalPayload = {
       ...mergedPayload,
       totcones: mergedPayload.totchees || 0,
+      tottareqty: (mergedPayload.totgrsqty - mergedPayload.totnetqty).toString(),  // Add this
       startdate: formattedStartDate,
       starttime: formattedStartTime,
       startdatetime: combinedDateTime.toISOString(),
@@ -834,15 +835,15 @@ const DoffEntry = ({ navigation, token, username }) => {
         totcones: firstIncompleteDoff.totchees,  // Add this
         totchees: firstIncompleteDoff.totchees,  // Add this
         totnetqty: firstIncompleteDoff.totnetqty,  // Add this
-        tottareqty: firstIncompleteDoff.tottareqty,  // Add this
         totgrsqty: firstIncompleteDoff.totgrsqty,  // Add this
         islastdoff: firstIncompleteDoff.islastdoff,  // Add this
+        tottareqty: (firstIncompleteDoff.totgrsqty - firstIncompleteDoff.totnetqty).toString(),  // Add this
         d1: [],
         d2: [],
         // Include all other fields from the original firstIncompleteDoff
         ...Object.fromEntries(
           Object.entries(firstIncompleteDoff).filter(([key]) =>
-            !['enddate', 'endtime', 'totcones'].includes(key)
+            !['enddate', 'endtime', 'totcones', 'tottareqty'].includes(key)
           )
         )
       };
@@ -1160,99 +1161,101 @@ const DoffEntry = ({ navigation, token, username }) => {
               }
 
               {hasLastDoff ? (null) :
-                <>
-                  {expandedEnd && (
-                    <View style={styles.accordionContent}>
-                      {/* Date & Time Picker Section */}
-                      <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>End Date & Time</Text>
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                          {/* Date Picker Button */}
-                          <TouchableOpacity
-                            style={styles.dateTimeInput}
-                            onPress={() => setShowStartDatePickerEnd(true)}
-                          >
-                            <Icon name="date-range" size={20} color="#666" />
-                            <Text style={styles.dateTimeText}>
-                              {formatDateDDMMYYYY(startDate)}
-                            </Text>
-                          </TouchableOpacity>
+                isAnyEndEmpty ?
+                  <>
+                    {expandedEnd && (
+                      <View style={styles.accordionContent}>
+                        {/* Date & Time Picker Section */}
+                        <View style={styles.fieldContainer}>
+                          <Text style={styles.label}>End Date & Time</Text>
+                          <View style={{ flexDirection: 'row', gap: 10 }}>
+                            {/* Date Picker Button */}
+                            <TouchableOpacity
+                              style={styles.dateTimeInput}
+                              onPress={() => setShowStartDatePickerEnd(true)}
+                            >
+                              <Icon name="date-range" size={20} color="#666" />
+                              <Text style={styles.dateTimeText}>
+                                {formatDateDDMMYYYY(startDate)}
+                              </Text>
+                            </TouchableOpacity>
 
-                          {/* Time Picker Button */}
-                          <TouchableOpacity
-                            style={styles.dateTimeInput}
-                            onPress={() => setShowStartTimePickerEnd(true)}
-                          >
-                            <Icon name="schedule" size={20} color="#666" />
-                            <Text style={styles.dateTimeText}>
-                              {formatTimeWithDot(startTime)}
-                            </Text>
-                          </TouchableOpacity>
+                            {/* Time Picker Button */}
+                            <TouchableOpacity
+                              style={styles.dateTimeInput}
+                              onPress={() => setShowStartTimePickerEnd(true)}
+                            >
+                              <Icon name="schedule" size={20} color="#666" />
+                              <Text style={styles.dateTimeText}>
+                                {formatTimeWithDot(startTime)}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
+
+                        {/* Date Picker Modal */}
+                        {showStartDatePickerEnd && (
+                          <DateTimePicker
+                            value={startDateEnd}
+                            mode="date"
+                            display="default"
+                            onChange={(event, date) => {
+                              setShowStartDatePickerEnd(false);
+                              if (event.type === 'set' && date) {
+                                setStartDateEnd(date);
+                              }
+                            }}
+                            minimumDate={new Date()}
+                            textColor="#000"
+                            locale="en-IN"
+                          />
+                        )}
+
+                        {/* Time Picker Modal */}
+                        {showStartTimePickerEnd && (
+                          <DateTimePicker
+                            value={startTimeEnd}
+                            mode="time"
+                            display="default"
+                            is24Hour={true}
+                            onChange={(event, time) => {
+                              setShowStartTimePickerEnd(false);
+                              if (event.type === 'set' && time) {
+                                setStartTimeEnd(time);
+                              }
+                            }}
+                            textColor="#000"
+                            locale="en-IN"
+                          />
+                        )}
+
+                        {/* Save Button */}
+                        <TouchableOpacity
+                          style={styles.saveButton}
+                          onPress={() => {
+                            if (!getSelectedFilteredMachine[0]) {
+                              showWarning("Please select a machine first");
+                              return;
+                            }
+                            console.log(
+                              "Selected Machine Data:",
+                              getSelectedFilteredMachine[0],
+                              "Start Date:",
+                              selectedDate || new Date(),
+                              "Start Time:",
+                              selectedTime || new Date(),
+                              "Combined DateTime:",
+                              getDate || new Date()
+                            );
+                            doffUpdateEnd();
+                          }}
+                        >
+                          <Text style={styles.saveButtonText}>END</Text>
+                        </TouchableOpacity>
                       </View>
-
-                      {/* Date Picker Modal */}
-                      {showStartDatePickerEnd && (
-                        <DateTimePicker
-                          value={startDateEnd}
-                          mode="date"
-                          display="default"
-                          onChange={(event, date) => {
-                            setShowStartDatePickerEnd(false);
-                            if (event.type === 'set' && date) {
-                              setStartDateEnd(date);
-                            }
-                          }}
-                          minimumDate={new Date()}
-                          textColor="#000"
-                          locale="en-IN"
-                        />
-                      )}
-
-                      {/* Time Picker Modal */}
-                      {showStartTimePickerEnd && (
-                        <DateTimePicker
-                          value={startTimeEnd}
-                          mode="time"
-                          display="default"
-                          is24Hour={true}
-                          onChange={(event, time) => {
-                            setShowStartTimePickerEnd(false);
-                            if (event.type === 'set' && time) {
-                              setStartTimeEnd(time);
-                            }
-                          }}
-                          textColor="#000"
-                          locale="en-IN"
-                        />
-                      )}
-
-                      {/* Save Button */}
-                      <TouchableOpacity
-                        style={styles.saveButton}
-                        onPress={() => {
-                          if (!getSelectedFilteredMachine[0]) {
-                            showWarning("Please select a machine first");
-                            return;
-                          }
-                          console.log(
-                            "Selected Machine Data:",
-                            getSelectedFilteredMachine[0],
-                            "Start Date:",
-                            selectedDate || new Date(),
-                            "Start Time:",
-                            selectedTime || new Date(),
-                            "Combined DateTime:",
-                            getDate || new Date()
-                          );
-                          doffUpdateEnd();
-                        }}
-                      >
-                        <Text style={styles.saveButtonText}>START</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </>
+                    )}
+                  </>
+                  : null
               }
             </View>
           </>
@@ -1274,395 +1277,399 @@ const DoffEntry = ({ navigation, token, username }) => {
           </>
         )}
 
+        {getAllDoffData.length > 0 ? (
+          <ScrollView contentContainerStyle={{ padding: 8 }}>
+            <FlatList
+              // key={refreshKey}
+              data={getAllDoffData}
+              keyExtractor={(item, index) => `${item.uid || index}`}
+              contentContainerStyle={{ padding: 8 }}
+              numColumns={numColumns}
+              extraData={editableDoffData}
+              key={`flatlist-${numColumns}`}
+              renderItem={({ item, index }) => {
+                const doffId = item.uid || index;
+                const currentEditableData = editableDoffData[doffId] || {};
 
-        <ScrollView contentContainerStyle={{ padding: 8 }}>
-          <FlatList
-            // key={refreshKey}
-            data={getAllDoffData}
-            keyExtractor={(item, index) => `${item.uid || index}`}
-            contentContainerStyle={{ padding: 8 }}
-            numColumns={numColumns}
-            extraData={editableDoffData}
-            key={`flatlist-${numColumns}`}
-            renderItem={({ item, index }) => {
-              const doffId = item.uid || index;
-              const currentEditableData = editableDoffData[doffId] || {};
-
-              // --- Editable Text Component (prevents focus loss) ---
-              const EditableText = ({ field, value, placeholder }) => {
-                const [localValue, setLocalValue] = useState(value);
-                useEffect(() => {
-                  setLocalValue(value);
-                }, [value]);
-                return (
-                  <TextInput
-                    style={styles.dateTimePickerButton}
-                    value={localValue}
-                    onChangeText={setLocalValue}
-                    onBlur={() => {
-                      if (localValue !== value) {
-                        handleFieldChange(field, localValue);
-                      }
-                    }}
-                    keyboardType="numeric"
-                    placeholder={placeholder}
-                    placeholderTextColor="#999"
-                  />
-                );
-              };
-
-              // --- Display helpers ---
-              const getDisplayDate = (dateStr) => {
-                if (dateStr && dateStr.length === 8) {
-                  // YYYYMMDD -> DD/MM/YYYY
-                  return `${dateStr.substring(6, 8)}/${dateStr.substring(4, 6)}/${dateStr.substring(0, 4)}`;
-                }
-                return '-';
-              };
-              const getDisplayTime = (timeStr) => timeStr || '--:--';
-
-              // --- Field change handler (only updates state, no refreshKey increment) ---
-              const validateDates = (startDateStr, endDateStr) => {
-                // if (!startDateStr && !endDateStr) return { valid: true, message: '' };
-                if (!startDateStr) return { valid: true, message: '' }; // Both empty is okay
-                // if (startDateStr && !endDateStr) {
-                //   return { valid: false, message: 'End date is required if start date is provided.' };
-                // }
-                if (startDateStr && endDateStr) {
-                  const startDate = parseYYYYMMDD(startDateStr);
-                  const endDate = parseYYYYMMDD(endDateStr);
-                  if (endDate < startDate) {
-                    return { valid: false, message: 'End date must be after or equal to start date.' };
-                  }
-                }
-                return { valid: true, message: '' };
-              };
-
-              const handleFieldChange = (field, value) => {
-                const newEditableData = {
-                  ...editableDoffData,
-                  [doffId]: { ...currentEditableData, [field]: value },
+                // --- Editable Text Component (prevents focus loss) ---
+                const EditableText = ({ field, value, placeholder }) => {
+                  const [localValue, setLocalValue] = useState(value);
+                  useEffect(() => {
+                    setLocalValue(value);
+                  }, [value]);
+                  return (
+                    <TextInput
+                      style={styles.dateTimePickerButton}
+                      value={localValue}
+                      onChangeText={setLocalValue}
+                      onBlur={() => {
+                        if (localValue !== value) {
+                          handleFieldChange(field, localValue);
+                        }
+                      }}
+                      keyboardType="numeric"
+                      placeholder={placeholder}
+                      placeholderTextColor="#999"
+                    />
+                  );
                 };
 
-                // If field is 'startdate' or 'enddate', validate
-                if (field === 'startdate' || field === 'enddate') {
-                  const startDate = newEditableData[doffId]?.startdate || item.startdate;
-                  const endDate = newEditableData[doffId]?.enddate || item.enddate;
-
-                  const validation = validateDates(startDate, endDate);
-                  if (!validation.valid) {
-                    showWarning(validation.message);
-                    return; // Do not update state if invalid
+                // --- Display helpers ---
+                const getDisplayDate = (dateStr) => {
+                  if (dateStr && dateStr.length === 8) {
+                    // YYYYMMDD -> DD/MM/YYYY
+                    return `${dateStr.substring(6, 8)}/${dateStr.substring(4, 6)}/${dateStr.substring(0, 4)}`;
                   }
+                  return '-';
+                };
+                const getDisplayTime = (timeStr) => timeStr || '--:--';
+
+                // --- Field change handler (only updates state, no refreshKey increment) ---
+                const validateDates = (startDateStr, endDateStr) => {
+                  // if (!startDateStr && !endDateStr) return { valid: true, message: '' };
+                  if (!startDateStr) return { valid: true, message: '' }; // Both empty is okay
+                  // if (startDateStr && !endDateStr) {
+                  //   return { valid: false, message: 'End date is required if start date is provided.' };
+                  // }
+                  if (startDateStr && endDateStr) {
+                    const startDate = parseYYYYMMDD(startDateStr);
+                    const endDate = parseYYYYMMDD(endDateStr);
+                    if (endDate < startDate) {
+                      return { valid: false, message: 'End date must be after or equal to start date.' };
+                    }
+                  }
+                  return { valid: true, message: '' };
+                };
+
+                const handleFieldChange = (field, value) => {
+                  const newEditableData = {
+                    ...editableDoffData,
+                    [doffId]: { ...currentEditableData, [field]: value },
+                  };
+
+                  // If field is 'startdate' or 'enddate', validate
+                  if (field === 'startdate' || field === 'enddate') {
+                    const startDate = newEditableData[doffId]?.startdate || item.startdate;
+                    const endDate = newEditableData[doffId]?.enddate || item.enddate;
+
+                    const validation = validateDates(startDate, endDate);
+                    if (!validation.valid) {
+                      showWarning(validation.message);
+                      return; // Do not update state if invalid
+                    }
+                  }
+
+                  setEditableDoffData(newEditableData);
+                };
+                // --- Date/Time picker helpers (using YYYYMMDD) ---
+                const parseYYYYMMDD = (dateStr) => {
+                  if (!dateStr || dateStr.length !== 8) return new Date();
+                  return new Date(
+                    parseInt(dateStr.substring(0, 4), 10),
+                    parseInt(dateStr.substring(4, 6), 10) - 1,
+                    parseInt(dateStr.substring(6, 8), 10)
+                  );
+                };
+                const formatDateYYYYMMDD = (date) => {
+                  const y = date.getFullYear();
+                  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+                  const d = date.getDate().toString().padStart(2, '0');
+                  return `${y}${m}${d}`;
+                };
+                const formatTimeForPicker = (timeStr) => {
+                  if (!timeStr) return new Date();
+                  const [hours, minutes] = timeStr.split('.').map(Number);
+                  const date = new Date();
+                  date.setHours(hours, minutes, 0, 0);
+                  return date;
+                };
+
+                // --- Static grid data (no editable fields here) ---
+                const getCompactData = () => [
+                  { label: 'Mach Speed', value: item.macactspeed },
+                  { label: 'Spindles', value: item.macspindle },
+                  { label: 'Act. Spin', value: item.macactspindle },
+                  { label: 'Idle Spin', value: parseFloat(item.macspindle || 0) - parseFloat(item.macactspindle || 0) },
+                  { label: 'Temp 1', value: item.tempone },
+                  { label: 'Temp 2', value: item.temptwo },
+                  { label: 'Temp 3', value: item.tempthree },
+                ];
+
+                const compactData = getCompactData();
+                return (
+                  <View style={item.islastdoff === '1' ? styles.compactCardLast : styles.compactCard}>
+                    {/* Header */}
+                    <View style={styles.compactHeader}>
+                      <Text style={styles.compactTitle}>Doff #{item.doffno}</Text>
+                      <View style={styles.shiftBadgeContainer}>
+                        <TouchableOpacity onPress={() => handleDoffDelete(item)}>
+                          <Icon name="delete" size={20} color="red" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Static Grid */}
+                    {/* <View style={styles.compactGrid}>
+            {compactData.map((row, i) => (
+              <View key={i} style={styles.compactItem}>
+                <Text style={styles.compactLabel}>{row.label}</Text>
+                <Text style={styles.compactValue}>{row.value || '-'}</Text>
+              </View>
+            ))}
+          </View> */}
+
+                    {/* <View style={styles.dateTimeRow}>
+            <View style={styles.halfField}>
+              <Text style={styles.compactLabel}>No. Of Tubes</Text>
+              <EditableText
+                field="totcones"
+                value={
+                  currentEditableData.totcones !== undefined
+                    ? currentEditableData.totcones
+                    : (item.totcones || '')
                 }
 
-                setEditableDoffData(newEditableData);
-              };
-              // --- Date/Time picker helpers (using YYYYMMDD) ---
-              const parseYYYYMMDD = (dateStr) => {
-                if (!dateStr || dateStr.length !== 8) return new Date();
-                return new Date(
-                  parseInt(dateStr.substring(0, 4), 10),
-                  parseInt(dateStr.substring(4, 6), 10) - 1,
-                  parseInt(dateStr.substring(6, 8), 10)
-                );
-              };
-              const formatDateYYYYMMDD = (date) => {
-                const y = date.getFullYear();
-                const m = (date.getMonth() + 1).toString().padStart(2, '0');
-                const d = date.getDate().toString().padStart(2, '0');
-                return `${y}${m}${d}`;
-              };
-              const formatTimeForPicker = (timeStr) => {
-                if (!timeStr) return new Date();
-                const [hours, minutes] = timeStr.split('.').map(Number);
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-              };
+              />
+            </View>
+            <View style={styles.halfField}>
+              <Text style={styles.compactLabel}>Chees</Text>
+              <EditableText
+                field="totchees"
+                value={
+                  currentEditableData.totchees !== undefined
+                    ? currentEditableData.totchees
+                    : (item.totchees || '')
+                }
+              // placeholder="Enter cone weight"
+              />
+            </View>
+          </View> */}
 
-              // --- Static grid data (no editable fields here) ---
-              const getCompactData = () => [
-                { label: 'Mach Speed', value: item.macactspeed },
-                { label: 'Spindles', value: item.macspindle },
-                { label: 'Act. Spin', value: item.macactspindle },
-                { label: 'Idle Spin', value: parseFloat(item.macspindle || 0) - parseFloat(item.macactspindle || 0) },
-                { label: 'Temp 1', value: item.tempone },
-                { label: 'Temp 2', value: item.temptwo },
-                { label: 'Temp 3', value: item.tempthree },
-              ];
+                    {/* Start Date & Time */}
+                    <View style={styles.dateTimeRow}>
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>Start Date</Text>
+                        <TouchableOpacity
+                          style={styles.dateTimePickerButton}
+                          onPress={() => showPicker(doffId, 'startDate')}
+                        >
+                          <Text style={styles.compactValue}>
+                            {getDisplayDate(currentEditableData.startdate || item.startdate)}
+                          </Text>
+                        </TouchableOpacity>
+                        {pickerVisibility[doffId]?.startDate && (
+                          <DateTimePicker
+                            value={parseYYYYMMDD(currentEditableData.startdate || item.startdate)}
+                            mode="date"
+                            display="default"
+                            // Inside your DateTimePicker onChange for startDate
+                            onChange={(event, date) => {
+                              hidePicker(doffId, 'startDate');
+                              if (event.type === 'set' && date) {
+                                const formatted = formatDateYYYYMMDD(date);
+                                const endDate = currentEditableData.enddate || item.enddate;
 
-              const compactData = getCompactData();
-              return (
-                <View style={item.islastdoff === '1' ? styles.compactCardLast : styles.compactCard}>
-                  {/* Header */}
-                  <View style={styles.compactHeader}>
-                    <Text style={styles.compactTitle}>Doff #{item.doffno}</Text>
-                    <View style={styles.shiftBadgeContainer}>
-                      <TouchableOpacity onPress={() => handleDoffDelete(item)}>
-                        <Icon name="delete" size={20} color="red" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                                const validation = validateDates(formatted, endDate);
+                                if (!validation.valid) {
+                                  showWarning(validation.message);
+                                  return;
+                                }
 
-                  {/* Static Grid */}
-                  {/* <View style={styles.compactGrid}>
-                    {compactData.map((row, i) => (
-                      <View key={i} style={styles.compactItem}>
-                        <Text style={styles.compactLabel}>{row.label}</Text>
-                        <Text style={styles.compactValue}>{row.value || '-'}</Text>
+                                handleFieldChange('startdate', formatted);
+                              }
+                            }}
+                            textColor="#000"
+                            minimumDate={minDate}
+                            maximumDate={maxDate}
+                          />
+                        )}
                       </View>
-                    ))}
-                  </View> */}
-
-                  {/* <View style={styles.dateTimeRow}>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>No. Of Tubes</Text>
-                      <EditableText
-                        field="totcones"
-                        value={
-                          currentEditableData.totcones !== undefined
-                            ? currentEditableData.totcones
-                            : (item.totcones || '')
-                        }
-
-                      />
-                    </View>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Chees</Text>
-                      <EditableText
-                        field="totchees"
-                        value={
-                          currentEditableData.totchees !== undefined
-                            ? currentEditableData.totchees
-                            : (item.totchees || '')
-                        }
-                      // placeholder="Enter cone weight"
-                      />
-                    </View>
-                  </View> */}
-
-                  {/* Start Date & Time */}
-                  <View style={styles.dateTimeRow}>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Start Date</Text>
-                      <TouchableOpacity
-                        style={styles.dateTimePickerButton}
-                        onPress={() => showPicker(doffId, 'startDate')}
-                      >
-                        <Text style={styles.compactValue}>
-                          {getDisplayDate(currentEditableData.startdate || item.startdate)}
-                        </Text>
-                      </TouchableOpacity>
-                      {pickerVisibility[doffId]?.startDate && (
-                        <DateTimePicker
-                          value={parseYYYYMMDD(currentEditableData.startdate || item.startdate)}
-                          mode="date"
-                          display="default"
-                          // Inside your DateTimePicker onChange for startDate
-                          onChange={(event, date) => {
-                            hidePicker(doffId, 'startDate');
-                            if (event.type === 'set' && date) {
-                              const formatted = formatDateYYYYMMDD(date);
-                              const endDate = currentEditableData.enddate || item.enddate;
-
-                              const validation = validateDates(formatted, endDate);
-                              if (!validation.valid) {
-                                showWarning(validation.message);
-                                return;
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>Start Time</Text>
+                        <TouchableOpacity
+                          style={styles.dateTimePickerButton}
+                          onPress={() => showPicker(doffId, 'startTime')}
+                        >
+                          <Text style={styles.compactValue}>
+                            {getDisplayTime(currentEditableData.starttime || item.starttime)}
+                          </Text>
+                        </TouchableOpacity>
+                        {pickerVisibility[doffId]?.startTime && (
+                          <DateTimePicker
+                            value={formatTimeForPicker(currentEditableData.starttime || item.starttime)}
+                            mode="time"
+                            display="default"
+                            is24Hour={true}
+                            onChange={(event, time) => {
+                              hidePicker(doffId, 'startTime');
+                              if (event.type === 'set' && time) {
+                                const formatted = formatTimeWithDot(time);
+                                handleFieldChange('starttime', formatted);
+                                // setRefreshKey(prev => prev + 1);
                               }
-
-                              handleFieldChange('startdate', formatted);
-                            }
-                          }}
-                          textColor="#000"
-                          minimumDate={minDate}
-                          maximumDate={maxDate}
-                        />
-                      )}
+                            }}
+                            textColor="#000"
+                          />
+                        )}
+                      </View>
                     </View>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Start Time</Text>
-                      <TouchableOpacity
-                        style={styles.dateTimePickerButton}
-                        onPress={() => showPicker(doffId, 'startTime')}
-                      >
-                        <Text style={styles.compactValue}>
-                          {getDisplayTime(currentEditableData.starttime || item.starttime)}
-                        </Text>
-                      </TouchableOpacity>
-                      {pickerVisibility[doffId]?.startTime && (
-                        <DateTimePicker
-                          value={formatTimeForPicker(currentEditableData.starttime || item.starttime)}
-                          mode="time"
-                          display="default"
-                          is24Hour={true}
-                          onChange={(event, time) => {
-                            hidePicker(doffId, 'startTime');
-                            if (event.type === 'set' && time) {
-                              const formatted = formatTimeWithDot(time);
-                              handleFieldChange('starttime', formatted);
-                              // setRefreshKey(prev => prev + 1);
-                            }
-                          }}
-                          textColor="#000"
-                        />
-                      )}
-                    </View>
-                  </View>
 
-                  {/* End Date & Time (fixed to use YYYYMMDD) */}
-                  <View style={styles.dateTimeRow}>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>End Date</Text>
-                      <TouchableOpacity
-                        style={styles.dateTimePickerButton}
-                        onPress={() => showPicker(doffId, 'endDate')}
-                      >
-                        <Text style={styles.compactValue}>
-                          {getDisplayDate(currentEditableData.enddate || item.enddate)}
-                        </Text>
-                      </TouchableOpacity>
-                      {pickerVisibility[doffId]?.endDate && (
-                        <DateTimePicker
-                          value={parseYYYYMMDD(currentEditableData.enddate || item.enddate)}
-                          mode="date"
-                          display="default"
-                          // Inside your DateTimePicker onChange for endDate
-                          onChange={(event, date) => {
-                            hidePicker(doffId, 'endDate');
-                            if (event.type === 'set' && date) {
-                              const formatted = formatDateYYYYMMDD(date);
-                              const startDate = currentEditableData.startdate || item.startdate;
+                    {/* End Date & Time (fixed to use YYYYMMDD) */}
+                    <View style={styles.dateTimeRow}>
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>End Date</Text>
+                        <TouchableOpacity
+                          style={styles.dateTimePickerButton}
+                          onPress={() => showPicker(doffId, 'endDate')}
+                        >
+                          <Text style={styles.compactValue}>
+                            {getDisplayDate(currentEditableData.enddate || item.enddate)}
+                          </Text>
+                        </TouchableOpacity>
+                        {pickerVisibility[doffId]?.endDate && (
+                          <DateTimePicker
+                            value={parseYYYYMMDD(currentEditableData.enddate || item.enddate)}
+                            mode="date"
+                            display="default"
+                            // Inside your DateTimePicker onChange for endDate
+                            onChange={(event, date) => {
+                              hidePicker(doffId, 'endDate');
+                              if (event.type === 'set' && date) {
+                                const formatted = formatDateYYYYMMDD(date);
+                                const startDate = currentEditableData.startdate || item.startdate;
 
-                              const validation = validateDates(startDate, formatted);
-                              if (!validation.valid) {
-                                showWarning(validation.message);
-                                return;
+                                const validation = validateDates(startDate, formatted);
+                                if (!validation.valid) {
+                                  showWarning(validation.message);
+                                  return;
+                                }
+
+                                handleFieldChange('enddate', formatted);
                               }
-
-                              handleFieldChange('enddate', formatted);
-                            }
-                          }}
-                          textColor="#000"
-                          minimumDate={minDate}
-                          maximumDate={maxDate}
-                        />
-                      )}
+                            }}
+                            textColor="#000"
+                            minimumDate={minDate}
+                            maximumDate={maxDate}
+                          />
+                        )}
+                      </View>
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>End Time</Text>
+                        <TouchableOpacity
+                          style={styles.dateTimePickerButton}
+                          onPress={() => showPicker(doffId, 'endTime')}
+                        >
+                          <Text style={styles.compactValue}>
+                            {getDisplayTime(currentEditableData.endtime || item.endtime)}
+                          </Text>
+                        </TouchableOpacity>
+                        {pickerVisibility[doffId]?.endTime && (
+                          <DateTimePicker
+                            value={formatTimeForPicker(currentEditableData.endtime || item.endtime)}
+                            mode="time"
+                            display="default"
+                            is24Hour={true}
+                            onChange={(event, time) => {
+                              hidePicker(doffId, 'endTime');
+                              if (event.type === 'set' && time) {
+                                const formatted = formatTimeWithDot(time);
+                                handleFieldChange('endtime', formatted);
+                                // setRefreshKey(prev => prev + 1);
+                              }
+                            }}
+                            textColor="#000"
+                          />
+                        )}
+                      </View>
                     </View>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>End Time</Text>
+
+
+                    <View style={styles.dateTimeRow}>
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>Chees</Text>
+                        <EditableText
+                          field="totchees"
+                          value={
+                            currentEditableData.totchees !== undefined
+                              ? currentEditableData.totchees
+                              : (item.totchees || '')
+                          }
+                        // placeholder="Enter cone weight"
+                        />
+                      </View>
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>Gross Wt.</Text>
+                        <EditableText
+                          field="totgrsqty"
+                          value={
+                            currentEditableData.totgrsqty !== undefined
+                              ? currentEditableData.totgrsqty
+                              : (item.totgrsqty || '')
+                          }
+                        // placeholder="Enter cone weight"
+                        />
+                      </View>
+                      <View style={styles.halfField}>
+                        <Text style={styles.compactLabel}>Net Wt.</Text>
+                        <EditableText
+                          field="totnetqty"
+                          value={
+                            currentEditableData.totnetqty !== undefined
+                              ? currentEditableData.totnetqty
+                              : (item.totnetqty || '')
+                          }
+                        // placeholder="Enter cone weight"
+                        />
+                      </View>
+                      {/* <View style={styles.halfField}>
+              <Text style={styles.compactLabel}>Tar Wt.</Text>
+              <EditableText
+                field="tottareqty"
+                value={
+                  currentEditableData.tottareqty !== undefined
+                    ? currentEditableData.tottareqty
+                    : (item.tottareqty || '')
+                }
+              // placeholder="Enter cone weight"
+              />
+            </View> */}
+
+                    </View>
+
+                    {/* Footer */}
+                    <View style={styles.compactFooter}>
+                      <View style={styles.switchRow}>
+                        <Text style={styles.lastDoffText}>Last Doff</Text>
+                        <Switch
+                          value={
+                            currentEditableData.islastdoff !== undefined
+                              ? currentEditableData.islastdoff === '1' || currentEditableData.islastdoff === 1 || currentEditableData.islastdoff === true
+                              : (item.islastdoff === '1' || item.islastdoff === 1)
+                          }
+                          onValueChange={(newValue) => {
+                            // Store as '1' for true, '0' for false
+                            handleFieldChange('islastdoff', newValue ? '1' : '0');
+                          }}
+                          trackColor={{ false: '#ccc', true: '#0F6C7B' }}
+                          thumbColor="#fff"
+                        />
+                      </View>
                       <TouchableOpacity
-                        style={styles.dateTimePickerButton}
-                        onPress={() => showPicker(doffId, 'endTime')}
+                        style={styles.smallUpdateBtn}
+                        onPress={() => handleDoffUpdate(item)}
                       >
-                        <Text style={styles.compactValue}>
-                          {getDisplayTime(currentEditableData.endtime || item.endtime)}
-                        </Text>
+                        <Text style={styles.smallUpdateText}>UPDATE</Text>
                       </TouchableOpacity>
-                      {pickerVisibility[doffId]?.endTime && (
-                        <DateTimePicker
-                          value={formatTimeForPicker(currentEditableData.endtime || item.endtime)}
-                          mode="time"
-                          display="default"
-                          is24Hour={true}
-                          onChange={(event, time) => {
-                            hidePicker(doffId, 'endTime');
-                            if (event.type === 'set' && time) {
-                              const formatted = formatTimeWithDot(time);
-                              handleFieldChange('endtime', formatted);
-                              // setRefreshKey(prev => prev + 1);
-                            }
-                          }}
-                          textColor="#000"
-                        />
-                      )}
                     </View>
                   </View>
+                );
+              }}
+            />
+          </ScrollView >
+        ) : <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>No doffs found!</Text>
+        </View>}
 
-
-                  <View style={styles.dateTimeRow}>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Chees</Text>
-                      <EditableText
-                        field="totchees"
-                        value={
-                          currentEditableData.totchees !== undefined
-                            ? currentEditableData.totchees
-                            : (item.totchees || '')
-                        }
-                      // placeholder="Enter cone weight"
-                      />
-                    </View>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Gross Wt.</Text>
-                      <EditableText
-                        field="totgrsqty"
-                        value={
-                          currentEditableData.totgrsqty !== undefined
-                            ? currentEditableData.totgrsqty
-                            : (item.totgrsqty || '')
-                        }
-                      // placeholder="Enter cone weight"
-                      />
-                    </View>
-                    <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Net Wt.</Text>
-                      <EditableText
-                        field="totnetqty"
-                        value={
-                          currentEditableData.totnetqty !== undefined
-                            ? currentEditableData.totnetqty
-                            : (item.totnetqty || '')
-                        }
-                      // placeholder="Enter cone weight"
-                      />
-                    </View>
-                    {/* <View style={styles.halfField}>
-                      <Text style={styles.compactLabel}>Tar Wt.</Text>
-                      <EditableText
-                        field="tottareqty"
-                        value={
-                          currentEditableData.tottareqty !== undefined
-                            ? currentEditableData.tottareqty
-                            : (item.tottareqty || '')
-                        }
-                      // placeholder="Enter cone weight"
-                      />
-                    </View> */}
-
-                  </View>
-
-                  {/* Footer */}
-                  <View style={styles.compactFooter}>
-                    <View style={styles.switchRow}>
-                      <Text style={styles.lastDoffText}>Last Doff</Text>
-                      <Switch
-                        value={
-                          currentEditableData.islastdoff !== undefined
-                            ? currentEditableData.islastdoff === '1' || currentEditableData.islastdoff === 1 || currentEditableData.islastdoff === true
-                            : (item.islastdoff === '1' || item.islastdoff === 1)
-                        }
-                        onValueChange={(newValue) => {
-                          // Store as '1' for true, '0' for false
-                          handleFieldChange('islastdoff', newValue ? '1' : '0');
-                        }}
-                        trackColor={{ false: '#ccc', true: '#0F6C7B' }}
-                        thumbColor="#fff"
-                      />
-                    </View>
-                    <TouchableOpacity
-                      style={styles.smallUpdateBtn}
-                      onPress={() => handleDoffUpdate(item)}
-                    >
-                      <Text style={styles.smallUpdateText}>UPDATE</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            }}
-          />
-        </ScrollView >
       </View >
 
       <Modal
@@ -2727,7 +2734,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                       totcones: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
                       totchees: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
                       totnetqty: latestEditedData.totnetqty || itemToUpdate.totnetqty,  // Add this
-                      tottareqty: latestEditedData.tottareqty || itemToUpdate.tottareqty,  // Add this
+                      tottareqty: (latestEditedData.totgrsqty - latestEditedData.totnetqty).toString() || (itemToUpdate.totgrsqty - itemToUpdate.totnetqty).toString(),  // Add this
                       totgrsqty: latestEditedData.totgrsqty || itemToUpdate.totgrsqty,  // Add this
                       islastdoff: latestEditedData.islastdoff || itemToUpdate.islastdoff,  // Add this
                       d1: [],

@@ -28,6 +28,8 @@ const SalesOrderItemList = ({ navigation, route }) => {
 
         workingRows = [],
 
+        isCustomItemEdit = false,
+
         party = null,
         partyData = null,
         selectedParty = null,
@@ -39,6 +41,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
     } = route?.params || {};
 
     const finalParty = party || partyData || selectedParty || null;
+    const isCustomItem = route?.params?.isCustomItem;
 
     const [search, setSearch] = useState('');
     const [items, setItems] = useState([]);
@@ -260,6 +263,97 @@ const SalesOrderItemList = ({ navigation, route }) => {
     }, [items, search, editMode, oldRow]);
 
     const selectItem = item => {
+        // =====================================================
+        // SPECIAL CASE:
+        // Edit existing temporary item ItmCode = -1
+        // Only replace item code/name in same SrNo row
+        // Do not go to Grade/Shade screen
+        // =====================================================
+        // if (editMode && oldRow && String(oldRow.ItmCode) === '-1') {
+        if (editMode && oldRow && isCustomItemEdit) {
+            const nextRows = (workingRows || []).map(row => {
+                const sameLine =
+                    String(row.LineId || '') === String(oldRow.LineId || '') ||
+                    Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+
+                if (!sameLine) return row;
+
+                return {
+                    ...row,
+                    ItmCode: item.ItmCode,
+                    ItmName: item.ItmName,
+                    MItmCode: item.MItmCode || item.ItmCode,
+                    UOM: item.UOM || row.UOM || '',
+                    Denier: item.Denier || row.Denier || '',
+                    HsnCode: item.HsnCode || row.HsnCode || '',
+                };
+            });
+
+            // navigation.replace({
+            //     name: 'OrderSummaryScreen',
+            //     params: {
+            //         completedRows: nextRows,
+            //         editMode: true,
+            //         replaceItemOnlyDone: true,
+
+            //         mode,
+            //         uid,
+            //         screenMode: mode,
+            //         soNo,
+            //         soDate,
+
+            //         party: finalParty,
+            //         partyData: finalParty,
+            //         selectedParty: finalParty,
+
+            //         prpcode,
+            //         strcode,
+            //         yearno,
+            //         token,
+
+            //         skipReload: true,
+            //     },
+            //     merge: true,
+            // });
+
+            navigation.replace(
+                'OrderSummaryScreen',
+                {
+                    completedRows: nextRows,
+
+                    editMode: true,
+
+                    replaceItemOnlyDone: true,
+
+                    mode,
+                    uid,
+
+                    screenMode: mode,
+
+                    soNo,
+                    soDate,
+
+                    workingRows: nextRows,
+
+                    party: finalParty,
+                    partyData: finalParty,
+                    selectedParty: finalParty,
+
+                    prpcode,
+                    strcode,
+                    yearno,
+                    token,
+
+                    skipReload: true,
+                }
+            );
+
+            return;
+        }
+
+        // =====================================================
+        // NORMAL FLOW
+        // =====================================================
         navigation.navigate('SalesOrderGradeList', {
             mode,
             uid,
@@ -369,7 +463,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
                             {oldRow.ItmCode} - {oldRow.ItmName}
                         </Text>
                         <Text style={styles.oldSub}>
-                            Design: {oldRow.DsnCode} {oldRow.DsnName}
+                            Grade: {oldRow.GrdCode} {oldRow.GrdName}
                         </Text>
                         <Text style={styles.oldSub}>
                             Shade: {oldRow.ShdCode} {oldRow.ShdName}
@@ -410,6 +504,32 @@ const SalesOrderItemList = ({ navigation, route }) => {
                         }
                     />
                 )}
+                <TouchableOpacity
+                    style={styles.addBtn}
+                    // onPress={() => navigation.navigate('AddNewPartyScreen')}
+                    onPress={() =>
+                        navigation.navigate('AddNewItemScreen', {
+                            mode,
+                            uid,
+                            soNo,
+                            soDate,
+                            editMode,
+                            editIndex,
+                            editLineId,
+                            oldRow,
+                            workingRows,
+                            party: finalParty,
+                            partyData: finalParty,
+                            selectedParty: finalParty,
+                            prpcode,
+                            strcode,
+                            yearno,
+                            token,
+                        })
+                    }
+                >
+                    <Text style={styles.addBtnText}>＋ Add New Item</Text>
+                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
@@ -568,5 +688,18 @@ const styles = StyleSheet.create({
         width: '55%',
         borderRadius: 8,
         backgroundColor: '#EEF2F6',
+    },
+    addBtn: {
+        height: 48,
+        backgroundColor: '#13879A',
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    addBtnText: {
+        color: '#fff',
+        fontWeight: '800',
+        fontSize: 14,
     },
 });

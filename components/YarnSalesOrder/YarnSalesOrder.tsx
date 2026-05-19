@@ -231,7 +231,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
                 isauth: activeFilters.show_authorized ? 1 : 0,
                 strtype: 'Y',
                 txntype: 'sales_order',
-                referrer: 'mob_dashboard',
+                referrer: 'mob_yarn_sales_order',
                 // atype: 'B',
                 atype: activeFilters.show_authorized ? 'm' : 'b',
             };

@@ -28,6 +28,9 @@ const SalesOrderGradeList = ({ navigation, route }) => {
         selectedItem = null,
 
         workingRows = [],
+
+        isCustomGradeEdit = false,
+
         party = null,
         partyData = null,
         selectedParty = null,
@@ -214,6 +217,75 @@ const SalesOrderGradeList = ({ navigation, route }) => {
 
 
     const selectDesign = grade => {
+        // if (editMode && oldRow && String(oldRow.ItmCode) === '-1') {
+        if (editMode && oldRow && isCustomGradeEdit) {
+            const nextRows = (workingRows || []).map(row => {
+                const sameLine =
+                    String(row.LineId || '') === String(oldRow.LineId || '') ||
+                    Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+
+                if (!sameLine) return row;
+
+                return {
+                    ...row,
+                    GrdCode: grade.GrdCode,
+                    GrdName: grade.GrdName || grade.GradeName || '',
+                };
+            });
+
+            // navigation.replace({
+            //     name: 'OrderSummaryScreen',
+            //     params: {
+            //         completedRows: nextRows,
+            //         editMode: true,
+            //         replaceItemOnlyDone: true,
+
+            //         mode,
+            //         uid,
+            //         screenMode: mode,
+            //         soNo,
+            //         soDate,
+
+            //         party: finalParty,
+            //         partyData: finalParty,
+            //         selectedParty: finalParty,
+
+            //         prpcode,
+            //         strcode,
+            //         yearno,
+            //         token,
+
+            //         skipReload: true,
+            //     },
+            //     merge: true,
+            // });
+
+            navigation.replace(
+                'OrderSummaryScreen',
+                {
+                    completedRows: nextRows,
+                    editMode: true,
+                    replaceItemOnlyDone: true,
+                    mode,
+                    uid,
+                    screenMode: mode,
+                    soNo,
+                    soDate,
+                    party: finalParty,
+                    partyData: finalParty,
+                    selectedParty: finalParty,
+                    prpcode,
+                    strcode,
+                    yearno,
+                    token,
+                    skipReload: true,
+                }
+            );
+
+            return;
+        }
+
+
         navigation.navigate('SalesOrderShadeList', {
             mode,
             uid,

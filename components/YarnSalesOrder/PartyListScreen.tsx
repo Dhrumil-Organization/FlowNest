@@ -140,6 +140,43 @@ const PartyListScreen = ({ navigation, route, token }) => {
     }, [search]);
 
     const selectParty = party => {
+        const selectedPartyData = {
+            ParCode: party.acccode,
+            ParName: party.accountname,
+            City: party.City || '',
+            Address: party.Address || '',
+            SExe: party.sexe || '',
+            SExeName: party.SExeName || ''
+        };
+
+        if (route?.params?.replaceTempPartyOnly === true) {
+            navigation.navigate({
+                name: 'OrderSummaryScreen',
+                params: {
+                    selectedTempParty: selectedPartyData,
+                    preservedRows: route?.params?.workingRows || [],
+
+                    mode: route?.params?.mode || 'EDIT',
+                    uid: route?.params?.uid || 0,
+                    screenMode: route?.params?.screenMode || 'EDIT',
+
+                    soNo: route?.params?.soNo || '',
+                    soDate: route?.params?.soDate || '',
+
+                    prpcode: route?.params?.prpcode || '',
+                    strcode: route?.params?.strcode || '002',
+                    yearno: route?.params?.yearno || '',
+                    token: route?.params?.token || '',
+
+                    skipReload: true,
+                    replaceTempPartyDone: true,
+                },
+                merge: true,
+            });
+
+            return;
+        }
+
         const params = {
             mode: 'ADD',
             uid: 0,
@@ -147,18 +184,10 @@ const PartyListScreen = ({ navigation, route, token }) => {
             strcode: route?.params?.strcode || salesOrderParams?.strcode || '002',
             yearno: route?.params?.yearno || salesOrderParams?.yearno || '',
             token: route?.params?.token || salesOrderParams?.token || token,
-            partyData: {
-                ParCode: party.acccode,
-                ParName: party.accountname,
-                City: party.City || '',
-                Address: party.Address || '',
-                SExe: party.sexe || '',
-                SExeName: party.SExeName || ''
-            },
+            partyData: selectedPartyData,
         };
 
         startNewOrder(params);
-        // console.log("params", params);
         navigation.navigate('OrderSummaryScreen', params);
     };
 
@@ -291,7 +320,15 @@ const PartyListScreen = ({ navigation, route, token }) => {
                 </TouchableOpacity> */}
                 <TouchableOpacity
                     style={styles.addBtn}
-                    onPress={() => navigation.navigate('AddNewPartyScreen')}
+                    // onPress={() => navigation.navigate('AddNewPartyScreen')}
+                    onPress={() =>
+                        navigation.navigate('AddNewPartyScreen', {
+                            prpcode: route?.params?.prpcode || salesOrderParams?.prpcode || '',
+                            strcode: route?.params?.strcode || salesOrderParams?.strcode || '002',
+                            yearno: route?.params?.yearno || salesOrderParams?.yearno || '',
+                            token: route?.params?.token || salesOrderParams?.token || token,
+                        })
+                    }
                 >
                     <Text style={styles.addBtnText}>＋ Add New Party</Text>
                 </TouchableOpacity>

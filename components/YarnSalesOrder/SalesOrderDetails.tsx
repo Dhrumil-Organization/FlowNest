@@ -10,6 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { API } from '../../common/API/dynamicAPI';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const num = v => {
   const n = parseFloat(String(v || '').replace(/,/g, ''));
@@ -59,6 +62,20 @@ const SalesOrderDetails = ({ navigation, route }) => {
   const [pcs, setPcs] = useState('');
   const [rate, setRate] = useState('');
   const [remark, setRemark] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  let cancelToken: any;
+
+  const getRequestConfig = (props: any) => ({
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'x-platform': 'mob'
+    },
+    params: props.params,
+    cancelToken: cancelToken?.token,
+  });
 
   const amount = useMemo(() => {
     return (num(qty) * num(rate)).toFixed(2);
@@ -179,24 +196,61 @@ const SalesOrderDetails = ({ navigation, route }) => {
       editIndex,
       editLineId: lineId,
       oldRow,
-
       selectedItem,
       selectedGrade,
       selectedShade,
-
       lastRow: newRow,
       workingRows: updatedRows,
-
       party: finalParty,
       partyData: finalParty,
       selectedParty: finalParty,
-
       prpcode,
       strcode,
       yearno,
       token,
     });
   };
+
+  const handleaddstock = async () => {
+    const yrno = yearno ? yearno.slice(-2) : '';
+    const userPtype = await AsyncStorage.getItem('user_prptype');
+    try {
+      setLoading(true);
+      const payload = {
+        prptype: userPtype,
+        prpcode,
+        strcode,
+        yearno: yrno,
+        itmcode: selectedItem.ItmCode,
+        grdcode: selectedGrade.GrdCode,
+        shdcode: selectedShade.ShdCode,
+      };
+
+      console.log("stock payload:", payload);
+
+      const res = await axios.get(
+        `${API}/api/stockqty`,
+        getRequestConfig({ params: { ...payload } }),
+      );
+
+      console.log("stock Response:", res);
+
+      const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+      // setShades(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.log('get stock ERROR:', error?.response?.data || error.message);
+      Alert.alert('Error', 'Unable to stock');
+      // setShades([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // useEffect(() => {
+  //   if (selectedItem?.ItmCode && selectedGrade?.GrdCode && selectedShade?.ShdCode) {
+  //     handleaddstock();
+  //   }
+  // }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -219,7 +273,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
             {selectedItem?.ItmCode} - {selectedItem?.ItmName}
           </Text>
 
-          <Text style={styles.label}>Design</Text>
+          <Text style={styles.label}>Grade</Text>
           <Text style={styles.value}>
             {selectedGrade?.GrdCode} - {selectedGrade?.GrdName}
           </Text>

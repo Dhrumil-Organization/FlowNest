@@ -6,11 +6,13 @@ import {
     initGlobalCacheDB
 } from '@/common/utils/sqliteCacheManager';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import * as Device from 'expo-device';
 import {
     ActivityIndicator,
     Alert,
@@ -29,6 +31,7 @@ export default function LoginScreen() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [getNotitoken, setNotitoken] = useState('');
+    const [getDeviceId, setDeviceId] = useState('');
     const [selectedProperty, setSelectedProperty] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -61,6 +64,47 @@ export default function LoginScreen() {
         };
         load();
     }, []);
+
+    const requestPermissions = async () => {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+            console.log('Notification permission denied');
+            return false;
+        }
+        return true;
+    };
+
+    const getFCMToken = async () => {
+        try {
+            const hasPermission = await requestPermissions();
+            if (!hasPermission) return null;
+
+            const token = (await Notifications.getExpoPushTokenAsync()).data;
+            console.log('Expo Push Token:', token);
+
+            if (token) {
+                await AsyncStorage.setItem('notification_token', token);
+                return token;
+            }
+        } catch (error) {
+            console.error('Error getting Expo push token:', error);
+            return null;
+        }
+    };
+
+    useEffect(() => {
+        const deviceId = Device.osInternalBuildId || "test-device";
+        console.log("Device ID:", deviceId);
+        setDeviceId(deviceId);
+        getFCMToken().then(token => {
+            if (token) {
+                setNotitoken(token);
+            }
+        });
+    }, []);
+
+    console.log("noti_token at render:", getNotitoken);
+
 
     const isCachePopulated = async (): Promise<boolean> => {
         try {
@@ -100,13 +144,15 @@ export default function LoginScreen() {
             console.log("🌐 USING API:", API);
             console.log("📌 PROPERTY:", selectedProperty);
             console.log("noti_token final", noti_token);
+            console.log("checkdevice final", getDeviceId);
 
             const response = await axios.post(
                 `${API}/api/login`,
                 {
                     name: username.trim(),
                     password: password.trim(),
-                    noti_token: noti_token
+                    noti_token: noti_token || 'xyz-noti-token',
+                    checkdevice: getDeviceId || 'xyz-device',
                 },
                 {
                     headers: { 'x-platform': 'mob' }
@@ -171,7 +217,7 @@ export default function LoginScreen() {
                         await AsyncStorage.setItem('master_sync_data_common', JSON.stringify(ismastersyncData));
                         if (ismastersync == 1 || ismastersync === '1' || ismastersync === true) {
                             try {
-                                
+
                                 await AsyncStorage.setItem('master_sync_data', JSON.stringify(ismastersyncData));
                                 await initDatabase();
                                 await fetchMasterSyncPartyDataPerPrptypeCache(token || '', ismastersyncData);
@@ -184,7 +230,7 @@ export default function LoginScreen() {
                                 // await printCachedPrptypesWithData();
                                 console.log("💾 SAVED SUCCESS");
 
-                                
+
                             } catch (err) {
                                 console.warn('Master-sync or verification failed:', err);
                             }

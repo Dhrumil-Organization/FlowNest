@@ -60,6 +60,7 @@ export default function RootLayout() {
         console.log("🚀 App Start");
 
         const deviceId = Device.osInternalBuildId || "test-device";
+        console.log("Device ID:", deviceId);
         await AsyncStorage.setItem('cache_deviceId', deviceId);
 
         // 🔥 1. DEVICE CHECK

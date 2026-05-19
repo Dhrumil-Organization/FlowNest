@@ -10,10 +10,16 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      // "jsEngine": "jsc",
-      "bundleIdentifier": "com.anonymous.FlowNest",
+      "buildNumber": "3",
+      "jsEngine": "jsc",
+      "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "This app uses the camera to capture images.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to upload images.",
+        "NSPhotoLibraryAddUsageDescription": "This app saves images to your photo library.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for voice input.",
+        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text."
       }
     },
     "android": {
@@ -28,7 +34,10 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "INTERNET",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.FlowNest"

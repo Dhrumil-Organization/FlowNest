@@ -60,7 +60,7 @@ import {
   initFileSystem,
   readPrptypeCache,
 } from './common/API/Functions';
-import DashboardScreen from './screens/DashboardScreen';
+// import DashboardScreen from './screens/DashboardScreen';
 import { initDatabase } from './common/API/DatabaseManager';
 import { ThemeProvider } from './android/app/src/ThemeContext';
 import { API, initAPI } from './common/API/dynamicAPI';
@@ -102,7 +102,18 @@ import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueRetur
 import CreelIssueReturnModifyEntry from './components/CreelIssueReturn/CreelIssueReturnModifyEntry';
 import DoffEntry from './components/DoffEntry/DoffEntry';
 import YarnSalesOrderModule from './components/YarnSalesOrder/YarnSalesOrderModule';
-
+// Inquiry
+// import DashboardScreen from '../screens/DashboardScreen';
+import DashboardScreen from './src_inquiry/screens/DashboardScreen';
+import InquiryFormScreen from './src_inquiry/screens/InquiryFormScreen';
+import PartySelectionScreen from './src_inquiry/screens/PartySelectionScreen';
+import AddPartyScreen from './src_inquiry/screens/AddPartyScreen';
+import DesignSelectionScreen from './src_inquiry/screens/DesignSelectionScreen';
+import InquiryDetailScreen from './src_inquiry/screens/InquiryDetailScreen';
+import CostingScreen from './src_inquiry/screens/CostingScreen';
+import SendQuotationScreen from './src_inquiry/screens/SendQuotationScreen';
+import ConfirmInquiryScreen from './src_inquiry/screens/ConfirmInquiryScreen';
+import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -750,9 +761,9 @@ export default function App() {
                                 username={getUserDetails}
                                 setIsLoggedIn={setIsLoggedIn}
                               />
-                              {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                             
                             </GestureHandlerRootView>
-                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                            
                           </ErrorBoundary>
                         </>
                       )}
@@ -1234,8 +1245,108 @@ export default function App() {
                         />
                       )}
                     </Stack.Screen>
+                    {/* For Inquiry */}
+                    {/* <Stack.Screen name="Inquiry" options={{ title: 'Fabric Inquiries' }}>
+                      {props => (
+                        <DashboardScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen> */}
+                    <Stack.Screen name="InquiryForm" options={{ title: 'New Inquiry' }}>
+                      {props => (
+                        <InquiryFormScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="PartySelection" options={{ title: 'Select Party' }}>
+                      {props => (
+                        <PartySelectionScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="AddParty" options={{ title: 'Add New Party' }}>
+                      {props => (
+                        <AddPartyScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="DesignSelection" options={{ title: 'Select Design' }}>
+                      {props => (
+                        <DesignSelectionScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="InquiryDetail" options={{ title: 'Inquiry Details' }}>
+                      {props => (
+                        <InquiryDetailScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="Costing" options={{ title: 'Add Costing' }}>
+                      {props => (
+                        <CostingScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="SendQuotation" options={{ title: 'Send Quotation' }}>
+                      {props => (
+                        <SendQuotationScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="ConfirmInquiry" options={{ title: 'Confirm Inquiry' }}>
+                      {props => (
+                        <ConfirmInquiryScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="RejectInquiry" options={{ title: 'Reject Inquiry' }}>
+                      {props => (
+                        <RejectInquiryScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
 
-                    
                   </Stack.Navigator>
                   {/* </Stack.Navigator> */}
 

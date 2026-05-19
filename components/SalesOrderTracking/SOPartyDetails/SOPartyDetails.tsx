@@ -29,6 +29,7 @@ interface PartyDetail {
     totamt: string;
     totmtr: string;
     uid: string;
+    UnitRate: string;
 }
 
 interface PartySummary {
@@ -524,6 +525,62 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
         }
     };
 
+    const handleCardPressCurrent = async (order: PartyDetail) => {
+        // console.log("Selected Order Data:", JSON.stringify(order, null, 2));
+        // console.log("Selected Order Data123:", order, getChallanPayload);
+        // setAPILoading(true);
+        // navigation.navigate('Taka Checking Entry View Data', { party: partyData.partyname });
+        // navigation.navigate('Taka Checking Entry View Data');
+        console.log("Selected Order Data dhrumil:", order, getChallanPayload);
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Requested-with': 'XMLHttpRequest',
+        };
+        // try {
+
+
+        //     let seArr = []
+        //     let seArrCntr = 0;
+        //     selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+        //         seArr[seArrCntr] = el.sexe;
+        //         seArrCntr++;
+
+        //     })
+        //     // const yearValue = selectedYear.split('-')[1].substring(2);
+        //     // const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
+        //     const payload = {
+        //         ...getChallanPayload,
+        //         fromdate: "",
+        //         todate: "",
+        //         uid: order.uid,
+        //         srno: order.srno,
+        //         sexes: seArr,
+        //     };
+        //     const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
+        //     console.log("I am here:", response, payload);
+        //     if (response.data.success === true) {
+        //         setAPILoading(false);
+        //         console.log("I am here:", response.data);
+        //         // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
+        //         await AsyncStorage.setItem('parties_tracking_details_challan_response', JSON.stringify(response.data));
+        //         navigation.navigate('SOPartyDetailsPart1', { party: order.partyname });
+        //         // await saveLastViewedToCache(partyData.parcode);
+        //         // setLastViewedParcode(partyData.parcode);
+        //         // console.log("Response Data:", JSON.stringify(response.data.data, null, 2));
+        //         console.log("Response Data:", response);
+        //     }
+        // } catch (error) {
+        //     setAPILoading(false);
+        //     console.error("Error in handleCardPress:", error);
+        //     Alert.alert("Error", "Failed to process party details");
+        // } finally {
+        //     setAPILoading(false);
+        //     // setTrackingLoader(false);
+        // }
+    };
+
     const SummaryCard = ({ title, value1, label1, value2, label2, backgroundColor }: {
         title: string,
         value1: string,
@@ -563,6 +620,18 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                         {item.status}
                     </Text>
                     <Icon name="chevron-right" size={20} color="#999" /> */}
+                    {item.status === 'PENDING' ? (
+                        <TouchableOpacity
+                            onPress={() => handleCardPressCurrent(item)}
+                            style={styles.orderButtonContainer}
+                        >
+                            <Text style={[styles.orderStatus, { color: '#FF0000' }]}>
+                                Closed Order
+                            </Text>
+                            <Icon name="close" size={20} color="#FF0000" />
+                        </TouchableOpacity>
+
+                    ) : null}
                 </View>
                 <View style={styles.orderHeader}>
                     <Text style={styles.orderId}>SO-{item.sono}</Text>
@@ -604,6 +673,9 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     </View>
                 )}
 
+                <Text style={styles.orderQty}>
+                    Unit Rate: {item.UnitRate}
+                </Text>
                 <Text style={styles.orderQty}>
                     Qty: {item.chalqty}/{item.totmtr}
                 </Text>
@@ -894,6 +966,10 @@ const styles = StyleSheet.create({
         borderColor: theme.BORDER,
         // borderWidth: 2,
         borderBottomWidth: 2,
+    },
+    orderButtonContainer: {
+        display: 'flex',
+        flexDirection: 'row'
     },
     orderId: {
         fontSize: 14,

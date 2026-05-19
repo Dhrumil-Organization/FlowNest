@@ -677,7 +677,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     )}
                   </View>
 
-                  {/* Selected Designs (Chips) */}
+                  {/* Selected Items (Chips) */}
                   <ScrollView
                     horizontal
                     style={styles.selectedDesignsContainer}
@@ -756,8 +756,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               >
                 <Text style={styles.accordionHeaderText}>
                   {isDesignAccordionOpen
-                    ? `Hide Designs: (${selectedDesigns.length})`
-                    : `Select Designs: (${selectedDesigns.length})`}
+                    ? `Hide Items: (${selectedDesigns.length})`
+                    : `Select Items: (${selectedDesigns.length})`}
                 </Text>
                 <Icon
                   name={
@@ -776,7 +776,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   <View style={styles.searchContainer}>
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search Designs..."
+                      placeholder="Search Items..."
                       placeholderTextColor="#ccc"
                       value={searchQuery}
                       onChangeText={setSearchQuery}
@@ -817,7 +817,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     )}
                   </View>
 
-                  {/* Selected Designs (Chips) */}
+                  {/* Selected Items (Chips) */}
                   <ScrollView
                     horizontal
                     style={styles.selectedDesignsContainer}
@@ -960,7 +960,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     )}
                   </View>
 
-                  {/* Selected Designs (Chips) */}
+                  {/* Selected Items (Chips) */}
                   <ScrollView
                     horizontal
                     style={styles.selectedDesignsContainer}
@@ -1047,7 +1047,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               </View>
 
               <View style={styles.radioGroup}>
-                {(['Party Wise', 'Design Wise'] as WiseStatus[]).map(wise => (
+                {(['Party Wise', 'Item Wise'] as WiseStatus[]).map(wise => (
                   <TouchableOpacity
                     key={wise}
                     style={styles.radioButton}

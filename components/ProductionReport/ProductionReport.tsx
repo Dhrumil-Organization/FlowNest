@@ -847,19 +847,20 @@ const ProductionReport = ({ navigation, token }) => {
                     <Text style={styles.statValue}>{item.doffqty}</Text>
                     <Text style={styles.statLabel}>Doff</Text>
                   </View>
+                  <TouchableOpacity style={styles.statBox} onPress={() => handleInfoPress(item)}>
+                    <View >
+                      <View style={styles.valueRow}>
+                        <Text style={styles.statValue}>
+                          {item.packingqty || 0}
+                        </Text>
 
-                  <View style={styles.statBox}>
-                    <View style={styles.valueRow}>
-                      <Text style={styles.statValue}>
-                        {item.packingqty || 0}
-                      </Text>
 
-                      <TouchableOpacity onPress={() => handleInfoPress(item)}>
                         <Icon name="info-outline" size={19} color="#111" />
-                      </TouchableOpacity>
+
+                      </View>
+                      <Text style={styles.statLabel}>Packing</Text>
                     </View>
-                    <Text style={styles.statLabel}>Packing</Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.statsRow}>
@@ -1374,7 +1375,7 @@ const ProductionReport = ({ navigation, token }) => {
           </TouchableOpacity>
         </View>
       </Modal>
-	  
+
       <Modal
         visible={machinePickerVisible}
         animationType="slide"
@@ -1620,16 +1621,16 @@ const ProductionReport = ({ navigation, token }) => {
                 alertData.type === 'success'
                   ? 'check-circle'
                   : alertData.type === 'error'
-                  ? 'error'
-                  : 'warning'
+                    ? 'error'
+                    : 'warning'
               }
               size={40}
               color={
                 alertData.type === 'success'
                   ? '#4CAF50'
                   : alertData.type === 'error'
-                  ? '#F44336'
-                  : '#FFA000'
+                    ? '#F44336'
+                    : '#FFA000'
               }
             />
 
@@ -1644,8 +1645,8 @@ const ProductionReport = ({ navigation, token }) => {
               {alertData.type === 'success'
                 ? 'Success'
                 : alertData.type === 'error'
-                ? 'Error'
-                : 'Warning'}
+                  ? 'Error'
+                  : 'Warning'}
             </Text>
 
             <Text style={{ textAlign: 'center', marginTop: 8, color: '#444' }}>

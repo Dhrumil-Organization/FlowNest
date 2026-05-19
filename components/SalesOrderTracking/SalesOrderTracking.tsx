@@ -673,7 +673,9 @@ const SalesOrderTracking: React.FC<{
                     item?.cdsncode?.toLowerCase().includes(query) ||
                     item?.cdesign?.toLowerCase().includes(query) ||
                     item?.parcode?.toLowerCase().includes(query) ||
-                    item?.accname?.toLowerCase().includes(query),
+                    item?.accname?.toLowerCase().includes(query) ||
+                    item?.itmname?.toLowerCase().includes(query) ||
+                    item?.itmcode?.toLowerCase().includes(query),
             );
 
             // 🔹 Step 2: unique parcode nikalo
@@ -827,11 +829,12 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Design Wise'
+                        : selectedItemStatus1 === 'Item Wise'
                             ? 'design'
                             : '',
 
-                dsncodes: dsnCodes,
+                dsncodes: [],
+                itemcodes: dsnCodes,
                 parties: partyCodes,
                 prptype: 'S',
                 txntype: 'prodorderlist',
@@ -949,10 +952,11 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Design Wise'
+                        : selectedItemStatus1 === 'Item Wise'
                             ? 'design'
                             : '',
-                dsncodes: dsnCodes,
+                dsncodes: [],
+                itemcodes: dsnCodes,
                 parcode: partyData.parcode,
                 prptype: 'S',
                 txntype: 'prodorderlist',
@@ -1041,16 +1045,18 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Design Wise'
+                        : selectedItemStatus1 === 'Item Wise'
                             ? 'design'
                             : '',
-                dsncodes: dsnCodes,
+                dsncodes: [],
+                itemcodes: dsnCodes,
                 parcode: '',
                 parties: partyCodes,
                 prptype: 'S',
                 txntype: 'prodorderlist',
                 sexes: seArr,
             };
+            console.log('payload', payload);
             const response = await axios.post(
                 `${API}/api/salesorderdesigntracking`,
                 payload,
@@ -1070,15 +1076,6 @@ const SalesOrderTracking: React.FC<{
             if (responsedes?.data?.data) {
                 setDesignChildData(responsedes.data.data);
             }
-
-            // if (response.data.success === true) {
-            //     await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
-            //     await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
-            //     await AsyncStorage.setItem('parties_tracking_details_party_name', partyData.partyname);
-            //     await saveLastViewedToCache(partyData.parcode);
-            //     setLastViewedParcode(partyData.parcode);
-            //     navigation.navigate('SOPartyDetails', { party: partyData.partyname });
-            // }
         } catch (error) {
             console.error('Error in handleCardPress:', error);
             Alert.alert('Error', 'Failed to process party details');
@@ -1086,46 +1083,6 @@ const SalesOrderTracking: React.FC<{
             setIsLoading(false);
         }
     };
-
-    // const handleCardPress = async (partyData: Party) => {
-    //     const cacheKey = `${CACHE_KEY_CARD_PRESS}${partyData.parcode}`;
-    //     const headers = {
-    //         Authorization: `Bearer ${token}`,
-    //         'Content-Type': 'application/json',
-    //         'X-Requested-with': 'XMLHttpRequest',
-    //     };
-    //     setTrackingLoader(true);
-    //     try {
-    //         const yearValue = selectedYear.split('-')[1].substring(2);
-    //         const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
-    //         const payload = {
-    //             fromdate: formatDate(fromDate),
-    //             todate: formatDate(delDate),
-    //             yearno: yearValue,
-    //             sexes: selectedExe?.Code ? selectedExe?.Code : '0',
-    //             type: selectedItemStatus === 'All' ? 'all' : selectedItemStatus === 'Open' ? 'open' : selectedItemStatus === 'Closed' ? 'closed' : 'all',
-    //             dsncodes: dsnCodes,
-    //             parcode: partyData.parcode,
-    //             prptype: 'S',
-    //             txntype: 'prodorderlist'
-    //         };
-    //         const response = await axios.post(`${API}/api/salesorderpartytracking`, payload, { headers });
-    //         console.log("🔵 responsedd", payload, response);
-    //         if (response.data.success === true) {
-    //             await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
-    //             await AsyncStorage.setItem('parties_tracking_details_challan_payload', JSON.stringify(payload));
-    //             await AsyncStorage.setItem('parties_tracking_details_party_name', partyData.partyname);
-    //             await saveLastViewedToCache(partyData.parcode);
-    //             setLastViewedParcode(partyData.parcode);
-    //             navigation.navigate('SOPartyDetails', { party: partyData.partyname });
-    //         }
-    //     } catch (error) {
-    //         console.error("Error in handleCardPress:", error);
-    //         Alert.alert("Error", "Failed to process party details");
-    //     } finally {
-    //         setTrackingLoader(false);
-    //     }
-    // };
 
     const handleCardSubDesignPress = async (
         getDData?: any,
@@ -1184,10 +1141,11 @@ const SalesOrderTracking: React.FC<{
             wise:
                 selectedItemStatus1 === 'Party Wise'
                     ? 'party'
-                    : selectedItemStatus1 === 'Design Wise'
+                    : selectedItemStatus1 === 'Item Wise'
                         ? 'design'
                         : '',
-            dsncodes: customPayload.dsncodes,
+            dsncodes: [],
+            itemcodes: customPayload.dsncodes,
             uid: item?.muid ? item?.muid : '',
             mdsncode: item?.mdsncode ? item?.mdsncode : '',
             parcode: customPayload.parcode,
@@ -1209,6 +1167,7 @@ const SalesOrderTracking: React.FC<{
                 // await saveLastViewedToCache(getDData.parcode);
                 // setLastViewedParcode(getDData.parcode);
                 // navigation.navigate('SOPartyDetails', { party: parname.parname });
+                setTrackingLoader(false);
                 setSelectedPartyDetails({
                     designdetails: response.data.data.designdetails,
                     design_summary: response.data.data.design_summary,
@@ -1273,10 +1232,11 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Design Wise'
+                        : selectedItemStatus1 === 'Item Wise'
                             ? 'design'
                             : '',
-                dsncodes: item?.dsncode ? [item?.dsncode] : [],
+                dsncodes: [],
+                itemcodes: item?.dsncode ? [item?.dsncode] : [],
                 uid: item?.suid ? item?.suid : '',
                 mdsncode: item?.mdsncode ? item?.mdsncode : '',
                 parcode: getDData?.parcode,
@@ -1300,7 +1260,7 @@ const SalesOrderTracking: React.FC<{
                 );
                 await AsyncStorage.setItem(
                     'parties_tracking_details_party_name',
-                    selectedItemStatus1 === 'Design Wise'
+                    selectedItemStatus1 === 'Item Wise'
                         ? dsnname.dsnname
                         : parname.parname,
                 );
@@ -1309,7 +1269,7 @@ const SalesOrderTracking: React.FC<{
                 setLastViewedParcode(getDData.parcode);
                 navigation.navigate('SOPartyDetails', {
                     party:
-                        selectedItemStatus1 === 'Design Wise'
+                        selectedItemStatus1 === 'Item Wise'
                             ? dsnname.dsnname
                             : parname.parname,
                     selectedSalesExes: seArr
@@ -1619,7 +1579,7 @@ const SalesOrderTracking: React.FC<{
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Main Design Summary</Text>
+                        <Text style={styles.modalTitle}>Main Item Summary</Text>
                         <TouchableOpacity onPress={closeDesignModal}>
                             <Icon name="close" size={24} color="#333" />
                         </TouchableOpacity>
@@ -1642,7 +1602,7 @@ const SalesOrderTracking: React.FC<{
                         <TouchableOpacity
                             key={index}
                             style={
-                                selectedItemStatus1 === 'Design Wise'
+                                selectedItemStatus1 === 'Item Wise'
                                     ? styles.summaryCard123
                                     : styles.summaryCard
                             }
@@ -1656,12 +1616,12 @@ const SalesOrderTracking: React.FC<{
                                 setisALL(true);
                             }}
                         >
-                            {selectedItemStatus1 === 'Design Wise' ? null : (
+                            {selectedItemStatus1 === 'Item Wise' ? null : (
                                 <Text style={styles.partyNameInSummary}>
                                     Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
                                 </Text>
                             )}
-                            {selectedItemStatus1 === 'Design Wise' ? (
+                            {selectedItemStatus1 === 'Item Wise' ? (
                                 <>
                                     <View style={styles.summaryContainer}>
                                         <View
@@ -1749,7 +1709,7 @@ const SalesOrderTracking: React.FC<{
                             {/*  */}
                         </TouchableOpacity>
                     ))}
-                    {/* <Text style={styles.sectionTitle}>Main Design Details</Text> */}
+                    {/* <Text style={styles.sectionTitle}>Main Item Details</Text> */}
                     <View
                         style={{
                             flexDirection: 'row',
@@ -1757,7 +1717,7 @@ const SalesOrderTracking: React.FC<{
                             alignItems: 'center',
                         }}
                     >
-                        <Text style={styles.sectionTitle}>Main Design Details</Text>
+                        <Text style={styles.sectionTitle}>Main Item Details</Text>
                         <TouchableOpacity
                             onPress={toggleSortOrder1}
                             style={{ flexDirection: 'row', alignItems: 'center' }}
@@ -1783,7 +1743,8 @@ const SalesOrderTracking: React.FC<{
                                 onPress={() => {
                                     const payload = {
                                         ...selectedDesignData!.payload,
-                                        dsncodes: [item.dsncode],
+                                        dsncodes: [],
+                                        itemcodes: [item.dsncode],
                                     };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);
                                     handleCardSubDesignPress(
@@ -1897,13 +1858,13 @@ const SalesOrderTracking: React.FC<{
                                                 parname:
                                                     selectedPartyDetails?.designdetails[0].partyname,
                                             },
-                                            { dsnname: 'All Designs' },
+                                            { dsnname: 'All Items' },
                                             selectedPartyDetails?.payload,
                                             summary,
                                         );
                                     }}
                                 >
-                                    {selectedItemStatus1 === 'Design Wise' ? null : (
+                                    {selectedItemStatus1 === 'Item Wise' ? null : (
                                         <Text style={styles.partyNameInSummary}>
                                             Party:{' '}
                                             {selectedPartyDetails?.designdetails[0]?.partyname || ''}
@@ -1944,7 +1905,7 @@ const SalesOrderTracking: React.FC<{
                     ) : (
                         <View>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Sub Design Summary</Text>
+                                <Text style={styles.modalTitle}>Sub Item Summary</Text>
                                 <TouchableOpacity
                                     onPress={() => setIsPartyDetailsModalVisible(false)}
                                 >
@@ -2035,7 +1996,8 @@ const SalesOrderTracking: React.FC<{
                                 onPress={() => {
                                     const payload = {
                                         ...selectedPartyDetails!.payload,
-                                        dsncodes: [item.dsncode],
+                                        dsncodes: [],
+                                        itemcodes: [item.dsncode],
                                     };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);
                                     // handleCardSubDesignPress(getDData, { parname: item.partyname }, payload, item);

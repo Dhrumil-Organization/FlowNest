@@ -49,30 +49,30 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
             route: prp === "sudamo_knits" ? 'receivables-sudamo' : 'receivables',
             color: '#773F3F'
         },
-        { name: 'Collection', icon: 'currency-rupee', route: 'collection', color: '#6bd35d' },
-        { name: 'Upload', icon: 'upload', route: 'upload', color: '#2E2E2E' },
-        { name: 'Sudamo Production Order', icon: 'production-quantity-limits', route: 'sudamo-production-order', color: '#F2D43D' },
+        { name: 'Collection', icon: 'currency-rupee', route: 'Collection', color: '#6bd35d' },
+        // { name: 'Upload', icon: 'upload', route: 'upload', color: '#2E2E2E' },
+        // { name: 'Sudamo Production Order', icon: 'production-quantity-limits', route: 'sudamo-production-order', color: '#F2D43D' },
         { name: 'Yarn Purchase Order', icon: 'attach-money', route: 'yarn-purchase-order', color: '#1F7006' },
         // { name: 'Grey Purchase Order', icon: 'payments', route: 'grey-purchase-order', color: '#3BAD18' },
-        { name: 'Sales Order', icon: 'point-of-sale', route: 'sales-order', color: '#20BEC1' },
+        // { name: 'Sales Order', icon: 'point-of-sale', route: 'sales-order', color: '#20BEC1' },
         { name: 'Production Order Tracking', icon: 'track-changes', route: 'production-order-tracking', color: '#CE9F78' },
-        { name: 'New Account Request', icon: 'account-balance', route: 'new-account-request', color: '#E982F6' },
+        // { name: 'New Account Request', icon: 'account-balance', route: 'new-account-request', color: '#E982F6' },
         { name: 'Monthly Expense Report', icon: 'table-chart', route: 'monthly-expense-report', color: '#D35400' },
         { name: 'Snap View', icon: 'table-view', route: 'snap-view', color: '#ABC00B' },
         { name: 'Packing Automation', icon: 'receipt-long', route: 'packing-automation', color: 'rgb(194, 213, 52)' },
-        { name: 'Inquiry', icon: 'table-view', route: 'inquiry', color: 'rgb(194, 213, 52)' },
+        // { name: 'Inquiry', icon: 'table-view', route: 'inquiry', color: 'rgb(194, 213, 52)' },
         { name: 'Payable', icon: 'payment', route: 'payable', color: '#521313' },
         { name: 'Daily Collection Report', icon: 'collections-bookmark', route: 'daily-collection-report', color: '#5B2CFF' },
-        { name: 'Taka Checking Entry', icon: 'dynamic-form', route: 'taka-checking-entry', color: '#5B2CFF' },
+        // { name: 'Taka Checking Entry', icon: 'dynamic-form', route: 'taka-checking-entry', color: '#5B2CFF' },
         { name: 'Sales Order Tracking', icon: 'track-changes', route: 'sales-order-tracking', color: '#DB945A' },
-        { name: 'Yarn Stock Verification', icon: 'check-circle', route: 'yarn-stock-verification', color: '#008080' },
-        { name: 'Checking Scanner', icon: 'document-scanner', route: 'checking-scanner', color: '#4169E1' },
-        { name: 'Purchase Order Tracking', icon: 'shopping-cart', route: 'purchase-order-tracking', color: '#228B22' },
+        // { name: 'Yarn Stock Verification', icon: 'check-circle', route: 'yarn-stock-verification', color: '#008080' },
+        // { name: 'Checking Scanner', icon: 'document-scanner', route: 'checking-scanner', color: '#4169E1' },
+        // { name: 'Purchase Order Tracking', icon: 'shopping-cart', route: 'purchase-order-tracking', color: '#228B22' },
         { name: 'Sales Analysis', icon: 'bar-chart', route: 'sales-analysis', color: '#221080' },
-        { name: 'Sales Order(Inactive)', icon: 'bar-chart', route: 'sales order-inactive', color: '#221080' },
-        { name: 'Item Authorization', icon: 'gite', route: 'item-authorization', color: '#221080' },
-        { name: 'Process complete auth.', icon: 'autorenew', route: 'process-complete-auth', color: '#dd5c98' },
-        { name: 'Febric Stock', icon: 'autorenew', route: 'febric-stock', color: '#dd5c98' },
+        // { name: 'Sales Order(Inactive)', icon: 'bar-chart', route: 'sales order-inactive', color: '#221080' },
+        // { name: 'Item Authorization', icon: 'gite', route: 'item-authorization', color: '#221080' },
+        // { name: 'ProcesFs complete auth.', icon: 'autorenew', route: 'process-complete-auth', color: '#dd5c98' },
+        // { name: 'Febric Stock', icon: 'autorenew', route: 'febric-stock', color: '#dd5c98' },
         { name: 'Daily Payment Report', icon: 'payments', route: 'daily-payment-report', color: '#ff2ced' },
     ];
 
@@ -87,12 +87,7 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
 
                     const decoded = atob(data);
                     const parsed = JSON.parse(decoded);
-                    console.log("APP Access:", JSON.stringify(parsed));
-                    await AsyncStorage.setItem(
-                        'rightsMenuApps',
-                        JSON.stringify(parsed)
-                    );
-                    // await AsyncStorage.setItem('access_token', token);
+
                     // const parsed = [
                     //     {
                     //         "title": "",
@@ -103,18 +98,138 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
                     //                 "icon": "",
                     //                 "children": [
                     //                     {
+                    //                         "title": "Upload",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
                     //                         "title": "Credit Limit Request",
                     //                         "href": "/"
                     //                     },
                     //                     {
-                    //                         "title": "Receivables",
+                    //                         "title": "Sudamo Production Order",
                     //                         "href": "/"
                     //                     },
+                    //                     {
+                    //                         "title": "Purchase Order",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Collection",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "New Account Request",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Grey Purchase Order",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Production Order Tracking",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Monthly Expense Report",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Inquiry",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Checking Scanner",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Yarn Stock Verification",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Daily Collection Report",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order(Inactive)",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Item Authorization",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Process complete auth.",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Febric Stock",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Daily Collection Report",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Daily Payment Report",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+
+                    //                         "title": "Purchase Order Tracking",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order Tracking",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Beam Close",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Creel Management System",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Yarn Stock",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Beam Gaiting",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Taka Checking Entry",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Yarn Management System",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Party Dashboard",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+
+                    //                         "title": "Weft Issue",
+                    //                         "href": "/"
+                    //                     },
+
                     //                 ]
                     //             }
                     //         ]
                     //     }
                     // ];
+                    console.log("APP Access:", JSON.stringify(parsed));
+                    await AsyncStorage.setItem(
+                        'rightsMenuApps',
+                        JSON.stringify(parsed)
+                    );
 
                     const mobileApp = parsed.find((item: any) =>
                         item.pages?.some((p: any) => p.title === 'Mobile App')
@@ -196,7 +311,7 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
             />
 
             {/* 🔥 RIGHT SIDE ALPHABET */}
-            <View style={styles.alphabet}>
+            {/* <View style={styles.alphabet}>
                 {ALPHABET.map(letter => (
                     <TouchableOpacity key={letter} onPress={() => scrollToLetter(letter)}>
                         <Text style={[
@@ -207,7 +322,7 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
                         </Text>
                     </TouchableOpacity>
                 ))}
-            </View>
+            </View> */}
 
         </View>
     );

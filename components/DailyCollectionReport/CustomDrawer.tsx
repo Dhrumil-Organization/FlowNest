@@ -446,6 +446,7 @@ const styles = StyleSheet.create({
     closeButton: {
         alignSelf: 'flex-end',
         padding: 10,
+        marginTop: 25
     },
     stepIndicator: {
         alignItems: 'center',

@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -18,6 +18,7 @@
     },
     "android": {
       // "jsEngine": "jsc",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/log_white.png",

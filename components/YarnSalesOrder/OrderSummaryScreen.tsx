@@ -227,7 +227,15 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
     const hasLoadedOrderRef = useRef(false);
     const [pdfLoading, setPdfLoading] = useState(false);
-    const party =
+    // const party =
+    //     routeParty ||
+    //     partyData ||
+    //     selectedParty ||
+    //     contextParty ||
+    //     headerData?.Party ||
+    //     headerData?.party ||
+    //     null;
+    const initialParty =
         routeParty ||
         partyData ||
         selectedParty ||
@@ -235,6 +243,23 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         headerData?.Party ||
         headerData?.party ||
         null;
+
+    const [currentParty, setCurrentParty] = useState(initialParty);
+
+    useEffect(() => {
+        if (route?.params?.selectedTempParty) {
+            setCurrentParty(route.params.selectedTempParty);
+
+            if (Array.isArray(route?.params?.preservedRows)) {
+                setRows(reSrNo(route.params.preservedRows));
+            }
+
+            navigation.setParams({
+                selectedTempParty: undefined,
+                preservedRows: undefined,
+            });
+        }
+    }, [route?.params?.selectedTempParty]);
 
     const [rows, setRows] = useState(() => reSrNo(normalizeRows(contextItems)));
 
@@ -283,6 +308,37 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     useEffect(() => {
         const p = route?.params || {};
 
+        // =========================================
+        // TEMP PARTY REPLACEMENT
+        // DO NOT CHANGE MODE TO ADD
+        // =========================================
+
+        if (p.replaceTempPartyDone === true) {
+
+            setScreenMode(
+                p.screenMode || p.mode || 'EDIT'
+            );
+
+            setScreenUid(
+                Number(
+                    p.uid ||
+                    screenUid ||
+                    uid ||
+                    0
+                )
+            );
+
+            navigation.setParams({
+                replaceTempPartyDone: undefined,
+            });
+
+            return;
+        }
+
+        // =========================================
+        // NORMAL FLOW
+        // =========================================
+
         const nextUid = Number(
             p.uid ||
             p.completedRow?.UId ||
@@ -292,7 +348,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         );
 
         const nextMode =
-            nextUid > 0 || p.mode === 'EDIT' || screenMode === 'EDIT'
+            nextUid > 0 ||
+                p.mode === 'EDIT' ||
+                screenMode === 'EDIT'
                 ? 'EDIT'
                 : p.mode || screenMode || 'ADD';
 
@@ -303,6 +361,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         if (nextUid !== Number(screenUid || 0)) {
             setScreenUid(nextUid);
         }
+
     }, [route?.params]);
 
     const toNumber = value => {
@@ -407,6 +466,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 editLineId: undefined,
                 oldRow: undefined,
                 originalKey: undefined,
+                replaceItemOnlyDone: undefined,
             });
         }, [route?.params, navigation]),
     );
@@ -464,12 +524,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             editIndex: null,
             editLineId: null,
             oldRow: null,
-
             workingRows: rows,
 
-            party,
-            partyData: party,
-            selectedParty: party,
+            party: currentParty,
+            partyData: currentParty,
+            selectedParty: currentParty,
 
             prpcode,
             strcode,
@@ -491,12 +550,156 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             editIndex: rows.findIndex(x => x.LineId === row.LineId),
             editLineId: row.LineId,
             oldRow: row,
+            workingRows: rows,
+
+            party: currentParty,
+            partyData: currentParty,
+            selectedParty: currentParty,
+
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
+
+
+    const handleEditItem = row => {
+        const stableUid = Number(uid || row?.UId || route?.params?.uid || rawMain?.UId || 0);
+        const stableMode = stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
+        // const isCustomItem = row?.ItmCode == '-1';
+        navigation.navigate('SalesOrderItemList', {
+            mode: stableMode,
+            uid: stableUid,
+            soNo,
+            soDate,
+            editMode: true,
+            editIndex: rows.findIndex(x => x.LineId === row.LineId),
+            editLineId: row.LineId,
+            oldRow: row,
+            workingRows: rows,
+            isCustomItemEdit: true,
+            party: currentParty,
+            partyData: currentParty,
+            selectedParty: currentParty,
+
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
+
+    const handleEditgrade = row => {
+        const stableUid = Number(
+            uid || row?.UId || route?.params?.uid || rawMain?.UId || 0
+        );
+
+        const stableMode =
+            stableUid > 0 || mode === 'EDIT'
+                ? 'EDIT'
+                : 'ADD';
+
+        // const isCustomItem = row?.ItmCode == '-1';
+
+        navigation.navigate('SalesOrderGradeList', {
+            mode: stableMode,
+            uid: stableUid,
+            soNo,
+            soDate,
+
+            editMode: true,
+
+            editIndex: rows.findIndex(
+                x => x.LineId === row.LineId
+            ),
+
+            editLineId: row.LineId,
+
+            oldRow: row,
+
+            // =========================
+            // IMPORTANT
+            // =========================
+            selectedItem: {
+                ItmCode: row.ItmCode,
+                ItmName: row.ItmName,
+                MItmCode: row.MItmCode || row.ItmCode,
+                UOM: row.UOM || '',
+                Denier: row.Denier || '',
+                HsnCode: row.HsnCode || '',
+                Raw: row,
+            },
 
             workingRows: rows,
 
-            party,
-            partyData: party,
-            selectedParty: party,
+            isCustomGradeEdit: true,
+
+            party: currentParty,
+            partyData: currentParty,
+            selectedParty: currentParty,
+
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
+
+    const handleEditShade = row => {
+        const stableUid = Number(
+            uid || row?.UId || route?.params?.uid || rawMain?.UId || 0
+        );
+
+        const stableMode =
+            stableUid > 0 || mode === 'EDIT'
+                ? 'EDIT'
+                : 'ADD';
+
+        // const isCustomItem = row?.ItmCode == '-1';
+
+        navigation.navigate('SalesOrderShadeList', {
+            mode: stableMode,
+            uid: stableUid,
+            soNo,
+            soDate,
+
+            editMode: true,
+
+            editIndex: rows.findIndex(
+                x => x.LineId === row.LineId
+            ),
+
+            editLineId: row.LineId,
+
+            oldRow: row,
+
+            // =================================
+            // IMPORTANT
+            // =================================
+            selectedItem: {
+                ItmCode: row.ItmCode,
+                ItmName: row.ItmName,
+                MItmCode: row.MItmCode || row.ItmCode,
+                UOM: row.UOM || '',
+                Denier: row.Denier || '',
+                HsnCode: row.HsnCode || '',
+                Raw: row,
+            },
+
+            selectedGrade: {
+                GrdCode: row.GrdCode,
+                GrdName: row.GrdName,
+                Raw: row,
+            },
+
+            workingRows: rows,
+
+            isCustomShadeEdit: true,
+
+            party: currentParty,
+            partyData: currentParty,
+            selectedParty: currentParty,
 
             prpcode,
             strcode,
@@ -520,9 +723,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         ]);
     };
 
-
     const validateBeforeSave = () => {
-        if (!party?.ParCode) {
+        if (!currentParty?.ParCode) {
             Alert.alert('Required', 'Please select party.');
             return false;
         }
@@ -536,6 +738,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             Alert.alert('Required', 'Please add at least one item.');
             return false;
         }
+
 
         for (const row of rows) {
             if (!row.ItmCode || !row.GrdCode || !row.ShdCode) {
@@ -698,7 +901,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 City: main.city || main.DCity || main.Station || '',
                 Address: main.address || main.DAdd || '',
             };
-
+            setCurrentParty(loadedParty);
             navigation.setParams({
                 party: loadedParty,
                 partyData: loadedParty,
@@ -716,10 +919,42 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         }
     };
 
+    let newsoparty = [];
+
     const buildMainPayload = () => {
-        const base = uid > 0 && rawMain ? { ...rawMain } : {};
-        const yno = yearno ? yearno.slice(-2) : '';
-        console.log('Edit Mode ', base.SONo, rawMain);
+        const base =
+            uid > 0 && rawMain
+                ? { ...rawMain }
+                : {};
+
+        const yno =
+            yearno
+                ? yearno.slice(-2)
+                : '';
+
+        const isNewParty =
+            currentParty?.ParCode === '-1';
+
+        newsoparty = [];
+
+        if (isNewParty) {
+            newsoparty.push({
+                ParCode: currentParty?.ParCode || '-1',
+                ParName: currentParty?.ParName || '',
+                Address: currentParty?.Address || '',
+                City: currentParty?.City || '',
+                State: currentParty?.State || '',
+                Cnty: currentParty?.Cnty || 'INDIA',
+                Zip: currentParty?.Zip || '',
+                Tel1: currentParty?.Tel1 || '',
+                GSTIN: currentParty?.GSTIN || '',
+                SExe: currentParty?.SExe || '',
+                SExeName: currentParty?.SExeName || '',
+                PrintName: currentParty?.PrintName || '',
+                Remark: currentParty?.Remark || '',
+            });
+        }
+
         return {
             ...base,
 
@@ -730,11 +965,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             StrCode: strcode || base.StrCode || '002',
             YearNo: yno || base.YearNo || '',
 
-            ParCode: party?.ParCode || base.ParCode || '',
-            ParName: party?.ParName || base.ParName || '',
+            ParCode: currentParty?.ParCode || base.ParCode || '',
+            ParName: currentParty?.ParName || base.ParName || '',
 
-            SExe: party?.SExe || base.SExe || '',
-            SExeName: party?.SExeName || base.SExeName || '',
+            SExe: currentParty?.SExe || base.SExe || '',
+            SExeName: currentParty?.SExeName || base.SExeName || '',
 
             GrsAmt: fmt(totals.totalAmount),
             DisAmt: fmt(discountAmt),
@@ -752,13 +987,13 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             Remark: remark || '',
             DDays: ddays || '',
 
-            DAdd: party?.Address || base.DAdd || '',
-            DCity: party?.City || base.DCity || '',
-            Station: party?.City || base.Station || '',
+            DAdd: currentParty?.Address || base.DAdd || '',
+            DCity: currentParty?.City || base.DCity || '',
+            Station: currentParty?.City || base.Station || '',
 
             Status: base.Status || 'P',
-            EntType: base.EntType || 'G2',
-            TaxStru: base.TaxStru || '123',
+            EntType: base.EntType || '',
+            TaxStru: base.TaxStru || '',
 
             SONo: uid > 0 ? base.SONo : '',
             SODate: uid > 0 ? base.SODate : '',
@@ -767,20 +1002,65 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         };
     };
 
+    let newsoitem = [];
+
     const buildD1Payload = () => {
+
+        newsoitem = [];
+
+        const uniqueKeys = new Set();
+
         return reSrNo(rows).map((row, index) => {
             const raw = row.Raw || {};
+
+            const isNewItem = row.ItmCode === '-1';
+
+            // UNIQUE NEW ITEMS
+            if (isNewItem) {
+
+                // const key = `${row.ItmCode}_${row.ItmName}`;
+                const key = `${row.LineId || index + 1}_${row.ItmCode}_${row.ItmName}`;
+
+                if (!uniqueKeys.has(key)) {
+
+                    uniqueKeys.add(key);
+
+                    newsoitem.push({
+                        SrNo: index + 1,
+                        ItmCode: row.ItmCode || '-1',
+                        ItmName: row.ItmName || '',
+                        MItmCode: row.MItmCode || '-1',
+                        UOM: row.UOM || '',
+                        Denier: row.Denier || '',
+                        HsnCode: row.HsnCode || '',
+                        Remark: row.Remark || '',
+                    });
+                }
+            }
 
             return {
                 ...raw,
 
                 UId: uid || raw.UId || 0,
                 SrNo: index + 1,
-                StrCode: row.StrCode || raw.StrCode || strcode || '002',
+                StrCode:
+                    row.StrCode ||
+                    raw.StrCode ||
+                    strcode ||
+                    '002',
 
                 ItmCode: row.ItmCode || '',
-                MItmCode: row.MItmCode || raw.MItmCode || row.ItmCode || '',
-                ItmName: row.ItmName || raw.ItmName || '',
+
+                MItmCode:
+                    row.MItmCode ||
+                    raw.MItmCode ||
+                    row.ItmCode ||
+                    '',
+
+                ItmName:
+                    row.ItmName ||
+                    raw.ItmName ||
+                    '',
 
                 GrdCode: row.GrdCode || '',
                 GrdName: row.GrdName || raw.GrdName || '',
@@ -788,26 +1068,26 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 ShdCode: row.ShdCode || '',
                 ShdName: row.ShdName || raw.ShdName || '',
 
-                // Denier: row.Denier || '',
                 Denier:
-                    row.Denier ||
                     row.Denier ||
                     raw.Denier ||
                     '',
 
                 UOM:
                     row.UOM ||
-                    row.UOM ||
                     raw.UOM ||
                     '',
-                // UOM: row.UOM || raw.UOM || '',
 
                 Qty: fmt(row.Qty, 3),
                 QtyPcs: String(num(row.Pcs)),
                 UnitRate: fmt(row.Rate, 5),
                 Amount: fmt(row.Amount),
 
-                Remark1: row.Remark || raw.Remark1 || '',
+                Remark1:
+                    row.Remark ||
+                    raw.Remark1 ||
+                    '',
+
                 Remark2: raw.Remark2 || '',
                 Remark3: raw.Remark3 || '',
                 Remark4: raw.Remark4 || '',
@@ -825,19 +1105,25 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
                 CGSTPer: raw.CGSTPer || '.00',
                 CGSTAmt: raw.CGSTAmt || '.00',
+
                 SGSTPer: raw.SGSTPer || '.00',
                 SGSTAmt: raw.SGSTAmt || '.00',
+
                 IGSTPer: raw.IGSTPer || '.00',
                 IGSTAmt: raw.IGSTAmt || '.00',
 
-                D1NetAmt: fmt(row.Amount) || '.00',
-                // HsnCode: row.HsnCode || raw.HsnCode || '',
+                D1NetAmt:
+                    fmt(row.Amount) || '.00',
+
                 HsnCode:
-                    row.HsnCode ||
                     row.HsnCode ||
                     raw.HsnCode ||
                     '',
-                HSNName: row.HSNName || raw.HSNName || '',
+
+                HSNName:
+                    row.HSNName ||
+                    raw.HSNName ||
+                    '',
             };
         });
     };
@@ -861,6 +1147,13 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const saveOrder = async () => {
         if (!validateBeforeSave()) return;
 
+        const d1Response = buildD1Payload();
+        const mainResponse = buildMainPayload();
+
+        // const uniqueData = Array.from(
+        //     new Map(newsoitem.map(item => [item.ItmName, item])).values()
+        // );
+
         try {
             setSaving(true);
             const payload = {
@@ -870,32 +1163,14 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 d1: buildD1Payload(),
                 tax: buildTaxPayload(),
                 exp: buildExpPayload(),
+                newsoitem: newsoitem,
+                newsoparty: newsoparty,
                 extra: rawExtra,
             };
 
-            // const payload = {
-            //     Mode: mode,
-            //     UId: uid,
-
-            //     PrpCode: prpcode,
-            //     StrCode: strcode,
-            //     YearNo: yearno,
-
-            //     ParCode: party.ParCode,
-            //     ParName: party.ParName,
-
-            //     GrossAmount: totals.totalAmount,
-            //     DiscountAmount: discountAmt,
-            //     TaxPercent: taxPercent,
-
-            //     TaxAmount: taxAmt,
-            //     NetAmount: grandTotal,
-            //     Remark: remark,
-
-            //     Rows: reSrNo(rows),
-            // };
-
             console.log("save payload", payload);
+
+            // return payload;
 
             const res = await axios.post(`${API}/api/mobappsave`, payload, {
                 headers: {
@@ -922,9 +1197,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     prpcode: res?.data?.response?.PrpCode || prpcode,
                     yearno: res?.data?.response?.YearNo || yearno,
                     strcode: res?.data?.response?.StrCode || strcode,
-                    party,
-                    partyData: party,
-                    selectedParty: party,
+
+                    party: currentParty,
+                    partyData: currentParty,
+                    selectedParty: currentParty,
+
                     token,
                     dateTime: new Date().toLocaleString("en-IN", {
                         day: "2-digit",
@@ -938,7 +1215,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             } else {
                 Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
-        } catch (error) {
+        }
+        catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
             Alert.alert(
                 'Error',
@@ -948,6 +1226,40 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             setSaving(false);
         }
     };
+
+    // const saveOrder = async () => {
+    //     if (!validateBeforeSave()) return;
+    //     try {
+    //         setSaving(true);
+    //         const payload = {
+    //             Mode: mode,
+    //             UId: uid || 0,
+    //             main: buildMainPayload(),
+    //             d1: buildD1Payload(),
+    //             tax: buildTaxPayload(),
+    //             exp: buildExpPayload(),
+    //             extra: rawExtra,
+    //         };
+    //         console.log(
+    //             'SAVE PAYLOAD =>',
+    //             JSON.stringify(payload, null, 2),
+    //         );
+    //         return payload;
+    //     } catch (error) {
+    //         console.log(
+    //             'SAVE ORDER ERROR:',
+    //             error?.res?.data || error.message,
+    //         );
+
+    //         Alert.alert(
+    //             'Error',
+    //             error?.res?.data?.message ||
+    //             'Something went wrong while saving',
+    //         );
+    //     } finally {
+    //         setSaving(false);
+    //     }
+    // };
 
     const deleteOrder = async () => {
         const yno = yearno ? yearno.slice(-2) : '';
@@ -1014,7 +1326,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             setDeleting(false);
         }
     };
-    const printSalesOrderPdf = async (format = 'SOne') => {
+
+    const printSalesOrderPdf = async (format = 'ROne') => {
         try {
             setPdfLoading(true);
 
@@ -1026,6 +1339,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 printTypes: ['sales_order'],
                 printFormat: format,
             };
+
             console.log("payload:", payload);
             const res = await axios.post(
                 `${API}/api/saleschallanmultiprintnew`,
@@ -1040,6 +1354,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     },
                 }
             );
+
             console.log("res", res)
             console.log('PDF RESPONSE =>', res?.data);
 
@@ -1082,17 +1397,56 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName}>
-                            {item.ItmCode} - {item.ItmName}
-                        </Text>
+                        <View style={styles.rowBetween}>
+                            <Text style={styles.itemName}>
+                                {item.ItmCode} - {item.ItmName}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => handleEditItem(item, index)}
+                                style={styles.editBtn}
+                                disabled={Number(autoLocked) == 1 || isViewMode}
+                            >
+                                <Icon
+                                    name="mode-edit-outline"
+                                    size={16}
+                                    color="#0B7A3D"
+                                />
+                            </TouchableOpacity>
+                        </View>
 
-                        <Text style={styles.designText}>
-                            Grade : {item.GrdCode} - {item.GrdName || '-'}
-                        </Text>
+                        <View style={styles.rowBetween}>
+                            <Text style={styles.designText}>
+                                Grade : {item.GrdCode} - {item.GrdName || '-'}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => handleEditgrade(item, index)}
+                                style={styles.editBtn}
+                                disabled={Number(autoLocked) == 1 || isViewMode}
+                            >
+                                <Icon
+                                    name="mode-edit-outline"
+                                    size={16}
+                                    color="#0B7A3D"
+                                />
+                            </TouchableOpacity>
+                        </View>
 
-                        <Text style={styles.designText}>
-                            Shade : {item.ShdCode} - {item.ShdName || '-'}
-                        </Text>
+                        <View style={styles.rowBetween}>
+                            <Text style={styles.designText}>
+                                Shade : {item.ShdCode} - {item.ShdName || '-'}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => handleEditShade(item, index)}
+                                style={styles.editBtn}
+                                disabled={Number(autoLocked) == 1 || isViewMode}
+                            >
+                                <Icon
+                                    name="mode-edit-outline"
+                                    size={16}
+                                    color="#0B7A3D"
+                                />
+                            </TouchableOpacity>
+                        </View>
 
                         {!!item.Remark && (
                             <Text style={styles.remarkText}>
@@ -1208,36 +1562,39 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 </View>
                 <View style={styles.partyCard}>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.partyName}>{party?.ParName || '-'}</Text>
+                        <Text style={styles.partyName}>{currentParty?.ParName || '-'}</Text>
                         <Text style={styles.partySub}>
-                            {party?.ParCode || '-'} | {party?.City || '-'}
+                            {currentParty?.ParCode || '-'} | {currentParty?.Address || '-'}
                         </Text>
                         <Text style={styles.partySub}>
-                            {party?.SExeName || '-'}
+                            {currentParty?.SExeName || '-'}
                         </Text>
                     </View>
 
-                    {mode !== 'EDIT' && uid <= 0 && (
+                    {(((mode !== 'EDIT' && uid <= 0) || (currentParty?.ParCode == '-1' && Number(autoLocked) == 1))) && (
                         <TouchableOpacity
                             style={styles.changeBtn}
                             onPress={() => navigation.navigate('PartyListScreen', {
-                                editMode: false,
-                                editIndex: null,
-                                editLineId: null,
-                                oldRow: null,
+                                replaceTempPartyOnly: String(currentParty?.ParCode) === '-1',
 
-                                // IMPORTANT: send current rows also
+                                mode,
+                                uid,
+                                soNo,
+                                soDate,
+                                screenMode,
+
                                 workingRows: rows,
 
-                                party,
-                                partyData: party,
-                                selectedParty: party,
+                                party: currentParty,
+                                partyData: currentParty,
+                                selectedParty: currentParty,
 
                                 prpcode,
                                 strcode,
                                 yearno,
                                 token,
-                            })}>
+                            })}
+                        >
                             <Text style={styles.changeText}>Change</Text>
                         </TouchableOpacity>
                     )}
@@ -1277,6 +1634,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                                     {ddate || 'Select Date'}
                                 </Text>
                             </TouchableOpacity>
+
                             {showDeliveryDatePicker && (
                                 <DateTimePicker
                                     value={new Date()}
@@ -1329,7 +1687,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     </View>
                 </View>
 
-                <Text style={styles.sectionTitle}>Items / Design / Shade Rows</Text>
+                <Text style={styles.sectionTitle}>Items / Grade / Shade Rows</Text>
 
                 {rows.length === 0 ? (
                     <View style={styles.emptyBox}>
@@ -1419,47 +1777,31 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         size={16}
                         color="#fff"
                     />
-                    {/* <Text style={styles.saveBtnText}>
-                        {saving
-                            ? 'Saving...'
-                            : mode === 'EDIT' || uid > 0
-                                ? 'Update'
-                                : 'Save'}
-                    </Text> */}
                 </TouchableOpacity>
                 {!Number(autoLocked) && (
                     <TouchableOpacity
                         style={[styles.deleteBtn, saving && { opacity: 0.6 }]}
                         onPress={() => setDeleteModalVisible(true)}
                         disabled={saving || isViewMode || screenMode == 'ADD'}
-                    // disabled={true}
                     >
                         <Icon
                             name="delete"
                             size={16}
                             color="#fff"
                         />
-                        {/* <Text style={styles.saveBtnText}>
-                            {deleting
-                                ? 'Deleting...'
-                                : 'Delete'}
-                        </Text> */}
                     </TouchableOpacity>
                 )}
                 {screenMode != 'ADD' && (
                     <TouchableOpacity
                         style={styles.saveBtn}
-                        onPress={() => printSalesOrderPdf('SOne')}
+                        onPress={() => printSalesOrderPdf('ROne')}
                         disabled={pdfLoading}
                     >
-                         <Icon
+                        <Icon
                             name="print"
                             size={16}
                             color="#fff"
                         />
-                        {/* <Text style={styles.saveBtnText}>
-                            {pdfLoading ? 'Opening PDF...' : 'Print'}
-                        </Text> */}
                     </TouchableOpacity>
                 )}
             </View>
@@ -1947,5 +2289,20 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         textAlign: 'center',
         marginTop: 8,
+    },
+    rowBetween: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+
+    editBtn: {
+        height: 24,
+        width: 24,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#EAF7F0',
     },
 });

@@ -31,6 +31,8 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
         workingRows = [],
 
+        isCustomShadeEdit = false,
+
         party = null,
         partyData = null,
         selectedParty = null,
@@ -286,33 +288,98 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     // };
 
     const onNext = (item) => {
-    const shadeData = item || selectedShade;
-    navigation.navigate('SalesOrderDetails', {
-        mode,
-        uid,
-        soNo,
-        soDate,
-        editMode,
-        editIndex,
-        editLineId,
-        oldRow,
-        selectedItem,
-        selectedGrade,
-        selectedShade: {
-            ShdCode: shadeData.ShdCode,
-            ShdName: shadeData.ShdName || shadeData.ShadeName || '',
-            Raw: shadeData,
-        },
-        workingRows,
-        party: finalParty,
-        partyData: finalParty,
-        selectedParty: finalParty,
-        prpcode,
-        strcode,
-        yearno,
-        token,
-    });
-};
+        const shadeData = item || selectedShade;
+        // if (editMode && oldRow && String(oldRow.ItmCode) === '-1') {
+        if (editMode && oldRow && isCustomShadeEdit) {
+            const nextRows = (workingRows || []).map(row => {
+                const sameLine =
+                    String(row.LineId || '') === String(oldRow.LineId || '') ||
+                    Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+
+                if (!sameLine) return row;
+
+                return {
+                    ...row,
+                    ShdCode: shadeData.ShdCode,
+                    ShdName: shadeData.ShdName || shadeData.ShadeName || '',
+                };
+            });
+
+            // navigation.replace({
+            //     name: 'OrderSummaryScreen',
+            //     params: {
+            //         completedRows: nextRows,
+            //         editMode: true,
+            //         replaceItemOnlyDone: true,
+
+            //         mode,
+            //         uid,
+            //         screenMode: mode,
+            //         soNo,
+            //         soDate,
+
+            //         party: finalParty,
+            //         partyData: finalParty,
+            //         selectedParty: finalParty,
+
+            //         prpcode,
+            //         strcode,
+            //         yearno,
+            //         token,
+
+            //         skipReload: true,
+            //     },
+            //     merge: true,
+            // });
+            navigation.replace(
+                'OrderSummaryScreen',
+                {
+                    completedRows: nextRows,
+                    editMode: true,
+                    replaceItemOnlyDone: true,
+                    mode,
+                    uid,
+                    screenMode: mode,
+                    soNo,
+                    soDate,
+                    party: finalParty,
+                    partyData: finalParty,
+                    selectedParty: finalParty,
+                    prpcode,
+                    strcode,
+                    yearno,
+                    token,
+                    skipReload: true,
+                }
+            );
+            return;
+        }
+        navigation.navigate('SalesOrderDetails', {
+            mode,
+            uid,
+            soNo,
+            soDate,
+            editMode,
+            editIndex,
+            editLineId,
+            oldRow,
+            selectedItem,
+            selectedGrade,
+            selectedShade: {
+                ShdCode: shadeData.ShdCode,
+                ShdName: shadeData.ShdName || shadeData.ShadeName || '',
+                Raw: shadeData,
+            },
+            workingRows,
+            party: finalParty,
+            partyData: finalParty,
+            selectedParty: finalParty,
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
 
     const renderSkeleton = () => {
         return [1, 2, 3, 4, 5, 6].map(i => (
@@ -340,10 +407,10 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 activeOpacity={0.85}
                 style={[styles.card, isSelected && styles.selectedCard]}
                 onPress={() => onNext(item)}
-                // onPress={() => {
-                //     setSelectedShade(item);
-                //     onNext();
-                // }}
+            // onPress={() => {
+            //     setSelectedShade(item);
+            //     onNext();
+            // }}
             >
                 <View style={[styles.radio, isSelected && styles.radioActive]}>
                     {isSelected && <Icon name="check" size={16} color="#fff" />}

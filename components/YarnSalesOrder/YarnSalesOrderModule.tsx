@@ -15,7 +15,7 @@ import SalesOrderAddAnotherShade from './SalesOrderAddAnotherShade';
 import SalesOrderSaveSuccess from './SalesOrderSaveSuccess';
 import PdfViewerScreen from './PdfViewerScreen';
 import AddNewPartyScreen from './AddNewPartyScreen';
-
+import AddNewItemScreen from './AddNewItemScreen';
 
 ``
 const Stack = createNativeStackNavigator();
@@ -145,6 +145,16 @@ const YarnSalesOrderModule = props => {
                 <Stack.Screen name="AddNewPartyScreen">
                     {screenProps => (
                         <AddNewPartyScreen
+                            {...screenProps}
+                            token={props.token}
+                            isConnected={props.isConnected}
+                            username={props.username}
+                        />
+                    )}
+                </Stack.Screen>
+                <Stack.Screen name="AddNewItemScreen">
+                    {screenProps => (
+                        <AddNewItemScreen
                             {...screenProps}
                             token={props.token}
                             isConnected={props.isConnected}

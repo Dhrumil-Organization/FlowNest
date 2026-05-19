@@ -328,6 +328,16 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
         loadProperty();
     }, []);
 
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+        // Financial year starts in April
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2); // Return last two digits of the year
+    };
+
     let cancelToken: any;
 
     const getRequestConfig = (props: any) => ({
@@ -362,7 +372,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 referrer: 'dashboard',
                 // prptype: userPtype,
                 prptype: 'R',
-                yearno: yno,
+                // yearno: yno,
+                yearno: getCurrentFinancialYear(),
                 strcode: FormState.values.StrCode || '',
                 atype: 'B',
                 //strtype: 'Y',
@@ -377,16 +388,17 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
-            console.log("response", response)
+            console.log("response hereeeee", response)
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => ({
                     ...item,
-                    itemNameArray: []
+                    // itemNameArray: []
                 }));
                 setData(updatedData);
                 setAllHistoryDataYPO([]);
                 setAllVerifyDataYPO([]);
-            } else {
+            }
+            else {
                 setData([]);
             }
         } catch (error) {
@@ -422,7 +434,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 referrer: 'dashboard',
                 // prptype: userPtype,
                 prptype: 'R',
-                yearno: yno,
+                // yearno: yno,
+                 yearno: getCurrentFinancialYear(),
                 strcode: FormState.values.StrCode || '',
                 atype: 'h',
                 //strtype: 'Y',
@@ -433,7 +446,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
-             console.log("payload", payload)
+            console.log("payload", payload)
             console.log("response", response)
             if (response.data.success && response.data.response.data.length > 0) {
                 console.log('✅All History Data:', response.data.response.data);
@@ -478,7 +491,8 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
                 referrer: 'dashboard',
                 // prptype: userPtype,
                 prptype: 'R',
-                yearno: yno,
+                // yearno: yno,
+                 yearno: getCurrentFinancialYear(),
                 strcode: FormState.values.StrCode || '',
                 atype: 'A',
             };
@@ -730,20 +744,20 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             referrer: 'dashboard',
             itmcode: removed1.ItmCode,
             strcode: removed1.strCode,
-            yearno: "26",
+            yearno: getCurrentFinancialYear(),
             action: 'edit',
             txntype: 'app_item_master_auth',
             atype: "B"
         };
         const updatedItemVerifyPending = {
-             ...removed1,
+            ...removed1,
             remark: editableValuesYPO[removed1.ItmCode]?.aremark || (removed1.aremark || ''),
             prptype: "R",
             isauth: 0,
             referrer: 'dashboard',
             itmcode: removed1.ItmCode,
             strcode: removed1.strCode,
-            yearno: "26",
+            yearno: getCurrentFinancialYear(),
             action: 'edit',
             txntype: 'app_item_master_auth',
             atype: 'A',
@@ -756,7 +770,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             referrer: 'dashboard',
             itmcode: removed1.ItmCode,
             strcode: removed1.strCode,
-            yearno: "26",
+            yearno: getCurrentFinancialYear(),
             action: 'edit',
             txntype: 'app_item_master_auth',
             atype: "B"
@@ -770,7 +784,7 @@ const ItemAuthorization: React.FC<Props> = ({ token, navigation, isConnected, us
             referrer: 'dashboard',
             itmcode: removed1.ItmCode,
             strcode: removed1.strCode,
-            yearno: "26",
+            yearno: getCurrentFinancialYear(),
             action: 'edit',
             txntype: 'app_item_master_auth',
             atype: 'A',

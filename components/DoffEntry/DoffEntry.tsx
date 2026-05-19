@@ -108,10 +108,12 @@ const DoffEntry = ({ navigation, token, username }) => {
   // 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  const [getValidation, setValidation] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [itemToUpdate, setItemToUpdate] = useState(null);
   // 
   const [editableDoffData, setEditableDoffData] = useState({});
+  const [netWt, setNetWt] = useState('');
   // 
   const [minDate, setMinDate] = useState(new Date());
   const [maxDate, setMaxDate] = useState(new Date(new Date().getFullYear() + 10, 11, 31)); // Current year + 10 years
@@ -190,7 +192,11 @@ const DoffEntry = ({ navigation, token, username }) => {
       const data = await fetchAllPropertyData(token);
       setAllPropertyData(data);
 
-      if (data?.length) setAllPropertyData(data);
+      // if (data?.length) setAllPropertyData(data);
+      // Set the first property as selected by default
+      if (data && data.length > 0) {
+        setSelectedProperty(data[0]);
+      }
     };
 
     setTimeout(() => {
@@ -219,6 +225,9 @@ const DoffEntry = ({ navigation, token, username }) => {
         };
       });
       setEditableDoffData(initialData);
+      if (getAllDoffData.length > 1) {
+
+      }
     }
   }, [getAllDoffData]);
 
@@ -277,6 +286,10 @@ const DoffEntry = ({ navigation, token, username }) => {
         const allyeardata = await fetchAllYeardata(token, formData.PrpCode);
 
         setAllYearData(allyeardata);
+        // Select the first year by default
+        if (allyeardata && allyeardata.length > 0) {
+          setSelectedYear(allyeardata[0].YearName);
+        }
       };
 
       yearFunc();
@@ -325,11 +338,60 @@ const DoffEntry = ({ navigation, token, username }) => {
         const allstoredata = await fetchAllStoredata(token, prp, yr, txnType);
 
         setAllStoreData(allstoredata);
+        // Select the first store by default
+        if (allstoredata && allstoredata.length > 0) {
+          setSelectedStore(allstoredata[0]);
+        }
       };
 
       storeFunc();
     }
   }, [selectedYear, selectProperty, selectedProperty]);
+
+  useEffect(() => {
+    getMergeData();
+    const MergeFunc = async () => {
+
+      // Select the first year by default
+      if (getAllMerData && getAllMerData.length > 0) {
+        setSelectedMer(getAllMerData[0]);
+      }
+    };
+
+    MergeFunc();
+
+
+  }, [selectedYear, selectProperty, selectedProperty, selectedStore]);
+
+  useEffect(() => {
+    getItmData();
+    const ItemFunc = async () => {
+
+      // Select the first year by default
+      if (getAllItmData && getAllItmData.length > 0) {
+        setSelectedItm(getAllItmData[0]);
+      }
+    };
+
+    ItemFunc();
+
+
+  }, [selectedYear, selectProperty, selectedProperty, selectedStore, selectedMer]);
+
+  useEffect(() => {
+    getMachineData();
+    const MacFunc = async () => {
+
+      // Select the first year by default
+      if (getAllMachines && getAllMachines.length > 0) {
+        setSelectedMachines(getAllMachines[0]);
+      }
+    };
+
+    MacFunc();
+
+
+  }, [selectedYear, selectProperty, selectedProperty, selectedStore, selectedMer, selectedItm]);
 
   // Display date from YYYYMMDD string as DD/MM/YYYY
   const getDisplayDateFromYYYYMMDD = (dateStr) => {
@@ -409,24 +471,24 @@ const DoffEntry = ({ navigation, token, username }) => {
     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
 
-    if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
-      showWarning('Please select property');
-      return;
-    } else if (
-      typeof yearnumber3 == 'undefined' ||
-      yearnumber3 == null ||
-      yearnumber3 == ''
-    ) {
-      showWarning('Please select yaer');
-      return;
-    } else if (
-      typeof finalStrCode == 'undefined' ||
-      finalStrCode == null ||
-      finalStrCode == ''
-    ) {
-      showWarning('Please select store');
-      return;
-    }
+    // if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
+    //   showWarning('Please select property');
+    //   return;
+    // } else if (
+    //   typeof yearnumber3 == 'undefined' ||
+    //   yearnumber3 == null ||
+    //   yearnumber3 == ''
+    // ) {
+    //   showWarning('Please select yaer');
+    //   return;
+    // } else if (
+    //   typeof finalStrCode == 'undefined' ||
+    //   finalStrCode == null ||
+    //   finalStrCode == ''
+    // ) {
+    //   showWarning('Please select store');
+    //   return;
+    // }
 
     try {
       const payload = {
@@ -446,11 +508,12 @@ const DoffEntry = ({ navigation, token, username }) => {
         },
         params: payload,
       });
-      console.log("merge respo:", respo);
+      console.log("merge respo:", respo, payload);
 
       if (respo.data.success && respo.data.response.data.length > 0) {
         console.log('merge API success:', respo);
         setAllMerData(respo.data.response.data);
+        setSelectedMer(respo.data.response.data[0]);
       } else {
         console.log('merge API success false:', respo?.data);
       }
@@ -458,7 +521,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       console.log('merge api error:', error);
     }
 
-    setMerPickerVisible(true);
+    // setMerPickerVisible(true);
   };
 
   const getItmData = async () => {
@@ -467,31 +530,31 @@ const DoffEntry = ({ navigation, token, username }) => {
     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
     let finalmerCode = selectedMer ? selectedMer?.mercode : '';
 
-    if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
-      showWarning('Please select property');
-      return;
-    } else if (
-      typeof yearnumber3 == 'undefined' ||
-      yearnumber3 == null ||
-      yearnumber3 == ''
-    ) {
-      showWarning('Please select yaer');
-      return;
-    } else if (
-      typeof finalStrCode == 'undefined' ||
-      finalStrCode == null ||
-      finalStrCode == ''
-    ) {
-      showWarning('Please select store');
-      return;
-    } else if (
-      typeof finalmerCode == 'undefined' ||
-      finalmerCode == null ||
-      finalmerCode == ''
-    ) {
-      showWarning('Please select Merge');
-      return;
-    }
+    // if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
+    //   showWarning('Please select property');
+    //   return;
+    // } else if (
+    //   typeof yearnumber3 == 'undefined' ||
+    //   yearnumber3 == null ||
+    //   yearnumber3 == ''
+    // ) {
+    //   showWarning('Please select yaer');
+    //   return;
+    // } else if (
+    //   typeof finalStrCode == 'undefined' ||
+    //   finalStrCode == null ||
+    //   finalStrCode == ''
+    // ) {
+    //   showWarning('Please select store');
+    //   return;
+    // } else if (
+    //   typeof finalmerCode == 'undefined' ||
+    //   finalmerCode == null ||
+    //   finalmerCode == ''
+    // ) {
+    //   showWarning('Please select Merge');
+    //   return;
+    // }
 
     try {
       const payload = {
@@ -517,6 +580,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       if (respo.data.success && respo.data.response.data.length > 0) {
         console.log('itm API success:', respo);
         setAllItmData(respo.data.response.data);
+        setSelectedItm(respo.data.response.data[0]);
       } else {
         console.log('itm API success false:', respo?.data);
       }
@@ -524,7 +588,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       console.log('itm api error:', error);
     }
 
-    setItmPickerVisible(true);
+    // setItmPickerVisible(true);
   };
 
   const getMachineData = async () => {
@@ -534,24 +598,24 @@ const DoffEntry = ({ navigation, token, username }) => {
     let finalmerCode = selectedMer ? selectedMer?.mercode : '';
     let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
 
-    if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
-      showWarning('Please select property');
-      return;
-    } else if (
-      typeof yearnumber3 == 'undefined' ||
-      yearnumber3 == null ||
-      yearnumber3 == ''
-    ) {
-      showWarning('Please select yaer');
-      return;
-    } else if (
-      typeof finalStrCode == 'undefined' ||
-      finalStrCode == null ||
-      finalStrCode == ''
-    ) {
-      showWarning('Please select store');
-      return;
-    }
+    // if (typeof prp3 == 'undefined' || prp3 == null || prp3 == '') {
+    //   showWarning('Please select property');
+    //   return;
+    // } else if (
+    //   typeof yearnumber3 == 'undefined' ||
+    //   yearnumber3 == null ||
+    //   yearnumber3 == ''
+    // ) {
+    //   showWarning('Please select yaer');
+    //   return;
+    // } else if (
+    //   typeof finalStrCode == 'undefined' ||
+    //   finalStrCode == null ||
+    //   finalStrCode == ''
+    // ) {
+    //   showWarning('Please select store');
+    //   return;
+    // }
 
     try {
       const payload = {
@@ -578,6 +642,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       if (respo.data.success && respo.data.response.data.length > 0) {
         console.log('machine API success:', respo);
         setAllMachines(respo.data.response.data);
+        setSelectedMachines(respo.data.response.data[0]);
       } else {
         console.log('machine API success false:', respo?.data);
       }
@@ -585,7 +650,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       console.log('machine api error:', error);
     }
 
-    setMachinePickerVisible(true);
+    // setMachinePickerVisible(true);
   };
 
   const showData = async (selectedMachines) => {
@@ -653,7 +718,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       }
     }
 
-    setFilterVisible(false);
+    // setFilterVisible(false);
   };
 
   const createMergedPayload = (firstData, secondData) => {
@@ -732,8 +797,8 @@ const DoffEntry = ({ navigation, token, username }) => {
     // Final payload
     const finalPayload = {
       ...mergedPayload,
-      totcones: mergedPayload.totchees || 0,
-      tottareqty: (mergedPayload.totgrsqty - mergedPayload.totnetqty).toString(),  // Add this
+      // totcones: mergedPayload.totchees || 0,
+      // tottareqty: mergedPayload.tottareqty.toString() || 0,  // Add this
       startdate: formattedStartDate,
       starttime: formattedStartTime,
       startdatetime: combinedDateTime.toISOString(),
@@ -747,7 +812,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       itmcode: finalitmCode,
       txntype: 'mobile_doff_entry'
     };
-
+    console.log('📤 doff Add PAYLOAD:', finalPayload);
     // Only add machine fields if they are not already in mergedPayload
     if (getSelectedFilteredMachine && getSelectedFilteredMachine[0]) {
       const machine = getSelectedFilteredMachine[0];
@@ -760,7 +825,7 @@ const DoffEntry = ({ navigation, token, username }) => {
       // if (!finalPayload.powerconsumption) finalPayload.powerconsumption = machine.powerconsumption || null;
     }
 
-    console.log('📤 doff Add PAYLOAD:', finalPayload);
+
 
     try {
       const response = await axios.post(
@@ -837,7 +902,16 @@ const DoffEntry = ({ navigation, token, username }) => {
         totnetqty: firstIncompleteDoff.totnetqty,  // Add this
         totgrsqty: firstIncompleteDoff.totgrsqty,  // Add this
         islastdoff: firstIncompleteDoff.islastdoff,  // Add this
-        tottareqty: (firstIncompleteDoff.totgrsqty - firstIncompleteDoff.totnetqty).toString(),  // Add this
+        tottareqty: firstIncompleteDoff.tottareqty,  // Add this
+        // tottareqty: isNaN(
+        //   (parseFloat(firstIncompleteDoff.totchees) || 0) *
+        //   (parseFloat(firstIncompleteDoff.coneweight) || 0)
+        // )
+        //   ? "0"
+        //   : (
+        //     (parseFloat(firstIncompleteDoff.totchees) || 0) *
+        //     (parseFloat(firstIncompleteDoff.coneweight) || 0)
+        //   ).toString(),
         d1: [],
         d2: [],
         // Include all other fields from the original firstIncompleteDoff
@@ -888,9 +962,10 @@ const DoffEntry = ({ navigation, token, username }) => {
     setShowDeleteConfirm(true); // Show confirmation modal
   };
 
-  const handleDoffUpdate = (item) => {
+  const handleDoffUpdate = (item, validation = false) => {
     setItemToUpdate(item); // Store the item to delete
     setShowUpdateConfirm(true); // Show confirmation modal
+    setValidation(validation);
   };
   console.log('===getAllDoffData===', getAllDoffDataNew, getSelectedFilteredMachine);
   // const (editableDoffData[selectedDoffId] || {}) =
@@ -1290,9 +1365,10 @@ const DoffEntry = ({ navigation, token, username }) => {
               renderItem={({ item, index }) => {
                 const doffId = item.uid || index;
                 const currentEditableData = editableDoffData[doffId] || {};
+                const isFirstItem = index === 0;
 
                 // --- Editable Text Component (prevents focus loss) ---
-                const EditableText = ({ field, value, placeholder }) => {
+                const EditableText = ({ field, value, placeholder, editable = true }) => {
                   const [localValue, setLocalValue] = useState(value);
                   useEffect(() => {
                     setLocalValue(value);
@@ -1301,6 +1377,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                     <TextInput
                       style={styles.dateTimePickerButton}
                       value={localValue}
+                      editable={editable}
                       onChangeText={setLocalValue}
                       onBlur={() => {
                         if (localValue !== value) {
@@ -1347,6 +1424,23 @@ const DoffEntry = ({ navigation, token, username }) => {
                     [doffId]: { ...currentEditableData, [field]: value },
                   };
 
+                  if (field === 'totchees' || field === 'totgrsqty') {
+                    const chees = parseFloat(newEditableData[doffId]?.totchees || item.totchees || 0);
+                    const grossWt = parseFloat(newEditableData[doffId]?.totgrsqty || item.totgrsqty || 0);
+                    const coneWeight = parseFloat(item.coneweight || 0); // Assuming `coneweight` is available in `item`
+
+                    // Calculate Tare Weight = Chees * Cone Weight
+                    const tareWt = chees * coneWeight;
+                    newEditableData[doffId].tottareqty = tareWt.toString();
+
+                    // Calculate Net Weight = Gross Weight - Tare Weight
+                    const netWt = grossWt - tareWt;
+                    newEditableData[doffId].totnetqty = netWt.toString();
+
+                    // Update the `netWt` state (if you're using it elsewhere)
+                    setNetWt(netWt.toString());
+                  }
+
                   // If field is 'startdate' or 'enddate', validate
                   if (field === 'startdate' || field === 'enddate') {
                     const startDate = newEditableData[doffId]?.startdate || item.startdate;
@@ -1358,7 +1452,6 @@ const DoffEntry = ({ navigation, token, username }) => {
                       return; // Do not update state if invalid
                     }
                   }
-
                   setEditableDoffData(newEditableData);
                 };
                 // --- Date/Time picker helpers (using YYYYMMDD) ---
@@ -1401,11 +1494,13 @@ const DoffEntry = ({ navigation, token, username }) => {
                     {/* Header */}
                     <View style={styles.compactHeader}>
                       <Text style={styles.compactTitle}>Doff #{item.doffno}</Text>
-                      <View style={styles.shiftBadgeContainer}>
-                        <TouchableOpacity onPress={() => handleDoffDelete(item)}>
-                          <Icon name="delete" size={20} color="red" />
-                        </TouchableOpacity>
-                      </View>
+                      {isFirstItem && (
+                        <View style={styles.shiftBadgeContainer}>
+                          <TouchableOpacity onPress={() => handleDoffDelete(item)}>
+                            <Icon name="delete" size={20} color="red" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
 
                     {/* Static Grid */}
@@ -1589,6 +1684,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                         <Text style={styles.compactLabel}>Chees</Text>
                         <EditableText
                           field="totchees"
+                          style={styles.compactValue}
                           value={
                             currentEditableData.totchees !== undefined
                               ? currentEditableData.totchees
@@ -1613,6 +1709,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                         <Text style={styles.compactLabel}>Net Wt.</Text>
                         <EditableText
                           field="totnetqty"
+                          editable={false}
                           value={
                             currentEditableData.totnetqty !== undefined
                               ? currentEditableData.totnetqty
@@ -1638,28 +1735,32 @@ const DoffEntry = ({ navigation, token, username }) => {
 
                     {/* Footer */}
                     <View style={styles.compactFooter}>
-                      <View style={styles.switchRow}>
-                        <Text style={styles.lastDoffText}>Last Doff</Text>
-                        <Switch
-                          value={
-                            currentEditableData.islastdoff !== undefined
-                              ? currentEditableData.islastdoff === '1' || currentEditableData.islastdoff === 1 || currentEditableData.islastdoff === true
-                              : (item.islastdoff === '1' || item.islastdoff === 1)
-                          }
-                          onValueChange={(newValue) => {
-                            // Store as '1' for true, '0' for false
-                            handleFieldChange('islastdoff', newValue ? '1' : '0');
-                          }}
-                          trackColor={{ false: '#ccc', true: '#0F6C7B' }}
-                          thumbColor="#fff"
-                        />
-                      </View>
-                      <TouchableOpacity
-                        style={styles.smallUpdateBtn}
-                        onPress={() => handleDoffUpdate(item)}
-                      >
-                        <Text style={styles.smallUpdateText}>UPDATE</Text>
-                      </TouchableOpacity>
+                      {isFirstItem && (
+                        <>
+                          <View style={styles.switchRow}>
+                            <Text style={styles.lastDoffText}>Last Doff</Text>
+                            <Switch
+                              value={
+                                currentEditableData.islastdoff !== undefined
+                                  ? currentEditableData.islastdoff === '1' || currentEditableData.islastdoff === 1 || currentEditableData.islastdoff === true
+                                  : (item.islastdoff === '1' || item.islastdoff === 1)
+                              }
+                              onValueChange={(newValue) => {
+                                // Store as '1' for true, '0' for false
+                                handleFieldChange('islastdoff', newValue ? '1' : '0');
+                              }}
+                              trackColor={{ false: '#ccc', true: '#0F6C7B' }}
+                              thumbColor="#fff"
+                            />
+                          </View>
+                          <TouchableOpacity
+                            style={styles.smallUpdateBtn}
+                            onPress={() => handleDoffUpdate(item, true)}
+                          >
+                            <Text style={styles.smallUpdateText}>UPDATE</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
                   </View>
                 );
@@ -1667,7 +1768,7 @@ const DoffEntry = ({ navigation, token, username }) => {
             />
           </ScrollView >
         ) : <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 16, fontWeight: '600' }}>No doffs found!</Text>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: 'black' }}>No doffs found!</Text>
         </View>}
 
       </View >
@@ -2157,7 +2258,8 @@ const DoffEntry = ({ navigation, token, username }) => {
               <Text style={styles.label}>Merge</Text>
               <TouchableOpacity
                 style={styles.inputBoxProperty}
-                onPress={getMergeData}
+                // onPress={getMergeData}
+                onPress={() => setMerPickerVisible(true)}
               >
                 <Text numberOfLines={1} style={{ color: '#000' }}>
                   {selectedMer?.mername || 'Select merge'}
@@ -2168,7 +2270,8 @@ const DoffEntry = ({ navigation, token, username }) => {
               <Text style={styles.label}>Item</Text>
               <TouchableOpacity
                 style={styles.inputBoxProperty}
-                onPress={getItmData}
+                // onPress={getItmData}
+                onPress={() => setItmPickerVisible(true)}
               >
                 <Text numberOfLines={1} style={{ color: '#000' }}>
                   {selectedItm?.itmname || 'Select item'}
@@ -2181,7 +2284,8 @@ const DoffEntry = ({ navigation, token, username }) => {
                 <Text style={styles.label}>Machine</Text>
                 <TouchableOpacity
                   style={styles.inputBox}
-                  onPress={getMachineData}
+                  // onPress={getMachineData}
+                  onPress={() => setMachinePickerVisible(true)}
                 >
                   <Text numberOfLines={1} style={{ color: '#000' }}>
                     {selectedMachines?.MacName || 'Select machine'}
@@ -2701,16 +2805,53 @@ const DoffEntry = ({ navigation, token, username }) => {
               <TouchableOpacity
                 onPress={async () => {
                   setShowUpdateConfirm(false);
+                  const doffId = itemToUpdate.uid || getAllDoffData.indexOf(itemToUpdate);
+                  const latestEditedData = editableDoffData[doffId] || {};
+                  // const Netvalue =
+                  //   (parseFloat(latestEditedData?.totgrsqty) || parseFloat(itemToUpdate?.totgrsqty) || 0) -
+                  //   (parseFloat(latestEditedData?.totnetqty) || parseFloat(itemToUpdate?.totnetqty) || 0);
+                  // const Netvalue =
+                  //   (parseFloat(latestEditedData?.totchees) || parseFloat(itemToUpdate?.totchees) || 0) *
+                  //   (parseFloat(latestEditedData?.coneweight) || parseFloat(itemToUpdate?.coneweight) || 0);
+
+
+                  if (getValidation) {
+                    if (latestEditedData.totchees === null || !latestEditedData.totchees || latestEditedData.totchees === '') {
+                      console.log('Chees value:', latestEditedData.totchees, itemToUpdate.totchees);
+                      if (itemToUpdate.totchees) {
+
+                      } else {
+                        showWarning('Please enter Chees');
+                        return;
+                      }
+                    }
+                    else if (latestEditedData.totgrsqty === null || !latestEditedData.totgrsqty || latestEditedData.totgrsqty === '') {
+                      console.log('Gross Wt.:', latestEditedData.totgrsqty, itemToUpdate.totgrsqty);
+                      if (itemToUpdate.totgrsqty) {
+
+                      } else {
+                        showWarning('Please enter Gross Wt.');
+                        return;
+                      }
+                    }
+                    // else if (latestEditedData.totnetqty === null || !latestEditedData.totnetqty || latestEditedData.totnetqty === '') {
+                    //   console.log('Net Wt.', latestEditedData.totnetqty, itemToUpdate.totnetqty);
+                    //   if (itemToUpdate.totnetqty) {
+
+                    //   } else {
+                    //     showWarning('Please enter Net Wt.');
+                    //     return;
+                    //   }
+                    // }
+                  }
                   try {
                     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
                     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
                     let finalStrCode = selectedStore ? selectedStore?.StrCode : '';
                     let finalmerCode = selectedMer ? selectedMer?.mercode : '';
                     let finalitmCode = selectedItm ? selectedItm?.itmcode : '';
-
                     // Get the latest edited data for this doff
-                    const doffId = itemToUpdate.uid || getAllDoffData.indexOf(itemToUpdate);
-                    const latestEditedData = editableDoffData[doffId] || {};
+
 
                     // Prepare the payload with the latest edited data
                     const finalPayload = {
@@ -2734,7 +2875,14 @@ const DoffEntry = ({ navigation, token, username }) => {
                       totcones: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
                       totchees: latestEditedData.totchees || itemToUpdate.totchees,  // Add this
                       totnetqty: latestEditedData.totnetqty || itemToUpdate.totnetqty,  // Add this
-                      tottareqty: (latestEditedData.totgrsqty - latestEditedData.totnetqty).toString() || (itemToUpdate.totgrsqty - itemToUpdate.totnetqty).toString(),  // Add this
+                      // tottareqty: (() => {
+                      //   const value =
+                      //     (parseFloat(latestEditedData?.totgrsqty) || parseFloat(itemToUpdate?.totgrsqty) || 0) -
+                      //     (parseFloat(latestEditedData?.totnetqty) || parseFloat(itemToUpdate?.totnetqty) || 0);
+
+                      //   return isNaN(value) || value === null ? "0" : value.toString();
+                      // })(),
+                      tottareqty: latestEditedData.tottareqty || itemToUpdate.tottareqty,
                       totgrsqty: latestEditedData.totgrsqty || itemToUpdate.totgrsqty,  // Add this
                       islastdoff: latestEditedData.islastdoff || itemToUpdate.islastdoff,  // Add this
                       d1: [],
@@ -2793,7 +2941,7 @@ const DoffEntry = ({ navigation, token, username }) => {
             </View>
           </View>
         </View>
-      </Modal>
+      </Modal >
 
     </>
   );
@@ -3469,6 +3617,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     marginTop: 2,
+    color: '#0F6C7B',
   },
 
   machineInfoCard: {

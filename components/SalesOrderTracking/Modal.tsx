@@ -104,7 +104,7 @@ export interface POTData {
 
 export type ItemStatus = 'All' | 'Open' | 'Closed';
 
-export type WiseStatus = 'Party Wise' | 'Design Wise';
+export type WiseStatus = 'Party Wise' | 'Item Wise';
 
 export interface LabelMap {
     [key: string]: {

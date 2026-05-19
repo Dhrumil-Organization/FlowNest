@@ -2326,81 +2326,85 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={styles.label}>Net Amount</Text>
                     <Text style={styles.value}>{item.NetAmt || '-'}</Text>
                 </View>
-
-                <View style={styles.row}>
-                    <Text style={styles.label}>Store</Text>
-                    <Text style={styles.value}>{item.StoreName || '-'}</Text>
-                </View>
-
+                {API === "https://apiy.tms-webapp.com" && (
+                    < View style={styles.row}>
+                        <Text style={styles.label}>Store</Text>
+                        <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                    </View>
+                )}
                 <View style={styles.row}>
                     <Text style={styles.label}>Auth By</Text>
                     <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
                 </View>
 
                 {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
-                {type === 'verify' && (
-                    <View style={styles.actionRow}>
-                        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#4CAF50' }]}>
-                            <Icon name="check" size={20} color="#fff" />
-                        </TouchableOpacity>
+                {
+                    type === 'verify' && (
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#4CAF50' }]}>
+                                <Icon name="check" size={20} color="#fff" />
+                            </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#F44336' }]}>
-                            <Icon name="close" size={20} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                )}
+                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#F44336' }]}>
+                                <Icon name="close" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )
+                }
 
-                {type === 'request' && (
-                    <View style={styles.actionRow}>
+                {
+                    type === 'request' && (
+                        <View style={styles.actionRow}>
 
-                        {/* ✅ ACCEPT */}
-                        <TouchableOpacity
-                            onPress={() => handleIconPress(item, 'accept')}
-                            disabled={!isConnected || item.IsAuth !== '0'}
-                        >
-                            <Icon
-                                name="check-circle"
-                                size={35}
-                                color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#4CAF50"}
-                            />
-                        </TouchableOpacity>
+                            {/* ✅ ACCEPT */}
+                            <TouchableOpacity
+                                onPress={() => handleIconPress(item, 'accept')}
+                                disabled={!isConnected || item.IsAuth !== '0'}
+                            >
+                                <Icon
+                                    name="check-circle"
+                                    size={35}
+                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#4CAF50"}
+                                />
+                            </TouchableOpacity>
 
-                        {/* ❌ REJECT */}
-                        <TouchableOpacity
-                            onPress={() => handleIconPress(item, 'reject')}
-                            disabled={!isConnected || item.IsAuth !== '0'}
-                        >
-                            <Icon
-                                name="cancel"
-                                size={35}
-                                color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#F44336"}
-                            />
-                        </TouchableOpacity>
+                            {/* ❌ REJECT */}
+                            <TouchableOpacity
+                                onPress={() => handleIconPress(item, 'reject')}
+                                disabled={!isConnected || item.IsAuth !== '0'}
+                            >
+                                <Icon
+                                    name="cancel"
+                                    size={35}
+                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#F44336"}
+                                />
+                            </TouchableOpacity>
 
-                        {/* 📄 FILE */}
-                        <TouchableOpacity
-                            onPress={() => {
-                                if (isConnected && item.IsAuth === '0') {
-                                    handleCallURL(item);
+                            {/* 📄 FILE */}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (isConnected && item.IsAuth === '0') {
+                                        handleCallURL(item);
+                                    }
+                                }}
+                                disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
+                            >
+                                {
+                                    getLocationLoading === item.UId ? (
+                                        <ActivityIndicator size={35} color="#2196F3" />
+                                    ) : (
+                                        <Icon
+                                            name="file-present"
+                                            size={35}
+                                            color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
+                                        />
+                                    )
                                 }
-                            }}
-                            disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
-                        >
-                            {
-                                getLocationLoading === item.UId ? (
-                                    <ActivityIndicator size={35} color="#2196F3" />
-                                ) : (
-                                    <Icon
-                                        name="file-present"
-                                        size={35}
-                                        color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
-                                    />
-                                )
-                            }
-                        </TouchableOpacity>
+                            </TouchableOpacity>
 
-                    </View>
-                )}
+                        </View>
+                    )
+                }
 
                 {/* 🔽 EXPAND */}
                 <TouchableOpacity
@@ -2419,64 +2423,66 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 </TouchableOpacity>
 
                 {/* 🔽 ITEMS */}
-                {expandedHistoryCards[item.UId] && (
-                    <View style={styles.itemContainer}>
-                        {item.d1?.map((d1Item, index) => (
+                {
+                    expandedHistoryCards[item.UId] && (
+                        <View style={styles.itemContainer}>
+                            {item.d1?.map((d1Item, index) => (
 
-                            <View key={index} style={styles.itemCard}>
+                                <View key={index} style={styles.itemCard}>
 
-                                <View style={styles.itemHeader}>
-                                    <Text style={styles.itemTitle}>
-                                        {d1Item.ItmName}
-                                    </Text>
+                                    <View style={styles.itemHeader}>
+                                        <Text style={styles.itemTitle}>
+                                            {d1Item.ItmName}
+                                        </Text>
 
-                                    {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
-                                    <TouchableOpacity
-                                        style={styles.chartBtn}
-                                        onPress={() => navigation.navigate('ChartScreen', {
-                                            item,
-                                            d1Item,
-                                            token
-                                        })}
-                                    >
-                                        <Icon name="bar-chart" size={18} color="#fff" />
-                                    </TouchableOpacity>
+                                        {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
+                                        <TouchableOpacity
+                                            style={styles.chartBtn}
+                                            onPress={() => navigation.navigate('ChartScreen', {
+                                                item,
+                                                d1Item,
+                                                token
+                                            })}
+                                        >
+                                            <Icon name="bar-chart" size={18} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={styles.itemGrid}>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Grade</Text>
+                                            <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Shade</Text>
+                                            <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Qty</Text>
+                                            <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Rate</Text>
+                                            <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Amount</Text>
+                                            <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                                        </View>
+
+                                    </View>
+
                                 </View>
-
-                                <View style={styles.itemGrid}>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Grade</Text>
-                                        <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Shade</Text>
-                                        <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Qty</Text>
-                                        <Text style={styles.itemValue}>{d1Item.Qty}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Rate</Text>
-                                        <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Amount</Text>
-                                        <Text style={styles.itemValue}>{d1Item.Amount}</Text>
-                                    </View>
-
-                                </View>
-
-                            </View>
-                        ))}
-                    </View>
-                )}
-            </View>
+                            ))}
+                        </View>
+                    )
+                }
+            </View >
         );
     };
 

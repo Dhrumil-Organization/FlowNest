@@ -1327,12 +1327,12 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     soNo: {
-        color: '#101828',
+        color: '#000',
         fontSize: 15,
         fontWeight: '900',
     },
     soDate: {
-        color: '#667085',
+        color: '#000',
         fontSize: 12,
         fontWeight: '600',
         marginTop: 3,
@@ -1374,7 +1374,7 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     partyTitle: {
-        color: '#101828',
+        color: '#000',
         fontSize: 14,
         fontWeight: '800',
     },
@@ -1384,7 +1384,7 @@ const styles = StyleSheet.create({
         marginTop: 5,
     },
     partyMetaText: {
-        color: '#667085',
+        color: '#000',
         fontSize: 12,
         fontWeight: '700',
         marginLeft: 5,
@@ -1402,7 +1402,7 @@ const styles = StyleSheet.create({
         width: 70,
     },
     proMiniLabel: {
-        color: '#667085',
+        color: '#000',
         fontSize: 11,
         fontWeight: '700',
     },
@@ -1523,14 +1523,14 @@ const styles = StyleSheet.create({
     modalTitle: {
         fontSize: 20,
         fontWeight: '900',
-        color: '#111827',
+        color: '#000',
         textAlign: 'center',
     },
 
     modalMessage: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#6B7280',
+        color: '#000',
         textAlign: 'center',
         marginTop: 10,
         lineHeight: 22,
@@ -1555,7 +1555,7 @@ const styles = StyleSheet.create({
     },
 
     noBtnText: {
-        color: '#374151',
+        color: '#000',
         fontWeight: '900',
     },
 
@@ -1600,7 +1600,7 @@ const styles = StyleSheet.create({
 
     successMessage: {
         fontSize: 14,
-        color: '#475467',
+        color: '#000',
         fontWeight: '700',
         textAlign: 'center',
         marginTop: 8,

@@ -8,6 +8,8 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  Modal,
+  FlatList
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { API } from '../../common/API/dynamicAPI';
@@ -37,7 +39,8 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
     selectedItem = null,
     selectedGrade = null,
-    selectedShade = null,
+    // selectedShade = null,
+    selectedShade = [],
 
     workingRows = [],
 
@@ -63,6 +66,12 @@ const SalesOrderDetails = ({ navigation, route }) => {
   const [rate, setRate] = useState('');
   const [remark, setRemark] = useState('');
   const [loading, setLoading] = useState(false);
+  // STATES ADD KARO
+  const [stockData, setStockData] = useState([]);
+  const [totalStockQty, setTotalStockQty] = useState(0);
+  const [stockModalVisible, setStockModalVisible] = useState(false);
+
+  console.log("remark", remark)
 
   let cancelToken: any;
 
@@ -90,7 +99,134 @@ const SalesOrderDetails = ({ navigation, route }) => {
     }
   }, [editMode, oldRow]);
 
+  // const onSave = () => {
+  //   if (!selectedItem?.ItmCode) {
+  //     Alert.alert('Required', 'Item missing');
+  //     return;
+  //   }
+
+  //   if (!selectedGrade?.GrdCode) {
+  //     Alert.alert('Required', 'Grade missing');
+  //     return;
+  //   }
+
+  //   // if (!selectedShade?.ShdCode) {
+  //   //   Alert.alert('Required', 'Shade missing');
+  //   //   return;
+  //   // }
+
+  //   if (!selectedShade || selectedShade.length === 0) {
+  //     Alert.alert('Required', 'Please select shade');
+  //     return;
+  //   }
+
+  //   if (num(qty) <= 0) {
+  //     Alert.alert('Required', 'Enter valid qty');
+  //     return;
+  //   }
+
+  //   if (num(rate) <= 0) {
+  //     Alert.alert('Required', 'Enter valid rate');
+  //     return;
+  //   }
+
+  //   const lineId =
+  //     editMode && oldRow?.LineId
+  //       ? oldRow.LineId
+  //       : editLineId || createLineId();
+
+  //   const newRow = {
+  //     LineId: lineId,
+  //     UId: stableUid,
+  //     Mode: stableMode,
+  //     SrNo:
+  //       editMode && oldRow?.SrNo
+  //         ? oldRow.SrNo
+  //         : workingRows.length + 1,
+
+  //     PrpCode: prpcode,
+  //     StrCode: strcode,
+  //     YearNo: yearno,
+
+  //     ItmCode: selectedItem?.ItmCode || '',
+  //     ItmName: selectedItem?.ItmName || '',
+  //     MItmCode: selectedItem?.MItmCode || selectedItem?.ItmCode || '',
+
+  //     GrdCode: selectedGrade?.GrdCode || '',
+  //     GrdName: selectedGrade?.GrdName || '',
+
+  //     ShdCode: selectedShade?.ShdCode || '',
+  //     ShdName: selectedShade?.ShdName || '',
+
+  //     Qty: num(qty),
+  //     Pcs: num(pcs),
+  //     Rate: num(rate),
+  //     Amount: num(amount),
+  //     Remark: remark,
+
+  //     RowKey: `${selectedItem?.ItmCode || ''}_${selectedGrade?.GrdCode || ''}_${selectedShade?.ShdCode || ''}`,
+  //   };
+
+  //   let updatedRows = [];
+
+  //   if (editMode && oldRow) {
+  //     const editLineId = oldRow.LineId || newRow.LineId;
+
+  //     let replaced = false;
+
+  //     updatedRows = workingRows.map(row => {
+  //       if (String(row.LineId) === String(editLineId)) {
+  //         replaced = true;
+  //         return { ...newRow, LineId: editLineId };
+  //       }
+  //       return row;
+  //     });
+
+  //     if (!replaced) {
+  //       updatedRows = [...workingRows, newRow];
+  //     }
+  //   } else {
+  //     const existsIndex = workingRows.findIndex(
+  //       x => makeRowKey(x) === makeRowKey(newRow),
+  //     );
+
+  //     if (existsIndex >= 0) {
+  //       Alert.alert(
+  //         'Duplicate Shade',
+  //         'This shade is already added for same item and design.',
+  //       );
+  //       return;
+  //     }
+
+  //     updatedRows = [...workingRows, newRow];
+  //   }
+
+  //   navigation.navigate('SalesOrderAddAnotherShade', {
+  //     mode: stableMode,
+  //     uid: stableUid,
+  //     soNo,
+  //     soDate,
+  //     editMode,
+  //     editIndex,
+  //     editLineId: lineId,
+  //     oldRow,
+  //     selectedItem,
+  //     selectedGrade,
+  //     selectedShade,
+  //     lastRow: newRow,
+  //     workingRows: updatedRows,
+  //     party: finalParty,
+  //     partyData: finalParty,
+  //     selectedParty: finalParty,
+  //     prpcode,
+  //     strcode,
+  //     yearno,
+  //     token,
+  //   });
+  // };
+
   const onSave = () => {
+
     if (!selectedItem?.ItmCode) {
       Alert.alert('Required', 'Item missing');
       return;
@@ -101,8 +237,9 @@ const SalesOrderDetails = ({ navigation, route }) => {
       return;
     }
 
-    if (!selectedShade?.ShdCode) {
-      Alert.alert('Required', 'Shade missing');
+    // MULTIPLE SHADE VALIDATION
+    if (!selectedShade || selectedShade.length === 0) {
+      Alert.alert('Required', 'Please select shade');
       return;
     }
 
@@ -116,141 +253,321 @@ const SalesOrderDetails = ({ navigation, route }) => {
       return;
     }
 
-    const lineId =
-      editMode && oldRow?.LineId
-        ? oldRow.LineId
-        : editLineId || createLineId();
+    let updatedRows = [...workingRows];
 
-    const newRow = {
-      LineId: lineId,
-      UId: stableUid,
-      Mode: stableMode,
-      SrNo:
-        editMode && oldRow?.SrNo
-          ? oldRow.SrNo
-          : workingRows.length + 1,
+    let latestRow = null;
 
-      PrpCode: prpcode,
-      StrCode: strcode,
-      YearNo: yearno,
+    // MULTIPLE SHADE LOOP
+    selectedShade.forEach((shadeItem, index) => {
 
-      ItmCode: selectedItem?.ItmCode || '',
-      ItmName: selectedItem?.ItmName || '',
-      MItmCode: selectedItem?.MItmCode || selectedItem?.ItmCode || '',
+      const lineId =
+        editMode && oldRow?.LineId
+          ? oldRow.LineId
+          : createLineId();
 
-      GrdCode: selectedGrade?.GrdCode || '',
-      GrdName: selectedGrade?.GrdName || '',
+      const newRow = {
 
-      ShdCode: selectedShade?.ShdCode || '',
-      ShdName: selectedShade?.ShdName || '',
+        LineId: lineId,
 
-      Qty: num(qty),
-      Pcs: num(pcs),
-      Rate: num(rate),
-      Amount: num(amount),
-      Remark: remark,
+        UId: stableUid,
 
-      RowKey: `${selectedItem?.ItmCode || ''}_${selectedGrade?.GrdCode || ''}_${selectedShade?.ShdCode || ''}`,
-    };
+        Mode: stableMode,
 
-    let updatedRows = [];
+        SrNo:
+          editMode && oldRow?.SrNo
+            ? oldRow.SrNo
+            : updatedRows.length + 1,
 
-    if (editMode && oldRow) {
-      const editLineId = oldRow.LineId || newRow.LineId;
+        PrpCode: prpcode,
 
-      let replaced = false;
+        StrCode: strcode,
 
-      updatedRows = workingRows.map(row => {
-        if (String(row.LineId) === String(editLineId)) {
-          replaced = true;
-          return { ...newRow, LineId: editLineId };
+        YearNo: yearno,
+
+        ItmCode: selectedItem?.ItmCode || '',
+
+        ItmName: selectedItem?.ItmName || '',
+
+        MItmCode:
+          selectedItem?.MItmCode ||
+          selectedItem?.ItmCode ||
+          '',
+
+        GrdCode: selectedGrade?.GrdCode || '',
+
+        GrdName: selectedGrade?.GrdName || '',
+
+        // MULTIPLE SHADE
+        ShdCode: shadeItem?.ShdCode || '',
+
+        ShdName:
+          shadeItem?.ShdName ||
+          shadeItem?.ShadeName ||
+          '',
+
+        Qty: num(qty),
+
+        Pcs: num(pcs),
+
+        Rate: num(rate),
+
+        Amount: num(amount),
+
+        Remark: remark,
+
+        RowKey:
+          `${selectedItem?.ItmCode || ''}_` +
+          `${selectedGrade?.GrdCode || ''}_` +
+          `${shadeItem?.ShdCode || ''}`,
+      };
+
+      latestRow = newRow;
+
+      // EDIT MODE
+      if (editMode && oldRow) {
+
+        const editLineId =
+          oldRow.LineId || newRow.LineId;
+
+        let replaced = false;
+
+        updatedRows = updatedRows.map(row => {
+
+          if (
+            String(row.LineId) ===
+            String(editLineId)
+          ) {
+            replaced = true;
+
+            return {
+              ...newRow,
+              LineId: editLineId,
+            };
+          }
+
+          return row;
+        });
+
+        if (!replaced) {
+          updatedRows.push(newRow);
         }
-        return row;
-      });
 
-      if (!replaced) {
-        updatedRows = [...workingRows, newRow];
-      }
-    } else {
-      const existsIndex = workingRows.findIndex(
-        x => makeRowKey(x) === makeRowKey(newRow),
-      );
+      } else {
 
-      if (existsIndex >= 0) {
-        Alert.alert(
-          'Duplicate Shade',
-          'This shade is already added for same item and design.',
+        // DUPLICATE CHECK
+        const existsIndex = updatedRows.findIndex(
+          x => makeRowKey(x) === makeRowKey(newRow),
         );
-        return;
+
+        if (existsIndex >= 0) {
+          return;
+        }
+
+        updatedRows.push(newRow);
       }
 
-      updatedRows = [...workingRows, newRow];
-    }
-
-    navigation.navigate('SalesOrderAddAnotherShade', {
-      mode: stableMode,
-      uid: stableUid,
-      soNo,
-      soDate,
-      editMode,
-      editIndex,
-      editLineId: lineId,
-      oldRow,
-      selectedItem,
-      selectedGrade,
-      selectedShade,
-      lastRow: newRow,
-      workingRows: updatedRows,
-      party: finalParty,
-      partyData: finalParty,
-      selectedParty: finalParty,
-      prpcode,
-      strcode,
-      yearno,
-      token,
     });
+
+    console.log("updatedRows", updatedRows);
+
+    navigation.navigate(
+      'SalesOrderAddAnotherShade',
+      {
+        mode: stableMode,
+        uid: stableUid,
+        soNo,
+        soDate,
+
+        editMode,
+        editIndex,
+
+        oldRow,
+
+        selectedItem,
+        selectedGrade,
+
+        // IMPORTANT
+        selectedShade,
+
+        lastRow: latestRow,
+
+        workingRows: updatedRows,
+
+        party: finalParty,
+        partyData: finalParty,
+        selectedParty: finalParty,
+
+        prpcode,
+        strcode,
+        yearno,
+        token,
+      }
+    );
   };
 
   const handleaddstock = async () => {
+
     const yrno = yearno ? yearno.slice(-2) : '';
+
     const userPtype = await AsyncStorage.getItem('user_prptype');
+
     try {
+
       setLoading(true);
-      const payload = {
-        prptype: userPtype,
-        prpcode,
-        strcode,
-        yearno: yrno,
-        itmcode: selectedItem.ItmCode,
-        grdcode: selectedGrade.GrdCode,
-        shdcode: selectedShade.ShdCode,
-      };
+      const shadeArray =
+        Array.isArray(selectedShade)
+          ? selectedShade
+          : [selectedShade];
 
-      console.log("stock payload:", payload);
+      const lastRow =
+        workingRows?.length > 0
+          ? workingRows[workingRows.length - 1]
+          : null;
 
-      const res = await axios.get(
-        `${API}/api/stockqty`,
-        getRequestConfig({ params: { ...payload } }),
+      const lastSrNo =
+        Number(lastRow?.SrNo || 0);
+
+      const d1 = shadeArray.map(
+        (shadeItem, index) => ({
+          // srno: lastSrNo + index + 1,
+          // itmcode:
+          //   selectedItem?.ItmCode || '',
+          // grdcode:
+          //   selectedGrade?.GrdCode || '',
+          // shdcode:
+          //   shadeItem?.ShdCode || '',
+          srno:
+            oldRow?.SrNo
+              ? Number(oldRow?.SrNo)
+              : lastSrNo + index + 1,
+
+          // itmcode:
+          //   oldRow?.SrNo
+          //     ? 
+          //     oldRow?.ItmCode || ''
+          //     : selectedItem?.ItmCode || '',
+
+          // grdcode:
+          //   oldRow?.SrNo
+          //     ? oldRow?.GrdCode || ''
+          //     : selectedGrade?.GrdCode || '',
+
+          // shdcode:
+          //   oldRow?.SrNo
+          //     ? oldRow?.ShdCode || ''
+          //     : shadeItem?.ShdCode || '',
+          itmcode:
+            selectedItem?.ItmCode ||
+            oldRow?.ItmCode ||
+            '',
+
+          grdcode:
+            selectedGrade?.GrdCode ||
+            oldRow?.GrdCode ||
+            '',
+
+          shdcode:
+            shadeItem?.ShdCode ||
+            oldRow?.ShdCode ||
+            '',
+        })
       );
 
-      console.log("stock Response:", res);
+      const selectedd1 =
+        workingRows?.length > 0
+          ? workingRows.map(row => ({
+
+            srno:
+              row?.SrNo || 0,
+
+            itmcode:
+              row?.ItmCode || '',
+
+            grdcode:
+              row?.GrdCode || '',
+
+            shdcode:
+              row?.ShdCode || '',
+          }))
+          : [];
+
+      const payload = {
+
+        prptype: userPtype,
+
+        prpcode,
+
+        strcode,
+
+        yearno: yrno,
+
+        d1,
+
+        selectedd1,
+
+      };
+
+      console.log(
+        'stock payload:', JSON.stringify(payload, null, 2)
+      );
+
+      const res = await axios.post(
+        `${API}/api/get_so_current_stock`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+            Accept: 'application/json', 'x-platform': 'mob',
+          },
+        });
+
+      console.log('stock Response:', res);
+
+      // const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
 
       const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
-      // setShades(Array.isArray(data) ? data : []);
+
+      console.log('stock data:', data);
+
+      const stockRows = data?.stockdata || [];
+
+      setStockData(stockRows);
+
+      const totalQty = stockRows.reduce(
+        (sum, item) => sum + Number(item?.StkQty || 0),
+        0
+      );
+
+      setTotalStockQty(totalQty);
+
+      console.log('TOTAL STOCK:', totalQty);
+
+      console.log('stock data:', data);
+
     } catch (error) {
+
       console.log('get stock ERROR:', error?.response?.data || error.message);
-      Alert.alert('Error', 'Unable to stock');
-      // setShades([]);
+
+      Alert.alert('Error', 'Unable to get stock');
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
-  // useEffect(() => {
-  //   if (selectedItem?.ItmCode && selectedGrade?.GrdCode && selectedShade?.ShdCode) {
-  //     handleaddstock();
-  //   }
-  // }, []);
+  useEffect(() => {
+
+    const shadeArray = Array.isArray(selectedShade)
+      ? selectedShade
+      : [selectedShade];
+
+    if (selectedItem?.ItmCode && selectedGrade?.GrdCode && shadeArray?.length > 0) {
+      handleaddstock();
+    }
+
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -266,6 +583,97 @@ const SalesOrderDetails = ({ navigation, route }) => {
         <View style={{ width: 22 }} />
       </View>
 
+
+      {/* STOCK DETAILS MODAL */}
+      <Modal
+        visible={stockModalVisible}
+        transparent
+        animationType="slide"
+      >
+        <View style={styles.modalContainer}>
+
+          <View style={styles.modalContent}>
+
+            {/* HEADER */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Stock Details
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => setStockModalVisible(false)}
+              >
+                <Icon name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            {/* LIST */}
+            {/* <FlatList
+              data={stockData}
+              keyExtractor={(item, index) => index.toString()}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <View style={styles.stockCard}>
+
+                  <View style={styles.stockTopRow}>
+                    <Text style={styles.stockMer}>
+                      {item?.MerCode}
+                    </Text>
+
+                    <Text style={styles.stockQty}>
+                      {Number(item?.StkQty || 0).toFixed(3)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.stockName}>
+                    {item?.MerName}
+                  </Text>
+
+                  <View style={styles.stockBottomRow}>
+                    <Text style={styles.stockSmall}>
+                      Carton : {item?.TotCarton}
+                    </Text>
+
+                  </View>
+
+                </View>
+              )}
+            /> */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 400 }}
+            >
+              {stockData?.map((item, index) => (
+                <View key={index} style={styles.stockCard}>
+
+                  <View style={styles.stockTopRow}>
+                    <Text style={styles.stockMer}>
+                      {item?.MerCode}
+                    </Text>
+
+                    <Text style={styles.stockQty}>
+                      {Number(item?.StkQty || 0).toFixed(3)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.stockName}>
+                    {item?.MerName}
+                  </Text>
+
+                  <View style={styles.stockBottomRow}>
+                    <Text style={styles.stockSmall}>
+                      Carton : {item?.TotCarton}
+                    </Text>
+                  </View>
+
+                </View>
+              ))}
+            </ScrollView>
+
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.infoBox}>
           <Text style={styles.label}>Item</Text>
@@ -280,8 +688,42 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
           <Text style={styles.label}>Shade</Text>
           <Text style={styles.value}>
-            {selectedShade?.ShdCode} - {selectedShade?.ShdName}
+            {/* {selectedShade?.ShdCode} - {selectedShade?.ShdName}            */}
+            {/* <Text style={styles.value}>
+              {selectedShade?.map((x, i) => (
+                <Text key={i} style={styles.value}>
+                  {x?.ShdCode} - {x?.ShdName || x?.ShadeName}
+                </Text>
+              ))}
+            </Text> */}
+            <Text style={styles.value1}>
+              {selectedShade
+                ?.map(
+                  x =>
+                    `${x?.ShdCode} - ${x?.ShdName || x?.ShadeName}`
+                )
+                .join(', ')}
+            </Text>
           </Text>
+        </View>
+
+        {/* TOTAL STOCK */}
+        <View style={styles.stockRow}>
+          <View>
+            <Text style={styles.stockLabel}>Available Stock</Text>
+
+            <Text style={styles.stockValue}>
+              {Number(totalStockQty).toFixed(3)}
+            </Text>
+          </View>
+
+          {/* INFO BUTTON */}
+          <TouchableOpacity
+            style={styles.infoBtn}
+            onPress={() => setStockModalVisible(true)}
+          >
+            <Icon name="info-outline" size={22} color="#13879A" />
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.inputLabel}>Qty</Text>
@@ -376,6 +818,14 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 3,
   },
+  value1: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '900',
+    flexWrap: 'wrap',
+    flexShrink: 1,
+    marginTop: 3,
+  },
   inputLabel: {
     marginTop: 12,
     marginBottom: 6,
@@ -416,5 +866,109 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '900',
+  },
+  stockRow: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  stockLabel: {
+    fontSize: 10,
+    color: '#000',
+    fontWeight: '800',
+  },
+
+  stockValue: {
+    fontSize: 20,
+    color: '#13879A',
+    fontWeight: '900',
+    marginTop: 4,
+  },
+
+  infoBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#E8F7FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 16,
+    maxHeight: '70%',
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#101828',
+  },
+
+  stockCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E4E7EF',
+  },
+
+  stockTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  stockMer: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#101828',
+  },
+
+  stockQty: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#13879A',
+  },
+
+  stockName: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#475467',
+    fontWeight: '700',
+  },
+
+  stockBottomRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  stockSmall: {
+    fontSize: 12,
+    color: '#667085',
+    fontWeight: '700',
   },
 });

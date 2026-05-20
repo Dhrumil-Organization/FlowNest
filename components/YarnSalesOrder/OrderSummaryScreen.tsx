@@ -269,8 +269,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [ddays, setDdays] = useState(
         String(headerData?.DDays || '0'),
     );
+    // const [ddate, setDdate] = useState(
+    //     String(headerData?.DDays || '0'),
+    // );
     const [ddate, setDdate] = useState(
-        String(headerData?.DDays || '0'),
+        String(headerData?.DDate || ''),
     );
     const [tax, setTax] = useState(String(headerData?.TaxPercent || '0'));
     const [remark, setRemark] = useState(headerData?.Remark || '');
@@ -1330,10 +1333,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const printSalesOrderPdf = async (format = 'ROne') => {
         try {
             setPdfLoading(true);
-
+            const yno = yearno ? yearno.slice(-2) : '';
             const payload = {
                 prpcode,
-                yearno,
+                yearno: yno,
                 strcode,
                 uid,
                 printTypes: ['sales_order'],
@@ -1448,11 +1451,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             </TouchableOpacity>
                         </View>
 
-                        {!!item.Remark && (
-                            <Text style={styles.remarkText}>
-                                Remark : {item.Remark}
-                            </Text>
-                        )}
+                        {/* {!!item.Remark && ( */}
+                        <Text style={styles.remarkText}>
+                            Remark : {item.Remark}
+                        </Text>
+                        {/* )} */}
                     </View>
 
                     <TouchableOpacity
@@ -1505,23 +1508,73 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         );
     };
 
+    // useEffect(() => {
+    //     const days = Number(ddays || 0);
+    //     let baseDate = new Date();
+    //     if (soDate) {
+    //         const parts = soDate.split('-');
+
+    //         baseDate = new Date(
+    //             parts[2],
+    //             parts[1] - 1,
+    //             parts[0],
+    //         );
+    //     }
+    //     baseDate.setDate(baseDate.getDate() + days);
+    //     const day = String(baseDate.getDate()).padStart(2, '0');
+    //     const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+    //     const year = baseDate.getFullYear();
+    //     setDdate(`${day}-${month}-${year}`);
+    // }, [ddays, soDate]);
+
     useEffect(() => {
-        const days = Number(ddays || 0);
+
+        // INVALID VALUE
+        if (
+            ddays === '' ||
+            ddays === null ||
+            ddays === undefined
+        ) {
+            return;
+        }
+
+        const days = Number(ddays);
+
+        if (isNaN(days)) {
+            return;
+        }
+
         let baseDate = new Date();
+
+        // SO DATE AVAILABLE
         if (soDate) {
+
             const parts = soDate.split('-');
 
-            baseDate = new Date(
-                parts[2],
-                parts[1] - 1,
-                parts[0],
-            );
+            if (parts.length === 3) {
+
+                baseDate = new Date(
+                    Number(parts[2]),
+                    Number(parts[1]) - 1,
+                    Number(parts[0]),
+                );
+            }
         }
+
         baseDate.setDate(baseDate.getDate() + days);
+
         const day = String(baseDate.getDate()).padStart(2, '0');
         const month = String(baseDate.getMonth() + 1).padStart(2, '0');
         const year = baseDate.getFullYear();
-        setDdate(`${day}-${month}-${year}`);
+
+        const finalDate = `${day}-${month}-${year}`;
+
+        // IMPORTANT
+        // ONLY UPDATE IF DIFFERENT
+        if (finalDate !== ddate) {
+            setDdate(finalDate);
+        }
+
     }, [ddays, soDate]);
 
     if (loadingOrder) {
@@ -1714,7 +1767,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         <Text style={styles.staticAmount}>₹ {money(totals.totalAmount)}</Text>
                     </View>
 
-                    <View style={styles.inputRow}>
+                    {/* <View style={styles.inputRow}>
                         <Text style={styles.inputLabel}>Discount ₹</Text>
                         <TextInput
                             value={discount}
@@ -1744,7 +1797,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     <View style={styles.grandRow}>
                         <Text style={styles.grandLabel}>Net Amount</Text>
                         <Text style={styles.grandAmount}>₹ {money(grandTotal)}</Text>
-                    </View>
+                    </View> */}
 
                     <TextInput
                         value={remark}

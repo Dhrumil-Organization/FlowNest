@@ -262,7 +262,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
     console.log("soNo", soNo);
 
-    console.log("autoLocked", autoLocked);
+    console.log("autoLocked", autoLocked, mode);
 
     useEffect(() => {
         if (skipReload) {
@@ -1182,10 +1182,17 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
 
                 <Text style={styles.headerTitle}>
-                    {Number(autoLocked) == 1 ? 'Authorised Sales Order'
+                    {/* {Number(autoLocked) == 1 ? 'Authorised Sales Order'
                         : mode === 'EDIT' || uid > 0
                             ? 'Modify Sales Order'
-                            : 'New Sales Order'}
+                            : 'New Sales Order'} */}
+                    {isViewMode || mode === 'VIEW'
+                        ? 'View Sales Order'
+                        : Number(autoLocked) == 1
+                            ? 'Authorised Sales Order'
+                            : mode === 'EDIT' || uid > 0
+                                ? 'Modify Sales Order'
+                                : 'New Sales Order'}
                 </Text>
 
                 <View style={{ width: 22 }} />
@@ -1452,7 +1459,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                         onPress={() => printSalesOrderPdf('SOne')}
                         disabled={pdfLoading}
                     >
-                         <Icon
+                        <Icon
                             name="print"
                             size={16}
                             color="#fff"

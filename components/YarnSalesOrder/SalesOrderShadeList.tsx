@@ -51,8 +51,11 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
     const [search, setSearch] = useState('');
     const [shades, setShades] = useState([]);
-    const [selectedShade, setSelectedShade] = useState(null);
+    // const [selectedShade, setSelectedShade] = useState(null);
+    const [selectedShade, setSelectedShade] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    console.log("selectedShade", selectedShade)
 
     let cancelToken: any;
 
@@ -287,11 +290,39 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //     });
     // };
 
-    const onNext = (item) => {
-        const shadeData = item || selectedShade;
-        // if (editMode && oldRow && String(oldRow.ItmCode) === '-1') {
+    useEffect(() => {
+        if (editMode && oldRow?.ShdCode) {
+
+            const oldShade =
+                shades.find(
+                    x => String(x.ShdCode) === String(oldRow.ShdCode),
+                ) || {
+                    ShdCode: oldRow.ShdCode,
+                    ShdName: oldRow.ShdName,
+                    ShadeName: oldRow.ShdName,
+                };
+
+            // IMPORTANT
+            setSelectedShade([oldShade]);
+        }
+    }, [editMode, oldRow, shades]);
+
+    const onNext = () => {
+
+        // const shadeData = item || selectedShade;
+        const shadeData = selectedShade;
+
+        // always convert into array
+        const finalShadeData = Array.isArray(shadeData)
+            ? shadeData
+            : [shadeData];
+
+        console.log("finalShadeData", finalShadeData);
+
         if (editMode && oldRow && isCustomShadeEdit) {
+
             const nextRows = (workingRows || []).map(row => {
+
                 const sameLine =
                     String(row.LineId || '') === String(oldRow.LineId || '') ||
                     Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
@@ -300,37 +331,14 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
                 return {
                     ...row,
-                    ShdCode: shadeData.ShdCode,
-                    ShdName: shadeData.ShdName || shadeData.ShadeName || '',
+                    ShdCode: finalShadeData[0]?.ShdCode,
+                    ShdName:
+                        finalShadeData[0]?.ShdName ||
+                        finalShadeData[0]?.ShadeName ||
+                        '',
                 };
             });
 
-            // navigation.replace({
-            //     name: 'OrderSummaryScreen',
-            //     params: {
-            //         completedRows: nextRows,
-            //         editMode: true,
-            //         replaceItemOnlyDone: true,
-
-            //         mode,
-            //         uid,
-            //         screenMode: mode,
-            //         soNo,
-            //         soDate,
-
-            //         party: finalParty,
-            //         partyData: finalParty,
-            //         selectedParty: finalParty,
-
-            //         prpcode,
-            //         strcode,
-            //         yearno,
-            //         token,
-
-            //         skipReload: true,
-            //     },
-            //     merge: true,
-            // });
             navigation.replace(
                 'OrderSummaryScreen',
                 {
@@ -352,8 +360,10 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     skipReload: true,
                 }
             );
+
             return;
         }
+
         navigation.navigate('SalesOrderDetails', {
             mode,
             uid,
@@ -365,11 +375,13 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             oldRow,
             selectedItem,
             selectedGrade,
-            selectedShade: {
-                ShdCode: shadeData.ShdCode,
-                ShdName: shadeData.ShdName || shadeData.ShadeName || '',
-                Raw: shadeData,
-            },
+
+            selectedShade: finalShadeData.map(x => ({
+                ShdCode: x?.ShdCode,
+                ShdName: x?.ShdName || x?.ShadeName || '',
+                Raw: x,
+            })),
+
             workingRows,
             party: finalParty,
             partyData: finalParty,
@@ -393,11 +405,51 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         ));
     };
 
+    // const handleShadeSelect = (item) => {
+    //     const alreadySelected = selectedShade?.some(
+    //         x => String(x.ShdCode) === String(item.ShdCode)
+    //     );
+
+    //     if (alreadySelected) {
+    //         setSelectedShade(prev =>
+    //             prev.filter(
+    //                 x => String(x.ShdCode) !== String(item.ShdCode)
+    //             )
+    //         );
+    //     } else {
+    //         setSelectedShade(prev => [...prev, item]);
+    //     }
+    // };
+
+    const handleShadeSelect = (item) => {
+        if (editMode) {
+            setSelectedShade([item]);
+            return;
+        }
+
+        const alreadySelected = selectedShade?.some(
+            x => String(x.ShdCode) === String(item.ShdCode)
+        );
+
+        if (alreadySelected) {
+            setSelectedShade(prev =>
+                prev.filter(
+                    x => String(x.ShdCode) !== String(item.ShdCode)
+                )
+            );
+        } else {
+            setSelectedShade(prev => [...prev, item]);
+        }
+    };
+
     const renderItem = ({ item }) => {
         const shdCode = item.ShdCode;
         const shdName = item.ShdName || item.ShadeName || '';
 
-        const isSelected = String(selectedShade?.ShdCode) === String(shdCode);
+        // const isSelected = String(selectedShade?.ShdCode) === String(shdCode);
+        const isSelected = selectedShade?.some(
+            x => String(x.ShdCode) === String(shdCode)
+        );
 
         const isOld =
             editMode && oldRow && String(oldRow.ShdCode) === String(shdCode);
@@ -406,11 +458,11 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             <TouchableOpacity
                 activeOpacity={0.85}
                 style={[styles.card, isSelected && styles.selectedCard]}
-                onPress={() => onNext(item)}
-            // onPress={() => {
-            //     setSelectedShade(item);
-            //     onNext();
-            // }}
+                // onPress={() => onNext(item)}
+                // onPress={() => {
+                //     setSelectedShade(item);
+                // }}
+                onPress={() => handleShadeSelect(item)}
             >
                 <View style={[styles.radio, isSelected && styles.radioActive]}>
                     {isSelected && <Icon name="check" size={16} color="#fff" />}
@@ -469,6 +521,15 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     </View>
                 )}
 
+                {selectedShade?.length > 0 && (
+                    <Text style={{
+                        marginBottom: 10,
+                        color: '#13879A',
+                        fontWeight: '800',
+                    }}>
+                        Selected Shades: {selectedShade.length}
+                    </Text>
+                )}
                 <View style={styles.searchBox}>
                     <Icon name="search" size={20} color="#000" />
                     <TextInput
@@ -502,9 +563,9 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     />
                 )}
 
-                {/* <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
+                <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
                     <Text style={styles.nextText}>Next</Text>
-                </TouchableOpacity> */}
+                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );

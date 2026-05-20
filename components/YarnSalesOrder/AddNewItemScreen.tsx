@@ -45,10 +45,7 @@ const AddNewItemScreen = ({ navigation, route }) => {
             Alert.alert('Validation', 'Please enter Item name');
             return;
         }
-        if (!remark.trim()) {
-            Alert.alert('Validation', 'Please enter remark');
-            return;
-        }
+        
         const newitemdata = {
             ItmCode: '-1',
             ItmName: ItemName,
@@ -203,7 +200,7 @@ const styles = StyleSheet.create({
     },
 
     label: {
-        color: '#111',
+        color: '#000',
         fontSize: 14,
         fontWeight: '700',
         marginBottom: 8,

@@ -107,6 +107,17 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
 
             setFilters(nextFilters);
 
+            if (p.prpcode && propertyData?.length > 0) {
+
+                const matchedProperty = propertyData.find(
+                    x => String(x.PrpCode) === String(p.prpcode)
+                );
+
+                if (matchedProperty) {
+                    setSelectedProperty(matchedProperty);
+                }
+            }
+
             setSearch('');
 
             setShowFilter(false);

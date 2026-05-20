@@ -51,6 +51,8 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
     };
 
     console.log("selectedItem", selectedItem);
+    console.log("lastRow", lastRow);
+    console.log("workingRows", workingRows);
 
     const onYes = () => {
         navigation.navigate('SalesOrderShadeList', {
@@ -165,22 +167,26 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
                     <Text style={styles.row}>Amount: ₹ {lastRow?.Amount}</Text>
                     <Text style={styles.row}>Total Rows: {workingRows.length}</Text>
                 </View>
-
+{/* 
                 {!editMode && (
                     <Text style={styles.ask}>
                         Do you want to add another shade for same item and design?
                     </Text>
-                )}
+                )} */}
 
-                {!editMode && (
+                {/* {!editMode && (
                     <TouchableOpacity style={styles.btn} onPress={onYes}>
                         <Text style={styles.btnText}>Yes, Add Another Shade</Text>
                     </TouchableOpacity>
-                )}
+                )} */}
 
                 <TouchableOpacity style={styles.btn2} onPress={onNo}>
                     <Text style={styles.btnText2}>
-                        {editMode ? 'Back To Order Summary' : 'No, Finish This Item'}
+                        {
+                        // editMode ? 
+                        'Back To Order Summary' 
+                        // : 'No, Finish This Item'
+                        }
                     </Text>
                 </TouchableOpacity>
             </View>

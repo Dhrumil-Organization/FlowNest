@@ -312,6 +312,14 @@ const APP_SECTIONS = [
             { id: '34', name: 'Yarn Sales Order', screen: 'Yarn Sales Order', icon: 'shopping-cart-checkout', iconColor: '#4169E1' },
         ],
     },
+    {
+        title: 'W',
+        data: [
+            { id: '35', name: 'Warehouse Criteria Screen', screen: 'Warehouse Criteria Screen', icon: 'shopping-cart-checkout', iconColor: '#4169E1' },
+        ],
+    },
+
+
 ];
 
 interface Props {
@@ -598,9 +606,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Doff Entry",
+                //                         "title": "Warehouse Criteria Screen",
                 //                         "href": "/"
                 //                     },
+                                   
                 //                 ]
                 //             }
                 //         ]

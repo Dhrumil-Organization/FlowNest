@@ -116,6 +116,7 @@ import ConfirmInquiryScreen from './src_inquiry/screens/ConfirmInquiryScreen';
 import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
 import TatConfigScreen from './src_inquiry/screens/TatConfigScreen';
 import TatAnalyticsScreen from './src_inquiry/screens/TatAnalyticsScreen';
+import WarehouseCriteriaScreen from './components/Warehouse/WarehouseCriteriaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -763,9 +764,9 @@ export default function App() {
                                 username={getUserDetails}
                                 setIsLoggedIn={setIsLoggedIn}
                               />
-                             
+
                             </GestureHandlerRootView>
-                            
+
                           </ErrorBoundary>
                         </>
                       )}
@@ -1204,6 +1205,19 @@ export default function App() {
                         />
                       )}
                     </Stack.Screen>
+
+                    <Stack.Screen name="Warehouse Criteria Screen">
+                      {props => (
+                        <WarehouseCriteriaScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+
+
                     <Stack.Screen name="Production Report">
                       {props => (
                         <>

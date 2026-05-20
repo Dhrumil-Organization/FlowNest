@@ -114,6 +114,7 @@ import CostingScreen from './src_inquiry/screens/CostingScreen';
 import SendQuotationScreen from './src_inquiry/screens/SendQuotationScreen';
 import ConfirmInquiryScreen from './src_inquiry/screens/ConfirmInquiryScreen';
 import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
+import WarehouseCriteriaScreen from './components/Warehouse/WarehouseCriteriaScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -1202,6 +1203,19 @@ export default function App() {
                         />
                       )}
                     </Stack.Screen>
+
+                    <Stack.Screen name="Warehouse Criteria Screen">
+                      {props => (
+                        <WarehouseCriteriaScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+
+                    
                     <Stack.Screen name="Production Report">
                       {props => (
                         <>

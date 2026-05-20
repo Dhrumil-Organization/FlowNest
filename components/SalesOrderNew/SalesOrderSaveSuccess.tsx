@@ -139,13 +139,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#0b1d3a",
+    color: "#000",
     textAlign: "center",
     marginBottom: 24,
   },
   label: {
     fontSize: 13,
-    color: "#5d6b82",
+    color: "#000",
     marginBottom: 8,
     fontWeight: "600",
   },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   },
   dateTime: {
     fontSize: 15,
-    color: "#0b1d3a",
+    color: "#000",
     fontWeight: "600",
     marginBottom: 34,
   },

@@ -134,7 +134,7 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                 setPartyName(TradeName || '');
                 setDeliveryAddress(address || '');
                 setCityName(city || '');
-                setCntyName('');
+                setCntyName('INDIA');
                 setPrintname(TradeName || '');
                 setStateName(stateName.toUpperCase());
                 setZip(zipcode || '');
@@ -188,20 +188,39 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
             return;
         }
 
+        const finalAddress = deliveryAddress.trim();
+        const finalCity = cityname.trim();
+        const finalState = statename.trim();
+        const finalCountry = cntyname.trim() || 'INDIA';
+        const finalZip = zip.trim();
+
         const newPartyData = {
+            // ParCode: '-1',
+            // ParName: partyName,
+            // Address: deliveryAddress,
+            // City: cityname,
+            // State: statename,
+            // Cnty: "INDIA",
+            // Zip: zip,
+            // Tel1: mobileNo,
+            // GSTIN: gstin,
+            // SExe: '',
+            // SExeName: '',
+            // PrintName: printname,
+            // Remark: remark
             ParCode: '-1',
-            ParName: partyName,
-            Address: deliveryAddress,
-            City: cityname,
-            State: statename,
-            Cnty: "INDIA",
-            Zip: zip,
+            ParName: partyName.trim(),
+            Address: finalAddress,
+            City: finalCity,
+            State: finalState,
+            Cnty: finalCountry,
+            Zip: finalZip,
             Tel1: mobileNo,
-            GSTIN: gstin,
+            GSTIN: gstin.trim(),
             SExe: '',
             SExeName: '',
-            PrintName: printname,
-            Remark: remark
+            PrintName: printname.trim(),
+            Remark: remark.trim()
         };
 
         const params = {
@@ -241,7 +260,7 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                             value={gstin}
                             onChangeText={setGstin}
                             placeholder="Enter GSTIN"
-                            placeholderTextColor="#999"
+                            placeholderTextColor="#000"
                             autoCapitalize="characters"
                             style={styles.gstinInput}
                         />
@@ -272,7 +291,8 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                     </Text>
                     <TextInput
                         value={partyName}
-                        onChangeText={setPartyName}
+                        // onChangeText={setPartyName}
+                        onChangeText={(text) => setPartyName(text)}
                         placeholder="Enter party name"
                         placeholderTextColor="#999"
                         style={styles.input}
@@ -285,7 +305,8 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                     </Text>
                     <TextInput
                         value={deliveryAddress}
-                        onChangeText={setDeliveryAddress}
+                        // onChangeText={setDeliveryAddress}
+                        onChangeText={(text) => setDeliveryAddress(text)}
                         placeholder="Enter complete delivery address"
                         placeholderTextColor="#999"
                         multiline
@@ -300,7 +321,8 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                     </Text>
                     <TextInput
                         value={cityname}
-                        onChangeText={setCityName}
+                        // onChangeText={setCityName}
+                        onChangeText={(text) => setCityName(text)}
                         placeholder="Enter City"
                         placeholderTextColor="#999"
                         style={styles.input}
@@ -313,7 +335,8 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                     </Text>
                     <TextInput
                         value={statename}
-                        onChangeText={setStateName}
+                        // onChangeText={setStateName}
+                        onChangeText={(text) => setStateName(text)}
                         placeholder="Enter State"
                         placeholderTextColor="#999"
                         style={styles.input}
@@ -326,7 +349,7 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                     </Text>
                     <TextInput
                         value={cntyname}
-                        onChangeText={setCntyName}
+                        onChangeText={(text) => setCntyName(text)}
                         placeholder="Enter country"
                         placeholderTextColor="#999"
                         style={styles.input}
@@ -339,7 +362,8 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                     </Text>
                     <TextInput
                         value={zip}
-                        onChangeText={setZip}
+                        // onChangeText={setZip}
+                        onChangeText={(text) => setZip(text)}
                         placeholder="Enter zip code"
                         placeholderTextColor="#999"
                         style={styles.input}

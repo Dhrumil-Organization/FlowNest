@@ -114,6 +114,8 @@ import CostingScreen from './src_inquiry/screens/CostingScreen';
 import SendQuotationScreen from './src_inquiry/screens/SendQuotationScreen';
 import ConfirmInquiryScreen from './src_inquiry/screens/ConfirmInquiryScreen';
 import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
+import TatConfigScreen from './src_inquiry/screens/TatConfigScreen';
+import TatAnalyticsScreen from './src_inquiry/screens/TatAnalyticsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -1339,6 +1341,26 @@ export default function App() {
                     <Stack.Screen name="RejectInquiry" options={{ title: 'Reject Inquiry' }}>
                       {props => (
                         <RejectInquiryScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="TatConfig" options={{ title: 'TAT Configuration' }}>
+                      {props => (
+                        <TatConfigScreen
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="TatAnalytics" options={{ title: 'TAT Analytics' }}>
+                      {props => (
+                        <TatAnalyticsScreen
                           {...props}
                           token={gettoken || ''}
                           isConnected={isConnected}

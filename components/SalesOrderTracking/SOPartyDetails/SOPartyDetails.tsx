@@ -526,59 +526,49 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
     };
 
     const handleCardPressCurrent = async (order: PartyDetail) => {
-        // console.log("Selected Order Data:", JSON.stringify(order, null, 2));
-        // console.log("Selected Order Data123:", order, getChallanPayload);
-        // setAPILoading(true);
-        // navigation.navigate('Taka Checking Entry View Data', { party: partyData.partyname });
-        // navigation.navigate('Taka Checking Entry View Data');
-        console.log("Selected Order Data dhrumil:", order, getChallanPayload);
         const headers = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             'X-Requested-with': 'XMLHttpRequest',
         };
-        // try {
+        const payload = {
+            ...getChallanPayload,
+            uid: order.uid,
+            srno: order.srno,
+        };
 
-
-        //     let seArr = []
-        //     let seArrCntr = 0;
-        //     selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
-
-        //         seArr[seArrCntr] = el.sexe;
-        //         seArrCntr++;
-
-        //     })
-        //     // const yearValue = selectedYear.split('-')[1].substring(2);
-        //     // const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
-        //     const payload = {
-        //         ...getChallanPayload,
-        //         fromdate: "",
-        //         todate: "",
-        //         uid: order.uid,
-        //         srno: order.srno,
-        //         sexes: seArr,
-        //     };
-        //     const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
-        //     console.log("I am here:", response, payload);
-        //     if (response.data.success === true) {
-        //         setAPILoading(false);
-        //         console.log("I am here:", response.data);
-        //         // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
-        //         await AsyncStorage.setItem('parties_tracking_details_challan_response', JSON.stringify(response.data));
-        //         navigation.navigate('SOPartyDetailsPart1', { party: order.partyname });
-        //         // await saveLastViewedToCache(partyData.parcode);
-        //         // setLastViewedParcode(partyData.parcode);
-        //         // console.log("Response Data:", JSON.stringify(response.data.data, null, 2));
-        //         console.log("Response Data:", response);
-        //     }
-        // } catch (error) {
-        //     setAPILoading(false);
-        //     console.error("Error in handleCardPress:", error);
-        //     Alert.alert("Error", "Failed to process party details");
-        // } finally {
-        //     setAPILoading(false);
-        //     // setTrackingLoader(false);
-        // }
+        try {
+            setAPILoading(true);
+            const response = await axios.post(`${API}/api/sotrackcloseorder`, payload, { headers });
+            console.log("I am here CLosed Order :", response, payload);
+            if (response.data.success === true) {
+                // Update the status of the pressed card to "CLOSED"
+                setFilteredOrders(prevOrders =>
+                    prevOrders.map(prevOrder =>
+                        prevOrder.uid === order.uid && prevOrder.srno === order.srno
+                            ? { ...prevOrder, status: 'CLOSED' }
+                            : prevOrder
+                    )
+                );
+                // Also update the main data if needed
+                setDetailData(prevData => {
+                    if (!prevData) return null;
+                    return {
+                        ...prevData,
+                        partydetails: prevData.partydetails.map(prevOrder =>
+                            prevOrder.uid === order.uid && prevOrder.srno === order.srno
+                                ? { ...prevOrder, status: 'CLOSED' }
+                                : prevOrder
+                        )
+                    };
+                });
+            }
+        } catch (error) {
+            console.error("Error in handleCardPressCurrent:", error);
+            Alert.alert("Error", "Failed to close the order");
+        } finally {
+            setAPILoading(false);
+        }
     };
 
     const SummaryCard = ({ title, value1, label1, value2, label2, backgroundColor }: {
@@ -620,7 +610,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                         {item.status}
                     </Text>
                     <Icon name="chevron-right" size={20} color="#999" /> */}
-                    {item.status === 'PENDING' ? (
+                    {item.status === 'PENDING' || item.status === 'PARTIAL' ? (
                         <TouchableOpacity
                             onPress={() => handleCardPressCurrent(item)}
                             style={styles.orderButtonContainer}
@@ -673,6 +663,9 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     </View>
                 )}
 
+                <Text style={styles.orderQty}>
+                    Bal Qty: {item.BQty}
+                </Text>
                 <Text style={styles.orderQty}>
                     Unit Rate: {item.UnitRate}
                 </Text>

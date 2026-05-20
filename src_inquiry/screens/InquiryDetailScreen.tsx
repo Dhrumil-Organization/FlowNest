@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   Linking,
   Alert,
@@ -14,8 +13,10 @@ import {useFocusEffect} from '@react-navigation/native';
 
 import {colors, fontSize, radius, spacing} from '../utils/theme';
 import {inquiryApi} from '../services/inquiryApi';
-import {Inquiry, RootStackParamList} from '../types';
+import {InquiryDetailResponse, RootStackParamList} from '../types';
 import StatusBadge from '../components/StatusBadge';
+import TatBadge from '../components/TatBadge';
+import TatTimeline from '../components/TatTimeline';
 import Button from '../components/Button';
 import {formatCurrency, formatDate} from '../utils/validators';
 
@@ -23,7 +24,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'InquiryDetail'>;
 
 const InquiryDetailScreen: React.FC<Props> = ({route, navigation}) => {
   const {id} = route.params;
-  const [inquiry, setInquiry] = useState<Inquiry | null>(null);
+  const [inquiry, setInquiry] = useState<InquiryDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -53,7 +54,7 @@ const InquiryDetailScreen: React.FC<Props> = ({route, navigation}) => {
 
   if (loading || !inquiry) {
     return (
-      <View style={[styles.center]}>
+      <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -82,8 +83,16 @@ const InquiryDetailScreen: React.FC<Props> = ({route, navigation}) => {
           <Text style={styles.inqNo}>{inquiry.inquiry_no}</Text>
           <Text style={styles.date}>{formatDate(inquiry.inquiry_date)}</Text>
         </View>
-        <StatusBadge status={inquiry.status} />
+        <View style={{alignItems: 'flex-end', gap: 4}}>
+          <StatusBadge status={inquiry.status} />
+          {inquiry.tat.overall_status !== 'not_applicable' ? (
+            <TatBadge status={inquiry.tat.overall_status} customLabel={`TAT: ${inquiry.tat.overall_status === 'on_time' ? 'On Time' : inquiry.tat.overall_status === 'warning' ? 'Warning' : 'Breached'}`} />
+          ) : null}
+        </View>
       </View>
+
+      {/* TAT Timeline */}
+      {inquiry.tat_live ? <TatTimeline tatLive={inquiry.tat_live} /> : null}
 
       {/* Party */}
       <View style={styles.section}>
@@ -132,7 +141,7 @@ const InquiryDetailScreen: React.FC<Props> = ({route, navigation}) => {
         </View>
       ))}
 
-      {/* Totals (only if costed) */}
+      {/* Totals */}
       {grandTotal > 0 ? (
         <View style={styles.totalsBox}>
           <View style={styles.totalRow}>
@@ -228,7 +237,7 @@ const styles = StyleSheet.create({
   center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
   inqNo: {fontSize: fontSize.xl, fontWeight: '500', color: colors.textPrimary},

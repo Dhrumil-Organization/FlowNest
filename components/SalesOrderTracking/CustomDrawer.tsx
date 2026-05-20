@@ -163,8 +163,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   useEffect(() => {
     const filtered = designData1.filter(
       design =>
-        design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase()),
+        design.ItmName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        design.ItmCode.toLowerCase().includes(searchQuery.toLowerCase()),
     );
     const filtereditem = itemData.filter(
       item =>
@@ -276,8 +276,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setTimeout(() => {
       const filtered = designData1.filter(
         design =>
-          design.DsnName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          design.DsnCode.toLowerCase().includes(searchQuery.toLowerCase()),
+          design?.ItmName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          design?.ItmCode?.toLowerCase().includes(searchQuery.toLowerCase()),
       );
       const newDisplayed = filtered.slice(0, displayedDesigns.length + 10);
       setDisplayedDesigns(newDisplayed);
@@ -325,8 +325,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   // Toggle design selection
   const toggleDesignSelection = (design: DesignData) => {
     setSelectedDesigns(prev =>
-      prev.some(d => d.DsnCode === design.DsnCode)
-        ? prev.filter(d => d.DsnCode !== design.DsnCode)
+      prev.some(d => d.ItmCode === design.ItmCode)
+        ? prev.filter(d => d.ItmCode !== design.ItmCode)
         : [...prev, design],
     );
   };
@@ -793,16 +793,12 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     <TouchableOpacity
                       style={styles.selectAllButton}
                       onPress={() => {
-                        const filteredpar = getPartyData.filter(
+                        const filteredpar = designData.filter(
                           party =>
-                            party.accountname
-                              .toLowerCase()
-                              .includes(searchQuery.toLowerCase()) ||
-                            party.acccode
-                              .toLowerCase()
-                              .includes(searchQuery.toLowerCase()),
+                            party?.ItmName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            party?.ItmCode?.toLowerCase().includes(searchQuery.toLowerCase()),
                         );
-                        setSelectedParty(filteredpar);
+                        setSelectedDesigns(filteredpar);
                       }}
                     >
                       <Text style={styles.selectAllButtonText}>Select All</Text>
@@ -810,7 +806,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     {selectedDesigns.length > 0 && (
                       <TouchableOpacity
                         style={styles.removeAllButton}
-                        onPress={removeAllSelectedParty}
+                        onPress={removeAllSelected}
                       >
                         <Icon name="close" size={20} color="#fff" />
                       </TouchableOpacity>
@@ -828,7 +824,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                         style={styles.selectedDesignChip}
                       >
                         <Text style={styles.selectedDesignText}>
-                          {design.DsnName} ({design.DsnCode})
+                          {design.ItmName} ({design.ItmCode})
                         </Text>
                       </View>
                     ))}
@@ -855,17 +851,17 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   >
                     {displayedDesigns.map(design => (
                       <TouchableOpacity
-                        key={design.DsnCode}
+                        key={design.ItmCode}
                         style={[
                           styles.designItem,
                           selectedDesigns.some(
-                            d => d.DsnCode === design.DsnCode,
+                            d => d.ItmCode === design.ItmCode,
                           ) && styles.selectedDesignItem,
                         ]}
                         onPress={() => toggleDesignSelection(design)}
                       >
-                        <Text style={styles.designName}>{design.DsnName}</Text>
-                        <Text style={styles.designCode}>{design.DsnCode}</Text>
+                        <Text style={styles.designName}>{design.ItmName}</Text>
+                        <Text style={styles.designCode}>{design.ItmCode}</Text>
                       </TouchableOpacity>
                     ))}
                     {isLoadingMore && (

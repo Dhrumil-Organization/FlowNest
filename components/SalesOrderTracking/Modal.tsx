@@ -73,6 +73,8 @@ export interface RowSelectData {
 export interface DesignData {
     DsnCode: string;
     DsnName: string;
+    ItmCode: string;
+    ItmName: string;
 }
 export interface DesignCode {
     DsnCode: string;

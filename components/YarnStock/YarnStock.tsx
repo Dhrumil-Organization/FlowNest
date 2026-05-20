@@ -47,6 +47,10 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     const [isShadeVisible, setIsShadeVisible] = useState(false);
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const toggleSortOrder = () => {
+        setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
 
     console.log("selectedPrpCode", selectedPrpCode)
     console.log("Hiii", selectedItem)
@@ -631,6 +635,25 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     //     return addAllCard(renderedData);
     // }, [renderedData]);
 
+    // const displayData = useMemo(() => {
+
+    //     let baseData: any[] = addAllCard(renderedData);
+
+    //     // SEARCH FILTER
+    //     if (searchQueryPOT.trim()) {
+
+    //         const search = searchQueryPOT.toLowerCase();
+
+    //         baseData = baseData.filter((item: any) =>
+    //             String(item?.MITMNAME || '').toLowerCase().includes(search) ||
+    //             String(item?.TOTQTY || '').toLowerCase().includes(search)
+    //         );
+    //     }
+
+    //     return baseData;
+
+    // }, [renderedData, searchQueryPOT]);
+
     const displayData = useMemo(() => {
 
         let baseData: any[] = addAllCard(renderedData);
@@ -646,9 +669,21 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
             );
         }
 
-        return baseData;
+        // SORTING
+        baseData.sort((a: any, b: any) => {
 
-    }, [renderedData, searchQueryPOT]);
+            // ALL item top pe
+            if (a.MITMCODE === 'ALL') return -1;
+            if (b.MITMCODE === 'ALL') return 1;
+
+            return sortOrder === 'asc'
+                ? Number(a.TOTQTY || 0) - Number(b.TOTQTY || 0)
+                : Number(b.TOTQTY || 0) - Number(a.TOTQTY || 0);
+        });
+
+        return [...baseData];
+
+    }, [renderedData, searchQueryPOT, sortOrder]);
 
     // const totalQty = useMemo(() => {
     //     return renderedData
@@ -738,6 +773,46 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
             ) : (
                 <>
                     <View style={{ flex: 1 }}>
+                        <TouchableOpacity
+                            onPress={toggleSortOrder}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                alignSelf: 'flex-end',
+                                backgroundColor: '#F2F4F7',
+                                paddingVertical: 6,
+                                paddingHorizontal: 12,
+                                borderRadius: 8,
+                                marginHorizontal: 10,
+                                marginTop: 10,
+                                marginBottom: 5,
+                                elevation: 2,
+                            }}
+                        >
+                            <Icon
+                                name={
+                                    sortOrder === 'asc'
+                                        ? 'arrow-upward'
+                                        : 'arrow-downward'
+                                }
+                                size={16}
+                                color="#000"
+                            />
+
+                            <Text
+                                style={{
+                                    fontSize: 13,
+                                    color: '#000',
+                                    marginLeft: 6,
+                                    fontWeight: '600',
+                                }}
+                            >
+                                {/* {sortOrder === 'asc'
+                                    ? 'Low → High'
+                                    : 'High → Low'} */}
+                                Sort by Amount
+                            </Text>
+                        </TouchableOpacity>
                         <FlatList
                             data={displayData}
                             keyExtractor={(_, index) => index.toString()}

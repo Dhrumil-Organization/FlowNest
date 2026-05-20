@@ -7,6 +7,8 @@ export type InquiryStatus =
   | 'confirmed'
   | 'rejected';
 
+export type TatStatus = 'on_time' | 'warning' | 'breached' | 'not_applicable';
+
 export interface Party {
   prp_code: string | null;
   acc_code: string;
@@ -40,7 +42,6 @@ export interface Design {
 }
 
 export interface InquiryDesignInput {
-  // For existing design
   design_prp_code: string | null;
   design_dsn_code: number | null;
   is_new_design: boolean;
@@ -71,6 +72,54 @@ export interface InquiryDesign {
   is_costed: boolean;
 }
 
+export interface InquiryTat {
+  costing_status: TatStatus;
+  quotation_status: TatStatus;
+  response_status: TatStatus;
+  overall_status: TatStatus;
+  custom_overall_hours: number | null;
+}
+
+export interface InquiryMilestones {
+  created_at: string;
+  costing_completed_at: string | null;
+  quotation_sent_at: string | null;
+  closed_at: string | null;
+}
+
+export interface TatEvent {
+  step_code: string;
+  step_name: string;
+  started_at: string;
+  completed_at: string;
+  expected_hours: number;
+  actual_hours: number;
+  variance_hours: number;
+  status: TatStatus;
+}
+
+export interface TatLiveState {
+  step_code: string | null;
+  step_name: string | null;
+  is_started: boolean;
+  is_completed: boolean;
+  started_at: string | null;
+  completed_at: string | null;
+  expected_hours: number;
+  elapsed_hours: number;
+  remaining_hours: number;
+  variance_hours: number;
+  status: TatStatus;
+  percent_used: number;
+}
+
+export interface TatLive {
+  costing: TatLiveState;
+  send_quotation: TatLiveState;
+  party_response: TatLiveState;
+  overall: TatLiveState;
+}
+
 export interface Inquiry {
   id: number;
   inquiry_no: string;
@@ -83,6 +132,8 @@ export interface Inquiry {
   status: InquiryStatus;
   status_label: string;
   remarks: string | null;
+  tat: InquiryTat;
+  milestones: InquiryMilestones;
   designs_count?: number;
   designs?: InquiryDesign[];
   rejection?: {
@@ -96,8 +147,13 @@ export interface Inquiry {
     so_date: string;
     grand_total: number;
   } | null;
+  tat_events?: TatEvent[];
   created_at: string;
   updated_at: string;
+}
+
+export interface InquiryDetailResponse extends Inquiry {
+  tat_live?: TatLive;
 }
 
 export interface DashboardCounts {
@@ -109,6 +165,12 @@ export interface DashboardCounts {
   total: number;
 }
 
+export interface TatCounts {
+  on_time: number;
+  warning: number;
+  breached: number;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -117,6 +179,7 @@ export interface ApiResponse<T> {
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   counts?: DashboardCounts;
+  tat_counts?: TatCounts;
   meta: {
     current_page: number;
     last_page: number;
@@ -124,16 +187,40 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
-// Navigation param list
+export interface TatConfiguration {
+  id: number;
+  step_code: string;
+  step_name: string;
+  expected_hours: number;
+  warning_threshold_percent: number;
+  is_active: boolean;
+  description: string | null;
+}
+
+export interface TatAnalytics {
+  step_code: string;
+  step_name: string;
+  total_completed: number;
+  on_time: number;
+  warning: number;
+  breached: number;
+  breach_percent: number;
+  avg_actual_hours: number;
+  avg_variance_hours: number;
+}
+
+// Navigation
 export type RootStackParamList = {
   Dashboard: undefined;
-  InquiryForm: { inquiryId?: number } | undefined;
-  PartySelection: { onSelect: (party: Party) => void };
-  AddParty: { gstin?: string; onSaved: (party: Party) => void };
-  DesignSelection: { onSelect: (design: Design) => void };
-  InquiryDetail: { id: number };
-  Costing: { id: number };
-  SendQuotation: { id: number };
-  RejectInquiry: { id: number };
-  ConfirmInquiry: { id: number };
+  InquiryForm: {inquiryId?: number} | undefined;
+  PartySelection: {onSelect: (party: Party) => void};
+  AddParty: {gstin?: string; onSaved: (party: Party) => void};
+  DesignSelection: {onSelect: (design: Design) => void};
+  InquiryDetail: {id: number};
+  Costing: {id: number};
+  SendQuotation: {id: number};
+  RejectInquiry: {id: number};
+  ConfirmInquiry: {id: number};
+  TatConfig: undefined;
+  TatAnalytics: undefined;
 };

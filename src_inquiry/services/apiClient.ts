@@ -1,9 +1,8 @@
 import axios, {AxiosInstance, AxiosError} from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API } from '../../common/API/dynamicAPI';
 
 // TODO: Replace with your actual base URL
-export const API_BASE_URL = API;
+export const API_BASE_URL = 'https://your-domain.com/api/v1';
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

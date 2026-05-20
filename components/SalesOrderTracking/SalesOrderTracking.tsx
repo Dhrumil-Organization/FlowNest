@@ -115,6 +115,7 @@ const SalesOrderTracking: React.FC<{
     const [dsnData, setDsnData] = useState([]);
     //
     const [isDesignModalVisible, setIsDesignModalVisible] = useState(false);
+    const [getMainPayload, setMainPayload] = useState({});
     const [selectedDesignData, setSelectedDesignData] = useState<{
         designdetails: any[];
         design_summary: any[];
@@ -352,6 +353,7 @@ const SalesOrderTracking: React.FC<{
         }
     };
     const fetchParty = async () => {
+        console.log('🔵 payload PARTY', 'HI');
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
         const yearValue = selectedYear.split('-')[1].substring(2);
@@ -396,10 +398,11 @@ const SalesOrderTracking: React.FC<{
                 }),
             );
             console.log('🔵 payload PARTY', 'HI2');
-            console.log('🔵 payload PARTY', payload, response);
+            console.log('🔵 payload PARTY Payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
                 console.log('✅ Data Sexe:', response.data.response.data);
                 setPartyData(response.data.response.data);
+                fetchDesign();
                 // fetchDesign();
                 // fetchItem();
 
@@ -434,7 +437,7 @@ const SalesOrderTracking: React.FC<{
             };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/getdesign`,
-                `${API}/api/getdesign`,
+                `${API}/api/getitem`,
                 getRequestConfig({
                     params: {
                         prpcode: 'SIP',
@@ -534,8 +537,8 @@ const SalesOrderTracking: React.FC<{
     useEffect(() => {
         if (fromDate && delDate && selectedYear) {
             // fetchData();
-            fetchDesign();
-            fetchParty();
+            // fetchDesign();
+            // fetchParty();
             fetchSalesExe();
         }
     }, []);
@@ -796,7 +799,7 @@ const SalesOrderTracking: React.FC<{
             setsalesdata([]);
             setsalessumdata([]);
             const yearValue = selectedYear.split('-')[1].substring(2);
-            const dsnCodes = selectedDesigns.map(design => design.DsnCode);
+            const dsnCodes = selectedDesigns.map(design => design.ItmCode);
             const partyCodes = selectedParty.map((item: any) => item.acccode);
 
             let seArr = []
@@ -878,6 +881,7 @@ const SalesOrderTracking: React.FC<{
                     response.data.success === true &&
                     response.data.data.salesdata.length > 0
                 ) {
+                    setMainPayload(payload);
                     closeDrawer();
                     setsalesdata(response.data.data.salesdata);
                     setsalesdataTotal(response.data.data.salesdata.length);
@@ -955,8 +959,8 @@ const SalesOrderTracking: React.FC<{
                         : selectedItemStatus1 === 'Item Wise'
                             ? 'design'
                             : '',
-                dsncodes: [],
-                itemcodes: dsnCodes,
+                dsncodes: dsnCodes,
+                itemcodes: getMainPayload.itemcodes || [],
                 parcode: partyData.parcode,
                 prptype: 'S',
                 txntype: 'prodorderlist',
@@ -1014,7 +1018,7 @@ const SalesOrderTracking: React.FC<{
         setIsLoading(true);
         try {
             const yearValue = selectedYear.split('-')[1].substring(2);
-            const dsnCodes = selectedDesigns.map(design => design.DsnCode);
+            const dsnCodes = selectedDesigns.map(design => design.ItmCode);
 
             let seArr = []
             let seArrCntr = 0;
@@ -1069,7 +1073,9 @@ const SalesOrderTracking: React.FC<{
             );
             console.log('🔵 responsedd direct design', payload, response);
             console.log('🔵 responsedd direct child design', payload, responsedes);
+
             if (response.data.success) {
+                setMainPayload(payload);
                 setDData(null);
                 openDesignModal(response.data.data, payload);
             }
@@ -1098,6 +1104,7 @@ const SalesOrderTracking: React.FC<{
             customPayload || '',
             item || '',
         );
+        console.log("Main Paylaod:", getMainPayload);
         const headers = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1144,8 +1151,8 @@ const SalesOrderTracking: React.FC<{
                     : selectedItemStatus1 === 'Item Wise'
                         ? 'design'
                         : '',
-            dsncodes: [],
-            itemcodes: customPayload.dsncodes,
+            dsncodes: customPayload.dsncodes,
+            itemcodes: getMainPayload.itemcodes || [],
             uid: item?.muid ? item?.muid : '',
             mdsncode: item?.mdsncode ? item?.mdsncode : '',
             parcode: customPayload.parcode,
@@ -1235,8 +1242,8 @@ const SalesOrderTracking: React.FC<{
                         : selectedItemStatus1 === 'Item Wise'
                             ? 'design'
                             : '',
-                dsncodes: [],
-                itemcodes: item?.dsncode ? [item?.dsncode] : [],
+                dsncodes: item?.dsncode ? [item?.dsncode] : [],
+                itemcodes: getMainPayload.itemcodes || [],
                 uid: item?.suid ? item?.suid : '',
                 mdsncode: item?.mdsncode ? item?.mdsncode : '',
                 parcode: getDData?.parcode,
@@ -1405,6 +1412,8 @@ const SalesOrderTracking: React.FC<{
                 console.log('✅ getsexex API response:', response.data.data);
 
                 setSalesExeData(response.data.data);
+                // fetchDesign();
+                fetchParty();
 
             } else {
 
@@ -1743,7 +1752,7 @@ const SalesOrderTracking: React.FC<{
                                 onPress={() => {
                                     const payload = {
                                         ...selectedDesignData!.payload,
-                                        dsncodes: [],
+                                        dsncodes: [item.dsncode],
                                         itemcodes: [item.dsncode],
                                     };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);
@@ -1996,7 +2005,7 @@ const SalesOrderTracking: React.FC<{
                                 onPress={() => {
                                     const payload = {
                                         ...selectedPartyDetails!.payload,
-                                        dsncodes: [],
+                                        dsncodes: [item.dsncode],
                                         itemcodes: [item.dsncode],
                                     };
                                     // handleCardPress(getDData, { parname: item.partyname }, payload);

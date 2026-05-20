@@ -14,6 +14,8 @@ import CostingScreen from '../screens/CostingScreen';
 import SendQuotationScreen from '../screens/SendQuotationScreen';
 import ConfirmInquiryScreen from '../screens/ConfirmInquiryScreen';
 import RejectInquiryScreen from '../screens/RejectInquiryScreen';
+import TatConfigScreen from '../screens/TatConfigScreen';
+import TatAnalyticsScreen from '../screens/TatAnalyticsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -34,7 +36,7 @@ const AppNavigator: React.FC = () => {
       <Stack.Screen
         name="Dashboard"
         component={DashboardScreen}
-        options={{title: 'Fabric Inquiries'}}
+        options={{headerShown: false}}
       />
       <Stack.Screen
         name="InquiryForm"
@@ -80,6 +82,16 @@ const AppNavigator: React.FC = () => {
         name="RejectInquiry"
         component={RejectInquiryScreen}
         options={{title: 'Reject Inquiry'}}
+      />
+      <Stack.Screen
+        name="TatConfig"
+        component={TatConfigScreen}
+        options={{title: 'TAT Configuration'}}
+      />
+      <Stack.Screen
+        name="TatAnalytics"
+        component={TatAnalyticsScreen}
+        options={{title: 'TAT Analytics'}}
       />
     </Stack.Navigator>
   );

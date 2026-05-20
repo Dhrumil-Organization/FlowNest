@@ -4,12 +4,16 @@ import {
   DashboardCounts,
   Inquiry,
   InquiryDesignInput,
+  InquiryDetailResponse,
   InquiryStatus,
   PaginatedResponse,
+  TatCounts,
+  TatStatus,
 } from '../types';
 
 export interface ListParams {
   status?: InquiryStatus | 'all';
+  tat?: TatStatus | 'all';
   search?: string;
   from?: string;
   to?: string;
@@ -24,6 +28,7 @@ export interface StorePayload {
   party_address?: string;
   designs: InquiryDesignInput[];
   remarks?: string;
+  custom_overall_hours?: number | null;
 }
 
 export interface CostingPayload {
@@ -42,13 +47,18 @@ export const inquiryApi = {
     return {
       data: res.data.data,
       counts: res.data.counts as DashboardCounts,
+      tatCounts: res.data.tat_counts as TatCounts,
       meta: res.data.meta,
     };
   },
 
-  show: async (id: number): Promise<Inquiry> => {
-    const res = await client.get<ApiResponse<Inquiry>>(`/inquiries/${id}`);
-    return res.data.data;
+  show: async (id: number): Promise<InquiryDetailResponse> => {
+    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/inquiries/${id}`);
+    // The server attaches tat_live via additional() — axios serialises it into the data envelope.
+    // We merge both shapes safely:
+    const payload = res.data.data as InquiryDetailResponse;
+    const tat_live = (res.data as any).tat_live ?? (payload as any).tat_live;
+    return {...payload, tat_live};
   },
 
   store: async (payload: StorePayload): Promise<Inquiry> => {

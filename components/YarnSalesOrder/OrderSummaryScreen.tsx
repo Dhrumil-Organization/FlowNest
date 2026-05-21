@@ -227,6 +227,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
     const hasLoadedOrderRef = useRef(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+    const [detailVisible, setDetailVisible] = useState(false);
+    const [addressListVisible, setAddressListVisible] = useState(false);
+    const [AddressList, setAdedressList] = useState([]);
+
     // const party =
     //     routeParty ||
     //     partyData ||
@@ -275,6 +279,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [ddate, setDdate] = useState(
         String(headerData?.DDate || ''),
     );
+    const [DueDate, setDueDate] = useState(
+        String(headerData?.DueDate || ''),
+    );
+
     const [tax, setTax] = useState(String(headerData?.TaxPercent || '0'));
     const [remark, setRemark] = useState(headerData?.Remark || '');
     const [saving, setSaving] = useState(false);
@@ -895,6 +903,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             setRemark(main.Remark || '');
             setSoDate(main.SODate || '');
             setSoNo(main.SONo || '');
+            setDueDate(main.DueDate || '')
 
             const loadedParty = {
                 ParCode: main.ParCode || '',
@@ -903,6 +912,14 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 SExeName: main.SExeName || '',
                 City: main.city || main.DCity || main.Station || '',
                 Address: main.address || main.DAdd || '',
+                BAccCode: main.BAccCode || '',
+                BAccName: main.BAccName || '',
+                DueDay: main.DueDay || '',
+                DueDate: main.DueDate || '',
+                Dcity: main.City || main.DCity || '',
+                DState: main.State || main.DState || '',
+                DCnty: main.Cnty || main.DCnty || '',
+                DZip: main.Zip || main.DZip || ''
             };
             setCurrentParty(loadedParty);
             navigation.setParams({
@@ -917,6 +934,62 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 'Error',
                 error?.response?.data?.message || 'Unable to load sales order',
             );
+        } finally {
+            setLoadingOrder(false);
+        }
+    };
+
+    const loaddeliveryaddress = async () => {
+        try {
+            setLoadingOrder(true);
+
+            const yno = yearno ? yearno.slice(-2) : '';
+
+            const params = {
+                uid,
+                prpcode,
+                strcode,
+                yearno: yno,
+                parcode: currentParty.ParCode,
+                page: '',
+                limit: '',
+                search: '',
+                txntype: 'sales_order'
+            };
+
+            console.log('getaddress params =>', params);
+
+            const res = await axios.get(`${API}/api/getaddress`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'x-platform': 'mob',
+                },
+                params,
+            });
+
+            console.log('getaddress res =>', res?.data);
+
+            const data = res?.data?.response?.data || [];
+
+            console.log('ADDRESS LIST =>', data);
+
+            setAdedressList(data);
+
+        } catch (error) {
+
+            console.log(
+                'LOAD ADDRESS ERROR =>',
+                error?.response?.data || error
+            );
+
+            Alert.alert(
+                'Error',
+                error?.response?.data?.message ||
+                'Unable to load delivery address',
+            );
+
         } finally {
             setLoadingOrder(false);
         }
@@ -955,6 +1028,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 SExeName: currentParty?.SExeName || '',
                 PrintName: currentParty?.PrintName || '',
                 Remark: currentParty?.Remark || '',
+                // BAccCode: currentParty?.brkAcc || '',
+                // BAccName: currentParty?.brkname || '',
+                // DueDay: currentParty?.crday || ''
             });
         }
 
@@ -972,7 +1048,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             ParName: currentParty?.ParName || base.ParName || '',
 
             SExe: currentParty?.SExe || base.SExe || '',
-            SExeName: currentParty?.SExeName || base.SExeName || '',
+            // SExeName: currentParty?.SExeName || base.SExeName || '',
+
+            BAccCode: currentParty?.BAccCode || base?.BAccCode || '',
+            BAccName: currentParty?.BAccName || base?.BAccName || '',
+            DueDay: currentParty?.DueDay || base?.DueDay || '',
+            DueDate: DueDate || base.DueDate || '',
 
             GrsAmt: fmt(totals.totalAmount),
             DisAmt: fmt(discountAmt),
@@ -992,6 +1073,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
             DAdd: currentParty?.Address || base.DAdd || '',
             DCity: currentParty?.City || base.DCity || '',
+            DZip: currentParty?.City || base.DZip || '',
+            DState: currentParty?.State || base.DState || '',
+            DCnty: currentParty?.DCnty || base.DCnty || '',
             Station: currentParty?.City || base.Station || '',
 
             Status: base.Status || 'P',
@@ -1000,8 +1084,10 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
             SONo: uid > 0 ? base.SONo : '',
             SODate: uid > 0 ? base.SODate : '',
-            DueDay: base.DueDay || '',
-            DueDate: base.DueDate || '',
+
+            QtyKgs: currentParty?.QtyKgs || ''
+            // DueDay: base.DueDay || '',
+            // DueDate: base.DueDate || '',
         };
     };
 
@@ -1277,7 +1363,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             };
             console.log("save payload", payload);
 
-            const res = await axios.post(`${API}/api/sodelete`, payload, {
+            const res = await axios.post(`${API}/api/mobappdeleteso`, payload, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     Accept: 'application/json',
@@ -1577,6 +1663,43 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
     }, [ddays, soDate]);
 
+
+    useEffect(() => {
+        const dueDays = Number(currentParty?.DueDay || 0);
+        if (isNaN(dueDays)) {
+            return;
+        }
+        let baseDate;
+        if (soDate) {
+            const parts = soDate.split('-');
+            if (parts.length === 3) {
+                baseDate = new Date(
+                    Number(parts[2]),
+                    Number(parts[1]) - 1,
+                    Number(parts[0]),
+                );
+            }
+        }
+        if (!baseDate || isNaN(baseDate.getTime())) {
+            baseDate = new Date();
+        }
+        baseDate.setDate(
+            baseDate.getDate() + dueDays
+        );
+        const day = String(
+            baseDate.getDate()
+        ).padStart(2, '0');
+        const month = String(
+            baseDate.getMonth() + 1
+        ).padStart(2, '0');
+        const year = baseDate.getFullYear();
+        const finalDueDate =
+            `${day}-${month}-${year}`;
+        if (finalDueDate !== DueDate) {
+            setDueDate(finalDueDate);
+        }
+    }, [currentParty?.DueDay, soDate]);
+
     if (loadingOrder) {
         return <OrderSummarySkeleton />;
     }
@@ -1608,10 +1731,35 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             SO Date : {headerData?.SODate || soDate || '-'}
                         </Text>
                     </View>
-
+                    {/* 
                     <View style={styles.modeBadge}>
                         <Text style={styles.modeText}>{Number(autoLocked) == 1 ? 'VIEW' : initialMode}</Text>
+                    </View> */}
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+
+                        <TouchableOpacity
+                            style={styles.infoBtn}
+                            onPress={() => {
+                                setDetailVisible(true);
+                                loaddeliveryaddress();
+                            }}
+                        >
+                            <Icon
+                                name="info-outline"
+                                size={20}
+                                color="#13879A"
+                            />
+                        </TouchableOpacity>
+
+                        <View style={styles.modeBadge}>
+                            <Text style={styles.modeText}>
+                                {Number(autoLocked) == 1 ? 'VIEW' : initialMode}
+                            </Text>
+                        </View>
+
                     </View>
+
                 </View>
                 <View style={styles.partyCard}>
                     <View style={{ flex: 1 }}>
@@ -1919,6 +2067,396 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     </View>
                 </View>
             </Modal>
+
+            <Modal
+                visible={detailVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setDetailVisible(false)}
+            >
+                <View style={styles.detailOverlay}>
+
+                    <View style={styles.detailModal}>
+
+                        {/* <View style={styles.dragBar} /> */}
+
+                        {/* HEADER */}
+                        <View style={styles.detailHeader}>
+                            <Text style={styles.detailTitle}>
+                                Sales Order Details
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => setDetailVisible(false)}
+                            >
+                                <Icon
+                                    name="close"
+                                    size={24}
+                                    color="#000"
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                        >
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="person"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Sales Executive
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.SExeName || '-'}
+                                </Text>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="person"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Broker
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.BAccName || '-'}
+                                </Text>
+                            </View>
+
+                            {/* DELIVERY DAYS */}
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="calendar-today"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Due Days
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.DueDay || '-'}
+                                </Text>
+                            </View>
+
+                            {/* DELIVERY DATE */}
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="event"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Due Date
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {DueDate || '-'}
+                                </Text>
+                            </View>
+
+                            {/* ADDRESS */}
+                            {/* <View style={styles.detailRowTop}>
+                                <Icon
+                                    name="location-on"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Address
+                                </Text>
+
+                                <Text style={styles.detailValueAddress}>
+                                    {currentParty?.Address || '-'}
+                                </Text>
+                            </View> */}
+
+                            <TouchableOpacity
+                                style={styles.detailRowTop}
+                                activeOpacity={0.8}
+                                onPress={() => setAddressListVisible(true)}
+                            >
+                                <Icon
+                                    name="location-on"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Address
+                                </Text>
+
+                                <View style={{ width: '42%' }}>
+                                    <Text
+                                        numberOfLines={10}
+                                        style={styles.detailValueAddress}
+                                    >
+                                        {currentParty?.Address || '-'}
+                                    </Text>
+
+                                    <Text
+                                        style={{
+                                            color: '#13879A',
+                                            fontSize: 12,
+                                            marginTop: 4,
+                                            fontWeight: '700',
+                                        }}
+                                    >
+                                        Tap to change
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* CITY */}
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="location-city"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    City
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.City || '-'}
+                                </Text>
+                            </View>
+
+                            {/* STATE */}
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="map"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    State
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.DState || '-'}
+                                </Text>
+                            </View>
+
+                            {/* COUNTRY */}
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="public"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Country
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.DCnty || '-'}
+                                </Text>
+                            </View>
+
+                            {/* ZIP CODE */}
+                            <View style={styles.detailRow}>
+                                <Icon
+                                    name="markunread-mailbox"
+                                    size={20}
+                                    color="#13879A"
+                                />
+
+                                <Text style={styles.detailLabel}>
+                                    Zip Code
+                                </Text>
+
+                                <Text style={styles.detailValue}>
+                                    {currentParty?.DZip || '-'}
+                                </Text>
+                            </View>
+                        </ScrollView>
+
+                        {/* CLOSE BUTTON */}
+                        {/* <TouchableOpacity
+                            style={styles.closeDetailBtn}
+                            onPress={() => setDetailVisible(false)}
+                        >
+                            <Text style={styles.closeDetailText}>
+                                CLOSE
+                            </Text>
+                        </TouchableOpacity> */}
+
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={addressListVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setAddressListVisible(false)}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.35)',
+                        justifyContent: 'flex-end',
+                    }}
+                >
+                    <View
+                        style={{
+                            backgroundColor: '#fff',
+                            borderTopLeftRadius: 25,
+                            borderTopRightRadius: 25,
+                            padding: 18,
+                            maxHeight: '60%',
+                        }}
+                    >
+
+                        <View style={styles.dragBar} />
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: 18,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 18,
+                                    fontWeight: '800',
+                                    color: '#101828',
+                                }}
+                            >
+                                Select Address
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => setAddressListVisible(false)}
+                            >
+                                <Icon
+                                    name="close"
+                                    size={24}
+                                    color="#000"
+                                />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 20 }}
+                        >
+
+                            {AddressList && AddressList.length > 0 ? (
+
+                                AddressList.map((item, index) => (
+
+                                    <TouchableOpacity
+                                        key={index}
+                                        style={{
+                                            paddingVertical: 16,
+                                            borderBottomWidth: 1,
+                                            borderBottomColor: '#EDF2F7',
+                                        }}
+                                        onPress={() => {
+
+                                            console.log('Selected Address:', item);
+
+                                            setCurrentParty(prev => ({
+                                                ...prev,
+
+                                                Address: item?.DAdd || '',
+                                                DCity: item?.DCity || '',
+                                                DState: item?.DState || '',
+                                                DCnty: item?.DCnty || '',
+                                                DZip: item?.DZip || '',
+
+                                                QtyKgs: item?.SrNo || '',
+                                            }));
+
+                                            setAddressListVisible(false);
+                                        }}
+                                    >
+
+                                        {/* ADDRESS */}
+                                        <Text
+                                            style={{
+                                                color: '#101828',
+                                                fontSize: 14,
+                                                fontWeight: '800',
+                                                lineHeight: 22,
+                                            }}
+                                        >
+                                            {item?.DAdd || '-'}
+                                        </Text>
+
+                                        {/* CITY + STATE */}
+                                        <Text
+                                            style={{
+                                                color: '#667085',
+                                                fontSize: 13,
+                                                marginTop: 6,
+                                            }}
+                                        >
+                                            {item?.DCity || '-'} , {item?.DState || '-'}
+                                        </Text>
+
+                                        {/* COUNTRY + ZIP */}
+                                        <Text
+                                            style={{
+                                                color: '#98A2B3',
+                                                fontSize: 12,
+                                                marginTop: 2,
+                                            }}
+                                        >
+                                            {item?.DCnty || '-'} - {item?.DZip || '-'}
+                                        </Text>
+
+                                    </TouchableOpacity>
+
+                                ))
+
+                            ) : (
+
+                                <View
+                                    style={{
+                                        paddingVertical: 40,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: '#98A2B3',
+                                            fontSize: 14,
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        No Address Found
+                                    </Text>
+                                </View>
+
+                            )}
+
+                        </ScrollView>
+
+                    </View>
+                </View>
+            </Modal>
+
         </SafeAreaView>
     );
 };
@@ -2357,5 +2895,105 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#EAF7F0',
+    },
+
+    infoBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        borderWidth: 1,
+        borderColor: '#CDECEF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+
+    detailOverlay: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+
+    detailModal: {
+        flex: 1,
+        backgroundColor: '#fff',
+        paddingTop: 50,
+        paddingHorizontal: 18,
+    },
+
+    dragBar: {
+        width: 60,
+        height: 5,
+        borderRadius: 10,
+        backgroundColor: '#D0D5DD',
+        alignSelf: 'center',
+        marginBottom: 18,
+    },
+
+    detailHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+
+    detailTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#101828',
+    },
+
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EDF2F7',
+    },
+
+    detailRowTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EDF2F7',
+    },
+
+    detailLabel: {
+        flex: 1,
+        marginLeft: 14,
+        color: '#344054',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+
+    detailValue: {
+        width: '42%',
+        color: '#101828',
+        fontWeight: '700',
+        fontSize: 14,
+        textAlign: 'left',
+    },
+
+    detailValueAddress: {
+        // width: '42%',
+        color: '#101828',
+        fontWeight: '700',
+        fontSize: 14,
+        lineHeight: 22,
+    },
+
+    closeDetailBtn: {
+        marginTop: 20,
+        height: 52,
+        borderRadius: 14,
+        backgroundColor: '#13879A',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    closeDetailText: {
+        color: '#fff',
+        fontWeight: '900',
+        fontSize: 16,
     },
 });

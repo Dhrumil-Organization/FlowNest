@@ -24,10 +24,5 @@ export const warehouseApi = {
 
     saveTransfer: async (payload) => {
         return API.post("/warehouse/cartons/transfer", payload);
-    },
-
-    AllItemMergeGradeShade: async (payload) => {
-        return API.get("/warehouse/get_criterion", payload);
-    },
-    
+    },    
 };

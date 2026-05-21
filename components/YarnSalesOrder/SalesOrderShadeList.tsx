@@ -138,51 +138,47 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     // };
 
 
-    const loadShades = async () => {
-        const yrno = yearno ? yearno.slice(-2) : '';
-        if (!selectedItem?.ItmCode) {
-            Alert.alert('Required', 'Item is missing.');
-            return;
-        }
+    const loadShades = async (searchText = '') => {
+    const yrno = yearno ? yearno.slice(-2) : '';
 
-        if (!selectedGrade?.GrdCode) {
-            Alert.alert('Required', 'Grade is missing.');
-            return;
-        }
+    if (!selectedItem?.ItmCode) {
+        Alert.alert('Required', 'Item is missing.');
+        return;
+    }
 
-        try {
-            setLoading(true);
-            const payload = {
-                prpcode,
-                strcode,
-                yearno: yrno,
-                itmcode: selectedItem.ItmCode,
-                mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
-                // dsncode: selectedGrade.GrdCode,
-                // search,
-            };
-            console.log("shade type historyPayload:", payload);
+    try {
+        setLoading(true);
 
-            const res = await axios.get(
-                `${API}/api/getshade`,
-                getRequestConfig({ params: { ...payload } }),
-            );
-            console.log("shade type Response:", res);
-            const data =
-                res.data?.response?.data ||
-                res.data?.response ||
-                res.data?.data ||
-                [];
+        const payload = {
+            prpcode,
+            strcode,
+            yearno: yrno,
+            itmcode: selectedItem.ItmCode,
+            mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
+            search: searchText,
+            limit: 100,
+        };
 
-            setShades(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.log('getshade LIST ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load design list');
-            setShades([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+        const res = await axios.get(
+            `${API}/api/getmobshade`,
+            getRequestConfig({ params: payload }),
+        );
+
+        const data =
+            res.data?.response?.data ||
+            res.data?.response ||
+            res.data?.data ||
+            [];
+
+        setShades(Array.isArray(data) ? data : []);
+    } catch (error) {
+        console.log('getmobshade LIST ERROR:', error?.response?.data || error.message);
+        Alert.alert('Error', 'Unable to load shade list');
+        setShades([]);
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => {
         if (editMode && oldRow?.ShdCode) {
@@ -199,17 +195,17 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         }
     }, [editMode, oldRow, shades]);
 
+    //useEffect(() => {
+    //    loadShades();
+    //}, []);
+
     useEffect(() => {
-        loadShades();
-    }, []);
+    const t = setTimeout(() => {
+        loadShades(search);
+    }, 500);
 
-    // useEffect(() => {
-    //     const t = setTimeout(() => {
-    //         loadShades();
-    //     }, 400);
-
-    //     return () => clearTimeout(t);
-    // }, [search]);
+    return () => clearTimeout(t);
+}, [search]);
 
     const filteredShades = useMemo(() => {
         const s = search.toLowerCase();
@@ -549,7 +545,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                     <View>{renderSkeleton()}</View>
                 ) : (
                     <FlatList
-                        data={filteredShades}
+                        data={shades}
                         keyExtractor={(item, index) => `${item.ShdCode}_${index}`}
                         renderItem={renderItem}
                         showsVerticalScrollIndicator={false}

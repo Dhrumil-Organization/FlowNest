@@ -66,7 +66,7 @@ export const styles = StyleSheet.create({
     button: {
         height: 46,
         borderRadius: 10,
-        backgroundColor: COLORS.primary,
+        backgroundColor: '#13879A',
         alignItems: "center",
         justifyContent: "center",
         marginTop: 14,
@@ -147,6 +147,22 @@ export const styles = StyleSheet.create({
     inputText: {
         flex: 1,
         color: "#000"
+    },
+    header: {
+        height: 64,
+        backgroundColor:'#13879A',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        elevation: 4,
+    },
+
+    headerTitle: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
     },
 
 });

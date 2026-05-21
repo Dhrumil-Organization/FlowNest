@@ -34,7 +34,7 @@ export const fetchPropertyGroupDataDCR = async (token: string) => {
       },
     );
 
-    
+
     if (response.data.success && response.data.response.data.length > 0) {
       const propertyGroupData = response.data.response.data;
 
@@ -69,7 +69,7 @@ export const fetchPropertyDataDCR = async (token: string, prptype: string) => {
       },
     );
 
-    
+
     if (response.data.success && response.data.response.data.length > 0) {
       const propertyGroupData = response.data.response.data;
 
@@ -93,7 +93,7 @@ export const fetchPropertyData = async (token: string) => {
   try {
     // 1. Pehle cache check karo
     const cached = await AsyncStorage.getItem('get_property');
-    
+
     // 2. Cache nahi mila toh API call
     if (cancelToken?.cancel) cancelToken.cancel();
     cancelToken = axios.CancelToken.source();
@@ -110,6 +110,8 @@ export const fetchPropertyData = async (token: string) => {
         params,
       },
     );
+
+    console.log("response", response, params)
 
     if (response.data.success && response.data.response.data.length > 0) {
       const propertyData = response.data.response.data;
@@ -501,18 +503,18 @@ export const getPrptypeSummary = async (
     const accountCount = Array.isArray(cache.account)
       ? cache.account.length
       : cache.account
-      ? null
-      : 0;
+        ? null
+        : 0;
     const banksCount = Array.isArray(cache.banks)
       ? cache.banks.length
       : cache.banks
-      ? null
-      : 0;
+        ? null
+        : 0;
     const branchesCount = Array.isArray(cache.branches)
       ? cache.branches.length
       : cache.branches
-      ? null
-      : 0;
+        ? null
+        : 0;
     return {
       prptype,
       accountCount,
@@ -540,7 +542,7 @@ export const debugRawAsyncStorage = async () => {
       k => k && (k === ALL_PRPTYPES_KEY || k.startsWith(PRPTYPE_KEY_PREFIX)),
     );
     for (const k of masterKeys) {
-      const v = await AsyncStorage.getItem(k);      
+      const v = await AsyncStorage.getItem(k);
     }
   } catch (err) {
     console.warn('debugRawAsyncStorage failed', err);
@@ -550,7 +552,7 @@ export const debugRawAsyncStorage = async () => {
 export const printCachedPrptypesWithData = async () => {
   try {
     const { prptypes } = await getPrptypeIndex();
-    
+
     const present: string[] = [];
     for (const p of prptypes) {
       const key = normalizePrptype(p);

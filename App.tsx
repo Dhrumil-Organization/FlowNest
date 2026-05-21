@@ -71,6 +71,9 @@ import {
   initGlobalCacheDB,
   updateGlobalCacheInBackground,
 } from './common/utils/sqliteCacheManager';
+
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 import CheckingScanner from './components/CheckingScanner/CheckingScanner';
 import YarnStockVerification from './components/YarnStockVerification/YarnStockVerification';
 import PurchaseOrderTracking from './components/PurchaseOrderTracking/PurchaseOrderTracking';
@@ -116,7 +119,7 @@ import ConfirmInquiryScreen from './src_inquiry/screens/ConfirmInquiryScreen';
 import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
 import TatConfigScreen from './src_inquiry/screens/TatConfigScreen';
 import TatAnalyticsScreen from './src_inquiry/screens/TatAnalyticsScreen';
-import WarehouseCriteriaScreen from './components/Warehouse/WarehouseCriteriaScreen';
+import WarehouseStack from './components/Warehouse/WarehouseStack';
 
 const Stack = createNativeStackNavigator();
 
@@ -1208,7 +1211,7 @@ export default function App() {
 
                     <Stack.Screen name="Warehouse Criteria Screen">
                       {props => (
-                        <WarehouseCriteriaScreen
+                        <WarehouseStack
                           {...props}
                           token={gettoken || ''}
                           isConnected={isConnected}
@@ -1253,12 +1256,14 @@ export default function App() {
                     </Stack.Screen>
                     <Stack.Screen name="Yarn Sales Order">
                       {props => (
-                        <YarnSalesOrderModule
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                          username={getUserDetails}
-                        />
+                        <SafeAreaProvider>
+                          <YarnSalesOrderModule
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        </SafeAreaProvider>
                       )}
                     </Stack.Screen>
                     {/* For Inquiry */}

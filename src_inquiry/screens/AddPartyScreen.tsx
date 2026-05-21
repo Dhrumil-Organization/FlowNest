@@ -82,6 +82,8 @@ const AddPartyScreen: React.FC<Props> = ({route, navigation}) => {
         mobile,
         email,
         contact,
+        prpcode: "SIP",
+        yearno: "27"
       });
       onSaved(p);
       navigation.goBack();

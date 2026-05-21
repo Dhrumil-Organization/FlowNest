@@ -752,7 +752,7 @@ export default function App() {
                       <PackingAutomation {...props} token={gettoken || ''} isConnected={isConnected} getDeviceId={getDeviceId} username={getUserDetails} />
                     </>
                   }</Stack.Screen> */}
-                    <Stack.Screen name="Inquiry">
+                    {/* <Stack.Screen name="Inquiry">
                       {props => (
                         <>
                           <ErrorBoundary FallbackComponent={ErrorFallback}>
@@ -770,7 +770,7 @@ export default function App() {
                           </ErrorBoundary>
                         </>
                       )}
-                    </Stack.Screen>
+                    </Stack.Screen> */}
                     <Stack.Screen name="InquiryAdd">
                       {props => (
                         <>
@@ -1262,22 +1262,18 @@ export default function App() {
                       )}
                     </Stack.Screen>
                     {/* For Inquiry */}
-                    {/* <Stack.Screen name="Inquiry" options={{ title: 'Fabric Inquiries' }}>
+                    <Stack.Screen name="Inquiry" options={{ title: 'Fabric Inquiries' }}>
                       {props => (
                         <DashboardScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
-                    </Stack.Screen> */}
+                    </Stack.Screen>
                     <Stack.Screen name="InquiryForm" options={{ title: 'New Inquiry' }}>
                       {props => (
                         <InquiryFormScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1286,8 +1282,6 @@ export default function App() {
                       {props => (
                         <PartySelectionScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1296,8 +1290,6 @@ export default function App() {
                       {props => (
                         <AddPartyScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1306,8 +1298,6 @@ export default function App() {
                       {props => (
                         <DesignSelectionScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1316,8 +1306,6 @@ export default function App() {
                       {props => (
                         <InquiryDetailScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1326,8 +1314,6 @@ export default function App() {
                       {props => (
                         <CostingScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1336,8 +1322,6 @@ export default function App() {
                       {props => (
                         <SendQuotationScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1346,8 +1330,6 @@ export default function App() {
                       {props => (
                         <ConfirmInquiryScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1356,8 +1338,6 @@ export default function App() {
                       {props => (
                         <RejectInquiryScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1366,8 +1346,6 @@ export default function App() {
                       {props => (
                         <TatConfigScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}
@@ -1376,8 +1354,6 @@ export default function App() {
                       {props => (
                         <TatAnalyticsScreen
                           {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
                           username={getUserDetails}
                         />
                       )}

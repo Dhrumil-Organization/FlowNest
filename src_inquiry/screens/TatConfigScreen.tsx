@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,12 +8,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import {colors, fontSize, radius, spacing} from '../utils/theme';
-import {RootStackParamList, TatConfiguration} from '../types';
-import {tatApi} from '../services/tatApi';
+import { colors, fontSize, radius, spacing } from '../utils/theme';
+import { RootStackParamList, TatConfiguration } from '../types';
+import { tatApi } from '../services/tatApi';
 import Button from '../components/Button';
+import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TatConfig'>;
 
@@ -29,7 +30,7 @@ const formatHoursLabel = (h: number): string => {
   return remH > 0 ? `${days}d ${remH}h` : `${days} day${days > 1 ? 's' : ''}`;
 };
 
-const TatConfigScreen: React.FC<Props> = ({navigation}) => {
+const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
   const [rows, setRows] = useState<EditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,7 +38,10 @@ const TatConfigScreen: React.FC<Props> = ({navigation}) => {
   useEffect(() => {
     (async () => {
       try {
-        const data = await tatApi.listConfigurations();
+        const data = await tatApi.listConfigurations({
+          prpcode: "SIP",
+          yearno: "27"
+        });
         setRows(
           data.map(c => ({
             ...c,
@@ -54,7 +58,7 @@ const TatConfigScreen: React.FC<Props> = ({navigation}) => {
   }, []);
 
   const update = (id: number, patch: Partial<EditRow>) => {
-    setRows(prev => prev.map(r => (r.id === id ? {...r, ...patch} : r)));
+    setRows(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
   };
 
   const save = async () => {
@@ -78,9 +82,11 @@ const TatConfigScreen: React.FC<Props> = ({navigation}) => {
           expected_hours: parseInt(r._expectedHours, 10),
           warning_threshold_percent: parseInt(r._warningPct, 10),
         })),
+        "SIP",
+        "27"
       );
       Alert.alert('Saved', 'TAT configurations updated successfully', [
-        {text: 'OK', onPress: () => navigation.goBack()},
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to save');
@@ -98,72 +104,79 @@ const TatConfigScreen: React.FC<Props> = ({navigation}) => {
   }
 
   return (
-    <ScrollView
-      style={{flex: 1, backgroundColor: colors.bg}}
-      contentContainerStyle={{padding: spacing.md, paddingBottom: 40}}>
+    <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'TAT Configuration'}
+        subHeader={'Manage your TAT configuration'}
+      />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
 
-      <View style={styles.banner}>
-        <Text style={styles.bannerTitle}>⚙ TAT Configuration</Text>
-        <Text style={styles.bannerText}>
-          Configure expected time for each step of the inquiry workflow. Warning
-          % is when the inquiry starts showing as "warning" before fully
-          breaching.
-        </Text>
-      </View>
+        <View style={styles.banner}>
+          <Text style={styles.bannerTitle}>⚙ TAT Configuration</Text>
+          <Text style={styles.bannerText}>
+            Configure expected time for each step of the inquiry workflow. Warning
+            % is when the inquiry starts showing as "warning" before fully
+            breaching.
+          </Text>
+        </View>
 
-      {rows.map(row => {
-        const hrs = parseInt(row._expectedHours, 10);
-        return (
-          <View key={row.id} style={styles.card}>
-            <Text style={styles.stepName}>{row.step_name}</Text>
-            {row.description ? (
-              <Text style={styles.description}>{row.description}</Text>
-            ) : null}
+        {rows.map(row => {
+          const hrs = parseInt(row._expectedHours, 10);
+          return (
+            <View key={row.id} style={styles.card}>
+              <Text style={styles.stepName}>{row.step_name}</Text>
+              {row.description ? (
+                <Text style={styles.description}>{row.description}</Text>
+              ) : null}
 
-            <View style={{flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm}}>
-              <View style={{flex: 2}}>
-                <Text style={styles.label}>Expected Hours *</Text>
-                <TextInput
-                  value={row._expectedHours}
-                  onChangeText={t => update(row.id, {_expectedHours: t})}
-                  keyboardType="number-pad"
-                  placeholder="e.g., 4"
-                  placeholderTextColor={colors.textTertiary}
-                  style={styles.input}
-                />
-                {!isNaN(hrs) && hrs > 0 ? (
-                  <Text style={styles.hint}>= {formatHoursLabel(hrs)}</Text>
-                ) : null}
-              </View>
-              <View style={{flex: 1}}>
-                <Text style={styles.label}>Warning %</Text>
-                <TextInput
-                  value={row._warningPct}
-                  onChangeText={t => update(row.id, {_warningPct: t})}
-                  keyboardType="number-pad"
-                  placeholder="75"
-                  placeholderTextColor={colors.textTertiary}
-                  style={styles.input}
-                />
-                <Text style={styles.hint}>of expected</Text>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                <View style={{ flex: 2 }}>
+                  <Text style={styles.label}>Expected Hours *</Text>
+                  <TextInput
+                    value={row._expectedHours}
+                    onChangeText={t => update(row.id, { _expectedHours: t })}
+                    keyboardType="number-pad"
+                    placeholder="e.g., 4"
+                    placeholderTextColor={colors.textTertiary}
+                    style={styles.input}
+                  />
+                  {!isNaN(hrs) && hrs > 0 ? (
+                    <Text style={styles.hint}>= {formatHoursLabel(hrs)}</Text>
+                  ) : null}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Warning %</Text>
+                  <TextInput
+                    value={row._warningPct}
+                    onChangeText={t => update(row.id, { _warningPct: t })}
+                    keyboardType="number-pad"
+                    placeholder="75"
+                    placeholderTextColor={colors.textTertiary}
+                    style={styles.input}
+                  />
+                  <Text style={styles.hint}>of expected</Text>
+                </View>
               </View>
             </View>
-          </View>
-        );
-      })}
+          );
+        })}
 
-      <Button
-        title="Save Configuration"
-        onPress={save}
-        loading={saving}
-        style={{marginTop: spacing.md}}
-      />
-    </ScrollView>
+        <Button
+          title="Save Configuration"
+          onPress={save}
+          loading={saving}
+          style={{ marginTop: spacing.md }}
+        />
+      </ScrollView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   banner: {
     backgroundColor: colors.infoBg,
     borderLeftWidth: 3,
@@ -178,7 +191,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 4,
   },
-  bannerText: {color: colors.info, fontSize: fontSize.sm, lineHeight: 18},
+  bannerText: { color: colors.info, fontSize: fontSize.sm, lineHeight: 18 },
   card: {
     backgroundColor: colors.cardBg,
     borderWidth: 1,
@@ -187,7 +200,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  stepName: {fontSize: fontSize.base, fontWeight: '500', color: colors.textPrimary},
+  stepName: { fontSize: fontSize.base, fontWeight: '500', color: colors.textPrimary },
   description: {
     fontSize: fontSize.sm,
     color: colors.textSecondary,
@@ -209,7 +222,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     backgroundColor: colors.cardBg,
   },
-  hint: {fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2},
+  hint: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
 });
 
 export default TatConfigScreen;

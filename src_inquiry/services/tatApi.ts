@@ -2,10 +2,12 @@ import client from './apiClient';
 import {ApiResponse, TatAnalytics, TatConfiguration} from '../types';
 
 export const tatApi = {
-  listConfigurations: async (): Promise<TatConfiguration[]> => {
+  listConfigurations: async (params: {prpcode?: string; yearno?: string} = {}): Promise<TatConfiguration[]> => {
     const res = await client.get<ApiResponse<TatConfiguration[]>>(
-      '/tat/configurations',
-    );
+      '/api/tat/configurations',{
+        params,
+      });
+    console.log("tat api called", params, res);
     return res.data.data;
   },
 
@@ -14,7 +16,7 @@ export const tatApi = {
     payload: Partial<TatConfiguration>,
   ): Promise<TatConfiguration> => {
     const res = await client.patch<ApiResponse<TatConfiguration>>(
-      `/tat/configurations/${id}`,
+      `/api/tat/configurations/${id}`,
       payload,
     );
     return res.data.data;
@@ -24,20 +26,32 @@ export const tatApi = {
     configurations: Array<{
       id: number;
       expected_hours: number;
-      warning_threshold_percent?: number;
+      warning_threshold_percent: number;
     }>,
+    prpcode: string,
+    yearno: string
   ): Promise<TatConfiguration[]> => {
     const res = await client.post<ApiResponse<TatConfiguration[]>>(
-      '/tat/configurations/bulk',
-      {configurations},
+      '/api/tat/configurations/bulk',
+      {
+        configurations: configurations.map(c => ({
+          ...c,
+          prpcode,
+          yearno
+        })),
+        prpcode,
+        yearno
+      },
     );
+    console.log("tat bulkUpdate api called", configurations, res);
     return res.data.data;
   },
 
-  analytics: async (params: {from?: string; to?: string} = {}): Promise<TatAnalytics[]> => {
-    const res = await client.get<ApiResponse<TatAnalytics[]>>('/tat/analytics', {
+  analytics: async (params: {prpcode?: string; yearno?: string} = {}): Promise<TatAnalytics[]> => {
+    const res = await client.get<ApiResponse<TatAnalytics[]>>('/api/tat/analytics', {
       params,
     });
+    console.log("tat analytics api called", params, res);
     return res.data.data;
   },
 };

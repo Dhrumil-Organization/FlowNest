@@ -24,6 +24,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
     const strcode = route?.params?.strcode;
     const [search, setSearch] = useState('');
     const [parties, setParties] = useState([]);
+    const [exename, setExename] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const { salesOrderParams, startNewOrder } = useSalesOrder();
@@ -45,6 +46,8 @@ const PartyListScreen = ({ navigation, route, token }) => {
     const filteredParties = parties.filter(item =>
         item.acccode.toLowerCase().includes(search.toLowerCase()) ||
         item.accountname.toLowerCase().includes(search.toLowerCase())
+        // ||
+        // item.SExeName.toLowerCase().includes(search.toLowerCase())
     );
 
 
@@ -115,7 +118,45 @@ const PartyListScreen = ({ navigation, route, token }) => {
             if (axios.isCancel(error)) {
                 console.log("Request cancelled:", error.message);
             } else {
-                console.log("API getyarnblend error:", error);
+                console.log("API party error:", error);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadExecutive = async () => {
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        const yrno = yearno ? yearno.slice(-2) : '';
+        try {
+            setLoading(true);
+            const payload = {
+                prpcode: prpcode,
+                prptype: userPtype,
+                yearno: yrno,
+                strcode: '002',
+                txntype: 'yarn_sales_order',
+                fetch: 'salesexe'
+            };
+            console.log("Exe type historyPayload:", payload);
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`,
+                getRequestConfig({ params: { ...payload } }),
+            );
+            console.log("Exe type Response:", response);
+
+            const data = response?.data?.response?.data || [];
+            if (response?.data?.success && response?.data?.response?.data?.length > 0) {
+                setExename(data);
+            } else {
+                setExename([]);
+            }
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                console.log("Request cancelled:", error.message);
+            } else {
+                console.log("API Exe error:", error);
             }
         } finally {
             setLoading(false);
@@ -124,6 +165,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
 
     useEffect(() => {
         loadParties('');
+        loadExecutive();
     }, []);
 
     useEffect(() => {
@@ -140,13 +182,25 @@ const PartyListScreen = ({ navigation, route, token }) => {
     }, [search]);
 
     const selectParty = party => {
+
+        const executiveData = exename.find(
+            item => String(item.Code) === String(party.sexe)
+        );
+
         const selectedPartyData = {
             ParCode: party.acccode,
             ParName: party.accountname,
             City: party.City || '',
             Address: party.Address || '',
             SExe: party.sexe || '',
-            SExeName: party.SExeName || ''
+            SExeName: party.SExeName || executiveData?.SalesExecutive || '',
+            BAccCode: party.brkAcc || '',
+            BAccName: party.brkname || '',
+            DueDay: party.crday || '',
+            Dcity: party.City || '',
+            DState: party.State || '',
+            DCnty: party.Cnty || '',
+            DZip: party.Zip || '',
         };
 
         if (route?.params?.replaceTempPartyOnly === true) {

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-    View, Text, StyleSheet, SafeAreaView, TextInput,
+    View, Text, StyleSheet, TextInput,
     TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
-    ScrollView, Modal
+    ScrollView, Modal, StatusBar,
+    Platform,
 } from 'react-native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -12,6 +13,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { API } from "../../common/API/dynamicAPI";
 import { useSalesOrder } from './SalesOrderContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 
@@ -30,7 +32,11 @@ const todayYmd = () => {
     return `${yyyy}${mm}${dd}`;
 };
 
+const HEADER_HEIGHT = 52;
+
 const YarnSalesOrder = ({ token, navigation, route }) => {
+    const insets = useSafeAreaInsets();
+
     const { startNewOrder, loadExistingOrder } = useSalesOrder();
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
     const [yearPickerVisible, setYearPickerVisible] = useState(false);
@@ -45,7 +51,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
     const [filterLoading, setFilterLoading] = useState(false);
     const [opening, setOpening] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [showFilter, setShowFilter] = useState(false);
+    const [showFilter, setShowFilter] = useState(true);
     const [filters, setFilters] = useState({
         prpcode: '',
         yearno: '',
@@ -456,7 +462,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
             };
             console.log("delete payload", payload);
 
-            const res = await axios.post(`${API}/api/sodelete`, payload, {
+            const res = await axios.post(`${API}/api/mobappdeleteso`, payload, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     Accept: 'application/json',
@@ -567,15 +573,23 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+            <StatusBar
+                translucent={false}
+                backgroundColor="#00838f"
+                barStyle="light-content"
+            />
+            <View
+                // style={styles.header}
+                style={[styles.header, { height: HEADER_HEIGHT }]}
+            >
+                <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <Text style={styles.back}>‹</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.headerTitle}>Sales Order Browse</Text>
 
-                <TouchableOpacity onPress={() => setShowFilter(!showFilter)}>
+                <TouchableOpacity onPress={() => setShowFilter(!showFilter)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     {/* <Text style={styles.filterIcon}>⚙</Text> */}
                     <Icon name="tune" size={22} color="#fff" />
                 </TouchableOpacity>
@@ -720,7 +734,7 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
                     </View>
                 )}
 
-                {(loading && orders.length === 0) || filterLoading ? (
+                {(loading || orders.length === 0) || filterLoading ? (
                     <View>
                         {renderSkeleton()}
                     </View>
@@ -1049,37 +1063,62 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
 export default YarnSalesOrder;
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: '#f5f7fb' },
-    header: {
-        height: 56,
-        backgroundColor: '#13879A',
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-    },
+    // safe: { flex: 1, backgroundColor: '#f5f7fb' },
     // header: {
-    //     height: 100,
+    //     height: 56,
     //     backgroundColor: '#13879A',
     //     flexDirection: 'row',
-    //     alignItems: 'flex-end',
+    //     alignItems: 'center',
     //     paddingHorizontal: 14,
-    //     paddingBottom: 16,
     // },
-    back: { color: '#fff', fontSize: 34, width: 35 },
+    safe: {
+        flex: 1,
+        backgroundColor: '#00838f',
+    },
+
+    header: {
+        backgroundColor: '#00838f',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+    },
+
+    headerIcon: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
     headerTitle: {
         flex: 1,
         color: '#fff',
-        fontSize: 16,
-        fontWeight: '900',
+        fontSize: 18,
+        fontWeight: '700',
         textAlign: 'center',
     },
+
+    container: {
+        flex: 1,
+        backgroundColor: '#f6f7fb',
+        paddingHorizontal: 16,
+        paddingTop: 14,
+    },
+    back: { color: '#fff', fontSize: 34, width: 35 },
+    // headerTitle: {
+    //     flex: 1,
+    //     color: '#fff',
+    //     fontSize: 16,
+    //     fontWeight: '900',
+    //     textAlign: 'center',
+    // },
     filterIcon: {
         color: '#fff',
         fontSize: 22,
         width: 35,
         textAlign: 'right',
     },
-    container: { flex: 1, padding: 14 },
+    // container: { flex: 1, padding: 14 },
     searchBox: {
         height: 46,
         backgroundColor: '#fff',

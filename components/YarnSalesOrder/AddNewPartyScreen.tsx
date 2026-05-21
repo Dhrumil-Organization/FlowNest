@@ -220,7 +220,10 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
             SExe: '',
             SExeName: '',
             PrintName: printname.trim(),
-            Remark: remark.trim()
+            Remark: remark.trim(),
+            BAccCode: '',
+            BAccName: '',
+            DueDay: ''
         };
 
         const params = {

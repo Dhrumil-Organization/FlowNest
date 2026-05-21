@@ -1,36 +1,85 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import WarehouseCriteriaScreen from "../screens/warehouse/WarehouseCriteriaScreen";
-// import WarehouseDashboardScreen from "../screens/warehouse/WarehouseDashboardScreen";
-// import WarehouseAssignScreen from "../screens/warehouse/WarehouseAssignScreen";
-// import WarehouseTransferScreen from "../screens/warehouse/WarehouseTransferScreen";
-// import WarehouseViewScreen from "../screens/warehouse/WarehouseViewScreen";
+import WarehouseCriteriaScreen from "./WarehouseCriteriaScreen";
+import WarehouseDashboardScreen from "./WarehouseDashboardScreen";
+import WarehouseAssignScreen from "./WarehouseAssignScreen";
+import WarehouseTransferScreen from "./WarehouseTransferScreen";
+import WarehouseViewScreen from "./WarehouseViewScreen";
 // import WarehouseQRScannerScreen from "../screens/warehouse/WarehouseQRScannerScreen";
 
 const Stack = createNativeStackNavigator();
 
-export default function WarehouseStack() {
+const WarehouseStack = props => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: "#4F35D9" },
-        headerTintColor: "#fff",
-        headerTitleStyle: { fontWeight: "700" },
+        headerShown: false,
       }}
     >
-      <Stack.Screen
+      {/* <Stack.Screen
         name="WarehouseCriteria"
         component={WarehouseCriteriaScreen}
         options={{ title: "Warehouse Criteria" }}
-      />
+      /> */}
 
-      {/* <Stack.Screen
+      <Stack.Screen name="WarehouseCriteriaScreen">
+        {(screenProps) => (
+          <WarehouseCriteriaScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen
         name="WarehouseDashboard"
         component={WarehouseDashboardScreen}
         options={{ title: "WareHouse" }}
       />
 
+      <Stack.Screen name="WarehouseAssign">
+        {(screenProps) => (
+          <WarehouseAssignScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="WarehouseTransfer">
+        {(screenProps) => (
+          <WarehouseTransferScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="WarehouseView">
+        {(screenProps) => (
+          <WarehouseViewScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
+
+
+      {/* 
+<Stack.Screen
+        name="WarehouseAssign"
+        component={WarehouseAssignScreen}
+        options={{ title: "Assign Carton" }}
+      />
       <Stack.Screen
         name="WarehouseAssign"
         component={WarehouseAssignScreen}
@@ -60,3 +109,4 @@ export default function WarehouseStack() {
     </Stack.Navigator>
   );
 }
+export default WarehouseStack;

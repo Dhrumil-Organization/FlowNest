@@ -20,6 +20,11 @@ export interface ListParams {
   page?: number;
 }
 
+export interface ShowParams {
+  prpcode: string;
+  yearno: string;
+}
+
 export interface StorePayload {
   party_prp_code: string | null;
   party_acc_code: string;
@@ -28,6 +33,8 @@ export interface StorePayload {
   party_address?: string;
   designs: InquiryDesignInput[];
   remarks?: string;
+  prpcode: string;
+  yearno: string;
   custom_overall_hours?: number | null;
 }
 
@@ -36,14 +43,18 @@ export interface CostingPayload {
     inquiry_design_id: number;
     cost_per_mtr: number;
     gst_percent?: number;
+    prpcode: string;
   }>;
+  prpcode: string | null;
+  yearno: string | null;
 }
 
 export const inquiryApi = {
   list: async (params: ListParams = {}) => {
-    const res = await client.get<PaginatedResponse<Inquiry>>('/inquiries', {
+    const res = await client.get<PaginatedResponse<Inquiry>>('/api/inquiries', {
       params,
     });
+    console.log("Inquery:", params, res);
     return {
       data: res.data.data,
       counts: res.data.counts as DashboardCounts,
@@ -52,8 +63,11 @@ export const inquiryApi = {
     };
   },
 
-  show: async (id: number): Promise<InquiryDetailResponse> => {
-    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/inquiries/${id}`);
+  show: async (id: number, params: ShowParams = {}): Promise<InquiryDetailResponse> => {
+    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/api/inquiries/${id}`, {
+      params,
+    });
+    console.log("Inquery show:", params, res);
     // The server attaches tat_live via additional() — axios serialises it into the data envelope.
     // We merge both shapes safely:
     const payload = res.data.data as InquiryDetailResponse;
@@ -62,15 +76,17 @@ export const inquiryApi = {
   },
 
   store: async (payload: StorePayload): Promise<Inquiry> => {
-    const res = await client.post<ApiResponse<Inquiry>>('/inquiries', payload);
+    const res = await client.post<ApiResponse<Inquiry>>('/api/inquiries', payload);
+    console.log("Inquiry store", payload, res)
     return res.data.data;
   },
 
   submitCosting: async (id: number, payload: CostingPayload): Promise<Inquiry> => {
     const res = await client.post<ApiResponse<Inquiry>>(
-      `/inquiries/${id}/costing`,
+      `/api/inquiries/${id}/costing`,
       payload,
     );
+    console.log("Inquiry submitCosting", id, payload, res)
     return res.data.data;
   },
 
@@ -80,26 +96,30 @@ export const inquiryApi = {
       payment_terms?: string;
       delivery_terms?: string;
       remarks?: string;
+      prpcode: string;
+      yearno: string;
     },
   ) => {
     const res = await client.post<ApiResponse<any>>(
-      `/inquiries/${id}/confirm`,
+      `/api/inquiries/${id}/confirm`,
       payload,
     );
+    console.log("Inquiry confirm", id, payload, res)
     return res.data.data;
   },
 
-  reject: async (id: number, payload: {reason: string; remarks?: string}) => {
+  reject: async (id: number, payload: {reason: string; remarks?: string, prpcode: string; yearno: string}) => {
     const res = await client.post<ApiResponse<Inquiry>>(
-      `/inquiries/${id}/reject`,
+      `/api/inquiries/${id}/reject`,
       payload,
     );
+    console.log("Inquiry reject", id, payload, res)
     return res.data.data;
   },
 
   downloadPdf: async (id: number): Promise<{pdf_url: string; pdf_path: string}> => {
     const res = await client.get<ApiResponse<{pdf_url: string; pdf_path: string}>>(
-      `/inquiries/${id}/pdf`,
+      `/api/inquiries/${id}/pdf`,
     );
     return res.data.data;
   },
@@ -108,12 +128,12 @@ export const inquiryApi = {
     id: number,
     payload: {email: string; subject?: string; message?: string},
   ) => {
-    const res = await client.post(`/inquiries/${id}/email`, payload);
+    const res = await client.post(`/api/inquiries/${id}/email`, payload);
     return res.data;
   },
 
   sendWhatsapp: async (id: number, payload: {mobile: string; message?: string}) => {
-    const res = await client.post(`/inquiries/${id}/whatsapp`, payload);
+    const res = await client.post(`/api/inquiries/${id}/whatsapp`, payload);
     return res.data;
   },
 };

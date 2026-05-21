@@ -55,6 +55,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [isShadeVisible, setIsShadeVisible] = useState(false);
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // Default: ascending
 
     const fetchPrpCode = async () => {
         await axios
@@ -495,20 +496,32 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             baseData = addAllCard(finishStockData);
         }
 
+        // Sort by TOTQTY (asc/desc)
+        const sortedData = [...baseData].sort((a, b) => {
+            const qtyA = parseFloat(a.TOTQTY || '0');
+            const qtyB = parseFloat(b.TOTQTY || '0');
+            return sortOrder === 'asc' ? qtyA - qtyB : qtyB - qtyA;
+        });
+
+        // Keep "ALL [ ITEMS ]" at the top
+        const allItem = sortedData.find(item => item.ITMCODE === 'ALL');
+        const filteredData = sortedData.filter(item => item.ITMCODE !== 'ALL');
+        const finalData = allItem ? [allItem, ...filteredData] : sortedData;
+
         // SEARCH NAHI HAI
         if (!searchQueryPOT.trim()) {
-            return baseData;
+            return finalData;
         }
 
         const search = searchQueryPOT.toLowerCase();
 
         // SEARCH FILTER
-        return baseData.filter((item: any) =>
+        return finalData.filter((item: any) =>
             String(item?.ITMNAME || '').toLowerCase().includes(search) ||
             String(item?.TOTQTY || '').toLowerCase().includes(search)
         );
 
-    }, [activeTab, greyStockData, finishStockData, searchQueryPOT]);
+    }, [activeTab, greyStockData, finishStockData, searchQueryPOT, sortOrder]);
 
     // const totalQty = useMemo(
 
@@ -855,7 +868,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
         }, [selectedDesign, salesdata, finishStockData, activeTab, searchQueryPOT]
     )
 
-    
+
 
     return (
         <>
@@ -884,17 +897,49 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     style={{
                         flex: 1, padding: 12, backgroundColor: activeTab === 'grey' ? '#444' : '#ccc',
                         borderTopLeftRadius: 8, borderBottomLeftRadius: 8,
+                        display: 'flex', flexDirection: 'row', alignItems: 'center'
                     }}
-                    onPress={() => setActiveTab('grey')}>
+                    onPress={() => {
+                        setActiveTab('grey');
+                        setSortOrder('asc'); // Reset to ascending when switching tabs
+                    }}>
                     <Text style={{ textAlign: 'center', color: '#fff' }}> Grey Stock </Text>
+                    {activeTab === 'grey' && (
+                        <TouchableOpacity
+                            onPress={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                            style={{ marginLeft: 8 }}
+                        >
+                            <Icon
+                                name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={20}
+                                color="#fff"
+                            />
+                        </TouchableOpacity>
+                    )}
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={{
                         flex: 1, padding: 12, backgroundColor: activeTab === 'finish' ? '#444' : '#ccc',
                         borderTopRightRadius: 8, borderBottomRightRadius: 8,
+                        display: 'flex', flexDirection: 'row', alignItems: 'center'
                     }}
-                    onPress={() => setActiveTab('finish')}>
+                    onPress={() => {
+                        setActiveTab('finish');
+                        setSortOrder('asc'); // Reset to ascending when switching tabs
+                    }}>
                     <Text style={{ textAlign: 'center', color: '#FFF' }}>Finish Stock</Text>
+                    {activeTab === 'finish' && (
+                        <TouchableOpacity
+                            onPress={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                            style={{ marginLeft: 8 }}
+                        >
+                            <Icon
+                                name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={20}
+                                color="#fff"
+                            />
+                        </TouchableOpacity>
+                    )}
                 </TouchableOpacity>
             </View>
             <View style={{ flex: 1 }}>

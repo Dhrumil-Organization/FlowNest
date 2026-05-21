@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,11 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useFocusEffect} from '@react-navigation/native';
-
-import {colors, fontSize, radius, spacing} from '../utils/theme';
-import {inquiryApi} from '../services/inquiryApi';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import HeaderBar from '../HeaderBar/HeaderBar';
+import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import { colors, fontSize, radius, spacing } from '../utils/theme';
+import { inquiryApi } from '../services/inquiryApi';
 import {
   DashboardCounts,
   Inquiry,
@@ -25,30 +26,31 @@ import {
 import StatusBadge from '../components/StatusBadge';
 import TatBadge from '../components/TatBadge';
 import EmptyState from '../components/EmptyState';
-import {formatDate} from '../utils/validators';
+import { formatDate } from '../utils/validators';
+import theme from '../../android/app/src/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
 type FilterKey = InquiryStatus | 'all';
 type TatFilterKey = TatStatus | 'all';
 
-const STATUS_FILTERS: {key: FilterKey; label: string}[] = [
-  {key: 'all', label: 'All'},
-  {key: 'pending_costing', label: 'Pending'},
-  {key: 'costed', label: 'Costed'},
-  {key: 'sent', label: 'Sent'},
-  {key: 'confirmed', label: 'Confirmed'},
-  {key: 'rejected', label: 'Rejected'},
+const STATUS_FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'pending_costing', label: 'Pending' },
+  { key: 'costed', label: 'Costed' },
+  { key: 'sent', label: 'Sent' },
+  { key: 'confirmed', label: 'Confirmed' },
+  { key: 'rejected', label: 'Rejected' },
 ];
 
-const TAT_FILTERS: {key: TatFilterKey; label: string}[] = [
-  {key: 'all', label: 'All TAT'},
-  {key: 'on_time', label: '🟢 On Time'},
-  {key: 'warning', label: '🟡 Warning'},
-  {key: 'breached', label: '🔴 Breached'},
+const TAT_FILTERS: { key: TatFilterKey; label: string }[] = [
+  { key: 'all', label: 'All TAT' },
+  { key: 'on_time', label: '🟢 On Time' },
+  { key: 'warning', label: '🟡 Warning' },
+  { key: 'breached', label: '🔴 Breached' },
 ];
 
-const DashboardScreen: React.FC<Props> = ({navigation}) => {
+const DashboardScreen: React.FC<Props> = ({ navigation, username }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
@@ -66,7 +68,10 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
           status: statusFilter,
           tat: tatFilter === 'all' ? undefined : tatFilter,
           search: search || undefined,
+          prpcode: "SIP",
+          yearno: "27"
         });
+        console.log("Inquery:", res);
         setItems(res.data);
         setCounts(res.counts);
         setTatCounts(res.tatCounts);
@@ -95,11 +100,11 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
     load(false);
   };
 
-  const renderItem = ({item}: {item: Inquiry}) => (
+  const renderItem = ({ item }: { item: Inquiry }) => (
     <TouchableOpacity
       activeOpacity={0.7}
       style={styles.card}
-      onPress={() => navigation.navigate('InquiryDetail', {id: item.id})}>
+      onPress={() => navigation.navigate('InquiryDetail', { id: item.id })}>
       <View style={styles.cardHead}>
         <Text style={styles.inqNo}>{item.inquiry_no}</Text>
         <StatusBadge status={item.status} />
@@ -121,155 +126,172 @@ const DashboardScreen: React.FC<Props> = ({navigation}) => {
   );
 
   return (
-    <View style={styles.container}>
-      {/* Top bar with admin shortcut */}
-      <View style={styles.topBar}>
-        <Text style={styles.headerTitle}>Inquiries</Text>
-        <View style={{flexDirection: 'row', gap: spacing.sm}}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TatAnalytics')}
-            style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>📊</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('TatConfig')}
-            style={styles.iconBtn}>
-            <Text style={styles.iconBtnText}>⚙</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Stat cards */}
-      {counts ? (
-        <View style={styles.statsRow}>
-          <Stat label="Pending" value={counts.pending_costing} color={colors.warning} bg={colors.warningBg} />
-          <Stat label="Costed" value={counts.costed} color={colors.success} bg={colors.successBg} />
-          <Stat label="Sent" value={counts.sent} color={colors.purple} bg={colors.purpleBg} />
-          <Stat label="Total" value={counts.total} color={colors.info} bg={colors.infoBg} />
-        </View>
-      ) : null}
-
-      {/* TAT stat row */}
-      {tatCounts ? (
-        <View style={styles.tatRow}>
-          <View style={[styles.tatChip, {backgroundColor: colors.tatOnTimeBg}]}>
-            <Text style={[styles.tatChipDot, {backgroundColor: colors.tatOnTime}]} />
-            <Text style={[styles.tatChipText, {color: colors.tatOnTime}]}>
-              On Time: {tatCounts.on_time}
-            </Text>
-          </View>
-          <View style={[styles.tatChip, {backgroundColor: colors.tatWarningBg}]}>
-            <Text style={[styles.tatChipDot, {backgroundColor: colors.tatWarning}]} />
-            <Text style={[styles.tatChipText, {color: colors.tatWarning}]}>
-              Warning: {tatCounts.warning}
-            </Text>
-          </View>
-          <View style={[styles.tatChip, {backgroundColor: colors.tatBreachedBg}]}>
-            <Text style={[styles.tatChipDot, {backgroundColor: colors.tatBreached}]} />
-            <Text style={[styles.tatChipText, {color: colors.tatBreached}]}>
-              Breached: {tatCounts.breached}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Search */}
-      <TextInput
-        value={search}
-        onChangeText={setSearch}
-        onSubmitEditing={() => load()}
-        placeholder="Search by inquiry no or party"
-        placeholderTextColor={colors.textTertiary}
-        style={styles.search}
+    <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'Inquiries Dashboard'}
+        subHeader={'Manage your inquiries records'}
       />
-
-      {/* Status chips */}
-      <View style={styles.chipsWrap}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={STATUS_FILTERS}
-          keyExtractor={i => i.key}
-          renderItem={({item}) => {
-            const active = statusFilter === item.key;
-            return (
-              <TouchableOpacity
-                onPress={() => setStatusFilter(item.key)}
-                style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-
-      {/* TAT chips */}
-      <View style={styles.chipsWrap}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={TAT_FILTERS}
-          keyExtractor={i => i.key}
-          renderItem={({item}) => {
-            const active = tatFilter === item.key;
-            return (
-              <TouchableOpacity
-                onPress={() => setTatFilter(item.key)}
-                style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-
-      {/* List */}
-      {loading ? (
-        <ActivityIndicator style={{marginTop: 40}} color={colors.primary} />
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={i => String(i.id)}
-          renderItem={renderItem}
-          contentContainerStyle={{padding: spacing.md, paddingBottom: 100}}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              title="No inquiries"
-              subtitle="Tap the + button to create a new inquiry"
-            />
-          }
-        />
-      )}
-
-      {/* FAB */}
       <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('InquiryForm')}
-        style={styles.fab}>
-        <Text style={styles.fabText}>+</Text>
+        onPress={() => navigation.navigate('TatAnalytics')}
+        style={styles.iconBtn}>
+        <Text style={styles.iconBtnText}>📊</Text>
       </TouchableOpacity>
-    </View>
+      <TouchableOpacity
+        onPress={() => navigation.navigate('TatConfig')}
+        style={styles.iconBtn1}>
+        <Text style={styles.iconBtnText}>⚙</Text>
+      </TouchableOpacity>
+      <View style={styles.container}>
+        {/* Top bar with admin shortcut */}
+        {/* <View style={styles.topBar}>
+          <Text style={styles.headerTitle}>Inquiries</Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TatAnalytics')}
+              style={styles.iconBtn}>
+              <Text style={styles.iconBtnText}>📊</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TatConfig')}
+              style={styles.iconBtn1}>
+              <Text style={styles.iconBtnText}>⚙</Text>
+            </TouchableOpacity>
+          </View>
+        </View> */}
+
+        {/* Stat cards */}
+        {counts ? (
+          <View style={styles.statsRow}>
+            <Stat label="Pending" value={counts.pending_costing} color={colors.warning} bg={colors.warningBg} />
+            <Stat label="Costed" value={counts.costed} color={colors.success} bg={colors.successBg} />
+            <Stat label="Sent" value={counts.sent} color={colors.purple} bg={colors.purpleBg} />
+            <Stat label="Total" value={counts.total} color={colors.info} bg={colors.infoBg} />
+          </View>
+        ) : null}
+
+        {/* TAT stat row */}
+        {tatCounts ? (
+          <View style={styles.tatRow}>
+            <View style={[styles.tatChip, { backgroundColor: colors.tatOnTimeBg }]}>
+              <Text style={[styles.tatChipDot, { backgroundColor: colors.tatOnTime }]} />
+              <Text style={[styles.tatChipText, { color: colors.tatOnTime }]}>
+                On Time: {tatCounts.on_time}
+              </Text>
+            </View>
+            <View style={[styles.tatChip, { backgroundColor: colors.tatWarningBg }]}>
+              <Text style={[styles.tatChipDot, { backgroundColor: colors.tatWarning }]} />
+              <Text style={[styles.tatChipText, { color: colors.tatWarning }]}>
+                Warning: {tatCounts.warning}
+              </Text>
+            </View>
+            <View style={[styles.tatChip, { backgroundColor: colors.tatBreachedBg }]}>
+              <Text style={[styles.tatChipDot, { backgroundColor: colors.tatBreached }]} />
+              <Text style={[styles.tatChipText, { color: colors.tatBreached }]}>
+                Breached: {tatCounts.breached}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Search */}
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={() => load()}
+          placeholder="Search by inquiry no or party"
+          placeholderTextColor={colors.textTertiary}
+          style={styles.search}
+        />
+
+        {/* Status chips */}
+        <View style={styles.chipsWrap}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={STATUS_FILTERS}
+            keyExtractor={i => i.key}
+            renderItem={({ item }) => {
+              const active = statusFilter === item.key;
+              return (
+                <TouchableOpacity
+                  onPress={() => setStatusFilter(item.key)}
+                  style={[styles.chip, active && styles.chipActive]}>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+
+        {/* TAT chips */}
+        <View style={styles.chipsWrap}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={TAT_FILTERS}
+            keyExtractor={i => i.key}
+            renderItem={({ item }) => {
+              const active = tatFilter === item.key;
+              return (
+                <TouchableOpacity
+                  onPress={() => setTatFilter(item.key)}
+                  style={[styles.chip, active && styles.chipActive]}>
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+
+        {/* List */}
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={i => String(i.id)}
+            renderItem={renderItem}
+            contentContainerStyle={{ padding: spacing.md, paddingBottom: 100 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              <EmptyState
+                title="No inquiries"
+                subtitle="Tap the + button to create a new inquiry"
+              />
+            }
+          />
+        )}
+
+        {/* FAB */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('InquiryForm')}
+          style={styles.fab}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </>
   );
 };
 
 const Stat = ({
   label, value, color, bg,
-}: {label: string; value: number; color: string; bg: string}) => (
-  <View style={[styles.statCard, {backgroundColor: bg}]}>
-    <Text style={[styles.statLabel, {color}]}>{label}</Text>
-    <Text style={[styles.statValue, {color}]}>{value}</Text>
+}: { label: string; value: number; color: string; bg: string }) => (
+  <View style={[styles.statCard, { backgroundColor: bg }]}>
+    <Text style={[styles.statLabel, { color }]}>{label}</Text>
+    <Text style={[styles.statValue, { color }]}>{value}</Text>
   </View>
 );
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: colors.bg},
+  container: { flex: 1, backgroundColor: colors.bg },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -279,13 +301,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTitle: {fontSize: fontSize.lg, fontWeight: '500', color: colors.textPrimary},
+  headerTitle: { fontSize: fontSize.lg, fontWeight: '500', color: colors.textPrimary },
   iconBtn: {
-    padding: spacing.sm,
-    backgroundColor: colors.bgSecondary,
-    borderRadius: radius.md,
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 105,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 4,
   },
-  iconBtnText: {fontSize: 18},
+  iconBtn1: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 150,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtnText: { fontSize: 18, color: '#fff' },
   statsRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -296,9 +339,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing.sm + 2,
     borderRadius: radius.md,
+    zIndex: 1
   },
-  statLabel: {fontSize: fontSize.xs},
-  statValue: {fontSize: fontSize.xl, fontWeight: '500', marginTop: 2},
+  statLabel: { fontSize: fontSize.xs },
+  statValue: { fontSize: fontSize.xl, fontWeight: '500', marginTop: 2 },
   tatRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -313,8 +357,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     gap: 6,
   },
-  tatChipDot: {width: 8, height: 8, borderRadius: 4},
-  tatChipText: {fontSize: fontSize.xs, fontWeight: '500'},
+  tatChipDot: { width: 8, height: 8, borderRadius: 4 },
+  tatChipText: { fontSize: fontSize.xs, fontWeight: '500' },
   search: {
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
@@ -327,7 +371,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.textPrimary,
   },
-  chipsWrap: {paddingVertical: spacing.xs + 2, paddingLeft: spacing.md},
+  chipsWrap: { paddingVertical: spacing.xs + 2, paddingLeft: spacing.md },
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
@@ -337,9 +381,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chipActive: {backgroundColor: colors.primary, borderColor: colors.primary},
-  chipText: {fontSize: fontSize.sm, color: colors.textSecondary},
-  chipTextActive: {color: colors.textOnPrimary, fontWeight: '500'},
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: fontSize.sm, color: colors.textSecondary },
+  chipTextActive: { color: colors.textOnPrimary, fontWeight: '500' },
   card: {
     backgroundColor: colors.cardBg,
     padding: spacing.md,
@@ -354,14 +398,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  inqNo: {fontSize: fontSize.md, fontWeight: '500', color: colors.textPrimary},
-  partyName: {fontSize: fontSize.base, color: colors.textPrimary, marginBottom: 6},
+  inqNo: { fontSize: fontSize.md, fontWeight: '500', color: colors.textPrimary },
+  partyName: { fontSize: fontSize.base, color: colors.textPrimary, marginBottom: 6 },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  meta: {fontSize: fontSize.xs, color: colors.textSecondary, flex: 1},
+  meta: { fontSize: fontSize.xs, color: colors.textSecondary, flex: 1 },
   fab: {
     position: 'absolute',
     right: 24,
@@ -376,9 +420,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 6,
-    shadowOffset: {width: 0, height: 3},
+    shadowOffset: { width: 0, height: 3 },
   },
-  fabText: {color: colors.white, fontSize: 28, fontWeight: '300', lineHeight: 30},
+  fabText: { color: colors.white, fontSize: 28, fontWeight: '300', lineHeight: 30 },
 });
 
 export default DashboardScreen;

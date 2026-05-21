@@ -1,12 +1,14 @@
 import axios, {AxiosInstance, AxiosError} from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API } from '../../common/API/dynamicAPI';
 
 // TODO: Replace with your actual base URL
-export const API_BASE_URL = 'https://your-domain.com/api/v1';
+export const API_BASE_URL = API;
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  // timeout: 30000,
+  timeout: 99999999999,
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -17,7 +19,7 @@ const client: AxiosInstance = axios.create({
 // Replace 'auth_token' with your actual key.
 client.interceptors.request.use(async config => {
   try {
-    const token = await AsyncStorage.getItem('auth_token');
+    const token = await AsyncStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -37,6 +39,7 @@ client.interceptors.response.use(
         error.config?.url,
         error.response?.status,
         error.response?.data,
+        error
       );
     }
     return Promise.reject(error);

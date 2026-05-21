@@ -1881,10 +1881,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={styles.value}>{item.NetAmt || '-'}</Text>
                 </View>
 
-                <View style={styles.row}>
+                {/* <View style={styles.row}>
                     <Text style={styles.label}>Store</Text>
                     <Text style={styles.value}>{item.StoreName || '-'}</Text>
-                </View>
+                </View> */}
+
+                {API === "https://apiy.tms-webapp.com" && (
+                    < View style={styles.row}>
+                        <Text style={styles.label}>Store</Text>
+                        <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                    </View>
+                )}
 
                 <View style={styles.row}>
                     <Text style={styles.label}>Auth By</Text>

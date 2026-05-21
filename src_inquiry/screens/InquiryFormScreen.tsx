@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import {colors, fontSize, radius, spacing} from '../utils/theme';
+import { colors, fontSize, radius, spacing } from '../utils/theme';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import {inquiryApi} from '../services/inquiryApi';
-import {Design, InquiryDesignInput, Party, RootStackParamList} from '../types';
+import { inquiryApi } from '../services/inquiryApi';
+import { Design, InquiryDesignInput, Party, RootStackParamList } from '../types';
+import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryForm'>;
 
@@ -33,7 +34,7 @@ const emptyDesignRow = (id: string): DesignRow => ({
   gst_percent: 5,
 });
 
-const InquiryFormScreen: React.FC<Props> = ({navigation}) => {
+const InquiryFormScreen: React.FC<Props> = ({ navigation, username }) => {
   const [party, setParty] = useState<Party | null>(null);
   const [remarks, setRemarks] = useState('');
   const [designs, setDesigns] = useState<DesignRow[]>([
@@ -51,7 +52,7 @@ const InquiryFormScreen: React.FC<Props> = ({navigation}) => {
 
   const updateRow = (id: string, patch: Partial<DesignRow>) => {
     setDesigns(prev =>
-      prev.map(d => (d._id === id ? {...d, ...patch} : d)),
+      prev.map(d => (d._id === id ? { ...d, ...patch } : d)),
     );
   };
 
@@ -112,14 +113,16 @@ const InquiryFormScreen: React.FC<Props> = ({navigation}) => {
         party_gstin: party.gstin,
         party_address: party.address,
         remarks,
-        designs: designs.map(({_id, ...rest}) => rest),
+        prpcode: "SIP",
+        yearno: "27",
+        designs: designs.map(({ _id, ...rest }) => rest),
       });
 
       Alert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
         {
           text: 'OK',
           onPress: () => {
-            navigation.replace('InquiryDetail', {id: created.id});
+            navigation.replace('InquiryDetail', { id: created.id });
           },
         },
       ]);
@@ -131,187 +134,194 @@ const InquiryFormScreen: React.FC<Props> = ({navigation}) => {
   };
 
   return (
-    <ScrollView
-      style={{flex: 1, backgroundColor: colors.bg}}
-      contentContainerStyle={{padding: spacing.md, paddingBottom: 40}}>
-      
-      {/* Inquiry no/date info */}
-      <View style={styles.infoBox}>
-        <View>
-          <Text style={styles.infoLabel}>Inquiry No.</Text>
-          <Text style={styles.infoValue}>Auto Generated</Text>
-        </View>
-        <View>
-          <Text style={styles.infoLabel}>Date</Text>
-          <Text style={styles.infoValue}>
-            {new Date().toLocaleDateString('en-IN', {day: '2-digit', month: 'short', year: 'numeric'})}
-          </Text>
-        </View>
-      </View>
-
-      {/* Party */}
-      <Text style={styles.sectionLabel}>Party *</Text>
-      <TouchableOpacity onPress={pickParty} style={styles.partyBox}>
-        {party ? (
-          <View>
-            <Text style={styles.partyName}>{party.name}</Text>
-            <Text style={styles.partyMeta}>
-              {[party.city, party.state].filter(Boolean).join(', ')}
-              {party.gstin ? ` • ${party.gstin}` : ''}
-            </Text>
-          </View>
-        ) : (
-          <Text style={styles.partyPlaceholder}>Tap to select party</Text>
-        )}
-      </TouchableOpacity>
-
-      {/* Designs */}
-      <Text style={[styles.sectionLabel, {marginTop: spacing.md}]}>
-        Designs *
-      </Text>
-
-      {designs.map((row, idx) => (
-        <View key={row._id} style={styles.designCard}>
-          <View style={styles.designHead}>
-            <Text style={styles.designLabel}>
-              Design #{idx + 1}
-              {row.is_new_design ? ' (New)' : ''}
-            </Text>
-            {designs.length > 1 ? (
-              <TouchableOpacity onPress={() => removeRow(row._id)}>
-                <Text style={{color: colors.danger, fontSize: fontSize.sm}}>Remove</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {/* Toggle existing/new */}
-          <View style={styles.toggleRow}>
-            <TouchableOpacity
-              onPress={() => updateRow(row._id, {
-                is_new_design: false,
-                design_name_snapshot: '',
-                construction_remarks: '',
-                design_prp_code: null,
-                design_dsn_code: null,
-              })}
-              style={[
-                styles.toggleBtn,
-                !row.is_new_design && styles.toggleBtnActive,
-              ]}>
-              <Text style={[styles.toggleText, !row.is_new_design && styles.toggleTextActive]}>
-                Existing
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => updateRow(row._id, {
-                is_new_design: true,
-                design_name_snapshot: '',
-                construction_remarks: '',
-                design_prp_code: null,
-                design_dsn_code: null,
-              })}
-              style={[
-                styles.toggleBtn,
-                row.is_new_design && styles.toggleBtnActive,
-              ]}>
-              <Text style={[styles.toggleText, row.is_new_design && styles.toggleTextActive]}>
-                New Design
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Existing - searchable picker */}
-          {!row.is_new_design ? (
-            <TouchableOpacity
-              style={styles.pickerBox}
-              onPress={() => pickExistingDesign(row._id)}>
-              <Text style={
-                row.design_name_snapshot
-                  ? styles.pickerValue
-                  : styles.pickerPlaceholder
-              }>
-                {row.design_name_snapshot || 'Tap to select design'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <Input
-              label="Design Name"
-              required
-              value={row.design_name_snapshot}
-              onChangeText={t => updateRow(row._id, {design_name_snapshot: t})}
-              placeholder="Enter design name"
-            />
-          )}
-
-          <Input
-            label="Construction / Remarks"
-            value={row.construction_remarks}
-            onChangeText={t => updateRow(row._id, {construction_remarks: t})}
-            placeholder="Warp, weft, GSM, width, composition..."
-            multiline
-            required={row.is_new_design}
-          />
-
-          <View style={{flexDirection: 'row', gap: spacing.sm}}>
-            <View style={{flex: 1}}>
-              <Input
-                label="Quantity"
-                required
-                value={row.quantity ? String(row.quantity) : ''}
-                onChangeText={t =>
-                  updateRow(row._id, {quantity: parseFloat(t) || 0})
-                }
-                keyboardType="decimal-pad"
-                placeholder="5000"
-              />
-            </View>
-            <View style={{flex: 1}}>
-              <Input
-                label="Unit"
-                value={row.unit}
-                onChangeText={t => updateRow(row._id, {unit: t})}
-                placeholder="mtr"
-              />
-            </View>
-          </View>
-
-          <Input
-            label="GST %"
-            value={String(row.gst_percent)}
-            onChangeText={t => updateRow(row._id, {gst_percent: parseFloat(t) || 0})}
-            keyboardType="decimal-pad"
-            placeholder="5"
-          />
-        </View>
-      ))}
-
-      <TouchableOpacity style={styles.addDesignBtn} onPress={addRow}>
-        <Text style={styles.addDesignText}>+ Add Another Design</Text>
-      </TouchableOpacity>
-
-      <Input
-        label="Inquiry Remarks (optional)"
-        value={remarks}
-        onChangeText={setRemarks}
-        multiline
-        placeholder="Any general note for this inquiry..."
+    <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'Inquiries Form'}
+        subHeader={'Enter your inquiries details'}
       />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
 
-      <View style={{flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md}}>
-        <Button
-          title="Cancel"
-          variant="secondary"
-          onPress={() => navigation.goBack()}
-          style={{flex: 1}}
+        {/* Inquiry no/date info */}
+        <View style={styles.infoBox}>
+          <View>
+            <Text style={styles.infoLabel}>Inquiry No.</Text>
+            <Text style={styles.infoValue}>Auto Generated</Text>
+          </View>
+          <View>
+            <Text style={styles.infoLabel}>Date</Text>
+            <Text style={styles.infoValue}>
+              {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </Text>
+          </View>
+        </View>
+
+        {/* Party */}
+        <Text style={styles.sectionLabel}>Party *</Text>
+        <TouchableOpacity onPress={pickParty} style={styles.partyBox}>
+          {party ? (
+            <View>
+              <Text style={styles.partyName}>{party.name}</Text>
+              <Text style={styles.partyMeta}>
+                {[party.city, party.state].filter(Boolean).join(', ')}
+                {party.gstin ? ` • ${party.gstin}` : ''}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.partyPlaceholder}>Tap to select party</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Designs */}
+        <Text style={[styles.sectionLabel, { marginTop: spacing.md }]}>
+          Designs *
+        </Text>
+
+        {designs.map((row, idx) => (
+          <View key={row._id} style={styles.designCard}>
+            <View style={styles.designHead}>
+              <Text style={styles.designLabel}>
+                Design #{idx + 1}
+                {row.is_new_design ? ' (New)' : ''}
+              </Text>
+              {designs.length > 1 ? (
+                <TouchableOpacity onPress={() => removeRow(row._id)}>
+                  <Text style={{ color: colors.danger, fontSize: fontSize.sm }}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Toggle existing/new */}
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                onPress={() => updateRow(row._id, {
+                  is_new_design: false,
+                  design_name_snapshot: '',
+                  construction_remarks: '',
+                  design_prp_code: null,
+                  design_dsn_code: null,
+                })}
+                style={[
+                  styles.toggleBtn,
+                  !row.is_new_design && styles.toggleBtnActive,
+                ]}>
+                <Text style={[styles.toggleText, !row.is_new_design && styles.toggleTextActive]}>
+                  Existing
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => updateRow(row._id, {
+                  is_new_design: true,
+                  design_name_snapshot: '',
+                  construction_remarks: '',
+                  design_prp_code: null,
+                  design_dsn_code: null,
+                })}
+                style={[
+                  styles.toggleBtn,
+                  row.is_new_design && styles.toggleBtnActive,
+                ]}>
+                <Text style={[styles.toggleText, row.is_new_design && styles.toggleTextActive]}>
+                  New Design
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Existing - searchable picker */}
+            {!row.is_new_design ? (
+              <TouchableOpacity
+                style={styles.pickerBox}
+                onPress={() => pickExistingDesign(row._id)}>
+                <Text style={
+                  row.design_name_snapshot
+                    ? styles.pickerValue
+                    : styles.pickerPlaceholder
+                }>
+                  {row.design_name_snapshot || 'Tap to select design'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Input
+                label="Design Name"
+                required
+                value={row.design_name_snapshot}
+                onChangeText={t => updateRow(row._id, { design_name_snapshot: t })}
+                placeholder="Enter design name"
+              />
+            )}
+
+            <Input
+              label="Construction / Remarks"
+              value={row.construction_remarks}
+              onChangeText={t => updateRow(row._id, { construction_remarks: t })}
+              placeholder="Warp, weft, GSM, width, composition..."
+              multiline
+              required={row.is_new_design}
+            />
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Quantity"
+                  required
+                  value={row.quantity ? String(row.quantity) : ''}
+                  onChangeText={t =>
+                    updateRow(row._id, { quantity: parseFloat(t) || 0 })
+                  }
+                  keyboardType="decimal-pad"
+                  placeholder="5000"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input
+                  label="Unit"
+                  value={row.unit}
+                  onChangeText={t => updateRow(row._id, { unit: t })}
+                  placeholder="mtr"
+                />
+              </View>
+            </View>
+
+            <Input
+              label="GST %"
+              value={String(row.gst_percent)}
+              onChangeText={t => updateRow(row._id, { gst_percent: parseFloat(t) || 0 })}
+              keyboardType="decimal-pad"
+              placeholder="5"
+            />
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.addDesignBtn} onPress={addRow}>
+          <Text style={styles.addDesignText}>+ Add Another Design</Text>
+        </TouchableOpacity>
+
+        <Input
+          label="Inquiry Remarks (optional)"
+          value={remarks}
+          onChangeText={setRemarks}
+          multiline
+          placeholder="Any general note for this inquiry..."
         />
-        <Button
-          title="Save Inquiry"
-          onPress={save}
-          loading={saving}
-          style={{flex: 1}}
-        />
-      </View>
-    </ScrollView>
+
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+          <Button
+            title="Cancel"
+            variant="secondary"
+            onPress={() => navigation.goBack()}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Save Inquiry"
+            onPress={save}
+            loading={saving}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </ScrollView>
+    </>
   );
 };
 
@@ -324,8 +334,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: spacing.md,
   },
-  infoLabel: {fontSize: fontSize.xs, color: colors.textSecondary},
-  infoValue: {fontSize: fontSize.md, fontWeight: '500', color: colors.textPrimary, marginTop: 2},
+  infoLabel: { fontSize: fontSize.xs, color: colors.textSecondary },
+  infoValue: { fontSize: fontSize.md, fontWeight: '500', color: colors.textPrimary, marginTop: 2 },
   sectionLabel: {
     fontSize: fontSize.md,
     fontWeight: '500',
@@ -341,9 +351,9 @@ const styles = StyleSheet.create({
     minHeight: 56,
     justifyContent: 'center',
   },
-  partyName: {fontSize: fontSize.base, fontWeight: '500'},
-  partyMeta: {fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2},
-  partyPlaceholder: {fontSize: fontSize.md, color: colors.textTertiary},
+  partyName: { fontSize: fontSize.base, fontWeight: '500' },
+  partyMeta: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  partyPlaceholder: { fontSize: fontSize.md, color: colors.textTertiary },
 
   designCard: {
     backgroundColor: colors.cardBg,
@@ -358,8 +368,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  designLabel: {fontSize: fontSize.md, fontWeight: '500', color: colors.textSecondary},
-  toggleRow: {flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md},
+  designLabel: { fontSize: fontSize.md, fontWeight: '500', color: colors.textSecondary },
+  toggleRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
   toggleBtn: {
     flex: 1,
     paddingVertical: 8,
@@ -367,9 +377,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
   },
-  toggleBtnActive: {backgroundColor: colors.primary},
-  toggleText: {fontSize: fontSize.sm, color: colors.textPrimary},
-  toggleTextActive: {color: colors.textOnPrimary, fontWeight: '500'},
+  toggleBtnActive: { backgroundColor: colors.primary },
+  toggleText: { fontSize: fontSize.sm, color: colors.textPrimary },
+  toggleTextActive: { color: colors.textOnPrimary, fontWeight: '500' },
   pickerBox: {
     padding: spacing.md,
     borderWidth: 1,
@@ -379,8 +389,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  pickerValue: {fontSize: fontSize.base, color: colors.textPrimary},
-  pickerPlaceholder: {fontSize: fontSize.md, color: colors.textTertiary},
+  pickerValue: { fontSize: fontSize.base, color: colors.textPrimary },
+  pickerPlaceholder: { fontSize: fontSize.md, color: colors.textTertiary },
   addDesignBtn: {
     padding: spacing.md,
     borderWidth: 1,
@@ -391,7 +401,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  addDesignText: {color: colors.info, fontWeight: '500'},
+  addDesignText: { color: colors.info, fontWeight: '500' },
 });
 
 export default InquiryFormScreen;

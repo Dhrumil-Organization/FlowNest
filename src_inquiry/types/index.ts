@@ -187,6 +187,11 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
+export interface TatConfigurationList {
+  prpcode: string;
+  yearno: string;
+}
+
 export interface TatConfiguration {
   id: number;
   step_code: string;
@@ -195,6 +200,8 @@ export interface TatConfiguration {
   warning_threshold_percent: number;
   is_active: boolean;
   description: string | null;
+  prpcode: string;
+  yearno: string;
 }
 
 export interface TatAnalytics {

@@ -50,7 +50,7 @@ const TAT_FILTERS: { key: TatFilterKey; label: string }[] = [
   { key: 'breached', label: '🔴 Breached' },
 ];
 
-const DashboardScreen: React.FC<Props> = ({ navigation, username }) => {
+const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, getUserPrptype }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
@@ -59,6 +59,8 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username }) => {
   const [items, setItems] = useState<Inquiry[]>([]);
   const [counts, setCounts] = useState<DashboardCounts | null>(null);
   const [tatCounts, setTatCounts] = useState<TatCounts | null>(null);
+
+  console.log('getUserId from login :', getUserId,'getUserPrptype from login :', getUserPrptype);
 
   const load = useCallback(
     async (showSpinner = true) => {

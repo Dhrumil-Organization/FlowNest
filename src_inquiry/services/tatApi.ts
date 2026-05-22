@@ -2,7 +2,7 @@ import client from './apiClient';
 import {ApiResponse, TatAnalytics, TatConfiguration} from '../types';
 
 export const tatApi = {
-  listConfigurations: async (params: {prpcode?: string; yearno?: string} = {}): Promise<TatConfiguration[]> => {
+  listConfigurations: async (params: {prptype?: string; yearno?: string} = {}): Promise<TatConfiguration[]> => {
     const res = await client.get<ApiResponse<TatConfiguration[]>>(
       '/api/tat/configurations',{
         params,
@@ -28,7 +28,7 @@ export const tatApi = {
       expected_hours: number;
       warning_threshold_percent: number;
     }>,
-    prpcode: string,
+    prptype: string,
     yearno: string
   ): Promise<TatConfiguration[]> => {
     const res = await client.post<ApiResponse<TatConfiguration[]>>(
@@ -36,10 +36,10 @@ export const tatApi = {
       {
         configurations: configurations.map(c => ({
           ...c,
-          prpcode,
+          prptype,
           yearno
         })),
-        prpcode,
+        prptype,
         yearno
       },
     );
@@ -47,7 +47,7 @@ export const tatApi = {
     return res.data.data;
   },
 
-  analytics: async (params: {prpcode?: string; yearno?: string} = {}): Promise<TatAnalytics[]> => {
+  analytics: async (params: {prptype?: string; yearno?: string} = {}): Promise<TatAnalytics[]> => {
     const res = await client.get<ApiResponse<TatAnalytics[]>>('/api/tat/analytics', {
       params,
     });

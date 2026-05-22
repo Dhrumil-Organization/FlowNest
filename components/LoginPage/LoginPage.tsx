@@ -23,7 +23,7 @@ import theme from '../../android/app/src/theme';
 import { Picker } from '@react-native-picker/picker';
 import { Dropdown } from 'react-native-element-dropdown';
 import { PermissionsAndroid, Platform } from 'react-native';
-  import messaging from '@react-native-firebase/messaging';
+import messaging from '@react-native-firebase/messaging';
 // import React, { useEffect, useRef, useState } from 'react';
 // import {
 //   View,
@@ -104,7 +104,7 @@ const LoginScreen: React.FC<Props> = ({
   //   initializeApp();
   // }, []);
 
-  
+
 
   // Add this function to request notification permission
   const requestNotificationPermission = async () => {
@@ -342,29 +342,17 @@ const LoginScreen: React.FC<Props> = ({
       Alert.alert('❌ Error', 'Please enter username and password.');
       return;
     }
-    // if (!getNoti_Token) {
-    //   Alert.alert(
-    //     'Notification Permission Required',
-    //     'Please enable notifications in settings to proceed.',
-    //     [
-    //       { text: 'Cancel', style: 'cancel' },
-    //       { text: 'Open Settings', onPress: () => Linking.openSettings() },
-    //     ]
-    //   );
-    //   return;
-    // }
     const payload = {
       name: username.trim(),
       password: password.trim(),
       checkdevice: getDeviceId,
-      noti_token: getNoti_Token||"test"
+      noti_token: getNoti_Token || "test"
     };
     console.log('🔵 Sending login payload:', payload);
     try {
       setIsLoading(true);
       const headers = { 'x-platform': 'mob' };
       const response = await axios.post(
-        // 'https://apig.tms-webapp.com/api/login',
         `${API}/api/login`,
         payload,
         { headers }
@@ -378,6 +366,7 @@ const LoginScreen: React.FC<Props> = ({
       const userof = response.data.response?.userof;
       const yno = response.data.response?.year?.YearNo || '';
       const role1 = response.data.response?.role1;
+      const user_id = response.data.response?.user?.id || 0;
       if (response.data.success === true) {
         if (token && user_details && user_menu_apps) {
           await AsyncStorage.setItem('access_token', token);
@@ -388,6 +377,7 @@ const LoginScreen: React.FC<Props> = ({
           await AsyncStorage.setItem('login_user_passwd', password.trim());
           await AsyncStorage.setItem('yno', yno.trim());
           await AsyncStorage.setItem('user_login_role', JSON.stringify(role1));
+          await AsyncStorage.setItem('user_id', JSON.stringify(user_id));
           setToken(token);
           setUserDetails(user_details);
           setMenuApps(user_menu_apps);

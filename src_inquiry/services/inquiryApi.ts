@@ -86,7 +86,7 @@ export const inquiryApi = {
       `/api/inquiries/${id}/costing`,
       payload,
     );
-    console.log("Inquiry submitCosting", id, payload, res)
+    console.log("Inquiry submitCosting", id, payload, res);
     return res.data.data;
   },
 
@@ -117,22 +117,29 @@ export const inquiryApi = {
     return res.data.data;
   },
 
-  downloadPdf: async (id: number): Promise<{pdf_url: string; pdf_path: string}> => {
+  downloadPdf: async (id: number, prpcode: string, yearno: string): Promise<{pdf_url: string; pdf_path: string}> => {
     const res = await client.get<ApiResponse<{pdf_url: string; pdf_path: string}>>(
-      `/api/inquiries/${id}/pdf`,
+      `/api/inquiries/${id}/pdf`, {
+        params: {
+          prpcode,
+          yearno,
+        }
+      }
     );
+    console.log("Inquiry downloadPdf", id, prpcode, yearno, res);
     return res.data.data;
   },
 
   sendEmail: async (
     id: number,
-    payload: {email: string; subject?: string; message?: string},
+    payload: {email: string; subject?: string; message?: string, prpcode: string; yearno: string},
   ) => {
     const res = await client.post(`/api/inquiries/${id}/email`, payload);
+    console.log("Inquiry sendEmail", id, payload, res)
     return res.data;
   },
 
-  sendWhatsapp: async (id: number, payload: {mobile: string; message?: string}) => {
+  sendWhatsapp: async (id: number, payload: {mobile: string; message?: string, prpcode: string; yearno: string}) => {
     const res = await client.post(`/api/inquiries/${id}/whatsapp`, payload);
     return res.data;
   },

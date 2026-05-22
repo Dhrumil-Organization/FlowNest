@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -8,21 +8,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import {colors, fontSize, radius, spacing} from '../utils/theme';
-import {inquiryApi} from '../services/inquiryApi';
-import {Inquiry, RootStackParamList} from '../types';
+import { colors, fontSize, radius, spacing } from '../utils/theme';
+import { inquiryApi } from '../services/inquiryApi';
+import { Inquiry, RootStackParamList } from '../types';
 import Input from '../components/Input';
 import Button from '../components/Button';
-import {isValidEmail, isValidMobile} from '../utils/validators';
+import { isValidEmail, isValidMobile } from '../utils/validators';
+import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SendQuotation'>;
 
-type Channel = 'email' | 'whatsapp' | 'pdf';
+type Channel = 'email' | 'whatsapp';
 
-const SendQuotationScreen: React.FC<Props> = ({route, navigation}) => {
-  const {id} = route.params;
+const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) => {
+  const { id } = route.params;
   const [channel, setChannel] = useState<Channel>('email');
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
 
@@ -60,9 +61,9 @@ const SendQuotationScreen: React.FC<Props> = ({route, navigation}) => {
     }
     setSending(true);
     try {
-      await inquiryApi.sendEmail(id, {email, subject, message: emailMessage});
+      await inquiryApi.sendEmail(id, { email, subject, message: emailMessage, prpcode: "SIP", yearno: "27" });
       Alert.alert('Sent!', 'Quotation emailed successfully', [
-        {text: 'OK', onPress: () => navigation.goBack()},
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to send email');
@@ -78,9 +79,9 @@ const SendQuotationScreen: React.FC<Props> = ({route, navigation}) => {
     }
     setSending(true);
     try {
-      await inquiryApi.sendWhatsapp(id, {mobile, message: waMessage});
+      await inquiryApi.sendWhatsapp(id, { mobile, message: waMessage, prpcode: "SIP", yearno: "27" });
       Alert.alert('Sent!', 'Quotation sent via WhatsApp', [
-        {text: 'OK', onPress: () => navigation.goBack()},
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to send WhatsApp');
@@ -92,7 +93,8 @@ const SendQuotationScreen: React.FC<Props> = ({route, navigation}) => {
   const downloadPdf = async () => {
     setSending(true);
     try {
-      const {pdf_url} = await inquiryApi.downloadPdf(id);
+      // const {pdf_url} = await inquiryApi.downloadPdf(id);
+      const { pdf_url } = await inquiryApi.downloadPdf(id, "SIP", "27");
       Linking.openURL(pdf_url);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to generate PDF');
@@ -102,96 +104,102 @@ const SendQuotationScreen: React.FC<Props> = ({route, navigation}) => {
   };
 
   return (
-    <ScrollView
-      style={{flex: 1, backgroundColor: colors.bg}}
-      contentContainerStyle={{padding: spacing.md, paddingBottom: 40}}>
-      
-      {/* Inquiry header */}
-      {inquiry ? (
-        <View style={styles.header}>
-          <Text style={styles.inqNo}>{inquiry.inquiry_no}</Text>
-          <Text style={styles.party}>{inquiry.party_name}</Text>
-        </View>
-      ) : null}
+    <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'Send Quotation'}
+        subHeader={'Manage your quotation'}
+      />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
 
-      {/* Channel tabs */}
-      <View style={styles.tabs}>
-        {(['email', 'whatsapp', 'pdf'] as Channel[]).map(c => (
-          <TouchableOpacity
-            key={c}
-            style={[styles.tab, channel === c && styles.tabActive]}
-            onPress={() => setChannel(c)}>
-            <Text style={[styles.tabText, channel === c && styles.tabTextActive]}>
-              {c === 'email' ? 'Email' : c === 'whatsapp' ? 'WhatsApp' : 'PDF'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Email panel */}
-      {channel === 'email' ? (
-        <View style={styles.panel}>
-          <Input
-            label="To Email"
-            required
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholder="party@example.com"
-          />
-          <Input
-            label="Subject"
-            value={subject}
-            onChangeText={setSubject}
-            placeholder="Quotation subject"
-          />
-          <Input
-            label="Message"
-            value={emailMessage}
-            onChangeText={setEmailMessage}
-            multiline
-            placeholder="Email body"
-          />
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              📎 PDF quotation will be attached automatically
-            </Text>
+        {/* Inquiry header */}
+        {inquiry ? (
+          <View style={styles.header}>
+            <Text style={styles.inqNo}>{inquiry.inquiry_no}</Text>
+            <Text style={styles.party}>{inquiry.party_name}</Text>
           </View>
-          <Button title="Send Email" onPress={sendEmail} loading={sending} />
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* WhatsApp panel */}
-      {channel === 'whatsapp' ? (
-        <View style={styles.panel}>
-          <Input
-            label="Mobile Number"
-            required
-            value={mobile}
-            onChangeText={setMobile}
-            keyboardType="phone-pad"
-            placeholder="10-digit mobile"
-            maxLength={13}
-          />
-          <Input
-            label="Message"
-            value={waMessage}
-            onChangeText={setWaMessage}
-            multiline
-            placeholder="WhatsApp message"
-          />
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              📎 PDF will be sent as document attachment
-            </Text>
+        {/* Channel tabs */}
+        <View style={styles.tabs}>
+          {(['email', 'whatsapp'] as Channel[]).map(c => (
+            <TouchableOpacity
+              key={c}
+              style={[styles.tab, channel === c && styles.tabActive]}
+              onPress={() => setChannel(c)}>
+              <Text style={[styles.tabText, channel === c && styles.tabTextActive]}>
+                {c === 'email' ? 'Email' : c === 'whatsapp' ? 'WhatsApp' : ''}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Email panel */}
+        {channel === 'email' ? (
+          <View style={styles.panel}>
+            <Input
+              label="To Email"
+              required
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="party@example.com"
+            />
+            <Input
+              label="Subject"
+              value={subject}
+              onChangeText={setSubject}
+              placeholder="Quotation subject"
+            />
+            <Input
+              label="Message"
+              value={emailMessage}
+              onChangeText={setEmailMessage}
+              multiline
+              placeholder="Email body"
+            />
+            <View style={styles.note}>
+              <Text style={styles.noteText}>
+                📎 PDF quotation will be attached automatically
+              </Text>
+            </View>
+            <Button title="Send Email" onPress={sendEmail} loading={sending} />
           </View>
-          <Button title="Send via WhatsApp" onPress={sendWhatsapp} loading={sending} />
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* PDF panel */}
-      {channel === 'pdf' ? (
+        {/* WhatsApp panel */}
+        {channel === 'whatsapp' ? (
+          <View style={styles.panel}>
+            <Input
+              label="Mobile Number"
+              required
+              value={mobile}
+              onChangeText={setMobile}
+              keyboardType="phone-pad"
+              placeholder="10-digit mobile"
+              maxLength={13}
+            />
+            <Input
+              label="Message"
+              value={waMessage}
+              onChangeText={setWaMessage}
+              multiline
+              placeholder="WhatsApp message"
+            />
+            <View style={styles.note}>
+              <Text style={styles.noteText}>
+                📎 PDF will be sent as document attachment
+              </Text>
+            </View>
+            <Button title="Send via WhatsApp" onPress={sendWhatsapp} loading={sending} />
+          </View>
+        ) : null}
+
+        {/* PDF panel */}
+        {/* {channel === 'pdf' ? (
         <View style={styles.panel}>
           <Text style={styles.pdfDescription}>
             Download the quotation PDF to share manually via any other channel
@@ -201,18 +209,19 @@ const SendQuotationScreen: React.FC<Props> = ({route, navigation}) => {
             title="Download PDF"
             onPress={downloadPdf}
             loading={sending}
-            style={{marginTop: spacing.md}}
+            style={{ marginTop: spacing.md }}
           />
         </View>
-      ) : null}
-    </ScrollView>
+      ) : null} */}
+      </ScrollView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  header: {marginBottom: spacing.md},
-  inqNo: {fontSize: fontSize.lg, fontWeight: '500'},
-  party: {fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2},
+  header: { marginBottom: spacing.md },
+  inqNo: { fontSize: fontSize.lg, fontWeight: '500' },
+  party: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
   tabs: {
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
@@ -226,9 +235,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.sm,
   },
-  tabActive: {backgroundColor: colors.primary},
-  tabText: {fontSize: fontSize.sm, color: colors.textSecondary},
-  tabTextActive: {color: colors.textOnPrimary, fontWeight: '500'},
+  tabActive: { backgroundColor: colors.primary },
+  tabText: { fontSize: fontSize.sm, color: colors.textSecondary },
+  tabTextActive: { color: colors.textOnPrimary, fontWeight: '500' },
   panel: {
     backgroundColor: colors.cardBg,
     borderWidth: 1,
@@ -242,7 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     marginBottom: spacing.md,
   },
-  noteText: {color: colors.info, fontSize: fontSize.sm},
+  noteText: { color: colors.info, fontSize: fontSize.sm },
   pdfDescription: {
     fontSize: fontSize.base,
     color: colors.textSecondary,

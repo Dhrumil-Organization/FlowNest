@@ -6,13 +6,13 @@ import {
     initGlobalCacheDB
 } from '@/common/utils/sqliteCacheManager';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import * as Device from 'expo-device';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import * as Device from 'expo-device';
 import {
     ActivityIndicator,
     Alert,
@@ -40,8 +40,8 @@ export default function LoginScreen() {
     useEffect(() => {
         const check = async () => {
             const token = await AsyncStorage.getItem('access_token');
-            const noti_token = await AsyncStorage.getItem('notification_token');
-            setNotitoken(noti_token || '');
+            // const noti_token = await AsyncStorage.getItem('notification_token');
+            // setNotitoken(noti_token || '');
 
             if (token) {
                 router.replace('/');

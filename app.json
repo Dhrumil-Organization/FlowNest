@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -22,11 +22,9 @@
         "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text."
       }
     },
-    "experimental": {
-      "newArchEnabled": false
-    },
     "android": {
-      "jsEngine": "jsc",
+      // "jsEngine": "jsc",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/log_white.png",
@@ -42,7 +40,7 @@
         "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.FlowNest"
+      "package": "com.dhrumil.FlowNest"
     },
     "web": {
       "output": "static",

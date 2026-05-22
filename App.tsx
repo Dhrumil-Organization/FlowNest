@@ -138,6 +138,7 @@ export default function App() {
   const [showDeniedModalpage, setShowDeniedModalpage] = useState(true);
   const [countdown, setCountdown] = useState(5);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [getUserId, setUserId] = useState<number>();
   const PRPTYPE_FOLDER = `${RNFS.DocumentDirectoryPath}/prptypes/`;
 
   // App.tsx
@@ -232,6 +233,7 @@ export default function App() {
         const token = await AsyncStorage.getItem('access_token');
         const user_details = await AsyncStorage.getItem('user_details');
         const user_prptype = await AsyncStorage.getItem('user_prptype');
+        const user_id = await AsyncStorage.getItem('user_id');
 
         console.log('user_prptype', user_prptype);
 
@@ -240,6 +242,7 @@ export default function App() {
         setUserDetails(user_details);
         setUserPrptype(user_prptype);
         setIsLoggedIn(!!token);
+        setUserId(user_id as any);
 
         const netState = await NetInfo.fetch();
         setIsConnected(netState.isConnected);
@@ -1272,6 +1275,8 @@ export default function App() {
                         <DashboardScreen
                           {...props}
                           username={getUserDetails}
+                          getUserId={getUserId}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1280,6 +1285,7 @@ export default function App() {
                         <InquiryFormScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1288,6 +1294,7 @@ export default function App() {
                         <PartySelectionScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1296,6 +1303,7 @@ export default function App() {
                         <AddPartyScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1304,6 +1312,7 @@ export default function App() {
                         <DesignSelectionScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1312,6 +1321,7 @@ export default function App() {
                         <InquiryDetailScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1320,6 +1330,7 @@ export default function App() {
                         <CostingScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1328,6 +1339,7 @@ export default function App() {
                         <SendQuotationScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1336,6 +1348,7 @@ export default function App() {
                         <ConfirmInquiryScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1344,6 +1357,7 @@ export default function App() {
                         <RejectInquiryScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1352,6 +1366,7 @@ export default function App() {
                         <TatConfigScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>
@@ -1360,6 +1375,7 @@ export default function App() {
                         <TatAnalyticsScreen
                           {...props}
                           username={getUserDetails}
+                          getUserPrptype={getUserPrptype}
                         />
                       )}
                     </Stack.Screen>

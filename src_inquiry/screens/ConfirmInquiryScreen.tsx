@@ -11,7 +11,7 @@ import Button from '../components/Button';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ConfirmInquiry'>;
 
-const ConfirmInquiryScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const ConfirmInquiryScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
   const { id } = route.params;
   const [paymentTerms, setPaymentTerms] = useState('');
   const [deliveryTerms, setDeliveryTerms] = useState('');
@@ -25,7 +25,7 @@ const ConfirmInquiryScreen: React.FC<Props> = ({ route, navigation, username }) 
         payment_terms: paymentTerms,
         delivery_terms: deliveryTerms,
         remarks,
-        prpcode: 'SIP',
+        prptype: getUserPrptype,
         yearno: '27',
       });
       const soNo = res?.sales_order?.so_no;

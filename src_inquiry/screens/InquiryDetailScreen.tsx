@@ -49,7 +49,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
   const downloadPdf = async () => {
     if (!inquiry) return;
     try {
-      const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id);
+      const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id, "SIP", "27");
       Linking.openURL(pdf_url);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to download PDF');
@@ -78,168 +78,168 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
 
   return (
     <>
-    <HeaderBarwithBack
+      <HeaderBarwithBack
         userName={username}
         header={'Inquiries Details'}
         subHeader={'Manage your inquiries details'}
       />
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.inqNo}>{inquiry.inquiry_no}</Text>
-          <Text style={styles.date}>{formatDate(inquiry.inquiry_date)}</Text>
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <StatusBadge status={inquiry.status} />
-          {inquiry.tat.overall_status !== 'not_applicable' ? (
-            <TatBadge status={inquiry.tat.overall_status} customLabel={`TAT: ${inquiry.tat.overall_status === 'on_time' ? 'On Time' : inquiry.tat.overall_status === 'warning' ? 'Warning' : 'Breached'}`} />
-          ) : null}
-        </View>
-      </View>
-
-      {/* TAT Timeline */}
-      {inquiry.tat_live ? <TatTimeline tatLive={inquiry.tat_live} /> : null}
-
-      {/* Party */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Party</Text>
-        <Text style={styles.partyName}>{inquiry.party_name}</Text>
-        {inquiry.party_address ? (
-          <Text style={styles.meta}>{inquiry.party_address}</Text>
-        ) : null}
-        {inquiry.party_gstin ? (
-          <Text style={styles.meta}>GSTIN: {inquiry.party_gstin}</Text>
-        ) : null}
-      </View>
-
-      {/* Designs */}
-      <Text style={styles.sectionLabel}>Designs ({inquiry.designs?.length ?? 0})</Text>
-      {inquiry.designs?.map((d, idx) => (
-        <View key={d.id} style={styles.designItem}>
-          <View style={styles.designItemHead}>
-            <Text style={styles.designName}>
-              {idx + 1}. {d.design_name}
-              {d.is_new_design ? ' (New)' : ''}
-            </Text>
-            {d.is_costed ? (
-              <Text style={styles.costedBadge}>Costed</Text>
-            ) : (
-              <Text style={styles.pendingBadge}>Pending</Text>
-            )}
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.inqNo}>{inquiry.inquiry_no}</Text>
+            <Text style={styles.date}>{formatDate(inquiry.inquiry_date)}</Text>
           </View>
-          {d.construction_remarks ? (
-            <Text style={styles.construction}>{d.construction_remarks}</Text>
-          ) : null}
-          <View style={styles.row}>
-            <Text style={styles.kv}>Qty: <Text style={styles.kvValue}>{d.quantity} {d.unit}</Text></Text>
-            {d.cost_per_mtr !== null ? (
-              <Text style={styles.kv}>Rate: <Text style={styles.kvValue}>{formatCurrency(d.cost_per_mtr)}</Text></Text>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <StatusBadge status={inquiry.status} />
+            {inquiry.tat.overall_status !== 'not_applicable' ? (
+              <TatBadge status={inquiry.tat.overall_status} customLabel={`TAT: ${inquiry.tat.overall_status === 'on_time' ? 'On Time' : inquiry.tat.overall_status === 'warning' ? 'Warning' : 'Breached'}`} />
             ) : null}
           </View>
-          {d.is_costed ? (
-            <View style={[styles.row, { marginTop: 4 }]}>
-              <Text style={styles.kv}>GST: {d.gst_percent}%</Text>
-              <Text style={[styles.kvValue, { fontWeight: '500' }]}>
-                {formatCurrency(d.total_amount)}
+        </View>
+
+        {/* TAT Timeline */}
+        {inquiry.tat_live ? <TatTimeline tatLive={inquiry.tat_live} /> : null}
+
+        {/* Party */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Party</Text>
+          <Text style={styles.partyName}>{inquiry.party_name}</Text>
+          {inquiry.party_address ? (
+            <Text style={styles.meta}>{inquiry.party_address}</Text>
+          ) : null}
+          {inquiry.party_gstin ? (
+            <Text style={styles.meta}>GSTIN: {inquiry.party_gstin}</Text>
+          ) : null}
+        </View>
+
+        {/* Designs */}
+        <Text style={styles.sectionLabel}>Designs ({inquiry.designs?.length ?? 0})</Text>
+        {inquiry.designs?.map((d, idx) => (
+          <View key={d.id} style={styles.designItem}>
+            <View style={styles.designItemHead}>
+              <Text style={styles.designName}>
+                {idx + 1}. {d.design_name}
+                {d.is_new_design ? ' (New)' : ''}
               </Text>
+              {d.is_costed ? (
+                <Text style={styles.costedBadge}>Costed</Text>
+              ) : (
+                <Text style={styles.pendingBadge}>Pending</Text>
+              )}
+            </View>
+            {d.construction_remarks ? (
+              <Text style={styles.construction}>{d.construction_remarks}</Text>
+            ) : null}
+            <View style={styles.row}>
+              <Text style={styles.kv}>Qty: <Text style={styles.kvValue}>{d.quantity} {d.unit}</Text></Text>
+              {d.cost_per_mtr !== null ? (
+                <Text style={styles.kv}>Rate: <Text style={styles.kvValue}>{formatCurrency(d.cost_per_mtr)}</Text></Text>
+              ) : null}
+            </View>
+            {d.is_costed ? (
+              <View style={[styles.row, { marginTop: 4 }]}>
+                <Text style={styles.kv}>GST: {d.gst_percent}%</Text>
+                <Text style={[styles.kvValue, { fontWeight: '500' }]}>
+                  {formatCurrency(d.total_amount)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ))}
+
+        {/* Totals */}
+        {grandTotal > 0 ? (
+          <View style={styles.totalsBox}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Sub Total</Text>
+              <Text style={styles.totalValue}>{formatCurrency(subTotal)}</Text>
+            </View>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>GST</Text>
+              <Text style={styles.totalValue}>{formatCurrency(gstTotal)}</Text>
+            </View>
+            <View style={[styles.totalRow, styles.grandTotalRow]}>
+              <Text style={styles.grandLabel}>Grand Total</Text>
+              <Text style={styles.grandValue}>{formatCurrency(grandTotal)}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Sales order info if confirmed */}
+        {inquiry.sales_order ? (
+          <View style={[styles.section, { backgroundColor: colors.successBg, borderColor: colors.success }]}>
+            <Text style={[styles.sectionLabel, { color: colors.success }]}>
+              ✓ Converted to Sales Order
+            </Text>
+            <Text style={[styles.partyName, { color: colors.success }]}>
+              {inquiry.sales_order.so_no}
+            </Text>
+            <Text style={[styles.meta, { color: colors.success }]}>
+              {formatDate(inquiry.sales_order.so_date)} • {formatCurrency(inquiry.sales_order.grand_total)}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Rejection info */}
+        {inquiry.rejection ? (
+          <View style={[styles.section, { backgroundColor: colors.dangerBg, borderColor: colors.danger }]}>
+            <Text style={[styles.sectionLabel, { color: colors.danger }]}>Rejected</Text>
+            <Text style={[styles.partyName, { color: colors.danger }]}>
+              {inquiry.rejection.reason}
+            </Text>
+            {inquiry.rejection.remarks ? (
+              <Text style={[styles.meta, { color: colors.danger }]}>
+                {inquiry.rejection.remarks}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Action buttons */}
+        <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+          {canCost ? (
+            <Button
+              title="Add Costing"
+              onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
+            />
+          ) : null}
+
+          {canSend ? (
+            <>
+              <Button
+                title="Send Quotation to Party"
+                onPress={() => navigation.navigate('SendQuotation', { id: inquiry.id })}
+              />
+              <Button
+                title="Download PDF"
+                variant="outline"
+                onPress={downloadPdf}
+              />
+            </>
+          ) : null}
+
+          {canClose ? (
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Button
+                title="Mark Confirmed"
+                variant="secondary"
+                onPress={() => navigation.navigate('ConfirmInquiry', { id: inquiry.id })}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Mark Rejected"
+                variant="danger"
+                onPress={() => navigation.navigate('RejectInquiry', { id: inquiry.id })}
+                style={{ flex: 1 }}
+              />
             </View>
           ) : null}
         </View>
-      ))}
-
-      {/* Totals */}
-      {grandTotal > 0 ? (
-        <View style={styles.totalsBox}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Sub Total</Text>
-            <Text style={styles.totalValue}>{formatCurrency(subTotal)}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>GST</Text>
-            <Text style={styles.totalValue}>{formatCurrency(gstTotal)}</Text>
-          </View>
-          <View style={[styles.totalRow, styles.grandTotalRow]}>
-            <Text style={styles.grandLabel}>Grand Total</Text>
-            <Text style={styles.grandValue}>{formatCurrency(grandTotal)}</Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Sales order info if confirmed */}
-      {inquiry.sales_order ? (
-        <View style={[styles.section, { backgroundColor: colors.successBg, borderColor: colors.success }]}>
-          <Text style={[styles.sectionLabel, { color: colors.success }]}>
-            ✓ Converted to Sales Order
-          </Text>
-          <Text style={[styles.partyName, { color: colors.success }]}>
-            {inquiry.sales_order.so_no}
-          </Text>
-          <Text style={[styles.meta, { color: colors.success }]}>
-            {formatDate(inquiry.sales_order.so_date)} • {formatCurrency(inquiry.sales_order.grand_total)}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Rejection info */}
-      {inquiry.rejection ? (
-        <View style={[styles.section, { backgroundColor: colors.dangerBg, borderColor: colors.danger }]}>
-          <Text style={[styles.sectionLabel, { color: colors.danger }]}>Rejected</Text>
-          <Text style={[styles.partyName, { color: colors.danger }]}>
-            {inquiry.rejection.reason}
-          </Text>
-          {inquiry.rejection.remarks ? (
-            <Text style={[styles.meta, { color: colors.danger }]}>
-              {inquiry.rejection.remarks}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* Action buttons */}
-      <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
-        {canCost ? (
-          <Button
-            title="Add Costing"
-            onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
-          />
-        ) : null}
-
-        {canSend ? (
-          <>
-            <Button
-              title="Send Quotation to Party"
-              onPress={() => navigation.navigate('SendQuotation', { id: inquiry.id })}
-            />
-            <Button
-              title="Download PDF"
-              variant="outline"
-              onPress={downloadPdf}
-            />
-          </>
-        ) : null}
-
-        {canClose ? (
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button
-              title="Mark Confirmed"
-              variant="secondary"
-              onPress={() => navigation.navigate('ConfirmInquiry', { id: inquiry.id })}
-              style={{ flex: 1 }}
-            />
-            <Button
-              title="Mark Rejected"
-              variant="danger"
-              onPress={() => navigation.navigate('RejectInquiry', { id: inquiry.id })}
-              style={{ flex: 1 }}
-            />
-          </View>
-        ) : null}
-      </View>
-    </ScrollView>
+      </ScrollView>
     </>
   );
 };

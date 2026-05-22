@@ -1,84 +1,109 @@
-import React, { useState } from "react";
-import {
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    Alert,
-    ActivityIndicator,
-} from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, TextInput, FlatList, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import WarehouseHeader from "./components/WarehouseHeader";
 import { warehouseApi } from "./services/warehouseApi";
 import CartonCard from "./components/CartonCard";
 import { styles, COLORS } from "./components/WarehouseStyles";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API } from "../../common/API/dynamicAPI";
+import axios from "axios";
 
-export default function WarehouseViewScreen({ route }) {
-    const { criteria = {}, location = {} } = route.params || {};
+const keyOf = item => String(item?.uid || item?.UId || item?.cartonNo || item?.cartno || item?.CartNo || "");
+const searchable = item => `${item?.cartonNo || ""} ${item?.cartno || ""} ${item?.ItmName || ""} ${item?.itemName || ""} ${item?.ShdName || ""} ${item?.GrdName || ""} ${item?.MerName || ""} ${item?.vouNo || ""} ${item?.vouno || ""} ${item?.PackingNo || ""}`.toLowerCase();
 
-    const [loading, setLoading] = useState(false);
-    const [cartons, setCartons] = useState([]);
+export default function WarehouseViewScreen({ token, navigation, route }) {
+  const { criteria = {}, location = {} } = route.params || {};
+  const [loading, setLoading] = useState(false);
+  const [cartons, setCartons] = useState([]);
+  const [searchText, setSearchText] = useState("");
+  const filteredCartons = useMemo(() => { const s = searchText.trim().toLowerCase(); return s ? cartons.filter(x => searchable(x).includes(s)) : cartons; }, [cartons, searchText]);
+  const getRequestConfig = () => ({
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-platform": "mob",
+    },
+  });
 
-    const loadData = async () => {
-        try {
-            setLoading(true);
+  console.log("location", location);
 
-            const payload = {
-                ...criteria,
-                mode: "VIEW",
-                locationCode: location.locationCode,
-                locationName: location.locationName,
-            };
+  const getCurrentFinancialYear = () => {
+    const d = new Date();
+    const fy = d.getMonth() + 1 >= 4 ? d.getFullYear() + 1 : d.getFullYear();
+    return fy.toString().substring(2);
+  };
 
-            const res = await warehouseApi.loadCartons(payload);
-            const rows = res?.data?.data || res?.data?.results || [];
+  const loadData = async () => {
+    const userPtype = await AsyncStorage.getItem('user_prptype');
 
-            setCartons(Array.isArray(rows) ? rows : []);
-        } catch (e) {
-            Alert.alert("Error", e?.response?.data?.message || "Failed to load cartons");
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+      setLoading(true);
 
-    return (
-        <View style={styles.screen}>
-            <View style={styles.container}>
-                <View style={styles.card}>
-                    <View style={styles.between}>
-                        <Text style={styles.label}>Location</Text>
-                        <Text style={{ color: COLORS.primary, fontWeight: "900" }}>
-                            {location.locationName}
-                        </Text>
-                    </View>
+      const payload = {
+        prpcode: criteria.prpcode,
+        strcode: criteria.strcode,
+        yearno: getCurrentFinancialYear(),
+        itmcode: "",
+        txntype: "production_warehouse_locations",
+        selectedcartons: [],
+        fromlocationdetail: [location],
+        tolocationdetail: [],
+        action: "view",
+        prptype: userPtype
+      };
 
-                    <View style={styles.between}>
-                        <Text style={styles.label}>Capacity</Text>
-                        <Text style={{ color: COLORS.primary, fontWeight: "900" }}>
-                            {location.used || 0} / {location.capacity || 0}
-                        </Text>
-                    </View>
+      console.log("assign save payload", payload);
 
-                    <TouchableOpacity style={styles.button} onPress={loadData}>
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LOAD DATA</Text>}
-                    </TouchableOpacity>
-                </View>
+      const res = await axios.post(
+        `${API}/api/prodwarehousemanage`,
+        payload,
+        getRequestConfig()
+      );
 
-                <Text style={{ fontWeight: "900", marginBottom: 10 }}>
-                    Carton List ({cartons.length})
-                </Text>
+      console.log("response", res);
 
-                <FlatList
-                    data={cartons}
-                    keyExtractor={(item, index) => String(item.uid || item.cartonNo || index)}
-                    renderItem={({ item }) => (
-                        <CartonCard item={item} readonly />
-                    )}
-                    ListEmptyComponent={
-                        <Text style={{ textAlign: "center", color: COLORS.muted, marginTop: 40 }}>
-                            No cartons available
-                        </Text>
-                    }
-                />
-            </View>
+      const rows = res?.data?.data || res?.data?.results || [];
+
+      setCartons(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      Alert.alert(
+        "Error",
+        e?.response?.data?.message || e?.response?.data?.error ||
+        e?.message ||
+        "Failed to save assign"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.screen}>
+      <WarehouseHeader title="View Carton" navigation={navigation} />
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <View style={styles.between}><Text style={styles.label}>Location</Text><Text style={{ color: "#000", fontWeight: "900" }}>{location.locationName || location.location}</Text></View>
+          <View style={styles.between}><Text style={styles.label}>Capacity</Text><Text style={{ color: "#000", fontWeight: "900" }}>{location.used || location.occupancy || 0} / {location.capacity || 0}</Text></View>
+          <TouchableOpacity style={styles.button} onPress={loadData}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LOAD DATA</Text>}
+          </TouchableOpacity>
         </View>
-    );
+        <TextInput style={[styles.input, { marginBottom: 10 }]} value={searchText} onChangeText={setSearchText} placeholder="Search carton / item / shade / voucher" />
+        <Text style={styles.sectionTitle}>
+          Carton List ({filteredCartons.length})
+        </Text>
+        <FlatList data={filteredCartons}
+          keyExtractor={(item, index) =>
+            `${index}_${item?.uid || ""}_${item?.cartno || ""}`
+          }
+          renderItem={({ item }) => (
+            <View style={{ pointerEvents: "none" }}>
+              <CartonCard item={item} readonly />
+            </View>
+          )}
+          ListEmptyComponent={<Text style={styles.emptyText}>No cartons available</Text>} />
+      </View>
+    </View>
+  );
 }

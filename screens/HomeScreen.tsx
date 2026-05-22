@@ -315,10 +315,15 @@ const APP_SECTIONS = [
     {
         title: 'W',
         data: [
-            { id: '35', name: 'Warehouse Criteria Screen', screen: 'Warehouse Criteria Screen', icon: 'shopping-cart-checkout', iconColor: '#4169E1' },
+            { id: '35', name: 'Warehouse', screen: 'Warehouse', icon: 'warehouse', iconColor: '#991070' },
         ],
     },
-
+    {
+        title: 'Y',
+        data: [
+            { id: '35', name: 'Purchase Auth', screen: 'Purchase Auth', icon: 'fact-check', iconColor: '#5f738f' },
+        ],
+    },
 
 ];
 
@@ -606,10 +611,13 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
                 //                     {
-                //                         "title": "Warehouse Criteria Screen",
+                //                         "title": "Warehouse",
                 //                         "href": "/"
                 //                     },
-                                   
+                //                     {
+                //                         "title": "Purchase Auth",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

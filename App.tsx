@@ -120,6 +120,7 @@ import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
 import TatConfigScreen from './src_inquiry/screens/TatConfigScreen';
 import TatAnalyticsScreen from './src_inquiry/screens/TatAnalyticsScreen';
 import WarehouseStack from './components/Warehouse/WarehouseStack';
+import PurchaseAuth from './components/PurchaseAuth/PurchaseAuth';
 
 const Stack = createNativeStackNavigator();
 
@@ -1209,7 +1210,7 @@ export default function App() {
                       )}
                     </Stack.Screen>
 
-                    <Stack.Screen name="Warehouse Criteria Screen">
+                    <Stack.Screen name="Warehouse">
                       {props => (
                         <WarehouseStack
                           {...props}
@@ -1220,6 +1221,17 @@ export default function App() {
                       )}
                     </Stack.Screen>
 
+
+                    <Stack.Screen name="Purchase Auth">
+                      {props => (
+                        <PurchaseAuth
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
 
                     <Stack.Screen name="Production Report">
                       {props => (

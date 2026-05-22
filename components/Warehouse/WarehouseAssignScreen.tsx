@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,44 +7,127 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
+import Icon from "react-native-vector-icons/MaterialIcons";
+import WarehouseHeader from "./components/WarehouseHeader";
 import { warehouseApi } from "./services/warehouseApi";
-// import CartonCard from "./components/CartonCard";
 import CartonCard from "./components/CartonCard";
 import { styles, COLORS } from "./components/WarehouseStyles";
+import { API } from "../../common/API/dynamicAPI";
+import axios from "axios";
 
-export default function WarehouseAssignScreen({ navigation, route }) {
+const keyOf = item =>
+  String(
+    item?.uid ||
+    item?.UId ||
+    `${item?.cartno || item?.CartNo || ""}_${item?.vouno || ""}_${item?.srno || item?.SrNo || ""}`
+  );
+
+const searchable = item =>
+  `
+  ${item?.cartonNo || ""}
+  ${item?.cartno || ""}
+  ${item?.ItmName || ""}
+  ${item?.itemName || ""}
+  ${item?.ShdName || ""}
+  ${item?.GrdName || ""}
+  ${item?.MerName || ""}
+  ${item?.vouNo || ""}
+  ${item?.vouno || ""}
+  ${item?.PackingNo || ""}
+`.toLowerCase();
+
+export default function WarehouseAssignScreen({ token, navigation, route }) {
   const { criteria = {}, location = {} } = route.params || {};
 
   const [itemText, setItemText] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cartons, setCartons] = useState([]);
   const [selected, setSelected] = useState({});
+  const [selectedOrder, setSelectedOrder] = useState([]);
 
   const selectedCount = Object.keys(selected).length;
 
+  const filteredCartons = useMemo(() => {
+    const s = searchText.trim().toLowerCase();
+
+    const rows = s
+      ? cartons.filter(x => searchable(x).includes(s))
+      : cartons;
+
+    const selectedMap = new Map();
+
+    selectedOrder.forEach(key => {
+      const found = rows.find(x => keyOf(x) === key);
+
+      if (found) {
+        selectedMap.set(key, found);
+      }
+    });
+
+    const selectedRows = Array.from(selectedMap.values());
+
+    const remainingRows = rows.filter(
+      x => !selectedMap.has(keyOf(x))
+    );
+
+    return [...selectedRows, ...remainingRows];
+  }, [cartons, searchText, selected, selectedOrder]);
+
+  const getRequestConfig = () => ({
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-platform": "mob",
+    },
+  });
+
+  console.log("location", location);
+
+  const getCurrentFinancialYear = () => {
+    const d = new Date();
+    const fy = d.getMonth() + 1 >= 4 ? d.getFullYear() + 1 : d.getFullYear();
+    return fy.toString().substring(2);
+  };
+
   const loadData = async () => {
-    if (!location?.locationCode && !location?.locationName) {
-      Alert.alert("Validation", "Location is required");
-      return;
+    if (!location?.locationCode && !location?.locationName && !location?.location) {
+      return Alert.alert("Validation", "Location is required");
     }
 
     try {
       setLoading(true);
       setSelected({});
+      setSearchText("");
 
       const payload = {
-        ...criteria,
-        mode: "ASSIGN",
-        locationCode: location.locationCode,
-        locationName: location.locationName,
-        itemText,
+        PrpCode: criteria.prpcode,
+        StrCode: criteria.strcode,
+        YearNo: getCurrentFinancialYear(),
+        GrdCode: "",
+        ItmCode: "",
+        MerCode: "",
+        ShdCode: "",
+        limit: "",
+        page: "",
+        search: "",
+        selectedcarton: [],
+        ttype: ["8", "3", "30", "2", "34", "32", "83", "994", "992"],
+        txntype: "production_warehouse_locations",
+        type: "S",
       };
 
-      const res = await warehouseApi.loadCartons(payload);
-      const rows = res?.data?.data || res?.data?.results || [];
+      const res = await axios.post(`${API}/api/getcartondetail`, payload, getRequestConfig());
 
+      const rows = res?.data?.response?.data || res?.data?.response?.results || [];
       setCartons(Array.isArray(rows) ? rows : []);
     } catch (e) {
       Alert.alert("Error", e?.response?.data?.message || "Failed to load cartons");
@@ -54,15 +137,28 @@ export default function WarehouseAssignScreen({ navigation, route }) {
   };
 
   const toggleSelect = item => {
-    const key = String(item.uid || item.cartonNo);
+    const key = keyOf(item);
+
+    if (!key) {
+      return Alert.alert("Validation", "Carton number missing");
+    }
 
     setSelected(prev => {
       const next = { ...prev };
 
       if (next[key]) {
         delete next[key];
+
+        setSelectedOrder(order =>
+          order.filter(x => x !== key)
+        );
       } else {
         next[key] = item;
+
+        setSelectedOrder(order => [
+          key,
+          ...order.filter(x => x !== key),
+        ]);
       }
 
       return next;
@@ -70,130 +166,284 @@ export default function WarehouseAssignScreen({ navigation, route }) {
   };
 
   const openScanner = () => {
+    Keyboard.dismiss();
+
+    if (!cartons.length) {
+      return Alert.alert("Validation", "Please load carton data first");
+    }
+
     navigation.navigate("WarehouseQRScanner", {
       mode: "ASSIGN",
       cartons,
       selected,
-      onScanResult: scannedCarton => {
-        const key = String(scannedCarton.uid || scannedCarton.cartonNo);
+      onScanResult: row => {
+        const key = keyOf(row);
+
+        if (!key) return;
+
         setSelected(prev => ({
           ...prev,
-          [key]: scannedCarton,
+          [key]: row,
         }));
+
+        setSelectedOrder(prev => [
+          key,
+          ...prev.filter(x => x !== key),
+        ]);
       },
     });
   };
 
+  // const saveAssign = async () => {
+  //   const selectedRows = Object.values(selected);
+
+  //   if (!selectedRows.length) {
+  //     return Alert.alert("Validation", "Please select at least one carton");
+  //   }
+
+  //   try {
+  //     setLoading(true);
+
+  //     const payload = {
+  //       ...criteria,
+  //       locationCode: location.locationCode || "",
+  //       locationName: location.locationName || location.location || "",
+  //       cartons: selectedRows,
+  //     };
+
+  //     const res = await warehouseApi.saveAssign(payload);
+
+  //     Alert.alert("Success", res?.data?.message || "Assign saved successfully", [
+  //       { text: "OK", onPress: () => navigation.goBack() },
+  //     ]);
+  //   } catch (e) {
+  //     Alert.alert("Error", e?.response?.data?.message || "Failed to save assign");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const saveAssign = async () => {
     const selectedRows = Object.values(selected);
 
-    if (selectedRows.length === 0) {
-      Alert.alert("Validation", "Please select at least one carton");
-      return;
+    if (!selectedRows.length) {
+      return Alert.alert("Validation", "Please select at least one carton");
     }
 
     try {
       setLoading(true);
 
       const payload = {
-        ...criteria,
-        locationCode: location.locationCode,
-        locationName: location.locationName,
-        cartons: selectedRows,
+        prpcode: criteria.prpcode,
+        strcode: criteria.strcode,
+        yearno: getCurrentFinancialYear(),
+        itmcode: "",
+        txntype: "production_warehouse_locations",
+        selectedcartons: selectedRows,
+        fromlocationdetail: [location],
+        tolocationdetail: [],
+        action: "assign",
       };
 
-      const res = await warehouseApi.saveAssign(payload);
+      console.log("assign save payload", payload);
+
+      const res = await axios.post(
+        `${API}/api/prodwarehousemanage`,
+        payload,
+        getRequestConfig()
+      );
+
+      console.log("response", res);
+
+      if (res?.data?.success === false) {
+        return Alert.alert(
+          "Error",
+          res?.data?.message || "Failed to save assign"
+        );
+      }
 
       Alert.alert("Success", res?.data?.message || "Assign saved successfully", [
-        { text: "OK", onPress: () => navigation.goBack() },
+        {
+          text: "OK",
+          onPress: () => {
+            setSelected({});
+            setSearchText("");
+            navigation.goBack();
+          },
+        },
       ]);
     } catch (e) {
-      Alert.alert("Error", e?.response?.data?.message || "Failed to save assign");
+      Alert.alert(
+        "Error",
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "Failed to save assign"
+      );
     } finally {
       setLoading(false);
     }
   };
 
+
   return (
-    <View style={styles.screen}>
-      <View style={[styles.container, { paddingBottom: 80 }]}>
-        <View style={styles.card}>
-          <View style={styles.between}>
-            <Text style={styles.label}>Location</Text>
-            <Text style={{ color: COLORS.primary, fontWeight: "900" }}>
-              {location.locationName}
-            </Text>
-          </View>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1 }}>
+          <WarehouseHeader title="Assign Carton" navigation={navigation} />
 
-          <View style={styles.between}>
-            <Text style={styles.label}>Capacity</Text>
-            <Text style={{ color: COLORS.primary, fontWeight: "900" }}>
-              {location.used || 0} / {location.capacity || 0}
-            </Text>
-          </View>
+          <View style={[styles.container, { paddingBottom: searchFocused ? 10 : 82 }]}>
+            <View style={styles.card}>
+              <View style={styles.between}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Icon name="place" size={18} color="#0f8f9a" />
+                  <Text style={[styles.label, { marginLeft: 6 }]}>Location</Text>
+                </View>
 
-          <Text style={styles.label}>Item Name *</Text>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={itemText}
-              onChangeText={setItemText}
-              placeholder="Scan or select item"
-            />
-            <TouchableOpacity style={{ marginLeft: 8 }}>
-              <Icon name="qrcode-scan" size={28} color={COLORS.primary} />
-            </TouchableOpacity>
-          </View>
+                <Text style={{ color: "#000", fontWeight: "900" }}>
+                  {location.locationName || location.location}
+                </Text>
+              </View>
 
-          <TouchableOpacity style={styles.button} onPress={loadData}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LOAD DATA</Text>}
-          </TouchableOpacity>
+              <View style={styles.between}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Icon name="stacked-bar-chart" size={18} color="#0f8f9a" />
+                  <Text style={[styles.label, { marginLeft: 6 }]}>Capacity</Text>
+                </View>
 
-          <TouchableOpacity
-            style={[styles.card, { marginTop: 14, alignItems: "center" }]}
-            onPress={openScanner}
-          >
-            <Icon name="qrcode-scan" size={30} color={COLORS.primary} />
-            <Text style={{ fontWeight: "900", color: COLORS.primary }}>SCAN CARTON QR</Text>
-            <Text style={{ color: COLORS.muted, fontSize: 12 }}>Tap to scan carton barcode</Text>
-          </TouchableOpacity>
-        </View>
+                <Text style={{ color: "#000", fontWeight: "900" }}>
+                  {location.used || location.occupancy || 0} / {location.capacity || 0}
+                </Text>
+              </View>
 
-        <View style={styles.between}>
-          <Text style={{ fontWeight: "900" }}>Carton List ({cartons.length})</Text>
-          <TouchableOpacity onPress={() => setSelected({})}>
-            <Text style={{ color: COLORS.primary, fontWeight: "800" }}>Clear All</Text>
-          </TouchableOpacity>
-        </View>
+              {/* <Text style={styles.label}>
+                Item Name <Text style={styles.required}>*</Text>
+              </Text>
 
-        <FlatList
-          data={cartons}
-          keyExtractor={(item, index) => String(item.uid || item.cartonNo || index)}
-          renderItem={({ item }) => {
-            const key = String(item.uid || item.cartonNo);
-            return (
-              <CartonCard
-                item={item}
-                selected={!!selected[key]}
-                onPress={toggleSelect}
+              <TextInput
+                style={styles.input}
+                value={itemText}
+                onChangeText={setItemText}
+                placeholder="Search or select item"
+                placeholderTextColor="#9ca3af"
+              /> */}
+
+              <View style={{ flexDirection: "row", marginTop: 10 }}>
+                <TouchableOpacity
+                  style={[styles.button, { flex: 1, marginTop: 0 }]}
+                  onPress={loadData}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Icon name="inventory-2" size={18} color="#fff" />
+                      <Text style={[styles.buttonText, { marginLeft: 8 }]}>LOAD DATA</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={openScanner}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: "#0f8f9a",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "#fff",
+                    marginLeft: 8,
+                  }}
+                >
+                  <Icon name="qr-code-scanner" size={28} color="#0f8f9a" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={[styles.row, { marginBottom: 10 }]}>
+              <Icon name="search" size={20} color="#6b7280" />
+              <TextInput
+                style={[styles.input, { flex: 1, marginLeft: 8 }]}
+                value={searchText}
+                onChangeText={setSearchText}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                placeholder="Manual search carton / item / shade / voucher"
+                placeholderTextColor="#9ca3af"
               />
-            );
-          }}
-          ListEmptyComponent={
-            <Text style={{ textAlign: "center", color: COLORS.muted, marginTop: 40 }}>
-              No cartons available
-            </Text>
-          }
-        />
-      </View>
+            </View>
 
-      <View style={styles.bottomBar}>
-        <Text style={styles.bottomText}>Selected: {selectedCount}</Text>
+            <View style={styles.between}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Icon name="inventory" size={18} color="#0f8f9a" />
+                <Text style={[styles.sectionTitle, { marginLeft: 6 }]}>
+                  Carton List ({filteredCartons.length})
+                </Text>
+              </View>
 
-        <TouchableOpacity style={styles.bottomButton} onPress={saveAssign}>
-          <Text style={styles.bottomButtonText}>SAVE ASSIGN</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setSelected({});
+                  setSelectedOrder([]);
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Icon name="delete-sweep" size={16} color="#dc2626" />
+                  <Text style={{ color: "#dc2626", fontWeight: "800", marginLeft: 4 }}>
+                    Clear All
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={filteredCartons}
+              keyboardShouldPersistTaps="handled"
+              extraData={{ selected, searchText }}
+              keyExtractor={(item, index) =>
+                `${index}_${item?.uid || item?.UId || ""}_${item?.cartno || item?.CartNo || ""}_${item?.vouno || ""}`
+              }
+              renderItem={({ item }) => {
+                const rowKey = keyOf(item);
+
+                return (
+                  <CartonCard
+                    item={item}
+                    selected={!!selected[rowKey]}
+                    onPress={toggleSelect}
+                  />
+                );
+              }}
+              ListEmptyComponent={<Text style={styles.emptyText}>No cartons available</Text>}
+            />
+          </View>
+
+          {!searchFocused && (
+            <View style={styles.bottomBar}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Icon name="check-circle" size={18} color="#fff" />
+                <Text style={[styles.bottomText, { marginLeft: 6 }]}>
+                  Selected: {selectedCount}
+                </Text>
+              </View>
+
+              <TouchableOpacity style={styles.bottomButton} onPress={saveAssign}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Icon name="save-alt" size={18} color="#fff" />
+                  <Text style={[styles.bottomButtonText, { marginLeft: 8 }]}>
+                    SAVE ASSIGN
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }

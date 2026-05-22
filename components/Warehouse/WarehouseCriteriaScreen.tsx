@@ -16,8 +16,9 @@ import { warehouseApi } from "./services/warehouseApi";
 import { styles, COLORS } from "./components/WarehouseStyles";
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
+import { Picker } from '@react-native-picker/picker';
 
-const RadioRow = ({ label, value, onChange, onSelectedPress }) => (
+const RadioRow = ({ label, value, onChange, onSelectedPress, count = 0, }) => (
     <View style={[styles.between, { marginBottom: 12 }]}>
         <Text style={styles.label}>{label}</Text>
 
@@ -26,7 +27,7 @@ const RadioRow = ({ label, value, onChange, onSelectedPress }) => (
                 <Icon
                     name={value === "ALL" ? "radio-button-checked" : "radio-button-unchecked"}
                     size={22}
-                    color={COLORS.primary}
+                    color="#0f8f9a"
                 />
                 <Text style={{ marginLeft: 6, marginRight: 18 }}>All</Text>
             </TouchableOpacity>
@@ -43,15 +44,22 @@ const RadioRow = ({ label, value, onChange, onSelectedPress }) => (
                 <Icon
                     name={value === "SELECTED" ? "radio-button-checked" : "radio-button-unchecked"}
                     size={22}
-                    color={COLORS.primary}
+                    color="#0f8f9a"
                 />
-                <Text style={{ marginLeft: 6 }}>Selected</Text>
+                {/* <Text style={{ marginLeft: 6 }}>Selected</Text>
+                 */}
+                <Text style={{ marginLeft: 6 }}>
+                    {count > 0
+                        ? `Selected (${count})`
+                        : "Selected"}
+                </Text>
             </TouchableOpacity>
         </View>
     </View>
 );
 
 export default function WarehouseCriteriaScreen({ token, navigation }) {
+    const [selectionLoading, setSelectionLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
     const [storePickerVisible, setStorePickerVisible] = useState(false);
@@ -137,8 +145,16 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
 
     const handlePreview = async () => {
 
-        if (!form.prpgroup) {
-            Alert.alert("Validation", "Property group is required");
+        // if (!form.prpgroup) {
+        //     Alert.alert("Validation", "Property group is required");
+        //     return;
+        // }
+        if (!form.prpcode) {
+            Alert.alert("Validation", "Property is required");
+            return;
+        }
+        if (!form.strcode) {
+            Alert.alert("Validation", "Store is required");
             return;
         }
 
@@ -155,7 +171,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                 prptype: "R",
                 prpcodes: form.prpcode,
                 strcode: form.strcode,
-                stocktype: "All",
+                stocktype: form.stockType,
                 inverse: [],
                 extravalidate: {}
             };
@@ -245,7 +261,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
 
         try {
 
-            setLoading(true);
+            setSelectionLoading(true);
 
             const payload = {
                 prpcode: form.prpcode,
@@ -303,7 +319,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
 
         } finally {
 
-            setLoading(false);
+            setSelectionLoading(false);
         }
     };
 
@@ -336,7 +352,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                 </TouchableOpacity>
 
             </View>
-            <ScrollView contentContainerStyle={styles.container}>
+            {/* <ScrollView contentContainerStyle={styles.container}>
                 <View style={styles.card}>
                     <Text style={styles.label}>Property Group *</Text>
                     <TextInput
@@ -345,19 +361,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                         onChangeText={v => setValue("prpgroup", v)}
                         placeholder="Property Group"
                     />
-
-
-
-                    {/* <Text style={styles.label}>Prod. Property</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={form.prpcode}
-                        onChangeText={v => setValue("prpcode", v)}
-                        placeholder="Select Prod. Property"
-                    /> */}
-
                     <Text style={styles.label}>Prod. Property</Text>
-
                     <TouchableOpacity
                         style={styles.bigInput}
                         onPress={() => setPropertyPickerVisible(true)}
@@ -380,15 +384,12 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                                 'Select Property'
                             }
                         </Text>
-
                         <Icon
                             name="keyboard-arrow-down"
                             size={22}
                             color="#667085"
                         />
                     </TouchableOpacity>
-
-
                     <Text style={styles.label}>Prod. Store</Text>
                     <TouchableOpacity
                         style={styles.bigInput}
@@ -476,6 +477,225 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                         )}
                     </TouchableOpacity>
                 </View>
+            </ScrollView> */}
+
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.container}
+            >
+
+                {/* PROPERTY GROUP CARD */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>
+                        Property Details
+                    </Text>
+
+                    <Text style={styles.label}>Property Group *</Text>
+
+                    <TextInput
+                        style={[
+                            styles.input,
+                            {
+                                backgroundColor: '#F3F4F6',
+                                color: '#000',
+                            }
+                        ]}
+                        value="Yarn Division"
+                        placeholder="Property Group"
+                        editable={false}
+                    />
+
+                    {/* <TextInput
+                        style={[
+                            styles.input,
+                            {
+                                backgroundColor: '#F3F4F6',
+                                color: '#667085',
+                            }
+                        ]}
+                        value={form.prpgroup || "Yarn Division"}
+                        placeholder="Property Group"
+                        editable={false}
+                    /> */}
+                </View>
+
+                {/* PROPERTY + STORE CARD */}
+                <View style={styles.card}>
+
+                    <Text style={styles.sectionTitle}>
+                        Warehouse Selection
+                    </Text>
+
+                    <Text style={styles.label}>Prod. Property</Text>
+
+                    <TouchableOpacity
+                        style={styles.bigInput}
+                        onPress={() => setPropertyPickerVisible(true)}
+                        activeOpacity={0.8}
+                    >
+                        <Text
+                            style={[
+                                styles.inputText,
+                                !form.prpcode && { color: '#98A2B3' },
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {
+                                selectedProperty?.LngName ||
+                                propertyData.find(
+                                    x => String(x.PrpCode) === String(form.prpcode)
+                                )?.LngName ||
+                                'Select Property'
+                            }
+                        </Text>
+
+                        <Icon
+                            name="keyboard-arrow-down"
+                            size={22}
+                            color="#667085"
+                        />
+                    </TouchableOpacity>
+
+                    <Text style={styles.label}>Prod. Store</Text>
+
+                    <TouchableOpacity
+                        style={styles.bigInput}
+                        onPress={() => setStorePickerVisible(true)}
+                        activeOpacity={0.8}
+                    >
+                        <Text
+                            style={[
+                                styles.inputText,
+                                !form.strcode && { color: '#98A2B3' },
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {
+                                selectedStore?.StrName ||
+                                storeData.find(
+                                    x => String(x.StrCode) === String(form.strcode)
+                                )?.StrName ||
+                                'Select Store'
+                            }
+                        </Text>
+
+                        <Icon
+                            name="keyboard-arrow-down"
+                            size={22}
+                            color="#667085"
+                        />
+                    </TouchableOpacity>
+
+                    <Text style={styles.label}>Stock Type</Text>
+
+                    <View style={styles.pickerContainer}>
+                        <Picker
+                            selectedValue={form.stockType}
+                            onValueChange={(value) =>
+                                setValue("stockType", value)
+                            }
+                            dropdownIconColor="#667085"
+                            style={styles.picker}
+                        >
+                            <Picker.Item
+                                label="All"
+                                value="All"
+                            />
+
+                            <Picker.Item
+                                label="Partly"
+                                value="P"
+                            />
+
+                            <Picker.Item
+                                label="Full"
+                                value="F"
+                            />
+
+                            <Picker.Item
+                                label="Empty"
+                                value="E"
+                            />
+                        </Picker>
+                    </View>
+
+                </View>
+
+                {/* FILTER CARD */}
+                {/* <View style={styles.card}>
+
+                    <Text style={styles.sectionTitle}>
+                        Filter Criteria
+                    </Text>
+
+                    <RadioRow
+                        label="Item"
+                        value={form.itemMode}
+                        onChange={v => setValue("itemMode", v)}
+                        onSelectedPress={() => {
+                            loadSelectionData('itm');
+                            setItemModalVisible(true);
+                        }}
+                        count={selectedItem?.length}
+                    />
+
+                    <RadioRow
+                        label="Merge"
+                        value={form.mergeMode}
+                        onChange={v => setValue("mergeMode", v)}
+                        onSelectedPress={() => {
+                            loadSelectionData('mer');
+                            setMergeModalVisible(true);
+                        }}
+                        count={selectedMerge?.length}
+                    />
+
+                    <RadioRow
+                        label="Grade"
+                        value={form.gradeMode}
+                        onChange={v => setValue("gradeMode", v)}
+                        onSelectedPress={() => {
+                            loadSelectionData('grd');
+                            setGradeModalVisible(true);
+                        }}
+                        count={selectedGrade?.length}
+                    />
+
+                    <RadioRow
+                        label="Shade"
+                        value={form.shadeMode}
+                        onChange={v => setValue("shadeMode", v)}
+                        onSelectedPress={() => {
+                            loadSelectionData('shd');
+                            setShadeModalVisible(true);
+                        }}
+                        count={selectedShade?.length}
+                    />
+
+                </View> */}
+
+                {/* STOCK + BUTTON CARD */}
+                <View style={styles.card}>
+
+                    {/* <Text style={styles.sectionTitle}>
+                        Final Action
+                    </Text> */}
+
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handlePreview}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>
+                                PREVIEW
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+
+                </View>
+
             </ScrollView>
 
             <Modal visible={propertyPickerVisible} animationType="slide">
@@ -668,29 +888,72 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                             style={{ flex: 1 }}
                         />
                     </View>
-                    <FlatList
-                        data={itemData.filter(p =>
-                            p.ItmCode.toLowerCase().includes(
-                                ItemSearch.toLowerCase()
-                            )
-                        )}
-                        keyExtractor={(item) => item.ItmCode}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.pickerItem}
-                                onPress={() => {
-                                    setSelectedItem(item);
-                                    setValue('itmcode', item?.ItmCode || '');
-                                    setItemModalVisible(false);
-                                    setItemSearch("");
-                                }}
-                            >
-                                <Text style={{ color: "#000" }}>
-                                    {item.ItmName}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
+                    {
+                        selectionLoading ? (
+                            <View style={{ padding: 16 }}>
+
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <View
+                                        key={i}
+                                        style={{
+                                            height: 60,
+                                            backgroundColor: "#E5E7EB",
+                                            borderRadius: 14,
+                                            marginBottom: 14,
+                                        }}
+                                    />
+                                ))}
+
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={itemData.filter(p =>
+                                    p.ItmCode.toLowerCase().includes(
+                                        ItemSearch.toLowerCase()
+                                    )
+                                )}
+                                keyExtractor={(item) => item.ItmCode}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.pickerItem}
+                                        // onPress={() => {
+                                        //     setSelectedItem(item);
+                                        //     setValue('itmcode', item?.ItmCode || '');
+                                        //     setItemModalVisible(false);
+                                        //     setItemSearch("");
+                                        // }}
+                                        onPress={() => {
+
+                                            const exists = selectedItem.some(
+                                                x => x.ItmCode === item.ItmCode
+                                            );
+
+                                            let updated = [];
+
+                                            if (exists) {
+                                                updated = selectedItem.filter(
+                                                    x => x.ItmCode !== item.ItmCode
+                                                );
+                                            } else {
+                                                updated = [...selectedItem, item];
+                                            }
+
+                                            setSelectedItem(updated);
+
+                                            setValue(
+                                                'itmcode',
+                                                updated.map(x => x.ItmCode).join(",")
+                                            );
+                                        }}
+                                    >
+                                        <Text style={{ color: "#000" }}>
+                                            {item.ItmName}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        )
+                    }
 
                     {/* FLATLIST HERE */}
 
@@ -732,29 +995,72 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                             style={{ flex: 1 }}
                         />
                     </View>
-                    <FlatList
-                        data={itemData.filter(p =>
-                            p.ItmCode.toLowerCase().includes(
-                                MergeSearch.toLowerCase()
-                            )
-                        )}
-                        keyExtractor={(item) => item.ItmCode}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.pickerItem}
-                                onPress={() => {
-                                    setSelectedItem(item);
-                                    setValue('itmcode', item?.ItmCode || '');
-                                    setItemModalVisible(false);
-                                    setItemSearch("");
-                                }}
-                            >
-                                <Text style={{ color: "#000" }}>
-                                    {item.ItmName}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
+                    {
+                        selectionLoading ? (
+                            <View style={{ padding: 16 }}>
+
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <View
+                                        key={i}
+                                        style={{
+                                            height: 60,
+                                            backgroundColor: "#E5E7EB",
+                                            borderRadius: 14,
+                                            marginBottom: 14,
+                                        }}
+                                    />
+                                ))}
+
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={mergeData.filter(p =>
+                                    p.MerCode.toLowerCase().includes(
+                                        MergeSearch.toLowerCase()
+                                    )
+                                )}
+                                keyExtractor={(item) => item.MerCode}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.pickerItem}
+                                        // onPress={() => {
+                                        //     setSelectedMerge(item);
+                                        //     setValue('mercode', item?.MerCode || '');
+                                        //     setMergeModalVisible(false);
+                                        //     setMergeSearch("");
+                                        // }}
+                                        onPress={() => {
+
+                                            const exists = selectedMerge.some(
+                                                x => x.MerCode === item.MerCode
+                                            );
+
+                                            let updated = [];
+
+                                            if (exists) {
+                                                updated = selectedMerge.filter(
+                                                    x => x.MerCode !== item.MerCode
+                                                );
+                                            } else {
+                                                updated = [...selectedMerge, item];
+                                            }
+
+                                            setSelectedMerge(updated);
+
+                                            setValue(
+                                                'mercode',
+                                                updated.map(x => x.MerCode).join(",")
+                                            );
+                                        }}
+                                    >
+                                        <Text style={{ color: "#000" }}>
+                                            {item.MerName}-{item.MerCode}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        )
+                    }
 
                     {/* FLATLIST HERE */}
 
@@ -796,29 +1102,72 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                             style={{ flex: 1 }}
                         />
                     </View>
-                    <FlatList
-                        data={gradeData.filter(p =>
-                            p.GrdCode.toLowerCase().includes(
-                                GradeSearch.toLowerCase()
-                            )
-                        )}
-                        keyExtractor={(item) => item.GrdCode}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.pickerItem}
-                                onPress={() => {
-                                    setSelectedGrade(item);
-                                    setValue('grdcode', item?.GrdCode || '');
-                                    setGradeModalVisible(false);
-                                    setGradeSearch("");
-                                }}
-                            >
-                                <Text style={{ color: "#000" }}>
-                                    {item.GrdName}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
+                    {
+                        selectionLoading ? (
+                            <View style={{ padding: 16 }}>
+
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <View
+                                        key={i}
+                                        style={{
+                                            height: 60,
+                                            backgroundColor: "#E5E7EB",
+                                            borderRadius: 14,
+                                            marginBottom: 14,
+                                        }}
+                                    />
+                                ))}
+
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={gradeData.filter(p =>
+                                    p.GrdCode.toLowerCase().includes(
+                                        GradeSearch.toLowerCase()
+                                    )
+                                )}
+                                keyExtractor={(item) => item.GrdCode}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.pickerItem}
+                                        // onPress={() => {
+                                        //     setSelectedGrade(item);
+                                        //     setValue('grdcode', item?.GrdCode || '');
+                                        //     setGradeModalVisible(false);
+                                        //     setGradeSearch("");
+                                        // }}
+                                        onPress={() => {
+
+                                            const exists = selectedGrade.some(
+                                                x => x.GrdCode === item.GrdCode
+                                            );
+
+                                            let updated = [];
+
+                                            if (exists) {
+                                                updated = selectedGrade.filter(
+                                                    x => x.GrdCode !== item.GrdCode
+                                                );
+                                            } else {
+                                                updated = [...selectedGrade, item];
+                                            }
+
+                                            setSelectedGrade(updated);
+
+                                            setValue(
+                                                'grdcode',
+                                                updated.map(x => x.GrdCode).join(",")
+                                            );
+                                        }}
+                                    >
+                                        <Text style={{ color: "#000" }}>
+                                            {item.GrdName}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        )
+                    }
 
                     {/* FLATLIST HERE */}
 
@@ -831,7 +1180,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                         <TouchableOpacity
                             onPress={() => {
                                 setShadeModalVisible(false);
-                                setGradeSearch("");
+                                setShadeSearch("");
                             }}
                         >
                             <Icon
@@ -860,29 +1209,72 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                             style={{ flex: 1 }}
                         />
                     </View>
-                    <FlatList
-                        data={shadeData.filter(p =>
-                            p.ShdCode.toLowerCase().includes(
-                                ShadeSearch.toLowerCase()
-                            )
-                        )}
-                        keyExtractor={(item) => item.ShdCode}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.pickerItem}
-                                onPress={() => {
-                                    setSelectedShade(item);
-                                    setValue('shdcode', item?.ShdCode || '');
-                                    setShadeModalVisible(false);
-                                    setShadeSearch("");
-                                }}
-                            >
-                                <Text style={{ color: "#000" }}>
-                                    {item.Shdname}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    />
+                    {
+                        selectionLoading ? (
+                            <View style={{ padding: 16 }}>
+
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <View
+                                        key={i}
+                                        style={{
+                                            height: 60,
+                                            backgroundColor: "#E5E7EB",
+                                            borderRadius: 14,
+                                            marginBottom: 14,
+                                        }}
+                                    />
+                                ))}
+
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={shadeData.filter(p =>
+                                    p.ShdCode.toLowerCase().includes(
+                                        ShadeSearch.toLowerCase()
+                                    )
+                                )}
+                                keyExtractor={(item) => item.ShdCode}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.pickerItem}
+                                        // onPress={() => {
+                                        //     setSelectedShade(item);
+                                        //     setValue('shdcode', item?.ShdCode || '');
+                                        //     setShadeModalVisible(false);
+                                        //     setShadeSearch("");
+                                        // }}
+                                        onPress={() => {
+
+                                            const exists = selectedShade.some(
+                                                x => x.ShdCode === item.ShdCode
+                                            );
+
+                                            let updated = [];
+
+                                            if (exists) {
+                                                updated = selectedShade.filter(
+                                                    x => x.ShdCode !== item.ShdCode
+                                                );
+                                            } else {
+                                                updated = [...selectedShade, item];
+                                            }
+
+                                            setSelectedShade(updated);
+
+                                            setValue(
+                                                'shdcode',
+                                                updated.map(x => x.ShdCode).join(",")
+                                            );
+                                        }}
+                                    >
+                                        <Text style={{ color: "#000" }}>
+                                            {item.Shdname}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        )
+                    }
 
                     {/* FLATLIST HERE */}
 

@@ -1,116 +1,48 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
-
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { View, Text, TouchableOpacity } from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
 import { COLORS } from "./WarehouseStyles";
 
-export default function CartonCard({
-  item,
-  selected,
-  readonly = false,
-  onPress,
-}) {
+const getCartonNo = item => item?.cartonNo || item?.cartno || item?.CartNo || "-";
+
+export default function CartonCard({ item, selected, onPress }) {
   return (
     <TouchableOpacity
-      activeOpacity={readonly ? 1 : 0.8}
-      onPress={() => !readonly && onPress(item)}
-      style={[
-        local.card,
-        selected && local.selectedCard,
-      ]}
+      activeOpacity={0.85}
+      onPress={() => onPress(item)}
+      style={{
+        backgroundColor: selected ? "#f0edff" : "#fff",
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: selected ? COLORS.primary : "#e5e7eb",
+        flexDirection: "row",
+        alignItems: "center",
+      }}
     >
-      <View style={local.row}>
-        {!readonly && (
-          <Icon
-            name={selected ? "checkbox-marked" : "checkbox-blank-outline"}
-            size={24}
-            color={selected ? COLORS.primary : COLORS.muted}
-          />
-        )}
+      <Icon
+        name={selected ? "check-box" : "check-box-outline-blank"}
+        size={24}
+        color={selected ? COLORS.primary : "#6b7280"}
+      />
 
-        <View style={{ flex: 1, marginLeft: readonly ? 0 : 10 }}>
-          <View style={local.topRow}>
-            <Text style={local.carton}>{item.cartonNo}</Text>
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={{ fontSize: 16, fontWeight: "900", color: "#111827" }}>
+          {getCartonNo(item)}
+        </Text>
 
-            {item.isNew ? (
-              <View style={local.badge}>
-                <Text style={local.badgeText}>NEW</Text>
-              </View>
-            ) : null}
-          </View>
+        <Text style={{ color: "#374151", marginTop: 3 }}>
+          Packing | {item?.PackingNo || item?.vouno || item?.vouNo || "-"}
+        </Text>
 
-          <Text style={local.line}>
-            {item.tranType} | {item.vouNo}
-          </Text>
-
-          <Text style={local.line}>
-            {item.itemName} | Grade: {item.gradeName}
-          </Text>
-
-          <Text style={local.line}>
-            Merge: {item.mergeName} | Shade: {item.shadeName}
-          </Text>
-        </View>
-
-        <Icon name="dots-vertical" size={22} color={COLORS.muted} />
+        <Text numberOfLines={1} style={{ color: "#374151", marginTop: 2 }}>
+          {item?.ItmName || item?.itemName || "-"} | Grade:{" "}
+          {item?.GrdName || item?.gradeName || "-"}
+        </Text>
       </View>
+
+      <Icon name="more-vert" size={22} color="#4b5563" />
     </TouchableOpacity>
   );
 }
-
-const local = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  selectedCard: {
-    backgroundColor: COLORS.selected,
-    borderColor: COLORS.primary,
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  carton: {
-    fontSize: 15,
-    fontWeight: "900",
-    color: COLORS.text,
-  },
-
-  line: {
-    fontSize: 12,
-    color: COLORS.text,
-    marginTop: 2,
-  },
-
-  badge: {
-    marginLeft: 8,
-    backgroundColor: "#22C55E",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-
-  badgeText: {
-    fontSize: 10,
-    color: "#fff",
-    fontWeight: "900",
-  },
-});

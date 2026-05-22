@@ -1,51 +1,27 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   FlatList,
   RefreshControl,
-  Alert,
   ActivityIndicator,
   TouchableOpacity,
   Text,
+  StatusBar,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
 import WarehouseCard from "./components/WarehouseCard";
 import WarehouseActionSheet from "./WarehouseActionSheet";
-import { warehouseApi } from "./services/warehouseApi";
-import { styles, COLORS } from "./components/WarehouseStyles";
+import { COLORS } from "./components/WarehouseStyles";
 
 export default function WarehouseDashboardScreen({ navigation, route }) {
   const criteria = route.params?.criteria || {};
-
   const dashboardData = route.params?.dashboardData || [];
 
-  const [loading, setLoading] = useState(false);
-  const [locations, setLocations] = useState(dashboardData);
+  const [loading] = useState(false);
+  const [locations] = useState(dashboardData);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
-
-  // useEffect(() => {
-  //   loadDashboard();
-  // }, []);
-
-  // const loadDashboard = async () => {
-  //   try {
-  //     setLoading(true);
-
-  //     const res = await warehouseApi.getDashboard(criteria);
-  //     const rows = res?.data?.data || res?.data?.results || [];
-
-  //     setLocations(Array.isArray(rows) ? rows : []);
-  //   } catch (e) {
-  //     Alert.alert(
-  //       "Error",
-  //       e?.response?.data?.message || "Failed to load warehouse dashboard"
-  //     );
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
 
   const openMenu = item => {
     setSelectedLocation(item);
@@ -83,49 +59,34 @@ export default function WarehouseDashboardScreen({ navigation, route }) {
 
   return (
     <View style={styles.screen}>
+      <StatusBar backgroundColor="#0f8f9a" barStyle="light-content" />
 
-      {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.8}
-        >
-          <Icon name="menu" size={26} color="#fff" />
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.8}>
+          <Icon name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
-          WareHouse
-        </Text>
+        <Text style={styles.headerTitle}>WareHouse</Text>
 
         <TouchableOpacity activeOpacity={0.8}>
-          <Icon name="notifications-none" size={24} color="#fff" />
+          <Icon name="notifications-none" size={30} color="#fff" />
         </TouchableOpacity>
       </View>
 
       {loading && locations.length === 0 ? (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <View style={styles.loader}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       ) : (
         <FlatList
           data={locations}
           keyExtractor={(item, index) =>
-            String(item.locationCode || item.locationName || index)
+            String(item.locationCode || item.locationName || item.location || index)
           }
           numColumns={2}
-          contentContainerStyle={styles.container}
-          columnWrapperStyle={{ justifyContent: "space-between" }}
-          refreshControl={
-            <RefreshControl refreshing={loading} 
-            // onRefresh={loadDashboard} 
-            />
-          }
+          contentContainerStyle={styles.listContainer}
+          columnWrapperStyle={styles.columnWrapper}
+          refreshControl={<RefreshControl refreshing={loading} />}
           renderItem={({ item }) => (
             <WarehouseCard item={item} onMenu={openMenu} />
           )}
@@ -143,3 +104,42 @@ export default function WarehouseDashboardScreen({ navigation, route }) {
     </View>
   );
 }
+
+const styles = {
+  screen: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+  },
+
+  header: {
+    height: 62,
+    backgroundColor: "#0f8f9a",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 22,
+    elevation: 5,
+  },
+
+  headerTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+
+  loader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  listContainer: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 90,
+  },
+
+  columnWrapper: {
+    justifyContent: "space-between",
+  },
+};

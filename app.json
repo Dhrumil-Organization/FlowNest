@@ -40,7 +40,7 @@
         "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.FlowNest"
+      "package": "com.dhrumil.FlowNest"
     },
     "web": {
       "output": "static",

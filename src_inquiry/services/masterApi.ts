@@ -113,7 +113,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import client from './apiClient';
-import { ApiResponse, Design, GstinData, Party } from '../types';
+import { ApiResponse, Design, GstinData, Party, UserRights } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const buildAddress = (result: any): string => {
@@ -235,6 +235,22 @@ export const useMasterApi = () => {
     return res.data.data;
   }, []);
 
+  const userRights = useCallback(
+    async (q: string, permission: string, txntype: string): Promise<UserRights[]> => {
+      const payload = {
+        user_id: q,
+        permission: permission,
+        txntype: txntype
+      }
+      const res = await client.get<ApiResponse<UserRights[]>>('/api/checkrights', {
+        params: { ...payload },
+      });
+      console.log('user Rights api called', payload, res);
+      return res.data.data;
+    },
+    []
+  );
+
   return {
     userPrptype,
     searchParties,
@@ -242,5 +258,6 @@ export const useMasterApi = () => {
     storeParty,
     searchDesigns,
     storeDesign,
+    userRights
   };
 };

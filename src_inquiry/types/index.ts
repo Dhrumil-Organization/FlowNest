@@ -231,3 +231,9 @@ export type RootStackParamList = {
   TatConfig: undefined;
   TatAnalytics: undefined;
 };
+
+export interface UserRights {
+  permission: string | null;
+  user_id: string | number | null;
+  txntype: string;
+}

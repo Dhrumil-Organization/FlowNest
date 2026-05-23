@@ -30,7 +30,7 @@ const formatHoursLabel = (h: number): string => {
   return remH > 0 ? `${days}d ${remH}h` : `${days} day${days > 1 ? 's' : ''}`;
 };
 
-const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
+const TatConfigScreen: React.FC<Props> = ({ navigation, username, getUserPrptype }) => {
   const [rows, setRows] = useState<EditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
     (async () => {
       try {
         const data = await tatApi.listConfigurations({
-          prpcode: "SIP",
+          prptype: getUserPrptype,
           yearno: "27"
         });
         setRows(
@@ -82,7 +82,7 @@ const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
           expected_hours: parseInt(r._expectedHours, 10),
           warning_threshold_percent: parseInt(r._warningPct, 10),
         })),
-        "SIP",
+        getUserPrptype,
         "27"
       );
       Alert.alert('Saved', 'TAT configurations updated successfully', [

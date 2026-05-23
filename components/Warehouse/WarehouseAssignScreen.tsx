@@ -23,9 +23,13 @@ import axios from "axios";
 
 const keyOf = item =>
   String(
-    item?.uid ||
-    item?.UId ||
-    `${item?.cartno || item?.CartNo || ""}_${item?.vouno || ""}_${item?.srno || item?.SrNo || ""}`
+    item?.cartonNo ||
+      item?.cartno ||
+      item?.CartNo ||
+      item?.carcode ||
+      item?.CarCode ||
+      item?._scanCartonKey ||
+      `${item?.uid || item?.UId || ""}_${item?.vouno || ""}_${item?.psrno || item?.srno || item?.SrNo || ""}`
   );
 
 const searchable = item =>
@@ -166,33 +170,46 @@ export default function WarehouseAssignScreen({ token, navigation, route }) {
   };
 
   const openScanner = () => {
-    Keyboard.dismiss();
+  Keyboard.dismiss();
 
-    if (!cartons.length) {
-      return Alert.alert("Validation", "Please load carton data first");
-    }
+  if (!cartons.length) {
+    return Alert.alert("Validation", "Please load carton data first");
+  }
 
-    navigation.navigate("WarehouseQRScanner", {
-      mode: "ASSIGN",
-      cartons,
-      selected,
-      onScanResult: row => {
-        const key = keyOf(row);
+  navigation.navigate("WarehouseQRScanner", {
+    mode: "ASSIGN",
+    cartons,
+    selected,
+    onScanResult: result => {
+      const rows = Array.isArray(result) ? result : [result];
+      const validRows = rows.filter(Boolean);
 
-        if (!key) return;
+      if (!validRows.length) return;
 
-        setSelected(prev => ({
-          ...prev,
-          [key]: row,
-        }));
+      setSelected(prev => {
+        const next = { ...prev };
 
-        setSelectedOrder(prev => [
-          key,
-          ...prev.filter(x => x !== key),
-        ]);
-      },
-    });
-  };
+        validRows.forEach(row => {
+          const key = keyOf(row);
+          if (key) {
+            next[key] = row;
+          }
+        });
+
+        return next;
+      });
+
+      setSelectedOrder(prev => {
+        const newKeys = validRows.map(row => keyOf(row)).filter(Boolean);
+
+        return [
+          ...newKeys.reverse(),
+          ...prev.filter(x => !newKeys.includes(x)),
+        ];
+      });
+    },
+  });
+};
 
   // const saveAssign = async () => {
   //   const selectedRows = Object.values(selected);

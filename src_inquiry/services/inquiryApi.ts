@@ -21,7 +21,7 @@ export interface ListParams {
 }
 
 export interface ShowParams {
-  prpcode: string;
+  prptype: string;
   yearno: string;
 }
 
@@ -33,7 +33,7 @@ export interface StorePayload {
   party_address?: string;
   designs: InquiryDesignInput[];
   remarks?: string;
-  prpcode: string;
+  prptype: string;
   yearno: string;
   custom_overall_hours?: number | null;
 }
@@ -43,9 +43,9 @@ export interface CostingPayload {
     inquiry_design_id: number;
     cost_per_mtr: number;
     gst_percent?: number;
-    prpcode: string;
+    prptype: string;
   }>;
-  prpcode: string | null;
+  prptype: string | null;
   yearno: string | null;
 }
 
@@ -96,7 +96,7 @@ export const inquiryApi = {
       payment_terms?: string;
       delivery_terms?: string;
       remarks?: string;
-      prpcode: string;
+      prptype: string;
       yearno: string;
     },
   ) => {
@@ -108,7 +108,7 @@ export const inquiryApi = {
     return res.data.data;
   },
 
-  reject: async (id: number, payload: {reason: string; remarks?: string, prpcode: string; yearno: string}) => {
+  reject: async (id: number, payload: {reason: string; remarks?: string, prptype: string; yearno: string}) => {
     const res = await client.post<ApiResponse<Inquiry>>(
       `/api/inquiries/${id}/reject`,
       payload,
@@ -117,29 +117,29 @@ export const inquiryApi = {
     return res.data.data;
   },
 
-  downloadPdf: async (id: number, prpcode: string, yearno: string): Promise<{pdf_url: string; pdf_path: string}> => {
+  downloadPdf: async (id: number, prptype: string, yearno: string): Promise<{pdf_url: string; pdf_path: string}> => {
     const res = await client.get<ApiResponse<{pdf_url: string; pdf_path: string}>>(
       `/api/inquiries/${id}/pdf`, {
         params: {
-          prpcode,
+          prptype,
           yearno,
         }
       }
     );
-    console.log("Inquiry downloadPdf", id, prpcode, yearno, res);
+    console.log("Inquiry downloadPdf", id, prptype, yearno, res);
     return res.data.data;
   },
 
   sendEmail: async (
     id: number,
-    payload: {email: string; subject?: string; message?: string, prpcode: string; yearno: string},
+    payload: {email: string; subject?: string; message?: string, prptype: string; yearno: string},
   ) => {
     const res = await client.post(`/api/inquiries/${id}/email`, payload);
     console.log("Inquiry sendEmail", id, payload, res)
     return res.data;
   },
 
-  sendWhatsapp: async (id: number, payload: {mobile: string; message?: string, prpcode: string; yearno: string}) => {
+  sendWhatsapp: async (id: number, payload: {mobile: string; message?: string, prptype: string; yearno: string}) => {
     const res = await client.post(`/api/inquiries/${id}/whatsapp`, payload);
     return res.data;
   },

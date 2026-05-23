@@ -34,7 +34,7 @@ const emptyDesignRow = (id: string): DesignRow => ({
   gst_percent: 5,
 });
 
-const InquiryFormScreen: React.FC<Props> = ({ navigation, username }) => {
+const InquiryFormScreen: React.FC<Props> = ({ navigation, username, getUserPrptype }) => {
   const [party, setParty] = useState<Party | null>(null);
   const [remarks, setRemarks] = useState('');
   const [designs, setDesigns] = useState<DesignRow[]>([
@@ -113,7 +113,7 @@ const InquiryFormScreen: React.FC<Props> = ({ navigation, username }) => {
         party_gstin: party.gstin,
         party_address: party.address,
         remarks,
-        prpcode: "SIP",
+        prptype: getUserPrptype,
         yearno: "27",
         designs: designs.map(({ _id, ...rest }) => rest),
       });

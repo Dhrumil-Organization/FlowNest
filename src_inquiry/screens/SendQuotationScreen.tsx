@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SendQuotation'>;
 
 type Channel = 'email' | 'whatsapp';
 
-const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
   const { id } = route.params;
   const [channel, setChannel] = useState<Channel>('email');
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
@@ -61,7 +61,7 @@ const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) =
     }
     setSending(true);
     try {
-      await inquiryApi.sendEmail(id, { email, subject, message: emailMessage, prpcode: "SIP", yearno: "27" });
+      await inquiryApi.sendEmail(id, { email, subject, message: emailMessage, prptype: getUserPrptype, yearno: "27" });
       Alert.alert('Sent!', 'Quotation emailed successfully', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -79,7 +79,7 @@ const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) =
     }
     setSending(true);
     try {
-      await inquiryApi.sendWhatsapp(id, { mobile, message: waMessage, prpcode: "SIP", yearno: "27" });
+      await inquiryApi.sendWhatsapp(id, { mobile, message: waMessage, prptype: getUserPrptype, yearno: "27" });
       Alert.alert('Sent!', 'Quotation sent via WhatsApp', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
@@ -94,7 +94,7 @@ const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) =
     setSending(true);
     try {
       // const {pdf_url} = await inquiryApi.downloadPdf(id);
-      const { pdf_url } = await inquiryApi.downloadPdf(id, "SIP", "27");
+      const { pdf_url } = await inquiryApi.downloadPdf(id, getUserPrptype, "27");
       Linking.openURL(pdf_url);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to generate PDF');

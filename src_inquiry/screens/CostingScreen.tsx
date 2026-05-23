@@ -29,7 +29,7 @@ interface Row {
   gst_percent: string;
 }
 
-const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const CostingScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
   const { id } = route.params;
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -39,7 +39,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const load = useCallback(async () => {
     try {
       const data = await inquiryApi.show(id, {
-        prpcode: "SIP",
+        prptype: getUserPrptype,
         yearno: "27"
       });
       setInquiry(data);
@@ -82,7 +82,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
           cost_per_mtr: parseFloat(r.cost_per_mtr),
           gst_percent: parseFloat(r.gst_percent) || 5,
         })),
-        prpcode: "SIP",
+        prptype: getUserPrptype,
         yearno: "27"
       });
       Alert.alert('Success', 'Costing saved', [

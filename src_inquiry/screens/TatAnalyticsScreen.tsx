@@ -22,14 +22,14 @@ const formatHours = (h: number): string => {
   return `${(h / 24).toFixed(1)} days`;
 };
 
-const TatAnalyticsScreen: React.FC<Props> = ({ username }) => {
+const TatAnalyticsScreen: React.FC<Props> = ({ username, getUserPrptype }) => {
   const [rows, setRows] = useState<TatAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await tatApi.analytics({ prpcode: "SIP", yearno: "27" });
+        const data = await tatApi.analytics({ prptype: getUserPrptype, yearno: "27" });
         setRows(data);
       } finally {
         setLoading(false);

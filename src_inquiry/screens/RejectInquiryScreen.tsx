@@ -27,7 +27,7 @@ const REASONS = [
   'Other',
 ];
 
-const RejectInquiryScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const RejectInquiryScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
   const { id } = route.params;
   const [reason, setReason] = useState<string>('');
   const [remarks, setRemarks] = useState('');
@@ -40,7 +40,7 @@ const RejectInquiryScreen: React.FC<Props> = ({ route, navigation, username }) =
     }
     setSaving(true);
     try {
-      await inquiryApi.reject(id, { reason, remarks, prpcode: 'SIP', yearno: '27' });
+      await inquiryApi.reject(id, { reason, remarks, prptype: getUserPrptype, yearno: '27' });
       Alert.alert('Rejected', 'Inquiry has been marked as rejected', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);

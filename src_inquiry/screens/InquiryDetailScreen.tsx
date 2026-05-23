@@ -23,7 +23,7 @@ import { formatCurrency, formatDate } from '../utils/validators';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryDetail'>;
 
-const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
   const { id } = route.params;
   const [inquiry, setInquiry] = useState<InquiryDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
   const load = useCallback(async () => {
     try {
       const data = await inquiryApi.show(id, {
-        prpcode: "SIP",
+        prptype: getUserPrptype,
         yearno: "27"
       });
       setInquiry(data);
@@ -49,7 +49,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
   const downloadPdf = async () => {
     if (!inquiry) return;
     try {
-      const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id, "SIP", "27");
+      const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id, getUserPrptype, "27");
       Linking.openURL(pdf_url);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to download PDF');

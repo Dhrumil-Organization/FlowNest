@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, TextInput, FlatList, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import WarehouseHeader from "./components/WarehouseHeader";
 import { warehouseApi } from "./services/warehouseApi";
@@ -78,6 +78,10 @@ export default function WarehouseViewScreen({ token, navigation, route }) {
     }
   };
 
+  useEffect(() => {
+    loadData();
+  }, [])
+
   return (
     <View style={styles.screen}>
       <WarehouseHeader title="View Carton" navigation={navigation} />
@@ -85,24 +89,59 @@ export default function WarehouseViewScreen({ token, navigation, route }) {
         <View style={styles.card}>
           <View style={styles.between}><Text style={styles.label}>Location</Text><Text style={{ color: "#000", fontWeight: "900" }}>{location.locationName || location.location}</Text></View>
           <View style={styles.between}><Text style={styles.label}>Capacity</Text><Text style={{ color: "#000", fontWeight: "900" }}>{location.used || location.occupancy || 0} / {location.capacity || 0}</Text></View>
-          <TouchableOpacity style={styles.button} onPress={loadData}>
+          {/* <TouchableOpacity style={styles.button} onPress={loadData}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>LOAD DATA</Text>}
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
         <TextInput style={[styles.input, { marginBottom: 10 }]} value={searchText} onChangeText={setSearchText} placeholder="Search carton / item / shade / voucher" />
         <Text style={styles.sectionTitle}>
           Carton List ({filteredCartons.length})
         </Text>
-        <FlatList data={filteredCartons}
-          keyExtractor={(item, index) =>
-            `${index}_${item?.uid || ""}_${item?.cartno || ""}`
-          }
-          renderItem={({ item }) => (
-            <View style={{ pointerEvents: "none" }}>
-              <CartonCard item={item} readonly />
+        {
+          loading ? (
+
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingVertical: 80,
+              }}
+            >
+              <ActivityIndicator
+                size="large"
+                color={COLORS.primary}
+              />
+
+              <Text
+                style={{
+                  marginTop: 12,
+                  color: "#000",
+                  fontWeight: "700",
+                  fontSize: 14,
+                }}
+              >
+                Loading cartons...
+              </Text>
             </View>
-          )}
-          ListEmptyComponent={<Text style={styles.emptyText}>No cartons available</Text>} />
+          ) : (
+            <FlatList data={filteredCartons}
+              keyExtractor={(item, index) =>
+                `${index}_${item?.uid || ""}_${item?.cartno || ""}`
+              }
+              renderItem={({ item }) => (
+                <View style={{ pointerEvents: "none" }}>
+                  <CartonCard
+                    item={item}
+                    readonly
+                    hideCheckbox
+                  />
+                </View>
+              )}
+              ListEmptyComponent={<Text style={styles.emptyText}>No cartons available</Text>} />
+
+          )
+        }
       </View>
     </View>
   );

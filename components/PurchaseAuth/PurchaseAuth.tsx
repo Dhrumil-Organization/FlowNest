@@ -1777,13 +1777,13 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: "#E2E8F0",
+        borderColor: "#627fa5",
     },
 
     historyRemarkLabel: {
         fontSize: 11,
         fontWeight: "700",
-        color: "#64748B",
+        color: "#000",
         marginBottom: 4,
     },
 
@@ -1811,7 +1811,7 @@ const styles = StyleSheet.create({
         flex: 1,
         minHeight: 42,
         borderWidth: 1,
-        borderColor: "#D0D5DD",
+        borderColor: "#000",
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,

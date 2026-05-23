@@ -25,9 +25,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const keyOf = item =>
   String(
-    item?.uid ||
-    item?.UId ||
-    `${item?.cartno || item?.CartNo || ""}_${item?.vouno || ""}_${item?.srno || item?.SrNo || ""}`
+    item?.cartonNo ||
+      item?.cartno ||
+      item?.CartNo ||
+      item?.carcode ||
+      item?.CarCode ||
+      item?._scanCartonKey ||
+      `${item?.uid || item?.UId || ""}_${item?.vouno || ""}_${item?.psrno || item?.srno || item?.SrNo || ""}`
   );
 
 const searchable = item =>
@@ -342,37 +346,53 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
   };
 
   const openScanner = () => {
-    Keyboard.dismiss();
+  Keyboard.dismiss();
 
-    if (!toLocation.trim()) {
-      return Alert.alert("Validation", "Please enter/select To Location");
-    }
+  if (!toLocation.trim()) {
+    return Alert.alert("Validation", "Please enter/select To Location");
+  }
 
-    if (!cartons.length) {
-      return Alert.alert("Validation", "Please load carton data first");
-    }
+  if (!cartons.length) {
+    return Alert.alert("Validation", "Please load carton data first");
+  }
 
-    navigation.navigate("WarehouseQRScanner", {
-      mode: "TRANSFER",
-      cartons,
-      selected,
-      onScanResult: row => {
-        const key = keyOf(row);
+  navigation.navigate("WarehouseQRScanner", {
+    mode: "TRANSFER",
+    cartons,
+    selected,
+    onScanResult: result => {
+      const rows = Array.isArray(result) ? result : [result];
 
-        if (!key) return;
+      const validRows = rows.filter(Boolean);
 
-        setSelected(prev => ({
-          ...prev,
-          [key]: row,
-        }));
+      if (!validRows.length) return;
 
-        setSelectedOrder(prev => [
-          key,
-          ...prev.filter(x => x !== key),
-        ]);
-      },
-    });
-  };
+      setSelected(prev => {
+        const next = { ...prev };
+
+        validRows.forEach(row => {
+          const key = keyOf(row);
+          if (key) {
+            next[key] = row;
+          }
+        });
+
+        return next;
+      });
+
+      setSelectedOrder(prev => {
+        const newKeys = validRows
+          .map(row => keyOf(row))
+          .filter(Boolean);
+
+        return [
+          ...newKeys.reverse(),
+          ...prev.filter(x => !newKeys.includes(x)),
+        ];
+      });
+    },
+  });
+};
 
 
 

@@ -9,7 +9,8 @@ import {
     TextInput,
     Alert,
     ScrollView,
-    Modal
+    Modal,
+    ActivityIndicator
 } from 'react-native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -230,6 +231,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [detailVisible, setDetailVisible] = useState(false);
     const [addressListVisible, setAddressListVisible] = useState(false);
     const [AddressList, setAdedressList] = useState([]);
+    const [addressLoading, setAddressLoading] = useState(false);
 
     // const party =
     //     routeParty ||
@@ -941,7 +943,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
     const loaddeliveryaddress = async () => {
         try {
-            setLoadingOrder(true);
+            setAddressLoading(true);
 
             const yno = yearno ? yearno.slice(-2) : '';
 
@@ -991,7 +993,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             );
 
         } finally {
-            setLoadingOrder(false);
+            setAddressLoading(false);
         }
     };
 
@@ -1537,6 +1539,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             </TouchableOpacity>
                         </View>
 
+                        <View style={styles.rowBetween}>
+                            <Text style={styles.designText}>
+                                Denier : {item.Denier||item.denier} 
+                            </Text>                           
+                        </View>
+
                         {/* {!!item.Remark && ( */}
                         <Text style={styles.remarkText}>
                             Remark : {item.Remark}
@@ -1740,9 +1748,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
                         <TouchableOpacity
                             style={styles.infoBtn}
+                            // onPress={() => {
+                            //     setDetailVisible(true);
+                            //     loaddeliveryaddress();
+                            // }}
                             onPress={() => {
                                 setDetailVisible(true);
-                                loaddeliveryaddress();
                             }}
                         >
                             <Icon
@@ -2186,7 +2197,15 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             <TouchableOpacity
                                 style={styles.detailRowTop}
                                 activeOpacity={0.8}
-                                onPress={() => setAddressListVisible(true)}
+                                // onPress={() => setAddressListVisible(true)}
+                                onPress={async () => {
+
+                                    setAddressListVisible(true);
+
+                                    // if (AddressList.length === 0) {
+                                    await loaddeliveryaddress();
+                                    // }
+                                }}
                             >
                                 <Icon
                                     name="location-on"
@@ -2361,7 +2380,34 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             contentContainerStyle={{ paddingBottom: 20 }}
                         >
 
-                            {AddressList && AddressList.length > 0 ? (
+                            {/* {AddressList && AddressList.length > 0 ? ( */}
+                            {addressLoading ? (
+
+                                <View
+                                    style={{
+                                        paddingVertical: 50,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        size="large"
+                                        color="#13879A"
+                                    />
+
+                                    <Text
+                                        style={{
+                                            marginTop: 12,
+                                            color: '#667085',
+                                            fontSize: 14,
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        Loading Address...
+                                    </Text>
+                                </View>
+
+                            ) : AddressList && AddressList.length > 0 ? (
 
                                 AddressList.map((item, index) => (
 

@@ -55,7 +55,8 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [isShadeVisible, setIsShadeVisible] = useState(false);
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // Default: ascending
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder1, setSortOrder1] = useState<'asc' | 'desc'>('asc'); // Default: ascending
 
     const fetchPrpCode = async () => {
         await axios
@@ -697,20 +698,40 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             data = getAllDesignData(selectedItem, salesdata, 'no');
         }
 
+        const sortedData = [...data].sort((a, b) => {
+            const qtyA = parseFloat(a.TOTQTY || '0');
+            const qtyB = parseFloat(b.TOTQTY || '0');
+            return sortOrder1 === 'asc'
+                ? qtyA - qtyB
+                : qtyB - qtyA;
+        });
+
         // SEARCH FILTER
         if (searchQueryPOT.trim()) {
 
             const search = searchQueryPOT.toLowerCase();
 
-            data = data.filter((item: any) =>
-                String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
-                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            // data = data.filter((item: any) =>
+            //     String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
+            //     String(item?.TOTQTY || '').toLowerCase().includes(search)
+            // );
+
+            return sortedData.filter((item: any) =>
+                String(item?.MDSNNAME || '')
+                    .toLowerCase()
+                    .includes(search)
+
+                ||
+
+                String(item?.TOTQTY || '')
+                    .toLowerCase()
+                    .includes(search)
             );
         }
 
-        return data;
-
-    }, [selectedItem, salesdata, finishStockData, activeTab, searchQueryPOT]);
+        // return data;
+        return sortedData;
+    }, [selectedItem, salesdata, finishStockData, activeTab, searchQueryPOT, sortOrder1]);
 
     // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
 
@@ -1005,7 +1026,20 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                     }}>
                         <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1 }}> Item:    {selectedItem?.ITMNAME} </Text>
                         <TouchableOpacity
-                            onPress={() => setIsDetailVisible(false)}
+                            onPress={() => setSortOrder1(sortOrder1 === 'asc' ? 'desc' : 'asc')}
+                            style={{ marginLeft: 12 }}
+                        >
+                            <Icon
+                                name={sortOrder1 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={20}
+                                color="#fff"
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setSortOrder1('asc')
+                                setIsDetailVisible(false)
+                            }}
                             style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }} >
                             <Icon name="close" size={18} color="#fff" />
                         </TouchableOpacity>
@@ -1042,6 +1076,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                             }}
                         />
                     </View>
+
                     <FlatList
                         //data={detailData}
                         data={designDataLevel1}

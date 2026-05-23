@@ -1537,6 +1537,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                             </TouchableOpacity>
                         </View>
 
+                        {/* <View style={styles.rowBetween}>
+                            <Text style={styles.designText}>
+                                Denier : {item.Denier||item.denier} 
+                            </Text>                           
+                        </View> */}
+
                         {/* {!!item.Remark && ( */}
                         <Text style={styles.remarkText}>
                             Remark : {item.Remark}

@@ -324,7 +324,12 @@ const APP_SECTIONS = [
             { id: '35', name: 'Purchase Auth', screen: 'Purchase Auth', icon: 'fact-check', iconColor: '#5f738f' },
         ],
     },
-
+    {
+        title: 'Y',
+        data: [
+            { id: '36', name: 'Packing Auth', screen: 'Packing Auth', icon: 'assignment-turned-in', iconColor: '#3a70a3c9' },
+        ],
+    },
 ];
 
 interface Props {
@@ -616,6 +621,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     },
                 //                     {
                 //                         "title": "Purchase Auth",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Packing Auth",
                 //                         "href": "/"
                 //                     },
                 //                 ]

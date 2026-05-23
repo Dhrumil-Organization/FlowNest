@@ -121,6 +121,7 @@ import TatConfigScreen from './src_inquiry/screens/TatConfigScreen';
 import TatAnalyticsScreen from './src_inquiry/screens/TatAnalyticsScreen';
 import WarehouseStack from './components/Warehouse/WarehouseStack';
 import PurchaseAuth from './components/PurchaseAuth/PurchaseAuth';
+import PackingAuth from './components/PackingAuth/PackingAuth'
 
 const Stack = createNativeStackNavigator();
 
@@ -1228,6 +1229,17 @@ export default function App() {
                     <Stack.Screen name="Purchase Auth">
                       {props => (
                         <PurchaseAuth
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
+                      )}
+                    </Stack.Screen>
+
+                    <Stack.Screen name="Packing Auth">
+                      {props => (
+                        <PackingAuth
                           {...props}
                           token={gettoken || ''}
                           isConnected={isConnected}

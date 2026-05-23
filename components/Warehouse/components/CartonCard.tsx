@@ -5,7 +5,7 @@ import { COLORS } from "./WarehouseStyles";
 
 const getCartonNo = item => item?.cartonNo || item?.cartno || item?.CartNo || "-";
 
-export default function CartonCard({ item, selected, onPress }) {
+export default function CartonCard({ item, selected, onPress, hideCheckbox = false, }) {
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -21,13 +21,39 @@ export default function CartonCard({ item, selected, onPress }) {
         alignItems: "center",
       }}
     >
-      <Icon
+      {/* <Icon
         name={selected ? "check-box" : "check-box-outline-blank"}
         size={24}
         color={selected ? COLORS.primary : "#6b7280"}
-      />
+      /> */}
 
-      <View style={{ flex: 1, marginLeft: 12 }}>
+      {
+        !hideCheckbox && (
+
+          <Icon
+            name={
+              selected
+                ? "check-box"
+                : "check-box-outline-blank"
+            }
+            size={24}
+            color={
+              selected
+                ? COLORS.primary
+                : "#6b7280"
+            }
+          />
+
+        )
+      }
+
+      {/* <View style={{ flex: 1, marginLeft: 12 }}> */}
+      <View
+        style={{
+          flex: 1,
+          marginLeft: hideCheckbox ? 0 : 12,
+        }}
+      >
         <Text style={{ fontSize: 16, fontWeight: "900", color: "#111827" }}>
           {getCartonNo(item)}
         </Text>

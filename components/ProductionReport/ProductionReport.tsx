@@ -218,11 +218,11 @@ const ProductionReport = ({ navigation, token }) => {
       convertedStatus = '-1';
     } else if (productionType == 'running') {
       convertedStatus = '0';
-    } else if (productionType == 'close') {
+    } else if (productionType == 'closed') {
       convertedStatus = '2';
     }
 
-    let status = convertedStatus; // 'all' | 'running' | 'close'
+    let status = convertedStatus; // 'all' | 'running' | 'closed'
 
     if (typeof prp1 == 'undefined' || prp1 == null || prp1 == '') {
       showWarning('Please select property');
@@ -295,7 +295,7 @@ const ProductionReport = ({ navigation, token }) => {
       convertedStatus = '-1';
     } else if (productionType == 'running') {
       convertedStatus = '0';
-    } else if (productionType == 'close') {
+    } else if (productionType == 'closed') {
       convertedStatus = '2';
     }
 
@@ -378,7 +378,7 @@ const ProductionReport = ({ navigation, token }) => {
       convertedStatus = '-1';
     } else if (productionType == 'running') {
       convertedStatus = '0';
-    } else if (productionType == 'close') {
+    } else if (productionType == 'closed') {
       convertedStatus = '2';
     }
     let status = convertedStatus;
@@ -454,34 +454,53 @@ const ProductionReport = ({ navigation, token }) => {
         ? selectedMachines.map(i => i.MacCode)
         : [];
 
-    let fd = '';
-    let resfd = '';
-    let finalfromdate = '';
+    // let fd = '';
+    // let resfd = '';
+    // let finalfromdate = '';
 
-    let td = '';
-    let restd = '';
-    let finaltodate = '';
+    // let td = '';
+    // let restd = '';
+    // let finaltodate = '';
 
     let convertedStatus = '';
     if (productionType == 'all') {
       convertedStatus = '-1';
     } else if (productionType == 'running') {
       convertedStatus = '0';
-    } else if (productionType == 'close') {
+    } else if (productionType == 'closed') {
       convertedStatus = '2';
     }
     let status = convertedStatus;
 
-    if (fd != '') {
-      fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
-      resfd = fd.split('-');
-      finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+    // if (fd != '') {
+    //   fd = getFromDate ? getFromDate.toISOString().split('T')[0] : '';
+    //   resfd = fd.split('-');
+    //   finalfromdate = resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+    // }
+
+    // if (td != '') {
+    //   td = getToDate ? getToDate.toISOString().split('T')[0] : '';
+    //   restd = td.split('-');
+    //   finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
+    // }
+
+    let finalfromdate = '';
+    let finaltodate = '';
+
+    if (getFromDate) {
+      const fd = getFromDate.toISOString().split('T')[0];
+      const resfd = fd.split('-');
+
+      finalfromdate =
+        resfd[2] + '-' + resfd[1] + '-' + resfd[0];
     }
 
-    if (td != '') {
-      td = getToDate ? getToDate.toISOString().split('T')[0] : '';
-      restd = td.split('-');
-      finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
+    if (getToDate) {
+      const td = getToDate.toISOString().split('T')[0];
+      const restd = td.split('-');
+
+      finaltodate =
+        restd[2] + '-' + restd[1] + '-' + restd[0];
     }
 
     if (
@@ -528,7 +547,7 @@ const ProductionReport = ({ navigation, token }) => {
         'X-Requested-with': 'XMLHttpRequest',
       };
 
-      console.log('payload :', payload);
+      console.log('payload :---', payload);
 
       try {
         const response = await axios.post(
@@ -597,7 +616,7 @@ const ProductionReport = ({ navigation, token }) => {
       convertedStatus = '-1';
     } else if (productionType == 'running') {
       convertedStatus = '0';
-    } else if (productionType == 'close') {
+    } else if (productionType == 'closed') {
       convertedStatus = '2';
     }
     let status = convertedStatus;
@@ -613,6 +632,22 @@ const ProductionReport = ({ navigation, token }) => {
       restd = td.split('-');
       finaltodate = restd[2] + '-' + restd[1] + '-' + restd[0];
     }
+
+    // if (getFromDate) {
+    //   const fd = getFromDate.toISOString().split('T')[0];
+    //   const resfd = fd.split('-');
+
+    //   finalfromdate =
+    //     resfd[2] + '-' + resfd[1] + '-' + resfd[0];
+    // }
+
+    // if (getToDate) {
+    //   const td = getToDate.toISOString().split('T')[0];
+    //   const restd = td.split('-');
+
+    //   finaltodate =
+    //     restd[2] + '-' + restd[1] + '-' + restd[0];
+    // }
 
     const payload = {
       prptype: '',
@@ -639,6 +674,8 @@ const ProductionReport = ({ navigation, token }) => {
       doffqty: row.doffqty,
       packingqty: row.packingqty,
     };
+
+    console.log("payload ::", payload)
 
     const headers = {
       Authorization: `Bearer ${getToken()}`,
@@ -847,20 +884,19 @@ const ProductionReport = ({ navigation, token }) => {
                     <Text style={styles.statValue}>{item.doffqty}</Text>
                     <Text style={styles.statLabel}>Doff</Text>
                   </View>
-                  <TouchableOpacity style={styles.statBox} onPress={() => handleInfoPress(item)}>
-                    <View >
-                      <View style={styles.valueRow}>
-                        <Text style={styles.statValue}>
-                          {item.packingqty || 0}
-                        </Text>
 
+                  <View style={styles.statBox}>
+                    <View style={styles.valueRow}>
+                      <Text style={styles.statValue}>
+                        {item.packingqty || 0}
+                      </Text>
 
+                      <TouchableOpacity onPress={() => handleInfoPress(item)}>
                         <Icon name="info-outline" size={19} color="#111" />
-
-                      </View>
-                      <Text style={styles.statLabel}>Packing</Text>
+                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
+                    <Text style={styles.statLabel}>Packing</Text>
+                  </View>
                 </View>
 
                 <View style={styles.statsRow}>
@@ -985,7 +1021,7 @@ const ProductionReport = ({ navigation, token }) => {
               <View style={styles.modalHeader}>
                 <Text style={styles.title}></Text>
                 <TouchableOpacity onPress={() => setFilterVisible(false)}>
-                  <Icon name="close" size={20} style={{ color: '#000' }} />
+                  <Icon name="closed" size={20} style={{ color: '#000' }} />
                 </TouchableOpacity>
               </View>
 
@@ -1072,20 +1108,6 @@ const ProductionReport = ({ navigation, token }) => {
                 <TouchableOpacity
                   style={[
                     styles.radioBox,
-                    productionType === 'running' && styles.radioBoxActive,
-                  ]}
-                  onPress={() => setProductionType('running')}
-                >
-                  <View style={styles.radioOuter}>
-                    {productionType === 'running' && (
-                      <View style={styles.radioInner} />
-                    )}
-                  </View>
-                  <Text style={styles.radioLabel}>Running</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.radioBox,
                     productionType === 'all' && styles.radioBoxActive,
                   ]}
                   onPress={() => setProductionType('all')}
@@ -1100,16 +1122,44 @@ const ProductionReport = ({ navigation, token }) => {
                 <TouchableOpacity
                   style={[
                     styles.radioBox,
-                    productionType === 'close' && styles.radioBoxActive,
+                    productionType === 'running' && styles.radioBoxActive,
                   ]}
-                  onPress={() => setProductionType('close')}
+                  onPress={() => setProductionType('running')}
                 >
                   <View style={styles.radioOuter}>
-                    {productionType === 'close' && (
+                    {productionType === 'running' && (
                       <View style={styles.radioInner} />
                     )}
                   </View>
-                  <Text style={styles.radioLabel}>Close</Text>
+                  <Text style={styles.radioLabel}>Running</Text>
+                </TouchableOpacity>
+                {/* <TouchableOpacity
+                  style={[
+                    styles.radioBox,
+                    productionType === 'all' && styles.radioBoxActive,
+                  ]}
+                  onPress={() => setProductionType('all')}
+                >
+                  <View style={styles.radioOuter}>
+                    {productionType === 'all' && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                  <Text style={styles.radioLabel}>All</Text>
+                </TouchableOpacity> */}
+                <TouchableOpacity
+                  style={[
+                    styles.radioBox,
+                    productionType === 'closed' && styles.radioBoxActive,
+                  ]}
+                  onPress={() => setProductionType('closed')}
+                >
+                  <View style={styles.radioOuter}>
+                    {productionType === 'closed' && (
+                      <View style={styles.radioInner} />
+                    )}
+                  </View>
+                  <Text style={styles.radioLabel}>Closed</Text>
                 </TouchableOpacity>
               </View>
 

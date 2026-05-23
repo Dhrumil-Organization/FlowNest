@@ -71,6 +71,15 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);
+    useFocusEffect(
+        useCallback(() => {
+            StatusBar.setTranslucent(false);
+            StatusBar.setBackgroundColor('#00838f');
+            StatusBar.setBarStyle('light-content');
+
+            return () => { };
+        }, [])
+    );
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,

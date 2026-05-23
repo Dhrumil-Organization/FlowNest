@@ -48,8 +48,21 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder2, setSortOrder2] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder3, setSortOrder3] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder4, setSortOrder4] = useState<'asc' | 'desc'>('asc');
+
     const toggleSortOrder = () => {
         setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+    const toggleSortOrder2 = () => {
+        setSortOrder2(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+    const toggleSortOrder3 = () => {
+        setSortOrder3(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    };
+    const toggleSortOrder4 = () => {
+        setSortOrder4(prev => (prev === 'asc' ? 'desc' : 'asc'));
     };
 
     console.log("selectedPrpCode", selectedPrpCode)
@@ -199,23 +212,6 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
         }
     };
 
-    // const getmainitemwisesummary = (data) => {
-    //     const summary = data.reduce((acc, item) => {
-    //         const key = item.MITMCODE;
-    //         if (!acc[key]) {
-    //             acc[key] = {
-    //                 MITMCODE: item.MITMCODE,
-    //                 MITMNAME: item.MITMNAME,
-    //                 TOTQTY: 0
-    //             };
-    //         }
-    //         const qty = parseFloat(item?.QTY ?? 0) || 0;
-    //         acc[key].TOTQTY += qty;
-    //         return acc;
-    //     }, {});
-    //     return Object.values(summary);
-    // };
-
     const getmainitemwisesummary = (data, order = 'asc') => {
         const summary = data.reduce((acc, item) => {
             const key = item.MITMCODE;
@@ -331,11 +327,28 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
         return [allItem, ...result];
     };
 
+
+
     // const subItemData = useMemo(() => {
+
     //     if (!selectedItem) return [];
 
-    //     return getSubItemSummary(selectedItem, salesdata);
-    // }, [selectedItem, salesdata]);
+    //     let data: any[] = getSubItemSummary(selectedItem, salesdata);
+
+    //     // SEARCH FILTER
+    //     if (searchQueryPOT.trim()) {
+
+    //         const search = searchQueryPOT.toLowerCase();
+
+    //         data = data.filter((item: any) =>
+    //             String(item?.ITMCODE || '').toLowerCase().includes(search) ||
+    //             String(item?.TOTQTY || '').toLowerCase().includes(search)
+    //         );
+    //     }
+
+    //     return data;
+
+    // }, [selectedItem, salesdata, searchQueryPOT]);
 
     const subItemData = useMemo(() => {
 
@@ -354,46 +367,23 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
             );
         }
 
-        return data;
+        // SORTING
+        data.sort((a: any, b: any) => {
 
-    }, [selectedItem, salesdata, searchQueryPOT]);
+            // ALL item always top
+            if (a.ITMCODE === 'ALL') return -1;
+            if (b.ITMCODE === 'ALL') return 1;
+
+            return sortOrder2 === 'asc'
+                ? Number(a.TOTQTY || 0) - Number(b.TOTQTY || 0)
+                : Number(b.TOTQTY || 0) - Number(a.TOTQTY || 0);
+        });
+
+        return [...data];
+
+    }, [selectedItem, salesdata, searchQueryPOT, sortOrder2]);
 
 
-    // const getmergeSummary = (selectedItem = {}, data = []) => {
-    //     const filtered = data.filter(item =>
-    //         item.MITMCODE === selectedItem?.MITMCODE &&
-    //         item.ITMCODE === selectedItem?.ITMCODE
-    //     );
-
-    //     const summary = filtered.reduce((acc, item) => {
-    //         const key = item.MERCODE;
-
-    //         if (!acc[key]) {
-    //             acc[key] = {
-    //                 MERCODE: item.MERCODE,
-    //                 MERNAME: item.MERNAME,
-    //                 TOTQTY: 0
-    //             };
-    //         }
-
-    //         const qty = parseFloat(item?.QTY ?? 0) || 0;
-    //         acc[key].TOTQTY += qty;
-
-    //         return acc;
-    //     }, {});
-
-    //     const result = Object.values(summary);
-
-    //     const total = result.reduce((sum, item) => sum + item.TOTQTY, 0);
-
-    //     const allItem = {
-    //         MERCODE: 'ALL',
-    //         MERNAME: 'ALL [ MERGE ]',
-    //         TOTQTY: total
-    //     };
-
-    //     return [allItem, ...result];
-    // };
 
     const getmergeSummary = (selectedItem = {}, data = [], order = 'asc') => {
         // const filtered = data.filter(item =>
@@ -444,43 +434,31 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     };
 
     // const mergeData = useMemo(() => {
+
     //     if (!selectedDesign || !selectedItem) return [];
 
-    //     return getmergeSummary(
+    //     let data: any[] = getmergeSummary(
     //         {
     //             MITMCODE: selectedItem.MITMCODE,
     //             ITMCODE: selectedDesign.ITMCODE
     //         },
     //         salesdata
     //     );
-    // }, [selectedDesign, selectedItem, salesdata]);
 
-    const mergeData = useMemo(() => {
+    //     // SEARCH FILTER
+    //     if (searchQueryPOT.trim()) {
 
-        if (!selectedDesign || !selectedItem) return [];
+    //         const search = searchQueryPOT.toLowerCase();
 
-        let data: any[] = getmergeSummary(
-            {
-                MITMCODE: selectedItem.MITMCODE,
-                ITMCODE: selectedDesign.ITMCODE
-            },
-            salesdata
-        );
+    //         data = data.filter((item: any) =>
+    //             String(item?.MERNAME || '').toLowerCase().includes(search) ||
+    //             String(item?.TOTQTY || '').toLowerCase().includes(search)
+    //         );
+    //     }
 
-        // SEARCH FILTER
-        if (searchQueryPOT.trim()) {
+    //     return data;
 
-            const search = searchQueryPOT.toLowerCase();
-
-            data = data.filter((item: any) =>
-                String(item?.MERNAME || '').toLowerCase().includes(search) ||
-                String(item?.TOTQTY || '').toLowerCase().includes(search)
-            );
-        }
-
-        return data;
-
-    }, [selectedDesign, selectedItem, salesdata, searchQueryPOT]);
+    // }, [selectedDesign, selectedItem, salesdata, searchQueryPOT]);
 
 
     // const getshadeSummary = (selectedMerge = {}, data = []) => {
@@ -519,6 +497,47 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
 
     //     return [allItem, ...result];
     // };
+
+    const mergeData = useMemo(() => {
+
+        if (!selectedDesign || !selectedItem) return [];
+
+        let data: any[] = getmergeSummary(
+            {
+                MITMCODE: selectedItem.MITMCODE,
+                ITMCODE: selectedDesign.ITMCODE
+            },
+            salesdata
+        );
+
+        // SEARCH FILTER
+        if (searchQueryPOT.trim()) {
+
+            const search = searchQueryPOT.toLowerCase();
+
+            data = data.filter((item: any) =>
+                String(item?.MERNAME || '').toLowerCase().includes(search) ||
+                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            );
+        }
+
+        // SORTING
+        data.sort((a: any, b: any) => {
+
+            // ALL item always top
+            if (a.MERCODE === 'ALL') return -1;
+            if (b.MERCODE === 'ALL') return 1;
+
+            return sortOrder3 === 'asc'
+                ? Number(a.TOTQTY || 0) - Number(b.TOTQTY || 0)
+                : Number(b.TOTQTY || 0) - Number(a.TOTQTY || 0);
+        });
+
+        return [...data];
+
+    }, [selectedDesign, selectedItem, salesdata, searchQueryPOT, sortOrder3]);
+
+
 
     const getshadeSummary = (selectedMerge = {}, data = [], order = 'asc') => {
         // const filtered = data.filter(item =>
@@ -583,6 +602,34 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
     //     );
     // }, [selectedSubDesign, selectedDesign, selectedItem, salesdata]);
 
+    // const shadeData = useMemo(() => {
+
+    //     if (!selectedSubDesign || !selectedDesign || !selectedItem) return [];
+
+    //     let data: any[] = getshadeSummary(
+    //         {
+    //             MITMCODE: selectedItem.MITMCODE,
+    //             ITMCODE: selectedDesign.ITMCODE,
+    //             MERCODE: selectedSubDesign.MERCODE
+    //         },
+    //         salesdata
+    //     );
+
+    //     // SEARCH FILTER
+    //     if (searchQueryPOT.trim()) {
+
+    //         const search = searchQueryPOT.toLowerCase();
+
+    //         data = data.filter((item: any) =>
+    //             String(item?.SHDNAME || '').toLowerCase().includes(search) ||
+    //             String(item?.TOTQTY || '').toLowerCase().includes(search)
+    //         );
+    //     }
+
+    //     return data;
+
+    // }, [selectedSubDesign, selectedDesign, selectedItem, salesdata, searchQueryPOT]);
+
     const shadeData = useMemo(() => {
 
         if (!selectedSubDesign || !selectedDesign || !selectedItem) return [];
@@ -607,9 +654,28 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
             );
         }
 
-        return data;
+        // SORTING
+        data.sort((a: any, b: any) => {
 
-    }, [selectedSubDesign, selectedDesign, selectedItem, salesdata, searchQueryPOT]);
+            // ALL item always top
+            if (a.SHDCODE === 'ALL') return -1;
+            if (b.SHDCODE === 'ALL') return 1;
+
+            return sortOrder4 === 'asc'
+                ? Number(a.TOTQTY || 0) - Number(b.TOTQTY || 0)
+                : Number(b.TOTQTY || 0) - Number(a.TOTQTY || 0);
+        });
+
+        return [...data];
+
+    }, [
+        selectedSubDesign,
+        selectedDesign,
+        selectedItem,
+        salesdata,
+        searchQueryPOT,
+        sortOrder4
+    ]);
 
 
     const openDrawer = () => setIsDrawerVisible(true);
@@ -880,6 +946,7 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                     <Icon name="close" size={18} color="#fff" />
                                 </TouchableOpacity>
                             </View>
+
                             <View
                                 style={{
                                     flexDirection: 'row',
@@ -912,6 +979,48 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                     }}
                                 />
                             </View>
+                            {/* <View style={{ flex: 1 }}> */}
+                            <TouchableOpacity
+                                onPress={toggleSortOrder2}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    alignSelf: 'flex-end',
+                                    backgroundColor: '#F2F4F7',
+                                    paddingVertical: 6,
+                                    paddingHorizontal: 12,
+                                    borderRadius: 8,
+                                    marginHorizontal: 10,
+                                    marginTop: 10,
+                                    marginBottom: 5,
+                                    elevation: 2,
+                                }}
+                            >
+                                <Icon
+                                    name={
+                                        sortOrder === 'asc'
+                                            ? 'arrow-upward'
+                                            : 'arrow-downward'
+                                    }
+                                    size={16}
+                                    color="#000"
+                                />
+
+                                <Text
+                                    style={{
+                                        fontSize: 13,
+                                        color: '#000',
+                                        marginLeft: 6,
+                                        fontWeight: '600',
+                                    }}
+                                >
+                                    {/* {sortOrder === 'asc'
+                                    ? 'Low → High'
+                                    : 'High → Low'} */}
+                                    Sort by Amount
+                                </Text>
+                            </TouchableOpacity>
+                            {/* </View> */}
                             <FlatList
                                 //data={detailData}
                                 data={subItemData}
@@ -981,6 +1090,8 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                         </View>
                     </Modal>
 
+
+
                     <Modal visible={isSubDesignDetailVisible} animationType="slide">
                         <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
                             <View style={{
@@ -992,6 +1103,46 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                     <Icon name="close" size={18} color="#fff" />
                                 </TouchableOpacity>
                             </View>
+                            <TouchableOpacity
+                                onPress={toggleSortOrder3}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    alignSelf: 'flex-end',
+                                    backgroundColor: '#F2F4F7',
+                                    paddingVertical: 6,
+                                    paddingHorizontal: 12,
+                                    borderRadius: 8,
+                                    marginHorizontal: 10,
+                                    marginTop: 10,
+                                    marginBottom: 5,
+                                    elevation: 2,
+                                }}
+                            >
+                                <Icon
+                                    name={
+                                        sortOrder === 'asc'
+                                            ? 'arrow-upward'
+                                            : 'arrow-downward'
+                                    }
+                                    size={16}
+                                    color="#000"
+                                />
+
+                                <Text
+                                    style={{
+                                        fontSize: 13,
+                                        color: '#000',
+                                        marginLeft: 6,
+                                        fontWeight: '600',
+                                    }}
+                                >
+                                    {/* {sortOrder === 'asc'
+                                    ? 'Low → High'
+                                    : 'High → Low'} */}
+                                    Sort by Amount
+                                </Text>
+                            </TouchableOpacity>
                             <View
                                 style={{
                                     flexDirection: 'row',
@@ -1084,6 +1235,9 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                         </View>
                     </Modal>
 
+
+
+
                     <Modal visible={isShadeVisible} animationType="slide">
                         <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
                             <View style={{
@@ -1127,6 +1281,46 @@ const YarnStock: React.FC<{ token: string, navigation: any; username: string }> 
                                     }}
                                 />
                             </View>
+                            <TouchableOpacity
+                                onPress={toggleSortOrder4}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    alignSelf: 'flex-end',
+                                    backgroundColor: '#F2F4F7',
+                                    paddingVertical: 6,
+                                    paddingHorizontal: 12,
+                                    borderRadius: 8,
+                                    marginHorizontal: 10,
+                                    marginTop: 10,
+                                    marginBottom: 5,
+                                    elevation: 2,
+                                }}
+                            >
+                                <Icon
+                                    name={
+                                        sortOrder === 'asc'
+                                            ? 'arrow-upward'
+                                            : 'arrow-downward'
+                                    }
+                                    size={16}
+                                    color="#000"
+                                />
+
+                                <Text
+                                    style={{
+                                        fontSize: 13,
+                                        color: '#000',
+                                        marginLeft: 6,
+                                        fontWeight: '600',
+                                    }}
+                                >
+                                    {/* {sortOrder === 'asc'
+                                    ? 'Low → High'
+                                    : 'High → Low'} */}
+                                    Sort by Amount
+                                </Text>
+                            </TouchableOpacity>
                             <FlatList
                                 data={shadeData}
                                 keyExtractor={(_, index) => index.toString()}

@@ -1237,17 +1237,6 @@ export default function App() {
                       )}
                     </Stack.Screen>
 
-                    <Stack.Screen name="Packing Auth">
-                      {props => (
-                        <PackingAuth
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                          username={getUserDetails}
-                        />
-                      )}
-                    </Stack.Screen>
-
                     <Stack.Screen name="Production Report">
                       {props => (
                         <>
@@ -1283,14 +1272,12 @@ export default function App() {
                     </Stack.Screen>
                     <Stack.Screen name="Yarn Sales Order">
                       {props => (
-                        <SafeAreaProvider>
-                          <YarnSalesOrderModule
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                        </SafeAreaProvider>
+                        <YarnSalesOrderModule
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
+                        />
                       )}
                     </Stack.Screen>
                     {/* For Inquiry */}
@@ -1400,6 +1387,16 @@ export default function App() {
                           {...props}
                           username={getUserDetails}
                           getUserPrptype={getUserPrptype}
+                        />
+                      )}
+                    </Stack.Screen>
+                    <Stack.Screen name="Packing Auth">
+                      {props => (
+                        <PackingAuth
+                          {...props}
+                          token={gettoken || ''}
+                          isConnected={isConnected}
+                          username={getUserDetails}
                         />
                       )}
                     </Stack.Screen>

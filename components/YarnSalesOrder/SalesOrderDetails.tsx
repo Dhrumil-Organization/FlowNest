@@ -288,6 +288,11 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
         ItmName: selectedItem?.ItmName || '',
 
+        Denier: selectedItem.Denier,
+
+        UOM: selectedItem.UOM,
+        HsnCode: selectedItem.HsnCode,
+
         MItmCode:
           selectedItem?.MItmCode ||
           selectedItem?.ItmCode ||

@@ -506,6 +506,7 @@ export default function App() {
 
   return (
     <>
+      <SafeAreaProvider>
       <ThemeProvider>
         {isLoading ? (
           <FullScreenLoader message="Verifying..." />
@@ -1390,7 +1391,7 @@ export default function App() {
                         />
                       )}
                     </Stack.Screen>
-                    <Stack.Screen name="Packing Auth">
+                    <Stack.Screen name="Packing Grade Auth">
                       {props => (
                         <PackingAuth
                           {...props}
@@ -1435,6 +1436,7 @@ export default function App() {
           </>
         )}
       </ThemeProvider>
+      </SafeAreaProvider>
     </>
   );
 }

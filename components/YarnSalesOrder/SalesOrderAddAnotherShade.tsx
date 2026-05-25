@@ -4,11 +4,10 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { CommonActions } from '@react-navigation/native';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const SalesOrderAddAnotherShade = ({ navigation, route }) => {
     const {
         mode = 'ADD',
@@ -145,7 +144,7 @@ const SalesOrderAddAnotherShade = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             <View style={styles.container}>
                 <View style={styles.check}>
                     <Icon name="check" size={52} color="#fff" />

@@ -108,8 +108,6 @@ const YarnManagementSystem: React.FC<Props> = ({ token, navigation, isConnected,
         subtype_id: '',
         subtype_name: '',
         count_no: ''
-
-
     });
     const [mappedData, setMappedData] = useState([]);
     const [blendList, setBlendList] = useState([

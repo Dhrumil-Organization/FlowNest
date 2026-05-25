@@ -14,7 +14,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import HeaderBar from '../HeaderBar/HeaderBar';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import { colors, fontSize, radius, spacing } from '../utils/theme';
-import { inquiryApi, masterApi } from '../services/inquiryApi';
+import { inquiryApi } from '../services/inquiryApi';
+import {masterApi} from '../services/masterApi';
 import {
   DashboardCounts,
   Inquiry,
@@ -87,6 +88,24 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, get
     [statusFilter, tatFilter, search],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await masterApi.userRights({ getUserId, permission: 'mob_app', txntype: "mob_inquiry" });
+        console.log("userRights:", res);
+        if (!cancelled) setItems(res);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [getUserId]);
+
   useFocusEffect(
     useCallback(() => {
       load(false);
@@ -96,24 +115,6 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, get
   useEffect(() => {
     load();
   }, [statusFilter, tatFilter]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await masterApi.userRights({ getUserId, permission: 'mob_app', txntype: "mob_inquiry" });
-        // if (!cancelled) setItems(res);
-        console.log('userRights', res);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [search]);
 
   const onRefresh = () => {
     setRefreshing(true);

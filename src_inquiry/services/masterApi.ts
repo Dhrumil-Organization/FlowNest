@@ -146,7 +146,7 @@ export const useMasterApi = () => {
   const searchParties = useCallback(
     async (q: string): Promise<Party[]> => {
       const res = await client.get<ApiResponse<Party[]>>('/api/parties/search', {
-        params: { q, prptype: userPrptype, yearno: '27' },
+        params: { q, prpcode: 'SIP', yearno: '27' },
       });
       console.log('party api called', q, res);
       return res.data.data;
@@ -242,6 +242,7 @@ export const useMasterApi = () => {
         permission: permission,
         txntype: txntype
       }
+      console.log('I am called from masterAPI', payload);
       const res = await client.get<ApiResponse<UserRights[]>>('/api/checkrights', {
         params: { ...payload },
       });

@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Alert,
   Modal,
   FlatList
@@ -15,7 +14,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const num = v => {
   const n = parseFloat(String(v || '').replace(/,/g, ''));
   return isNaN(n) ? 0 : n;
@@ -575,7 +574,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Icon name="arrow-back-ios-new" size={20} color="#fff" />
@@ -743,7 +742,8 @@ const SalesOrderDetails = ({ navigation, route }) => {
         <Text style={styles.inputLabel}>Pcs</Text>
         <TextInput
           value={pcs}
-          onChangeText={setPcs}
+          // onChangeText={setPcs}
+          onChangeText={(text) => setPcs(text || '0')}
           keyboardType="numeric"
           style={styles.input}
           placeholder="Enter pcs"

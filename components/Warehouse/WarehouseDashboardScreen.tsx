@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   FlatList,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Text,
   StatusBar,
+  TextInput,
+  Keyboard,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
@@ -22,6 +24,22 @@ export default function WarehouseDashboardScreen({ navigation, route }) {
   const [locations] = useState(dashboardData);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  const [search, setSearch] = useState("");
+
+  const filteredLocations = useMemo(() => {
+    if (!search?.trim()) return locations;
+
+    const searchText = search.toLowerCase();
+
+    return locations.filter(item => {
+      return Object.values(item || {}).some(value =>
+        String(value || "")
+          .toLowerCase()
+          .includes(searchText)
+      );
+    });
+  }, [search, locations]);
 
   const openMenu = item => {
     setSelectedLocation(item);
@@ -73,13 +91,40 @@ export default function WarehouseDashboardScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      {loading && locations.length === 0 ? (
+      <View style={styles.mainSearchBox}>
+        <Icon name="search" size={20} color="#000" />
+
+        <TextInput
+          placeholder="Search warehouse..."
+          placeholderTextColor="#000"
+          value={search}
+          onChangeText={setSearch}
+          style={styles.mainSearchInput}
+          returnKeyType="search"
+        />
+
+        {search?.length > 0 && (
+          <TouchableOpacity
+            onPress={() => {
+              setSearch("");
+              Keyboard.dismiss();
+            }}
+            style={styles.clearBtn}
+          >
+            <Icon name="close" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* {loading && locations.length === 0 ? ( */}
+      {loading && filteredLocations.length === 0 ? (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       ) : (
         <FlatList
-          data={locations}
+          // data={locations}
+          data={filteredLocations}
           keyExtractor={(item, index) =>
             String(item.locationCode || item.locationName || item.location || index)
           }
@@ -141,5 +186,28 @@ const styles = {
 
   columnWrapper: {
     justifyContent: "space-between",
+  },
+  mainSearchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    height: 50,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  },
+
+  mainSearchInput: {
+    flex: 1,
+    height: "100%",
+    color: "#000",
+    fontSize: 15,
+    marginLeft: 10,
   },
 };

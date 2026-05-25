@@ -105,7 +105,6 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
     },
     [statusFilter, tatFilter, search, getUserPrptype],
   );
-
   const right = async (getUserId) => {
     const user_id = getUserId;
     const permission = 'mob_app';

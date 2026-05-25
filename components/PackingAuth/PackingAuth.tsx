@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, Animated, Keyboard, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, Modal, Animated, Keyboard, ActivityIndicator, ScrollView } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import LinearGradient from "react-native-linear-gradient";
 import axios from "axios";
@@ -221,7 +221,7 @@ const PackingAuth = ({ navigation, token }) => {
                 txntype: "mob_packing_auth",
                 atype: atype,
                 referrer: 'dashboard',
-                fetch: "proddata",
+                fetch: "packdata",
                 produid: item?.produid
             };
             console.log("api payload => ", payload)
@@ -236,7 +236,7 @@ const PackingAuth = ({ navigation, token }) => {
             });
             console.log("api response => ", res)
 
-            const rawData = res?.data?.data?.data || [];
+            const rawData = res?.data?.response?.data || [];
 
             setProductionDetails(prev => ({
                 ...prev,
@@ -287,10 +287,10 @@ const PackingAuth = ({ navigation, token }) => {
             i?.qty3?.toLowerCase()?.includes(searchText) ||
             i?.authby?.toLowerCase()?.includes(searchText) ||
             i?.authdate?.toLowerCase()?.includes(searchText) ||
-            i?.aremark?.toLowerCase()?.includes(searchText) 
-            // i?.pono?.toLowerCase()?.includes(searchText) ||
-            // i?.podate?.toLowerCase()?.includes(searchText) ||
-            
+            i?.aremark?.toLowerCase()?.includes(searchText) ||
+            i?.vouddate?.toLowerCase()?.includes(searchText)
+            // ||
+            // i?.vouno?.toLowerCase()?.includes(searchText)
         );
     });
 
@@ -376,7 +376,7 @@ const PackingAuth = ({ navigation, token }) => {
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />
                 </TouchableOpacity>
 
-                <Text style={styles.headerTitle}> Packing Auth </Text>
+                <Text style={styles.headerTitle}> Packing Grade Auth </Text>
 
                 <TouchableOpacity onPress={() => setFilterProdPackingVisible(true)} style={styles.headerIconBtn} >
                     <Icon name="tune" size={22} color="#fff" />
@@ -444,6 +444,8 @@ const PackingAuth = ({ navigation, token }) => {
             ) : (
                 <FlatList
                     data={filteredData}
+                    nestedScrollEnabled={true}
+                    keyboardShouldPersistTaps="handled"
                     keyExtractor={(item, index) => index.toString()}
                     contentContainerStyle={{
                         paddingBottom: 30,
@@ -451,7 +453,8 @@ const PackingAuth = ({ navigation, token }) => {
                     }}
                     renderItem={({ item }) => {
                         return (
-                            <TouchableOpacity activeOpacity={0.95} style={[
+                            // <TouchableOpacity activeOpacity={0.95} style={[
+                            <View style={[
                                 styles.proCard,
                                 showProdPackingInfo[item.uid] && {
                                     minHeight:
@@ -660,7 +663,7 @@ const PackingAuth = ({ navigation, token }) => {
 
                                 </View>
 
-                                <View style={styles.poMainRow}>
+                                {/* <View style={styles.poMainRow}>
 
                                     <View style={styles.poBox}>
                                         <Text style={styles.newLabel}>
@@ -682,36 +685,170 @@ const PackingAuth = ({ navigation, token }) => {
                                         </Text>
                                     </View>
 
+                                    <TouchableOpacity
+                                        style={styles.poInfoIconBtn}
+                                        onPress={() => {
+                                            fetchProdPackingdatalist(item);
+
+                                            console.log("Packing BROWSE API HIT", item?.produid);
+                                        }}
+                                    >
+                                        {
+                                            infoProdPackingLoading[item.uid] ? (
+
+                                                <ActivityIndicator
+                                                    size="small"
+                                                    color="#2563EB"
+                                                />
+
+                                            ) : (
+
+                                                <Icon
+                                                    name="info-outline"
+                                                    size={18}
+                                                    color="#2563EB"
+                                                />
+                                            )
+                                        }
+                                    </TouchableOpacity>
+
                                     <View style={styles.poRightSpace} />
+
+                                </View> */}
+
+                                <View style={styles.poMainRow}>
+
+                                    <View style={styles.middleInfoBox}>
+                                        <Text style={styles.newLabel}>
+                                            Prod. No.
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {item.prodno || "-"}
+                                        </Text>
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.middleInfoBox,
+                                            { alignItems: "center" }
+                                        ]}
+                                    >
+                                        <Text style={styles.newLabel}>
+                                            Prod. Date
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {item.proddate || "-"}
+                                        </Text>
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.middleInfoBox,
+                                            { alignItems: "flex-end" }
+                                        ]}
+                                    >
+                                        {/* <Text style={styles.newLabel}>
+                                            Info
+                                        </Text> */}
+
+                                        <TouchableOpacity
+                                            style={styles.poInfoIconBtn}
+                                            onPress={() => {
+                                                fetchProdPackingdatalist(item);
+
+                                                console.log(
+                                                    "Packing BROWSE API HIT",
+                                                    item?.produid
+                                                );
+                                            }}
+                                        >
+                                            {
+                                                infoProdPackingLoading[item.uid] ? (
+                                                    <ActivityIndicator
+                                                        size="small"
+                                                        color="#2563EB"
+                                                    />
+                                                ) : (
+                                                    <Icon
+                                                        name="info-outline"
+                                                        size={18}
+                                                        color="#2563EB"
+                                                    />
+                                                )
+                                            }
+                                        </TouchableOpacity>
+                                    </View>
 
                                 </View>
 
                                 {
                                     showProdPackingInfo[item.uid] && (
 
+                                        // <View style={styles.poInfoBox}>
+                                        //     <View style={styles.poHeaderRow}>
+                                        //         <Text style={styles.poHeaderText}>
+                                        //             Packing Date
+                                        //         </Text>
+
+                                        //         <Text style={styles.poHeaderText}>
+                                        //             Packing No
+                                        //         </Text>
+                                        //     </View>
+
+                                        //     {ProductionDetails[item.uid]?.map((poItem, index) => (
+
+                                        //         <View key={index} style={styles.poInfoRow} >
+                                        //             <Text style={styles.poInfoLabel}>
+                                        //                 {poItem?.vouddate}
+                                        //             </Text>
+
+                                        //             <Text style={styles.poInfoValue}>
+                                        //                 {poItem?.vouno}
+                                        //             </Text>
+                                        //         </View>
+                                        //     ))}
+                                        // </View>
+
                                         <View style={styles.poInfoBox}>
+
                                             <View style={styles.poHeaderRow}>
                                                 <Text style={styles.poHeaderText}>
-                                                    Purchase Date
+                                                    Packing Date
                                                 </Text>
 
                                                 <Text style={styles.poHeaderText}>
-                                                    Purchase No
+                                                    Packing No
                                                 </Text>
                                             </View>
 
-                                            {ProductionDetails[item.uid]?.map((poItem, index) => (
+                                            <ScrollView
+                                                style={styles.poScrollArea}
+                                                nestedScrollEnabled={true}
+                                                showsVerticalScrollIndicator={true}
+                                                persistentScrollbar={true}
+                                                bounces={false}
+                                                scrollEventThrottle={16}
+                                            >
 
-                                                <View key={index} style={styles.poInfoRow} >
-                                                    <Text style={styles.poInfoLabel}>
-                                                        {poItem?.inwdate}
-                                                    </Text>
+                                                {(ProductionDetails[item.uid] || []).map((poItem, index) => (
 
-                                                    <Text style={styles.poInfoValue}>
-                                                        {poItem?.inwno}
-                                                    </Text>
-                                                </View>
-                                            ))}
+                                                    <View key={index} style={styles.poInfoRow}>
+
+                                                        <Text style={styles.poInfoLabel}>
+                                                            {poItem?.vouddate}
+                                                        </Text>
+
+                                                        <Text style={styles.poInfoValue}>
+                                                            {poItem?.vouno}
+                                                        </Text>
+
+                                                    </View>
+                                                ))}
+
+                                            </ScrollView>
+
                                         </View>
                                     )
                                 }
@@ -841,7 +978,9 @@ const PackingAuth = ({ navigation, token }) => {
                                         </>
                                     )
                                 }
-                            </TouchableOpacity>
+
+                                {/* </TouchableOpacity> */}
+                            </View>
                         );
                     }}
 
@@ -1950,17 +2089,22 @@ const styles = StyleSheet.create({
 
     poInfoBox: {
         backgroundColor: "#F8FAFC",
+        overflow: "hidden",
         borderRadius: 14,
         padding: 12,
         marginBottom: 14,
         borderWidth: 1,
         borderColor: "#E2E8F0",
+        maxHeight: 230,
     },
 
     poInfoRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 8,
+        marginBottom: 10,
+        paddingBottom: 8,
+        borderBottomWidth: 0.5,
+        borderBottomColor: "#E5E7EB",
     },
 
     poInfoLabel: {
@@ -1981,19 +2125,19 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
 
-    poBox: {
-        flex: 1,
-        alignItems: "flex-start",
-    },
+    // poBox: {
+    //     flex: 1,
+    //     alignItems: "flex-start",
+    // },
 
-    poDateBox: {
-        flex: 1,
-        alignItems: "center",
-    },
+    // poDateBox: {
+    //     flex: 1,
+    //     alignItems: "center",
+    // },
 
-    poRightSpace: {
-        flex: 1,
-    },
+    // poRightSpace: {
+    //     flex: 1,
+    // },
 
     poInfoIconBtn: {
         width: 40,
@@ -2016,5 +2160,10 @@ const styles = StyleSheet.create({
         color: "#000",
         fontSize: 12,
         fontWeight: "800",
+    },
+    poScrollArea: {
+        maxHeight: 160,
+        minHeight: 160,
+        paddingRight: 4,
     },
 });

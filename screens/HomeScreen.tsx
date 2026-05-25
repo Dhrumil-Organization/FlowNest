@@ -219,7 +219,7 @@ const APP_SECTIONS = [
         title: 'P',
         data: [
             { id: '25', name: 'Process complete auth.', screen: 'Process complete auth.', icon: 'autorenew', iconColor: '#dd5c98' },
-            { id: '25', name: 'Packing Auth', screen: 'Packing Auth', icon: 'autorenew', iconColor: '#dd5c98' },
+            { id: '25', name: 'Packing Grade Auth', screen: 'Packing Grade Auth', icon: 'admin-panel-settings', iconColor: '#3a70a3c9' },
         ],
     },
     {

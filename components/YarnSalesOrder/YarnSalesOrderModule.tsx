@@ -17,7 +17,6 @@ import PdfViewerScreen from './PdfViewerScreen';
 import AddNewPartyScreen from './AddNewPartyScreen';
 import AddNewItemScreen from './AddNewItemScreen';
 
-``
 const Stack = createNativeStackNavigator();
 
 const YarnSalesOrderModule = props => {

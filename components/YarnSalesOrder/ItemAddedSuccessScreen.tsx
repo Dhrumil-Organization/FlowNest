@@ -3,13 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { API } from '../../common/API/dynamicAPI';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const money = value => {
   return Number(value || 0).toLocaleString('en-IN', {
     minimumFractionDigits: 2,
@@ -96,7 +95,7 @@ const ItemAddedSuccessScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
       {/* Main Card */}
       <View style={styles.card}>
         {/* Header */}

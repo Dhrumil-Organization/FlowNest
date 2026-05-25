@@ -16,6 +16,7 @@ import { Inquiry, RootStackParamList } from '../types';
 import Button from '../components/Button';
 import { formatCurrency } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Costing'>;
 
@@ -29,12 +30,29 @@ interface Row {
   gst_percent: string;
 }
 
-const CostingScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
+const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const { id } = route.params;
   const [inquiry, setInquiry] = useState<Inquiry | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -57,7 +75,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username, getUserPr
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, getUserPrptype]);
 
   useEffect(() => {
     load();

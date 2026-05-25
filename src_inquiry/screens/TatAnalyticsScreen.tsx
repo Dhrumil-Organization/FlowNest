@@ -13,6 +13,7 @@ import { RootStackParamList, TatAnalytics } from '../types';
 import { tatApi } from '../services/tatApi';
 import EmptyState from '../components/EmptyState';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TatAnalytics'>;
 
@@ -22,9 +23,26 @@ const formatHours = (h: number): string => {
   return `${(h / 24).toFixed(1)} days`;
 };
 
-const TatAnalyticsScreen: React.FC<Props> = ({ username, getUserPrptype }) => {
+const TatAnalyticsScreen: React.FC<Props> = ({ username }) => {
   const [rows, setRows] = useState<TatAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+  
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -35,7 +53,7 @@ const TatAnalyticsScreen: React.FC<Props> = ({ username, getUserPrptype }) => {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [getUserPrptype]);
 
   if (loading) {
     return (

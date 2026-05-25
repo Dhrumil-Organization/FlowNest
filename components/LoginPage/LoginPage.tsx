@@ -357,7 +357,7 @@ const LoginScreen: React.FC<Props> = ({
         payload,
         { headers }
       );
-      console.log('✅ Login API Response:', response.data);
+      console.log('✅ Login API Response:', response);
       const token = response.data.response?.access_token;
       const user_details = response.data.response?.user?.first_name || 'user';
       const user_menu_apps = response.data.response?.usermenu || '';
@@ -368,7 +368,7 @@ const LoginScreen: React.FC<Props> = ({
       const role1 = response.data.response?.role1;
       const user_id = response.data.response?.user?.id || 0;
       if (response.data.success === true) {
-        if (token && user_details && user_menu_apps) {
+        if (token && user_details) {
           await AsyncStorage.setItem('access_token', token);
           await AsyncStorage.setItem('user_details', user_details);
           await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
@@ -410,14 +410,16 @@ const LoginScreen: React.FC<Props> = ({
             }
           }
         } else {
-          Alert.alert('❌ Error', `${response.data.message}`);
+          Alert.alert('❌ Error1', `${response}`);
+          console.log('❌ Login API Error:', JSON.stringify(response));
         }
       } else {
-        Alert.alert('❌ Error', `${response.data.message}`);
+        Alert.alert('❌ Error12', `${response}`);
+        console.log('❌ Login API Error:', JSON.stringify(response));
       }
     } catch (error) {
       console.error('❌ Login API Error:', error);
-      Alert.alert('Error', `Server error ${error} ${JSON.stringify(payload)}`);
+      Alert.alert('Error123', `Server error ${error} ${JSON.stringify(payload)}`);
     } finally {
       setIsLoading(false);
     }

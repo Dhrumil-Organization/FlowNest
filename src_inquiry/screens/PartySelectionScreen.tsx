@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,19 +8,36 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {colors, fontSize, radius, spacing} from '../utils/theme';
-import {masterApi} from '../services/masterApi';
-import {Party, RootStackParamList} from '../types';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { colors, fontSize, radius, spacing } from '../utils/theme';
+import { masterApi } from '../services/masterApi';
+import { Party, RootStackParamList } from '../types';
 import EmptyState from '../components/EmptyState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PartySelection'>;
 
-const PartySelectionScreen: React.FC<Props> = ({route, navigation}) => {
-  const {onSelect} = route.params;
+const PartySelectionScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { onSelect } = route.params;
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Party[]>([]);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,12 +88,12 @@ const PartySelectionScreen: React.FC<Props> = ({route, navigation}) => {
       </TouchableOpacity>
 
       {loading ? (
-        <ActivityIndicator style={{marginTop: 40}} color={colors.primary} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={p => `${p.prp_code}-${p.acc_code}`}
-          renderItem={({item}) => (
+          renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => handleSelect(item)}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.meta}>
@@ -85,7 +102,7 @@ const PartySelectionScreen: React.FC<Props> = ({route, navigation}) => {
               </Text>
             </TouchableOpacity>
           )}
-          contentContainerStyle={{padding: spacing.md}}
+          contentContainerStyle={{ padding: spacing.md }}
           ListEmptyComponent={
             <EmptyState
               title="No parties found"
@@ -99,8 +116,8 @@ const PartySelectionScreen: React.FC<Props> = ({route, navigation}) => {
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: colors.bg},
-  searchWrap: {padding: spacing.md},
+  container: { flex: 1, backgroundColor: colors.bg },
+  searchWrap: { padding: spacing.md },
   search: {
     backgroundColor: colors.cardBg,
     borderWidth: 1,
@@ -122,7 +139,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.infoBg,
     alignItems: 'center',
   },
-  addBoxText: {color: colors.info, fontWeight: '500'},
+  addBoxText: { color: colors.info, fontWeight: '500' },
   row: {
     padding: spacing.md,
     backgroundColor: colors.cardBg,
@@ -131,8 +148,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  name: {fontSize: fontSize.base, fontWeight: '500', color: colors.textPrimary},
-  meta: {fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2},
+  name: { fontSize: fontSize.base, fontWeight: '500', color: colors.textPrimary },
+  meta: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
 });
 
 export default PartySelectionScreen;

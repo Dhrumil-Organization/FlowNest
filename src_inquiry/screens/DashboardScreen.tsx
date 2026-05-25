@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -15,7 +16,7 @@ import HeaderBar from '../HeaderBar/HeaderBar';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import { colors, fontSize, radius, spacing } from '../utils/theme';
 import { inquiryApi } from '../services/inquiryApi';
-import {masterApi} from '../services/masterApi';
+import { masterApi } from '../services/masterApi';
 import {
   DashboardCounts,
   Inquiry,
@@ -29,6 +30,7 @@ import TatBadge from '../components/TatBadge';
 import EmptyState from '../components/EmptyState';
 import { formatDate } from '../utils/validators';
 import theme from '../../android/app/src/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
@@ -51,7 +53,7 @@ const TAT_FILTERS: { key: TatFilterKey; label: string }[] = [
   { key: 'breached', label: '🔴 Breached' },
 ];
 
-const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, getUserPrptype }) => {
+const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FilterKey>('all');
@@ -60,8 +62,24 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, get
   const [items, setItems] = useState<Inquiry[]>([]);
   const [counts, setCounts] = useState<DashboardCounts | null>(null);
   const [tatCounts, setTatCounts] = useState<TatCounts | null>(null);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
 
   console.log('getUserId from login :', getUserId, 'getUserPrptype from login :', getUserPrptype);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const load = useCallback(
     async (showSpinner = true) => {
@@ -85,26 +103,44 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, get
         setRefreshing(false);
       }
     },
-    [statusFilter, tatFilter, search],
+    [statusFilter, tatFilter, search, getUserPrptype],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await masterApi.userRights({ getUserId, permission: 'mob_app', txntype: "mob_inquiry" });
-        console.log("userRights:", res);
-        if (!cancelled) setItems(res);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [getUserId]);
+  const right = async (getUserId) => {
+    const user_id = getUserId;
+    const permission = 'mob_app';
+    const txntype = 'mob_inquiry';
+
+    setLoading(true);
+    try {
+      const data = await masterApi.checkRights(user_id, permission, txntype);
+      console.log("Rights:", data);
+    } catch (e: any) {
+      // Convert error to string (handles ReadableNativeMap, objects, etc.)
+      Alert.alert('Error', String(e || 'Unable to fetch Rights'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // const right = useCallback(
+  //   async (showSpinner = true) => {
+  //     if (showSpinner) setLoading(true);
+  //     try {
+  //       const res = await MasterApi.userRights({ getUserId: getUserId, permission: 'mob_app', txntype: "mob_inquiry" });
+  //       console.log("Right:", res);
+  //       // setItems(res.data);
+  //       // setCounts(res.counts);
+  //       // setTatCounts(res.tatCounts);
+  //     } catch (e) {
+  //       // ignore
+  //     } finally {
+  //       setLoading(false);
+  //       // setRefreshing(false);
+  //     }
+  //   },
+  //   [getUserId],
+  // );
 
   useFocusEffect(
     useCallback(() => {
@@ -114,7 +150,11 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId, get
 
   useEffect(() => {
     load();
-  }, [statusFilter, tatFilter]);
+  }, [statusFilter, tatFilter, getUserId, getUserPrptype]);
+
+  useEffect(() => {
+    right(getUserId);
+  }, [getUserId]);
 
   const onRefresh = () => {
     setRefreshing(true);

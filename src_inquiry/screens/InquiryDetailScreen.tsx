@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -20,13 +20,30 @@ import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithB
 import TatTimeline from '../components/TatTimeline';
 import Button from '../components/Button';
 import { formatCurrency, formatDate } from '../utils/validators';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryDetail'>;
 
-const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
+const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const { id } = route.params;
   const [inquiry, setInquiry] = useState<InquiryDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -38,7 +55,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, getUserPrptype]);
 
   useFocusEffect(
     useCallback(() => {

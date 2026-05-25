@@ -194,7 +194,7 @@ export const useMasterApi = () => {
   );
 
   const checkRights = useCallback(
-    async (user_id: string, permission: string, txntype: string): Promise<GstinData> => {
+    async (user_id: string, permission: string, txntype: string): Promise<UserRights> => {
       const payload = {
         user_id: user_id,
         permission: permission,

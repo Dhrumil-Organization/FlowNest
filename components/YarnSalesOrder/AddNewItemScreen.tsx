@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     TouchableOpacity,
     TextInput,
     ScrollView,
@@ -14,7 +13,7 @@ import { useSalesOrder } from './SalesOrderContext';
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const AddNewItemScreen = ({ navigation, route }) => {
     const {
         mode = 'ADD',
@@ -80,7 +79,7 @@ const AddNewItemScreen = ({ navigation, route }) => {
 
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             {/* HEADER */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>

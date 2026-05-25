@@ -183,10 +183,18 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
             );
 
             console.log("preview response ::", res?.data);
-            const responseData =
-                res?.data?.data?.prodwarehouselocations || [];
+            const responseData = res?.data?.data?.prodwarehouselocations || [];
 
             console.log("dashboard data ::", responseData);
+
+            if (
+                !responseData || !Array.isArray(responseData) || responseData.length === 0) {
+                Alert.alert(
+                    "No Data Found",
+                    "No warehouse data available"
+                );
+                return;
+            }
 
             navigation.navigate("WarehouseDashboard", {
                 criteria: form,

@@ -5,7 +5,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     TouchableOpacity,
     TextInput,
     ScrollView,
@@ -16,7 +15,7 @@ import { useSalesOrder } from './SalesOrderContext';
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const AddNewPartyScreen = ({ navigation, route, token }) => {
 
     const [partyName, setPartyName] = useState('');
@@ -241,7 +240,7 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.back}>‹</Text>

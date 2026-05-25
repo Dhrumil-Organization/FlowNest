@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     TouchableOpacity,
     // Share,
     Alert,
@@ -16,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Share from 'react-native-share';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 // import * as FileSystem from 'expo-file-system';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import RNFS from 'react-native-fs';
 
 const PdfViewerScreen = ({ navigation, route }) => {
@@ -208,7 +208,7 @@ const PdfViewerScreen = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             {/* <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />

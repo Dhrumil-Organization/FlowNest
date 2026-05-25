@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     TouchableOpacity,
     FlatList,
     TextInput,
@@ -12,7 +11,7 @@ import {
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { API } from '../../common/API/dynamicAPI';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const toText = v => String(v || '').trim();
 
 const SalesOrderGradeList = ({ navigation, route }) => {
@@ -363,7 +362,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />

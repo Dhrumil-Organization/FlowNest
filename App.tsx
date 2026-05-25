@@ -508,25 +508,26 @@ export default function App() {
 
   return (
     <>
-      <ThemeProvider>
-        {isLoading ? (
-          <FullScreenLoader message="Verifying..." />
-        ) : (
-          <>
-            {getAuth === true ? (
-              isLoggedIn && gettoken && getUserDetails ? (
-                <NavigationContainer ref={navigationRef}>
-                  {/* <Stack.Navigator initialRouteName="Dashboard" screenOptions={{ headerShown: false }}> */}
-                  <Stack.Navigator
-                    initialRouteName="Home"
-                    screenOptions={{ headerShown: false }}
-                  >
-                    {/* <Stack.Screen
+      <SafeAreaProvider>
+        <ThemeProvider>
+          {isLoading ? (
+            <FullScreenLoader message="Verifying..." />
+          ) : (
+            <>
+              {getAuth === true ? (
+                isLoggedIn && gettoken && getUserDetails ? (
+                  <NavigationContainer ref={navigationRef}>
+                    {/* <Stack.Navigator initialRouteName="Dashboard" screenOptions={{ headerShown: false }}> */}
+                    <Stack.Navigator
+                      initialRouteName="Home"
+                      screenOptions={{ headerShown: false }}
+                    >
+                      {/* <Stack.Screen
                 name="Dashboard"
                 component={DashboardScreen}
                 options={{ headerShown: false }}
               /> */}
-                    {/* <Stack.Screen name="Dashboard">
+                      {/* <Stack.Screen name="Dashboard">
                       {(props) => (
                         <>
 
@@ -536,233 +537,233 @@ export default function App() {
                       )}
                     </Stack.Screen> */}
 
-                    <Stack.Screen name="Home">
-                      {props => (
-                        <>
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                          <HomeScreen
-                            {...props}
-                            isConnected={isConnected}
-                            username={getUserDetails || ''}
-                            token={gettoken || ''}
-                            getMenuApps={getMenuApps || ''}
-                            setMenuApps={setMenuApps}
-                            setDecodedMenuApps={setDecodedMenuApps}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Settings">
-                      {props => (
-                        <>
-                          <Settings
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Upload">
-                      {props => (
-                        <CameraPage
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Credit Limit Request">
-                      {props => (
-                        <>
-                          <CreditLimitRequest
+                      <Stack.Screen name="Home">
+                        {props => (
+                          <>
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                            <HomeScreen
+                              {...props}
+                              isConnected={isConnected}
+                              username={getUserDetails || ''}
+                              token={gettoken || ''}
+                              getMenuApps={getMenuApps || ''}
+                              setMenuApps={setMenuApps}
+                              setDecodedMenuApps={setDecodedMenuApps}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Settings">
+                        {props => (
+                          <>
+                            <Settings
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Upload">
+                        {props => (
+                          <CameraPage
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}
-                            username={getUserDetails}
                           />
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Sudamo Production Order">
-                      {props => (
-                        <>
-                          <SudamoProdOrder
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Yarn Purchase Order">
-                      {props => (
-                        <>
-                          <YarnPurchaseOrder
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="ChartScreen" component={ChartScreen} />
-                    {/* <Stack.Screen name="Grey Purchase Order">{(props) =>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Credit Limit Request">
+                        {props => (
+                          <>
+                            <CreditLimitRequest
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Sudamo Production Order">
+                        {props => (
+                          <>
+                            <SudamoProdOrder
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Yarn Purchase Order">
+                        {props => (
+                          <>
+                            <YarnPurchaseOrder
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="ChartScreen" component={ChartScreen} />
+                      {/* <Stack.Screen name="Grey Purchase Order">{(props) =>
                       <>
                         <GreyPurchaseOrder {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} />
                       </>
                     }</Stack.Screen> */}
-                    <Stack.Screen name="Sales Order">
-                      {props => (
-                        <>
-                          <GreySalesOrder
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Production Order Tracking">
-                      {props => (
-                        <>
-                          <ProdOrderTracking
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="New Account Request">
-                      {props => (
-                        <>
-                          <NewAccountRequest
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          <Footer
-                            onLogout={() => setIsLoggedIn(false)}
-                            isConnected={isConnected}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Collection">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <CollectionList
+                      <Stack.Screen name="Sales Order">
+                        {props => (
+                          <>
+                            <GreySalesOrder
                               {...props}
                               token={gettoken || ''}
                               isConnected={isConnected}
                               username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
+                            />
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Production Order Tracking">
+                        {props => (
+                          <>
+                            <ProdOrderTracking
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="New Account Request">
+                        {props => (
+                          <>
+                            <NewAccountRequest
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            <Footer
+                              onLogout={() => setIsLoggedIn(false)}
+                              isConnected={isConnected}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Collection">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <CollectionList
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                              {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                            </GestureHandlerRootView>
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="CollectionAdd">
+                        {props => (
+                          <>
+                            <Collection
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
                             />
                             {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                          </GestureHandlerRootView>
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="CollectionAdd">
-                      {props => (
-                        <>
-                          <Collection
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="CollectionEdit">
-                      {props => (
-                        <>
-                          <CollectionEdit
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Monthly Expense Report">
-                      {props => (
-                        <>
-                          <MonthlyExpenseReport
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            getDeviceId={getDeviceId}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Snap View">
-                      {props => (
-                        <>
-                          <SnapView
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            getDeviceId={getDeviceId}
-                            username={getUserDetails}
-                            API={API}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    {/* <Stack.Screen name="Packing Automation">{(props) =>
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="CollectionEdit">
+                        {props => (
+                          <>
+                            <CollectionEdit
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Monthly Expense Report">
+                        {props => (
+                          <>
+                            <MonthlyExpenseReport
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              getDeviceId={getDeviceId}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Snap View">
+                        {props => (
+                          <>
+                            <SnapView
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              getDeviceId={getDeviceId}
+                              username={getUserDetails}
+                              API={API}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      {/* <Stack.Screen name="Packing Automation">{(props) =>
                     <>
                       <PackingAutomation {...props} token={gettoken || ''} isConnected={isConnected} getDeviceId={getDeviceId} username={getUserDetails} />
                     </>
                   }</Stack.Screen> */}
-                    {/* <Stack.Screen name="Inquiry">
+                      {/* <Stack.Screen name="Inquiry">
                       {props => (
                         <>
                           <ErrorBoundary FallbackComponent={ErrorFallback}>
@@ -781,664 +782,665 @@ export default function App() {
                         </>
                       )}
                     </Stack.Screen> */}
-                    <Stack.Screen name="InquiryAdd">
-                      {props => (
-                        <>
-                          <InquiryAdd
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="InquiryEdit">
-                      {props => (
-                        <>
-                          <CollectionEdit
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Receivables">
-                      {props => (
-                        <>
-                          {API === 'https://apig.tms-webapp.com' ? (
-                            <ReceivablesSudamo
+                      <Stack.Screen name="InquiryAdd">
+                        {props => (
+                          <>
+                            <InquiryAdd
                               {...props}
                               token={gettoken || ''}
                               isConnected={isConnected}
                               username={getUserDetails}
                             />
-                          ) : (
-                            <ErrorBoundary FallbackComponent={ErrorFallback}>
-                              <Receivables
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="InquiryEdit">
+                        {props => (
+                          <>
+                            <CollectionEdit
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Receivables">
+                        {props => (
+                          <>
+                            {API === 'https://apig.tms-webapp.com' ? (
+                              <ReceivablesSudamo
                                 {...props}
                                 token={gettoken || ''}
                                 isConnected={isConnected}
                                 username={getUserDetails}
                               />
-                            </ErrorBoundary>
-                          )}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    {/* <Stack.Screen name="Receivables">{(props) =>
+                            ) : (
+                              <ErrorBoundary FallbackComponent={ErrorFallback}>
+                                <Receivables
+                                  {...props}
+                                  token={gettoken || ''}
+                                  isConnected={isConnected}
+                                  username={getUserDetails}
+                                />
+                              </ErrorBoundary>
+                            )}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      {/* <Stack.Screen name="Receivables">{(props) =>
                       <>
                         {API === 'https://apig.tms-webapp.com' ? <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} /> :
                           <ReceivablesSudamo {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />}
 
                       </>
                     }</Stack.Screen> */}
-                    <Stack.Screen name="Payable">
-                      {props => (
-                        <>
-                          <Payable
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Daily Collection Report">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <DailyCollectionReport
+                      <Stack.Screen name="Payable">
+                        {props => (
+                          <>
+                            <Payable
                               {...props}
                               token={gettoken || ''}
                               isConnected={isConnected}
                               username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
                             />
                             {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                          </GestureHandlerRootView>
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Taka Checking Entry">
-                      {props => (
-                        <>
-                          <TakaCheckingEntry
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Daily Collection Report">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <DailyCollectionReport
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                              {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                            </GestureHandlerRootView>
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Taka Checking Entry">
+                        {props => (
+                          <>
+                            <TakaCheckingEntry
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Taka Checking Entry View Data">
+                        {props => (
+                          <>
+                            <TakaCheckingViewData
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Sales Order Tracking">
+                        {props => (
+                          <>
+                            <SalesOrderTracking
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="SOPartyDetails">
+                        {props => (
+                          <>
+                            <SOPartyDetails
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="SOPartyDetailsPart1">
+                        {props => (
+                          <>
+                            <SOPartyDetailsPart1
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Sales Analysis">
+                        {props => (
+                          <>
+                            <SalesAnalysis
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                              getUserPrptype={getUserPrptype}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Checking Scanner">
+                        {props => (
+                          <>
+                            <CheckingScanner
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Yarn Stock Verification">
+                        {props => (
+                          <>
+                            <YarnStockVerification
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                              getUserPrptype={getUserPrptype}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Purchase Order Tracking">
+                        {props => (
+                          <>
+                            <PurchaseOrderTracking
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Sales Order(Inactive)">
+                        {props => (
+                          <>
+                            <SalesOrderInActive
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Item Authorization">
+                        {props => (
+                          <>
+                            <ItemAuthorization
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                            {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Process complete auth.">
+                        {props => (
+                          <>
+                            <ProcessCompleteAuth
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                              getUserPrptype={getUserPrptype}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Febric Stock">
+                        {props => (
+                          <>
+                            <FebricStock
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                              getUserPrptype={getUserPrptype}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Daily Payment Report">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <DailyPaymentReport
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                            </GestureHandlerRootView>
+                          </>
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Beam Close">
+                        {props => (
+                          <>
+                            <BeamClose
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Design Authorization">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <DesignAuthorization
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                            </GestureHandlerRootView>
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Creel Management System">
+                        {props => (
+                          <>
+                            <ErrorBoundary FallbackComponent={ErrorFallback}>
+                              <CreelManagementSystem
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                            </ErrorBoundary>
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Beam Gaiting">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <BeamGaiting
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                            </GestureHandlerRootView>
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Yarn Stock">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <YarnStock
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                            </GestureHandlerRootView>
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Yarn Management System">
+                        {props => (
+                          <>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <YarnManagementSystem
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                setIsLoggedIn={setIsLoggedIn}
+                                rightsMenuApps={
+                                  (getDecodedMenuApps &&
+                                    getDecodedMenuApps[0]?.pages[0]?.children) ||
+                                  []
+                                }
+                              />
+                            </GestureHandlerRootView>
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Party Dashboard">
+                        {props => (
+                          <>
+                            <PartyDashboard
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen
+                        name="PartyDetailScreen"
+                        component={PartyDetailScreen}
+                      />
+
+                      <Stack.Screen name="Weft Issue">
+                        {props => (
+                          <>
+                            <WftIssue
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Sales Order Entry">
+                        {props => (
+                          <SalesOrderModule
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
                           />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Taka Checking Entry View Data">
-                      {props => (
-                        <>
-                          <TakaCheckingViewData
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Warehouse">
+                        {props => (
+                          <WarehouseStack
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
                           />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Sales Order Tracking">
-                      {props => (
-                        <>
-                          <SalesOrderTracking
+                        )}
+                      </Stack.Screen>
+
+
+                      <Stack.Screen name="Purchase Auth">
+                        {props => (
+                          <PurchaseAuth
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
                           />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="SOPartyDetails">
-                      {props => (
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Production Report">
+                        {props => (
+                          <>
+                            <ProductionReport
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Creel Issue Return">{(props) =>
                         <>
-                          <SOPartyDetails
+                          <CreelIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="CreelIssueReturnEntry" component={CreelIssueReturnEntry} />
+                      <Stack.Screen name="CreelIssueReturnModifyEntry" component={CreelIssueReturnModifyEntry} />
+                      <Stack.Screen name="Doff Entry">
+                        {props => (
+                          <>
+                            <DoffEntry
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Yarn Sales Order">
+                        {props => (
+                          <SafeAreaProvider>
+                            <YarnSalesOrderModule
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </SafeAreaProvider>
+                        )}
+                      </Stack.Screen>
+                      {/* For Inquiry */}
+                      <Stack.Screen name="Inquiry" options={{ title: 'Fabric Inquiries' }}>
+                        {props => (
+                          <DashboardScreen
                             {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
                             username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
                           />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="SOPartyDetailsPart1">
-                      {props => (
-                        <>
-                          <SOPartyDetailsPart1
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="InquiryForm" options={{ title: 'New Inquiry' }}>
+                        {props => (
+                          <InquiryFormScreen
                             {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Sales Analysis">
-                      {props => (
-                        <>
-                          <SalesAnalysis
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
                             username={getUserDetails}
                             getUserPrptype={getUserPrptype}
                           />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Checking Scanner">
-                      {props => (
-                        <>
-                          <CheckingScanner
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="PartySelection" options={{ title: 'Select Party' }}>
+                        {props => (
+                          <PartySelectionScreen
                             {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Yarn Stock Verification">
-                      {props => (
-                        <>
-                          <YarnStockVerification
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
                             username={getUserDetails}
                             getUserPrptype={getUserPrptype}
                           />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Purchase Order Tracking">
-                      {props => (
-                        <>
-                          <PurchaseOrderTracking
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="AddParty" options={{ title: 'Add New Party' }}>
+                        {props => (
+                          <AddPartyScreen
                             {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Sales Order(Inactive)">
-                      {props => (
-                        <>
-                          <SalesOrderInActive
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Item Authorization">
-                      {props => (
-                        <>
-                          <ItemAuthorization
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                          {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Process complete auth.">
-                      {props => (
-                        <>
-                          <ProcessCompleteAuth
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
                             username={getUserDetails}
                             getUserPrptype={getUserPrptype}
                           />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Febric Stock">
-                      {props => (
-                        <>
-                          <FebricStock
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="DesignSelection" options={{ title: 'Select Design' }}>
+                        {props => (
+                          <DesignSelectionScreen
                             {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
                             username={getUserDetails}
                             getUserPrptype={getUserPrptype}
                           />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Daily Payment Report">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <DailyPaymentReport
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
-                            />
-                          </GestureHandlerRootView>
-                        </>
-                      )}
-                    </Stack.Screen>
-
-                    <Stack.Screen name="Beam Close">
-                      {props => (
-                        <>
-                          <BeamClose
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="InquiryDetail" options={{ title: 'Inquiry Details' }}>
+                        {props => (
+                          <InquiryDetailScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Costing" options={{ title: 'Add Costing' }}>
+                        {props => (
+                          <CostingScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="SendQuotation" options={{ title: 'Send Quotation' }}>
+                        {props => (
+                          <SendQuotationScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="ConfirmInquiry" options={{ title: 'Confirm Inquiry' }}>
+                        {props => (
+                          <ConfirmInquiryScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="RejectInquiry" options={{ title: 'Reject Inquiry' }}>
+                        {props => (
+                          <RejectInquiryScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="TatConfig" options={{ title: 'TAT Configuration' }}>
+                        {props => (
+                          <TatConfigScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="TatAnalytics" options={{ title: 'TAT Analytics' }}>
+                        {props => (
+                          <TatAnalyticsScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Packing Grade Auth">
+                        {props => (
+                          <PackingAuth
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
                           />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Design Authorization">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <DesignAuthorization
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
-                            />
-                          </GestureHandlerRootView>
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Creel Management System">
-                      {props => (
-                        <>
-                          <ErrorBoundary FallbackComponent={ErrorFallback}>
-                            <CreelManagementSystem
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
-                            />
-                          </ErrorBoundary>
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Beam Gaiting">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <BeamGaiting
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
-                            />
-                          </GestureHandlerRootView>
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Yarn Stock">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <YarnStock
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
-                            />
-                          </GestureHandlerRootView>
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Yarn Management System">
-                      {props => (
-                        <>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <YarnManagementSystem
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              setIsLoggedIn={setIsLoggedIn}
-                              rightsMenuApps={
-                                (getDecodedMenuApps &&
-                                  getDecodedMenuApps[0]?.pages[0]?.children) ||
-                                []
-                              }
-                            />
-                          </GestureHandlerRootView>
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Party Dashboard">
-                      {props => (
-                        <>
-                          <PartyDashboard
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen
-                      name="PartyDetailScreen"
-                      component={PartyDetailScreen}
-                    />
+                        )}
+                      </Stack.Screen>
 
-                    <Stack.Screen name="Weft Issue">
-                      {props => (
-                        <>
-                          <WftIssue
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Sales Order Entry">
-                      {props => (
-                        <SalesOrderModule
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                          username={getUserDetails}
-                        />
-                      )}
-                    </Stack.Screen>
-
-                    <Stack.Screen name="Warehouse">
-                      {props => (
-                        <WarehouseStack
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                          username={getUserDetails}
-                        />
-                      )}
-                    </Stack.Screen>
+                    </Stack.Navigator>
+                    {/* </Stack.Navigator> */}
 
 
-                    <Stack.Screen name="Purchase Auth">
-                      {props => (
-                        <PurchaseAuth
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                          username={getUserDetails}
-                        />
-                      )}
-                    </Stack.Screen>
-
-                    <Stack.Screen name="Production Report">
-                      {props => (
-                        <>
-                          <ProductionReport
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-
-                    <Stack.Screen name="Creel Issue Return">{(props) =>
-                      <>
-                        <CreelIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
-
-                      </>
-                    }</Stack.Screen>
-                    <Stack.Screen name="CreelIssueReturnEntry" component={CreelIssueReturnEntry} />
-                    <Stack.Screen name="CreelIssueReturnModifyEntry" component={CreelIssueReturnModifyEntry} />
-                    <Stack.Screen name="Doff Entry">
-                      {props => (
-                        <>
-                          <DoffEntry
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                        </>
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Yarn Sales Order">
-                      {props => (
-                        <SafeAreaProvider>
-                          <YarnSalesOrderModule
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
-                        </SafeAreaProvider>
-                      )}
-                    </Stack.Screen>
-                    {/* For Inquiry */}
-                    <Stack.Screen name="Inquiry" options={{ title: 'Fabric Inquiries' }}>
-                      {props => (
-                        <DashboardScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserId={getUserId}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="InquiryForm" options={{ title: 'New Inquiry' }}>
-                      {props => (
-                        <InquiryFormScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="PartySelection" options={{ title: 'Select Party' }}>
-                      {props => (
-                        <PartySelectionScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="AddParty" options={{ title: 'Add New Party' }}>
-                      {props => (
-                        <AddPartyScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="DesignSelection" options={{ title: 'Select Design' }}>
-                      {props => (
-                        <DesignSelectionScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="InquiryDetail" options={{ title: 'Inquiry Details' }}>
-                      {props => (
-                        <InquiryDetailScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Costing" options={{ title: 'Add Costing' }}>
-                      {props => (
-                        <CostingScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="SendQuotation" options={{ title: 'Send Quotation' }}>
-                      {props => (
-                        <SendQuotationScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="ConfirmInquiry" options={{ title: 'Confirm Inquiry' }}>
-                      {props => (
-                        <ConfirmInquiryScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="RejectInquiry" options={{ title: 'Reject Inquiry' }}>
-                      {props => (
-                        <RejectInquiryScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="TatConfig" options={{ title: 'TAT Configuration' }}>
-                      {props => (
-                        <TatConfigScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="TatAnalytics" options={{ title: 'TAT Analytics' }}>
-                      {props => (
-                        <TatAnalyticsScreen
-                          {...props}
-                          username={getUserDetails}
-                          getUserPrptype={getUserPrptype}
-                        />
-                      )}
-                    </Stack.Screen>
-                    <Stack.Screen name="Packing Auth">
-                      {props => (
-                        <PackingAuth
-                          {...props}
-                          token={gettoken || ''}
-                          isConnected={isConnected}
-                          username={getUserDetails}
-                        />
-                      )}
-                    </Stack.Screen>
-
-                  </Stack.Navigator>
-                  {/* </Stack.Navigator> */}
-
-
-                </NavigationContainer>
-              ) : isConnected === false ? (
-                <OfflineFallback />
+                  </NavigationContainer>
+                ) : isConnected === false ? (
+                  <OfflineFallback />
+                ) : (
+                  <LoginScreen
+                    setIsLoggedIn={setIsLoggedIn}
+                    setToken={setToken}
+                    getDeviceId={getDeviceId}
+                    isConnected={isConnected}
+                    setUserDetails={setUserDetails}
+                    setMenuApps={setMenuApps}
+                  />
+                )
               ) : (
-                <LoginScreen
-                  setIsLoggedIn={setIsLoggedIn}
-                  setToken={setToken}
-                  getDeviceId={getDeviceId}
-                  isConnected={isConnected}
-                  setUserDetails={setUserDetails}
-                  setMenuApps={setMenuApps}
+                <AccessDeniedModal
+                  visible={showDeniedModal}
+                  visiblepage={showDeniedModalpage}
+                  countdown={countdown}
+                  onClose={() => {
+                    setShowDeniedModal(false);
+                    BackHandler.exitApp();
+                  }}
+                  checkToken={checkToken}
+                  checkConnectionQuality={checkConnectionQuality}
+                  isLoading={isLoading}
                 />
-              )
-            ) : (
-              <AccessDeniedModal
-                visible={showDeniedModal}
-                visiblepage={showDeniedModalpage}
-                countdown={countdown}
-                onClose={() => {
-                  setShowDeniedModal(false);
-                  BackHandler.exitApp();
-                }}
-                checkToken={checkToken}
-                checkConnectionQuality={checkConnectionQuality}
-                isLoading={isLoading}
-              />
-            )}
-          </>
-        )}
-      </ThemeProvider>
+              )}
+            </>
+          )}
+        </ThemeProvider>
+      </SafeAreaProvider>
     </>
   );
 }

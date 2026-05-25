@@ -15,6 +15,7 @@ import { RootStackParamList, TatConfiguration } from '../types';
 import { tatApi } from '../services/tatApi';
 import Button from '../components/Button';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TatConfig'>;
 
@@ -30,10 +31,27 @@ const formatHoursLabel = (h: number): string => {
   return remH > 0 ? `${days}d ${remH}h` : `${days} day${days > 1 ? 's' : ''}`;
 };
 
-const TatConfigScreen: React.FC<Props> = ({ navigation, username, getUserPrptype }) => {
+const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
   const [rows, setRows] = useState<EditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -55,7 +73,7 @@ const TatConfigScreen: React.FC<Props> = ({ navigation, username, getUserPrptype
         setLoading(false);
       }
     })();
-  }, []);
+  }, [getUserPrptype]);
 
   const update = (id: number, patch: Partial<EditRow>) => {
     setRows(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -15,6 +15,7 @@ import { RootStackParamList } from '../types';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RejectInquiry'>;
 
@@ -27,11 +28,28 @@ const REASONS = [
   'Other',
 ];
 
-const RejectInquiryScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
+const RejectInquiryScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const { id } = route.params;
   const [reason, setReason] = useState<string>('');
   const [remarks, setRemarks] = useState('');
   const [saving, setSaving] = useState(false);
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+  
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const submit = async () => {
     if (!reason) {

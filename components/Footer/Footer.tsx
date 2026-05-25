@@ -72,6 +72,7 @@ const Footer: React.FC<FooterProps> = ({ onLogout, isConnected, totalAmount = 0,
             await AsyncStorage.removeItem('receivables_sync_date');
             await AsyncStorage.removeItem('receivables_prpgroup');
             await AsyncStorage.removeItem('live_logs_unlocked');
+            await AsyncStorage.removeItem('user_prptype');
             onLogout();
           },
         },

@@ -132,7 +132,7 @@ export default function App() {
   const [getMenuApps, setMenuApps] = useState<string | null>('');
   const [getDecodedMenuApps, setDecodedMenuApps] = useState([]);
   const [getUserDetails, setUserDetails] = useState<string | null>('');
-  const [getUserPrptype, setUserPrptype] = useState<string | null>('');
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
   const [getMasterSyncData, setMasterSyncData] = useState([]);
   const [getDeviceId, setDeviceId] = useState<string | null>('');
   const [getAuth, setAuth] = useState<boolean | null>(null);
@@ -260,6 +260,8 @@ export default function App() {
 
     initializeApp();
   }, []);
+
+  console.log('getUserPrptype In App', getUserPrptype);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {

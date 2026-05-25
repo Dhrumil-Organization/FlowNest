@@ -146,7 +146,7 @@ export const useMasterApi = () => {
   const searchParties = useCallback(
     async (q: string): Promise<Party[]> => {
       const res = await client.get<ApiResponse<Party[]>>('/api/parties/search', {
-        params: { q, prpcode: 'SIP', yearno: '27' },
+        params: { q, prptype: userPrptype , yearno: '27' },
       });
       console.log('party api called', q, res);
       return res.data.data;
@@ -193,6 +193,32 @@ export const useMasterApi = () => {
     [userPrptype]
   );
 
+  const checkRights = useCallback(
+    async (user_id: string, permission: string, txntype: string): Promise<GstinData> => {
+      const payload = {
+        user_id: user_id,
+        permission: permission,
+        txntype: txntype
+      }
+
+      try {
+        const response = await client.post('/api/checkrights', payload);
+        const { success } = response.data;
+        console.log('Rights fetch response:', response, payload);
+
+        if (!success) {
+          throw new Error(String(response.data.message) || 'Rights fetch failed');
+        }
+
+        return response.data;
+      } catch (error) {
+        console.error('GSTIN fetch error:', error);
+        throw error;
+      }
+    },
+    []
+  );
+
   const storeParty = useCallback(
     async (party: {
       name: string;
@@ -235,30 +261,13 @@ export const useMasterApi = () => {
     return res.data.data;
   }, []);
 
-  const userRights = useCallback(
-    async (q: string, permission: string, txntype: string): Promise<UserRights[]> => {
-      const payload = {
-        user_id: q,
-        permission: permission,
-        txntype: txntype
-      }
-      console.log('I am called from masterAPI', payload);
-      const res = await client.get<ApiResponse<UserRights[]>>('/api/checkrights', {
-        params: { ...payload },
-      });
-      console.log('user Rights api called', payload, res);
-      return res.data.data;
-    },
-    []
-  );
-
   return {
     userPrptype,
     searchParties,
     fetchGstin,
+    checkRights,
     storeParty,
     searchDesigns,
-    storeDesign,
-    userRights
+    storeDesign
   };
 };

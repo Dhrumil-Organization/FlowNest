@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -16,10 +16,11 @@ import { masterApi } from '../services/masterApi';
 import { RootStackParamList, Party } from '../types';
 import { isValidEmail, isValidGSTIN, isValidMobile } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddParty'>;
 
-const AddPartyScreen: React.FC<Props> = ({ route, navigation, username, getUserPrptype }) => {
+const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const { onSaved, gstin: initialGstin } = route.params;
 
   const [gstin, setGstin] = useState(initialGstin || '');
@@ -37,6 +38,22 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username, getUserP
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const verifyGstin = async () => {
     const g = gstin.trim().toUpperCase();

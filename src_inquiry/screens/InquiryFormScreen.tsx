@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -15,6 +15,7 @@ import Button from '../components/Button';
 import { inquiryApi } from '../services/inquiryApi';
 import { Design, InquiryDesignInput, Party, RootStackParamList } from '../types';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryForm'>;
 
@@ -34,13 +35,29 @@ const emptyDesignRow = (id: string): DesignRow => ({
   gst_percent: 5,
 });
 
-const InquiryFormScreen: React.FC<Props> = ({ navigation, username, getUserPrptype }) => {
+const InquiryFormScreen: React.FC<Props> = ({ navigation, username }) => {
   const [party, setParty] = useState<Party | null>(null);
   const [remarks, setRemarks] = useState('');
+  const [getUserPrptype, setUserPrptype] = useState<string>('');
   const [designs, setDesigns] = useState<DesignRow[]>([
     emptyDesignRow('d1'),
   ]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        const user_prptype = await AsyncStorage.getItem('user_prptype');
+        console.log('user_prptype', user_prptype);
+        setUserPrptype(user_prptype);
+      } catch (error) {
+        console.error('Initialization error:', error);
+      } finally {
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   const pickParty = () => {
     navigation.navigate('PartySelection', {

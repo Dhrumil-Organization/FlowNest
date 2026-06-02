@@ -1,4 +1,4 @@
-package com.flownest
+package com.anonymous.FlowNest
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

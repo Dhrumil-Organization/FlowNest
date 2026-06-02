@@ -33,7 +33,7 @@ interface FooterProps {
   text: string;
 }
 
-const APP_PACKAGE_NAME = 'com.flownest'; // replace with your real package name if you need to open Manage All Files
+const APP_PACKAGE_NAME = 'com.anonymous.FlowNest'; // replace with your real package name if you need to open Manage All Files
 
 const Footer: React.FC<FooterProps> = ({ onLogout, isConnected, totalAmount = 0, isChequeList = false, text = '' }) => {
   const navigation = useNavigation();

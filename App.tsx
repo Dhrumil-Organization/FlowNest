@@ -119,9 +119,14 @@ import ConfirmInquiryScreen from './src_inquiry/screens/ConfirmInquiryScreen';
 import RejectInquiryScreen from './src_inquiry/screens/RejectInquiryScreen';
 import TatConfigScreen from './src_inquiry/screens/TatConfigScreen';
 import TatAnalyticsScreen from './src_inquiry/screens/TatAnalyticsScreen';
+import InquiryNotesScreen from './src_inquiry/screens/InquiryNotesScreen';
 import WarehouseStack from './components/Warehouse/WarehouseStack';
 import PurchaseAuth from './components/PurchaseAuth/PurchaseAuth';
 import PackingAuth from './components/PackingAuth/PackingAuth'
+import PdfViewerScreen from './components/YarnSalesOrder/PdfViewerScreen';
+import PdfViewerScreenMain from './screens/PdfViewerScreenMain';
+import ProductionMergeAuth from './components/ProductionMergeAuth/ProductionMergeAuth';
+import ShadeSelectionScreen from './src_inquiry/screens/ShadeSelectionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -1301,6 +1306,7 @@ export default function App() {
                           <InquiryFormScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1310,6 +1316,7 @@ export default function App() {
                           <PartySelectionScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1319,6 +1326,7 @@ export default function App() {
                           <AddPartyScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1328,6 +1336,7 @@ export default function App() {
                           <DesignSelectionScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1337,6 +1346,7 @@ export default function App() {
                           <InquiryDetailScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1346,6 +1356,7 @@ export default function App() {
                           <CostingScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1355,6 +1366,7 @@ export default function App() {
                           <SendQuotationScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1364,6 +1376,7 @@ export default function App() {
                           <ConfirmInquiryScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1373,6 +1386,7 @@ export default function App() {
                           <RejectInquiryScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1382,6 +1396,7 @@ export default function App() {
                           <TatConfigScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1391,6 +1406,27 @@ export default function App() {
                           <TatAnalyticsScreen
                             {...props}
                             username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="InquiryNotes" options={{ title: 'Notes' }}>
+                        {props => (
+                          <InquiryNotesScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="ShadeSelection" options={{ title: 'Shade Selection' }}>
+                        {props => (
+                          <ShadeSelectionScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
                             getUserPrptype={getUserPrptype}
                           />
                         )}
@@ -1398,6 +1434,26 @@ export default function App() {
                       <Stack.Screen name="Packing Grade Auth">
                         {props => (
                           <PackingAuth
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="PdfViewerScreenMain">
+                        {screenProps => (
+                          <PdfViewerScreenMain
+                            {...screenProps}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails || ''}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Production Merge Auth">
+                        {props => (
+                          <ProductionMergeAuth
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}

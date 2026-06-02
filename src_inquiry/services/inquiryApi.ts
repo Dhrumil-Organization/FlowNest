@@ -38,6 +38,12 @@ export interface StorePayload {
   custom_overall_hours?: number | null;
 }
 
+export interface DeleteParams {
+  item: number
+  prptype: string;
+  yearno: string;
+}
+
 export interface CostingPayload {
   costings: Array<{
     inquiry_design_id: number;
@@ -142,5 +148,23 @@ export const inquiryApi = {
   sendWhatsapp: async (id: number, payload: {mobile: string; message?: string, prptype: string; yearno: string}) => {
     const res = await client.post(`/api/inquiries/${id}/whatsapp`, payload);
     return res.data;
+  },
+
+  update: async (id: number, payload: StorePayload): Promise<Inquiry> => {
+    const res = await client.put<ApiResponse<Inquiry>>(
+      `/api/inquiries/${id}`,
+      payload,
+    );
+    console.log("Inquiry update", id, payload, res)
+    return res.data.data;
+  },
+
+  // Delete an inquiry (only allowed when status = pending_costing)
+  delete: async (params: DeleteParams): Promise<void> => {
+    const res = await client.delete<ApiResponse<Inquiry>>(
+      `/api/inquiries/${params.item}?prptype=${params.prptype}&yearno=${params.yearno}`,
+    );
+    console.log("Inquiry delete", params, res)
+    return res.data.data;
   },
 };

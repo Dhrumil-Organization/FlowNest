@@ -4,10 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
+  // SafeAreaView,
   StatusBar,
 } from "react-native";
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SalesOrderSuccessScreen = ({ navigation, route }) => {
   const orderNo = route?.params?.orderNo || route?.params?.SONo || "SO-00000";
@@ -47,7 +48,7 @@ const SalesOrderSuccessScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
       <StatusBar backgroundColor="#13879A" barStyle="light-content" />
 
       <View style={styles.header}>

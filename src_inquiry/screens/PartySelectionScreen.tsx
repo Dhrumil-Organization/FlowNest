@@ -14,6 +14,7 @@ import { masterApi } from '../services/masterApi';
 import { Party, RootStackParamList } from '../types';
 import EmptyState from '../components/EmptyState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import theme from '../../android/app/src/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PartySelection'>;
 
@@ -44,7 +45,7 @@ const PartySelectionScreen: React.FC<Props> = ({ route, navigation }) => {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await masterApi.searchParties(search);
+        const res = await masterApi.searchParties(search, getUserPrptype, '27');
         if (!cancelled) setItems(res);
       } finally {
         if (!cancelled) setLoading(false);
@@ -54,7 +55,7 @@ const PartySelectionScreen: React.FC<Props> = ({ route, navigation }) => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search]);
+  }, [search, getUserPrptype]);
 
   const handleSelect = (p: Party) => {
     onSelect(p);
@@ -148,7 +149,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  name: { fontSize: fontSize.base, fontWeight: '500', color: colors.textPrimary },
+  name: { fontSize: fontSize.base, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   meta: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
 });
 

@@ -230,10 +230,25 @@ export type RootStackParamList = {
   ConfirmInquiry: {id: number};
   TatConfig: undefined;
   TatAnalytics: undefined;
+  ShadeSelection: { onSelect: (shade: { name: string; code?: string; isNew?: boolean }) => void };
 };
 
 export interface UserRights {
   permission: string | null;
   user_id: string | number | null;
   txntype: string;
+}
+
+export interface InquiryNote {
+  id: number;
+  inquiry_id: number;
+  note: string;
+  created_by: number | null;
+  created_by_name: string | null;
+  is_edited: boolean;
+  edited_at: string | null;
+  prptype: string;
+  yearno: '27',
+  created_at: string;
+  updated_at: string;
 }

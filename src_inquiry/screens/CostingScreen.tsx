@@ -17,6 +17,7 @@ import Button from '../components/Button';
 import { formatCurrency } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import theme from '../../android/app/src/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Costing'>;
 
@@ -213,7 +214,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  designName: { fontSize: fontSize.base, fontWeight: '500' },
+  designName: { fontSize: fontSize.base, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   meta: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
   construction: {
     fontSize: fontSize.sm,

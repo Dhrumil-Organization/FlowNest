@@ -6,10 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
+  // SafeAreaView,
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const num = v => {
   const n = parseFloat(String(v || '').replace(/,/g, ''));
@@ -121,6 +122,11 @@ const SalesOrderDetails = ({ navigation, route }) => {
       ItmName: selectedItem?.ItmName || '',
       MItmCode: selectedItem?.MItmCode || selectedItem?.ItmCode || '',
 
+      Denier: selectedItem.Denier,
+
+      UOM: selectedItem.UOM,
+      HsnCode: selectedItem.HsnCode,
+
       DsnCode: selectedDesign?.DsnCode || '',
       DsnName: selectedDesign?.DsnName || '',
 
@@ -199,7 +205,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Icon name="arrow-back-ios-new" size={20} color="#fff" />

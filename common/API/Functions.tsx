@@ -603,7 +603,8 @@ export const debugChunkedFiles = async (prptype: string) => {
 
 export const fetchAllPropertyData = async (token: string) => {
   try {
-    const userPtype = 'R'; //await AsyncStorage.getItem('user_prptype');
+    // const userPtype = 'R'; //await AsyncStorage.getItem('user_prptype');
+    const userPtype = await AsyncStorage.getItem('user_prptype');
 
     if (cancelToken?.cancel) cancelToken.cancel();
     cancelToken = axios.CancelToken.source();

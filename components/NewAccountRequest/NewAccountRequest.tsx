@@ -28,7 +28,7 @@ import HeaderBar from '../HeaderBar/HeaderBar';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
 
-const APP_PACKAGE_NAME = 'com.flownest'; // <-- REPLACE with your real package name (e.g. com.flownest)
+const APP_PACKAGE_NAME = 'com.anonymous.FlowNest'; // <-- REPLACE with your real package name (e.g. com.anonymous.FlowNest)
 
 interface CardData {
     [key: string]: any;

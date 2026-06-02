@@ -1494,7 +1494,7 @@ const DoffEntry = ({ navigation, token, username }) => {
                     {/* Header */}
                     <View style={styles.compactHeader}>
                       <Text style={styles.compactTitle}>Doff #{item.doffno}</Text>
-                      {isFirstItem && (
+                      {isFirstItem && !hasLastDoff && (
                         <View style={styles.shiftBadgeContainer}>
                           <TouchableOpacity onPress={() => handleDoffDelete(item)}>
                             <Icon name="delete" size={20} color="red" />
@@ -1735,7 +1735,7 @@ const DoffEntry = ({ navigation, token, username }) => {
 
                     {/* Footer */}
                     <View style={styles.compactFooter}>
-                      {isFirstItem && (
+                      {isFirstItem && !hasLastDoff && (
                         <>
                           <View style={styles.switchRow}>
                             <Text style={styles.lastDoffText}>Last Doff</Text>

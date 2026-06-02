@@ -16,6 +16,8 @@ export const colors = {
 
   border: '#e5e5e5',
   borderStrong: '#ccc',
+  // borderLight: '#f5f5f5',
+  borderLight: '#e2e8f0',
 
   info: '#185FA5',
   infoBg: '#E6F1FB',

@@ -3,7 +3,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     TouchableOpacity,
     FlatList,
     TextInput,
@@ -17,7 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { API } from '../../common/API/dynamicAPI';
 import { useSalesOrder } from './SalesOrderContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
+import { SafeAreaView } from 'react-native-safe-area-context';
 const money = value => {
     return Number(value || 0).toLocaleString('en-IN', {
         minimumFractionDigits: 2,
@@ -108,7 +107,7 @@ const SkeletonBox = ({ width = "100%", height = 16, radius = 8, style }) => {
 
 const OrderSummarySkeleton = () => {
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top']} style={styles.safe}>
             <View style={styles.header}>
                 <SkeletonBox width={24} height={20} />
                 <SkeletonBox width={160} height={18} style={{ marginLeft: 50 }} />
@@ -1175,7 +1174,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     }
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top']} style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />

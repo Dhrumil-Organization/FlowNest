@@ -21,14 +21,17 @@ import TatTimeline from '../components/TatTimeline';
 import Button from '../components/Button';
 import { formatCurrency, formatDate } from '../utils/validators';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { masterApi } from '../services/masterApi';
+import theme from '../../android/app/src/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryDetail'>;
 
-const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, getUserId }) => {
   const { id } = route.params;
   const [inquiry, setInquiry] = useState<InquiryDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [getUserPrptype, setUserPrptype] = useState<string>('');
+  const [getUserRights, setUserRights] = useState([]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -62,6 +65,24 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
       load();
     }, [load]),
   );
+
+  const checkRightsAPI = useCallback(async (showSpinner = true, getUserId) => {
+    if (showSpinner) setLoading(true);
+    try {
+      const data = await masterApi.checkRights('', getUserId, 'mob_inquiry');
+      console.log("Rights res:", data?.response?.module_rights);
+      setUserRights(data?.response?.module_rights);
+    } catch (e: any) {
+      Alert.alert('Error', e || 'Unable to fetch Rights');
+    } finally {
+      setLoading(false);
+    }
+  }, [getUserId],
+  );
+
+  useEffect(() => {
+    checkRightsAPI(true, getUserId);
+  }, [getUserId]);
 
   const downloadPdf = async () => {
     if (!inquiry) return;
@@ -218,12 +239,27 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
 
         {/* Action buttons */}
         <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
-          {canCost ? (
-            <Button
-              title="Add Costing"
-              onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
-            />
-          ) : null}
+          {/* {getUserRights[0].assign === "1" || getUserRights[0].attachtds === "1" ? (
+            null
+          ) : (
+            <>
+              {canCost ? (
+                <Button
+                  title="Add Costing"
+                  onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
+                />
+              ) : null}
+            </>
+          )} */}
+          <>
+            {canCost ? (
+              <Button
+                title="Add Costing"
+                onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
+              />
+            ) : null}
+          </>
+
 
           {canSend ? (
             <>
@@ -301,7 +337,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  designName: { fontSize: fontSize.base, fontWeight: '500', flex: 1, paddingRight: 8 },
+  designName: { fontSize: fontSize.base, fontWeight: '500', flex: 1, paddingRight: 8, color: theme.BRAND_GRADIENT_END },
   costedBadge: {
     fontSize: fontSize.xs,
     color: colors.success,

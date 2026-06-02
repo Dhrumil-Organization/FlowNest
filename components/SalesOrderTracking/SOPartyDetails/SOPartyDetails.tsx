@@ -571,6 +571,67 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
         }
     };
 
+    const printSalesOrderPdf = async (item, format = 'A4') => {
+        try {
+            // setPdfLoading(true);
+            
+            const payload = {
+                prpcode: item.prpcode || '',
+                yearno: getChallanPayload?.yearno || '',
+                strcode: item.strcode || '',
+                uid: item.uid || '',
+                printTypes: ['sales_order'],
+                printFormat: format || 'A4',
+            };
+
+            console.log("'PDF PAYLOAD =>':", payload);
+            const res = await axios.post(
+                `${API}/api/saleschallanmultiprintnew`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'x-platform': 'mob',
+                    },
+                }
+            );
+
+            console.log("res", res)
+            console.log('PDF RESPONSE =>', res?.data);
+
+            if (res?.data?.success === true) {
+                const pdfUrl = res?.data?.results?.sales_order;
+
+                if (!pdfUrl) {
+                    Alert.alert('PDF Error', 'PDF URL not found.');
+                    return;
+                }
+
+                navigation.navigate('PdfViewerScreenMain', {
+                    pdfUrl,
+                    title: 'Sales Order',
+                });
+            } else {
+                Alert.alert(
+                    'PDF Failed',
+                    res?.data?.message || 'PDF generation failed.'
+                );
+            }
+        } catch (error) {
+            console.log('PDF ERROR =>', error?.response?.data || error.message);
+
+            Alert.alert(
+                'Error',
+                error?.response?.data?.message || 'Unable to generate PDF.'
+            );
+        } finally {
+            // setPdfLoading(false);
+        }
+    };
+
     const SummaryCard = ({ title, value1, label1, value2, label2, backgroundColor }: {
         title: string,
         value1: string,
@@ -628,7 +689,14 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     <Text style={[styles.orderStatus, { color: getStatusColor(item.status) }]}>
                         {item.status}
                     </Text>
-                    <Icon name="chevron-right" size={20} color="#999" />
+                    {/* <Icon name="chevron-right" size={20} color="#999" /> */}
+                    <TouchableOpacity
+                        onPress={() => printSalesOrderPdf(item, 'A4')}
+                        style={styles.orderButtonContainer}
+                    >
+                        
+                        <Icon name="print" size={20} color="blue" />
+                    </TouchableOpacity>
                 </View>
 
                 <Text style={styles.orderDate}>Sodate: {item.sodate} | Duedate: {item.duedate}</Text>

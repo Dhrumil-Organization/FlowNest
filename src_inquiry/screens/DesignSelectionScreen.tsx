@@ -14,6 +14,7 @@ import { masterApi } from '../services/masterApi';
 import { Design, RootStackParamList } from '../types';
 import EmptyState from '../components/EmptyState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import theme from '../../android/app/src/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DesignSelection'>;
 
@@ -45,7 +46,7 @@ const DesignSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await masterApi.searchDesigns(search);
+        const res = await masterApi.searchDesigns(search, getUserPrptype, '27');
         if (!cancelled) setItems(res);
       } finally {
         if (!cancelled) setLoading(false);
@@ -55,19 +56,32 @@ const DesignSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [search]);
+  }, [search, getUserPrptype]);
 
   return (
     <View style={styles.container}>
       <View style={styles.searchWrap}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search design by name or code"
-          placeholderTextColor={colors.textTertiary}
-          style={styles.search}
-          autoFocus
-        />
+        {getUserPrptype === 'S' ? (
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search design by name or code"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.search}
+            autoFocus
+          />
+        ) : (
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search item by name or code"
+            placeholderTextColor={colors.textTertiary}
+            style={styles.search}
+            autoFocus
+          />
+
+        )}
+
       </View>
 
       {loading ? (
@@ -124,7 +138,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  name: { fontSize: fontSize.base, fontWeight: '500' },
+  name: { fontSize: fontSize.base, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   meta: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
 });
 

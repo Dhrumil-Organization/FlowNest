@@ -189,6 +189,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     const [sexeModalVisible, setSexeModalVisible] = useState(false);
     const [getSexeLoading, setSexeLoading] = useState(false);
     const [sexeSearchQuery, setSexeSearchQuery] = useState("");
+    const [partydetailSearchQuery, setPartyDetailSearchQuery] = useState("");
     const [gePOTData, setPOTData] = useState([])
     const [getSummaryData, setSummaryData] = useState([])
     const [getpayload, setPayload] = useState([])
@@ -2916,8 +2917,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                                             ) : (
                                                 <TextInput
                                                     placeholder="Search..."
-                                                    value={sexeSearchQuery}
-                                                    onChangeText={setSexeSearchQuery}
+                                                    value={partySearchQuery}
+                                                    onChangeText={setPartySearchQuery}
                                                     style={{
                                                         padding: 10,
                                                         borderWidth: 1,

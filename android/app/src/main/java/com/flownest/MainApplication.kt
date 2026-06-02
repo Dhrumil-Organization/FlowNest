@@ -1,4 +1,4 @@
-package com.flownest
+package com.anonymous.FlowNest
 
 import android.app.Application
 import com.facebook.react.PackageList

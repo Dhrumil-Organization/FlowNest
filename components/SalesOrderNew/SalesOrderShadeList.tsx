@@ -3,7 +3,7 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
+    // SafeAreaView,
     TouchableOpacity,
     FlatList,
     TextInput,
@@ -12,6 +12,7 @@ import {
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { API } from '../../common/API/dynamicAPI';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const toText = v => String(v || '').trim();
 
@@ -286,33 +287,33 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     // };
 
     const onNext = (item) => {
-    const shadeData = item || selectedShade;
-    navigation.navigate('SalesOrderDetails', {
-        mode,
-        uid,
-        soNo,
-        soDate,
-        editMode,
-        editIndex,
-        editLineId,
-        oldRow,
-        selectedItem,
-        selectedDesign,
-        selectedShade: {
-            ShdCode: shadeData.ShdCode,
-            ShdName: shadeData.ShdName || shadeData.ShadeName || '',
-            Raw: shadeData,
-        },
-        workingRows,
-        party: finalParty,
-        partyData: finalParty,
-        selectedParty: finalParty,
-        prpcode,
-        strcode,
-        yearno,
-        token,
-    });
-};
+        const shadeData = item || selectedShade;
+        navigation.navigate('SalesOrderDetails', {
+            mode,
+            uid,
+            soNo,
+            soDate,
+            editMode,
+            editIndex,
+            editLineId,
+            oldRow,
+            selectedItem,
+            selectedDesign,
+            selectedShade: {
+                ShdCode: shadeData.ShdCode,
+                ShdName: shadeData.ShdName || shadeData.ShadeName || '',
+                Raw: shadeData,
+            },
+            workingRows,
+            party: finalParty,
+            partyData: finalParty,
+            selectedParty: finalParty,
+            prpcode,
+            strcode,
+            yearno,
+            token,
+        });
+    };
 
     const renderSkeleton = () => {
         return [1, 2, 3, 4, 5, 6].map(i => (
@@ -340,10 +341,10 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 activeOpacity={0.85}
                 style={[styles.card, isSelected && styles.selectedCard]}
                 onPress={() => onNext(item)}
-                // onPress={() => {
-                //     setSelectedShade(item);
-                //     onNext();
-                // }}
+            // onPress={() => {
+            //     setSelectedShade(item);
+            //     onNext();
+            // }}
             >
                 <View style={[styles.radio, isSelected && styles.radioActive]}>
                     {isSelected && <Icon name="check" size={16} color="#fff" />}
@@ -364,7 +365,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />

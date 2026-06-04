@@ -127,6 +127,12 @@ import PdfViewerScreen from './components/YarnSalesOrder/PdfViewerScreen';
 import PdfViewerScreenMain from './screens/PdfViewerScreenMain';
 import ProductionMergeAuth from './components/ProductionMergeAuth/ProductionMergeAuth';
 import ShadeSelectionScreen from './src_inquiry/screens/ShadeSelectionScreen';
+import EmployDashboard from './components/EmployDashboard/DashboardScreen';
+import CostSheetScreen from './src_inquiry/screens/CostSheetScreen';
+import AuthQueueScreen from './src_inquiry/screens/AuthQueueScreen';
+import AuthReviewScreen from './src_inquiry/screens/AuthReviewScreen';
+import SettingsScreen from './src_inquiry/screens/SettingsScreen';
+import CostSheetDesignPickerScreen from './src_inquiry/screens/CostSheetDesignPickerScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -561,7 +567,7 @@ export default function App() {
                           </>
                         )}
                       </Stack.Screen>
-                      <Stack.Screen name="Settings">
+                      <Stack.Screen name="Settings_old">
                         {props => (
                           <>
                             <Settings
@@ -1421,9 +1427,59 @@ export default function App() {
                           />
                         )}
                       </Stack.Screen>
+                      <Stack.Screen name="CostSheet" options={{ title: 'Notes' }}>
+                        {props => (
+                          <CostSheetScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="AuthQueue" options={{ title: 'Notes' }}>
+                        {props => (
+                          <AuthQueueScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="AuthReview" options={{ title: 'Notes' }}>
+                        {props => (
+                          <AuthReviewScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Settings" options={{ title: 'Notes' }}>
+                        {props => (
+                          <SettingsScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
                       <Stack.Screen name="ShadeSelection" options={{ title: 'Shade Selection' }}>
                         {props => (
                           <ShadeSelectionScreen
+                            {...props}
+                            username={getUserDetails}
+                            getUserId={getUserId}
+                            getUserPrptype={getUserPrptype}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="CostSheetDesignPicker" options={{ title: 'Shade Selection' }}>
+                        {props => (
+                          <CostSheetDesignPickerScreen
                             {...props}
                             username={getUserDetails}
                             getUserId={getUserId}
@@ -1454,6 +1510,16 @@ export default function App() {
                       <Stack.Screen name="Production Merge Auth">
                         {props => (
                           <ProductionMergeAuth
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                          />
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="Employ Dashboard">
+                        {props => (
+                          <EmployDashboard
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}

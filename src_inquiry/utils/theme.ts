@@ -27,7 +27,8 @@ export const colors = {
   warningBg: '#FAEEDA',
   danger: '#A32D2D',
   dangerBg: '#FCEBEB',
-  purple: '#3C3489',
+  // purple: '#3C3489',
+  purple: '#534AB7',
   purpleBg: '#EEEDFE',
 
   // TAT-specific
@@ -37,6 +38,8 @@ export const colors = {
   tatWarningBg: '#FAEEDA',
   tatBreached: '#A32D2D',
   tatBreachedBg: '#FCEBEB',
+
+  // purple: '#534AB7',
 };
 
 export const spacing = {
@@ -66,6 +69,15 @@ export const fontSize = {
   xxl: 22,
 };
 
+// export const statusColors: Record<string, {bg: string; fg: string; label: string}> = {
+//   pending_costing: {bg: colors.warningBg, fg: colors.warning, label: 'Pending Cost'},
+//   awaiting_auth:   {bg: colors.infoBg, fg: colors.info, label: 'Awaiting Auth'},
+//   auth_rejected:   {bg: colors.dangerBg, fg: colors.danger, label: 'Auth Rejected'},
+//   costed:          {bg: colors.successBg, fg: colors.success, label: 'Costed'},
+//   sent:            {bg: colors.purpleBg, fg: colors.purple, label: 'Sent'},
+//   confirmed:       {bg: colors.infoBg, fg: colors.info, label: 'Confirmed'},
+//   rejected:        {bg: colors.dangerBg, fg: colors.danger, label: 'Rejected'},
+// };
 export const statusColors: Record<
   string,
   {bg: string; fg: string; label: string}
@@ -73,12 +85,38 @@ export const statusColors: Record<
   pending_costing: {
     bg: colors.warningBg,
     fg: colors.warning,
-    label: 'Pending Cost',
+    label: 'Pending Costing',
   },
-  costed: {bg: colors.successBg, fg: colors.success, label: 'Costed'},
-  sent: {bg: colors.purpleBg, fg: colors.purple, label: 'Sent'},
-  confirmed: {bg: colors.infoBg, fg: colors.info, label: 'Confirmed'},
-  rejected: {bg: colors.dangerBg, fg: colors.danger, label: 'Rejected'},
+  awaiting_auth: {
+    bg: colors.infoBg,
+    fg: colors.info,
+    label: 'Awaiting Auth',
+  },
+  auth_rejected: {
+    bg: colors.dangerBg,
+    fg: colors.danger,
+    label: 'Auth Rejected',
+  },
+  costed: {
+    bg: colors.successBg,
+    fg: colors.success,
+    label: 'Costed',
+  },
+  sent: {
+    bg: colors.purpleBg || colors.infoBg,
+    fg: colors.purple || colors.info,
+    label: 'Sent',
+  },
+  confirmed: {
+    bg: colors.successBg,
+    fg: colors.success,
+    label: 'Confirmed',
+  },
+  rejected: {
+    bg: colors.dangerBg,
+    fg: colors.danger,
+    label: 'Rejected',
+  },
 };
 
 export const tatColors: Record<

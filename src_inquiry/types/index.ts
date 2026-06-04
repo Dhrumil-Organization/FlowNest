@@ -2,6 +2,8 @@
 
 export type InquiryStatus =
   | 'pending_costing'
+  | 'awaiting_auth'
+  | 'auth_rejected'
   | 'costed'
   | 'sent'
   | 'confirmed'
@@ -51,6 +53,7 @@ export interface InquiryDesignInput {
   unit: string;
   expected_delivery_date?: string;
   gst_percent: number;
+  shades?: InquiryShade[];   // NEW
 }
 
 export interface InquiryDesign {
@@ -70,7 +73,11 @@ export interface InquiryDesign {
   gst_amount: number;
   total_amount: number;
   is_costed: boolean;
+  costing_method?: 'simple' | 'cost_sheet';   // NEW
+  shades?: InquiryShade[];                     // NEW
+  costSheet?: CostSheet | null;                // NEW (or cost_sheet — check your backend serialization)
 }
+
 
 export interface InquiryTat {
   costing_status: TatStatus;
@@ -156,8 +163,18 @@ export interface InquiryDetailResponse extends Inquiry {
   tat_live?: TatLive;
 }
 
+// export interface DashboardCounts {
+//   pending_costing: number;
+//   costed: number;
+//   sent: number;
+//   confirmed: number;
+//   rejected: number;
+//   total: number;
+// }
 export interface DashboardCounts {
   pending_costing: number;
+  awaiting_auth: number;   // NEW
+  auth_rejected: number;   // NEW
   costed: number;
   sent: number;
   confirmed: number;
@@ -230,7 +247,14 @@ export type RootStackParamList = {
   ConfirmInquiry: {id: number};
   TatConfig: undefined;
   TatAnalytics: undefined;
-  ShadeSelection: { onSelect: (shade: { name: string; code?: string; isNew?: boolean }) => void };
+  ShadeSelection: {
+    onSelect: (shade: { shade_code: string; shade_name: string }) => void;
+  };
+  CostSheet: {inquiryId: number; designId: number};
+  AuthQueue: undefined;
+  AuthReview: {inquiryId: number; designId: number};
+  Settings: undefined;
+  Tour: undefined;
 };
 
 export interface UserRights {
@@ -251,4 +275,117 @@ export interface InquiryNote {
   yearno: '27',
   created_at: string;
   updated_at: string;
+}
+
+
+export interface InquiryShade {
+  id?: number; // optional for new entries
+  inquiry_design_id?: number;
+  shade_name: string;
+  shade_code?: string | null;
+  quantity: number;
+  rate?: number | null;
+  stock_qty?: number | null;
+  stock_status?: 'sufficient' | 'low' | 'out' | 'unknown';
+  total?: number;
+  display_order?: number;
+}
+
+export type CostSheetAuthStatus =
+  | 'draft'
+  | 'awaiting_auth'
+  | 'approved'
+  | 'rejected';
+
+export interface CostSheet {
+  prptype: string;
+  yearno: string;
+  id?: number;
+  inquiry_design_id: number;
+  so_no?: string | null;
+  quality?: string | null;
+  total_quantity?: number;
+  quantity_unit?: string;
+  knitter_prp_code?: string | null;
+  knitter_acc_code?: string | null;
+  knitter_name?: string | null;
+  mill_name?: string | null;
+  shades_dyed?: string | null;
+  greige_rate: number;
+  purchase: number;
+  brokerage: number;
+  freight: number;
+  dyeing_shortage_pct: number;
+  dyeing_shortage_amount: number;
+  dyeing_charge: number;
+  value_add: number;
+  packaging_charge: number;
+  overheads_exp: number;
+  overheads_basis?: string | null;
+  hidden_cost_pct: number;
+  hidden_cost_amount: number;
+  sale_discount_pct: number;
+  sale_discount_amount: number;
+  sale_brokerage_pct: number;
+  sale_brokerage_amount: number;
+  total_cost: number;
+  sale_rate: number;
+  gross_margin_amount: number;
+  gross_margin_pct: number;
+  payment_term?: string | null;
+  cost_remarks?: string | null;
+  auth_status: CostSheetAuthStatus;
+  submitted_by?: number | null;
+  submitted_at?: string | null;
+  authorized_by?: number | null;
+  authorized_by_name?: string | null;
+  authorized_at?: string | null;
+  rejection_reason?: string | null;
+  rejection_remarks?: string | null;
+}
+
+// 6) Auth queue item
+export interface AuthQueueItem {
+  id: number;
+  inquiry_id: number;
+  inquiry_no: string;
+  party_name: string;
+  design_id: number;
+  design_name: string;
+  quality: string | null;
+  total_quantity: number;
+  quantity_unit: string;
+  total_cost: number;
+  sale_rate: number;
+  gross_margin_amount: number;
+  gross_margin_pct: number;
+  submitted_at: string | null;
+  submitted_by: number | null;
+}
+
+export interface AuthQueueResponse {
+  prptype: string;
+  yearno: string;
+  counts: {
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
+  data: AuthQueueItem[];
+}
+
+// 7) User permissions
+export interface UserPermissions {
+  is_authorizer: boolean;
+  user_id: number | null;
+}
+
+// 8) Stock response
+export interface ShadeStock {
+  shade_name: string;
+  stock_qty: number;
+  unit: string;
+  last_updated: string;
+  prptype: string;
+  yearno: string;
 }

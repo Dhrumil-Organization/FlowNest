@@ -69,8 +69,8 @@ export const inquiryApi = {
     };
   },
 
-  show: async (id: number, params: ShowParams = {}): Promise<InquiryDetailResponse> => {
-    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/api/inquiries/${id}`, {
+  show: async (id: number, prptype: string, yearno: string, params: ShowParams = {}): Promise<InquiryDetailResponse> => {
+    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/api/inquiries/${id}?prptype=${prptype}&yearno=${yearno}`, {
       params,
     });
     console.log("Inquery show:", params, res);
@@ -87,9 +87,9 @@ export const inquiryApi = {
     return res.data.data;
   },
 
-  submitCosting: async (id: number, payload: CostingPayload): Promise<Inquiry> => {
+  submitCosting: async (id: number, prptype: string, yearno: string, payload: CostingPayload): Promise<Inquiry> => {
     const res = await client.post<ApiResponse<Inquiry>>(
-      `/api/inquiries/${id}/costing`,
+      `/api/inquiries/${id}/costing?prptype=${prptype}&yearno=${yearno}`,
       payload,
     );
     console.log("Inquiry submitCosting", id, payload, res);

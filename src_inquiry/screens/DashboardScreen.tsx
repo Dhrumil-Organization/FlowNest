@@ -31,6 +31,9 @@ import EmptyState from '../components/EmptyState';
 import { formatDate } from '../utils/validators';
 import theme from '../../android/app/src/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import TourOverlay, { DASHBOARD_TOUR } from '../components/TourOverlay';
+import { settingsApi } from '../services/settingsApi';
+import { costSheetApi } from '../services/costSheetApi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
@@ -80,6 +83,9 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
   const [tatCounts, setTatCounts] = useState<TatCounts | null>(null);
   const [getUserPrptype, setUserPrptype] = useState<string>('');
   const [getUserRights, setUserRights] = useState([]);
+  const [isAuthorizer, setIsAuthorizer] = useState(false);
+  const [pendingAuth, setPendingAuth] = useState(0);
+  const [showTour, setShowTour] = useState(false);
 
   console.log('getUserId from login :', getUserId, 'getUserPrptype from login :', getUserPrptype);
 
@@ -97,6 +103,21 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
 
     initializeApp();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const perms = await settingsApi.myPermissions(getUserPrptype, '27');
+        setIsAuthorizer(perms.is_authorizer);
+        if (perms.is_authorizer) {
+          const queue = await costSheetApi.pendingQueue(getUserPrptype, '27');
+          setPendingAuth(queue.counts.pending);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [getUserPrptype]);
 
 
   const checkRightsAPI = useCallback(async (showSpinner = true, getUserId) => {
@@ -368,10 +389,36 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
             <Text style={styles.iconBtnText}>📊</Text>
           </TouchableOpacity> */}
           <TouchableOpacity
+            onPress={() => setShowTour(true)}
+            style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}> ?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => navigation.navigate('TatConfig')}
             style={styles.iconBtn1}>
             <Text style={styles.iconBtnText}>⚙</Text>
           </TouchableOpacity>
+          {getUserPrptype !== 'S' ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.iconBtn2}>
+              <Text style={styles.iconBtnText}>⚙</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {isAuthorizer && getUserPrptype !== 'S' ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AuthQueue')}
+              style={[styles.iconBtn3, pendingAuth > 0 && styles.iconBtnAlert]}>
+              <Text style={styles.iconBtnText}>🔔</Text>
+              {pendingAuth > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingAuth}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          ) : null}
+
         </>
       )}
       <View style={styles.container}>
@@ -509,6 +556,15 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
           </TouchableOpacity>
         </>)}
       </View>
+      <TourOverlay
+        tourKey="dashboard"
+        steps={DASHBOARD_TOUR}
+        autoStart
+        visible={showTour}
+        onClose={() => setShowTour(false)}
+        //  language="hi"
+        language="en"
+      />
     </>
   );
 };
@@ -546,6 +602,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     borderRadius: 3,
     padding: 4,
+    height: 35,
+    width: 30,
+    alignContent: 'center',
+    textAlign: 'center',
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
   iconBtn1: {
     // padding: spacing.sm,
@@ -553,6 +615,45 @@ const styles = StyleSheet.create({
     // borderRadius: radius.md,
     position: 'absolute',
     top: 150,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtn2: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 200,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: '#000',
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtn3: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 250,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtn4: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 250,
     right: 2.5,
     zIndex: 10,
     backgroundColor: theme.BRAND_GRADIENT_END,
@@ -704,6 +805,26 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: fontSize.xs,
     color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  iconBtnAlert: {
+    backgroundColor: colors.warningBg,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: colors.danger,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 10,
     fontWeight: '500',
   },
 });

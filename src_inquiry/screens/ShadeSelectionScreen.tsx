@@ -1,4 +1,3 @@
-// ShadeSelectionScreen.tsx
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -8,72 +7,66 @@ import {
     TextInput,
     TouchableOpacity,
     View,
-    Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, fontSize, radius, spacing } from '../utils/theme';
-import { masterApi } from '../services/masterApi';
 import { RootStackParamList } from '../types';
 import EmptyState from '../components/EmptyState';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { shadesApi } from '../services/shadesApi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShadeSelection'>;
 
+interface Shade {
+    ShdCode: string;
+    ShdName: string;
+}
+
 const ShadeSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
     const { onSelect } = route.params;
+    const [getUserPrptype, setUserPrptype] = useState<string>('');
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
-    const [shades, setShades] = useState<{ name: string; code?: string }[]>([]);
-    const [userPrptype, setUserPrptype] = useState('');
+    const [shades, setShades] = useState<Shade[]>([]);
+
 
     useEffect(() => {
         const initializeApp = async () => {
             try {
                 const user_prptype = await AsyncStorage.getItem('user_prptype');
-                console.log('user_prptype', user_prptype);
-                setUserPrptype(user_prptype);
+                setUserPrptype(user_prptype || '');
             } catch (error) {
                 console.error('Initialization error:', error);
-            } finally {
             }
         };
-
         initializeApp();
     }, []);
-
-    // Search shades from API
+    // SK
     useEffect(() => {
-        let cancelled = false;
-        const timer = setTimeout(async () => {
+        const fetchShades = async () => {
+            if(!getUserPrptype) return;
             setLoading(true);
+            console.log('getUserPrptype', getUserPrptype);
             try {
-                const res = await masterApi.searchShades(search, userPrptype, '27');
-                if (!cancelled) setShades(res);
-            } catch (error) {
-                console.error(error);
+                const prpType = getUserPrptype?.toString().trim().toUpperCase();
+                const apiPrpType = prpType === 'S' ? 'SIP' : 'SK';
+                console.log('apiPrpType:', apiPrpType); // Debug: Check the final value
+                const response = await shadesApi.listShades(apiPrpType, '27', '002', 'sales_order');
+                setShades(response.response.data || []);
+            } catch (e) {
+                console.error('Failed to load shades', e);
             } finally {
-                if (!cancelled) setLoading(false);
+                setLoading(false);
             }
-        }, 300);
-        return () => {
-            cancelled = true;
-            clearTimeout(timer);
         };
-    }, [search, userPrptype]);
+        fetchShades();
+    }, [getUserPrptype]);
 
-    const handleSelectShade = (shade: { name: string; code?: string }) => {
-        onSelect(shade);
-        navigation.goBack();
-    };
-
-    const handleAddNewShade = () => {
-        if (!search.trim()) {
-            Alert.alert('Enter shade name', 'Please type a shade name first');
-            return;
-        }
-        onSelect({ name: search.trim(), code: undefined, isNew: true });
-        navigation.goBack();
-    };
+    const filteredShades = shades.filter(
+        shade =>
+            shade.ShdName.toLowerCase().includes(search.toLowerCase()) ||
+            shade.ShdCode.toLowerCase().includes(search.toLowerCase())
+    );
 
     return (
         <View style={styles.container}>
@@ -81,7 +74,7 @@ const ShadeSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
                 <TextInput
                     value={search}
                     onChangeText={setSearch}
-                    placeholder="Search shade by name or code..."
+                    placeholder="Search shade by name or code"
                     placeholderTextColor={colors.textTertiary}
                     style={styles.search}
                     autoFocus
@@ -92,27 +85,29 @@ const ShadeSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
                 <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} />
             ) : (
                 <FlatList
-                    data={shades}
-                    keyExtractor={(item, idx) => item.code || idx.toString()}
+                    data={filteredShades}
+                    keyExtractor={shade => shade.ShdCode}
                     renderItem={({ item }) => (
-                        <TouchableOpacity style={styles.row} onPress={() => handleSelectShade(item)}>
-                            <Text style={styles.name}>{item.name}</Text>
-                            {item.code && <Text style={styles.meta}>Code: {item.code}</Text>}
+                        <TouchableOpacity
+                            style={styles.row}
+                            onPress={() => {
+                                onSelect({
+                                    shade_code: item.ShdCode,
+                                    shade_name: item.ShdName,
+                                });
+                                navigation.goBack();
+                            }}
+                        >
+                            <Text style={styles.name}>{item.ShdName}</Text>
+                            <Text style={styles.meta}>Code: {item.ShdCode}</Text>
                         </TouchableOpacity>
                     )}
                     contentContainerStyle={{ padding: spacing.md }}
                     ListEmptyComponent={
                         <EmptyState
                             title="No shades found"
-                            subtitle={search ? 'Try a different search' : 'Start typing to search'}
+                            subtitle={search ? 'Try a different search' : 'No shades available'}
                         />
-                    }
-                    ListFooterComponent={
-                        search.trim().length > 0 && !shades.some(s => s.name.toLowerCase() === search.toLowerCase()) ? (
-                            <TouchableOpacity style={styles.addNewBtn} onPress={handleAddNewShade}>
-                                <Text style={styles.addNewText}>+ Add New Shade: "{search}"</Text>
-                            </TouchableOpacity>
-                        ) : null
                     }
                 />
             )}
@@ -141,19 +136,8 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.border,
     },
-    name: { fontSize: fontSize.base, fontWeight: '500', color: colors.primary },
+    name: { fontSize: fontSize.base, fontWeight: '500', color: colors.textPrimary },
     meta: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
-    addNewBtn: {
-        marginTop: spacing.md,
-        padding: spacing.md,
-        backgroundColor: colors.infoBg,
-        borderRadius: radius.md,
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: colors.info,
-        alignItems: 'center',
-    },
-    addNewText: { color: colors.info, fontWeight: '600', fontSize: fontSize.md },
 });
 
 export default ShadeSelectionScreen;

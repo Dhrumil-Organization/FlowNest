@@ -38,6 +38,12 @@ export interface StorePayload {
   custom_overall_hours?: number | null;
 }
 
+export interface DeleteParams {
+  item: number
+  prptype: string;
+  yearno: string;
+}
+
 export interface CostingPayload {
   costings: Array<{
     inquiry_design_id: number;
@@ -63,8 +69,8 @@ export const inquiryApi = {
     };
   },
 
-  show: async (id: number, params: ShowParams = {}): Promise<InquiryDetailResponse> => {
-    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/api/inquiries/${id}`, {
+  show: async (id: number, prptype: string, yearno: string, params: ShowParams = {}): Promise<InquiryDetailResponse> => {
+    const res = await client.get<ApiResponse<InquiryDetailResponse>>(`/api/inquiries/${id}?prptype=${prptype}&yearno=${yearno}`, {
       params,
     });
     console.log("Inquery show:", params, res);
@@ -81,9 +87,9 @@ export const inquiryApi = {
     return res.data.data;
   },
 
-  submitCosting: async (id: number, payload: CostingPayload): Promise<Inquiry> => {
+  submitCosting: async (id: number, prptype: string, yearno: string, payload: CostingPayload): Promise<Inquiry> => {
     const res = await client.post<ApiResponse<Inquiry>>(
-      `/api/inquiries/${id}/costing`,
+      `/api/inquiries/${id}/costing?prptype=${prptype}&yearno=${yearno}`,
       payload,
     );
     console.log("Inquiry submitCosting", id, payload, res);
@@ -142,5 +148,23 @@ export const inquiryApi = {
   sendWhatsapp: async (id: number, payload: {mobile: string; message?: string, prptype: string; yearno: string}) => {
     const res = await client.post(`/api/inquiries/${id}/whatsapp`, payload);
     return res.data;
+  },
+
+  update: async (id: number, payload: StorePayload): Promise<Inquiry> => {
+    const res = await client.put<ApiResponse<Inquiry>>(
+      `/api/inquiries/${id}`,
+      payload,
+    );
+    console.log("Inquiry update", id, payload, res)
+    return res.data.data;
+  },
+
+  // Delete an inquiry (only allowed when status = pending_costing)
+  delete: async (params: DeleteParams): Promise<void> => {
+    const res = await client.delete<ApiResponse<Inquiry>>(
+      `/api/inquiries/${params.item}?prptype=${params.prptype}&yearno=${params.yearno}`,
+    );
+    console.log("Inquiry delete", params, res)
+    return res.data.data;
   },
 };

@@ -220,6 +220,7 @@ const APP_SECTIONS = [
         data: [
             { id: '25', name: 'Process complete auth.', screen: 'Process complete auth.', icon: 'autorenew', iconColor: '#dd5c98' },
             { id: '25', name: 'Packing Grade Auth', screen: 'Packing Grade Auth', icon: 'admin-panel-settings', iconColor: '#3a70a3c9' },
+            { id: '37', name: 'Production Merge Auth', screen: 'Production Merge Auth', icon: 'merge-type', iconColor: '#8b55d1' },
         ],
     },
     {
@@ -323,6 +324,12 @@ const APP_SECTIONS = [
         title: 'Y',
         data: [
             { id: '35', name: 'Purchase Auth', screen: 'Purchase Auth', icon: 'fact-check', iconColor: '#5f738f' },
+        ],
+    },
+    {
+        title: 'E',
+        data: [
+            { id: '35', name: 'Employ Dashboard', screen: 'Employ Dashboard', icon: 'fact-check', iconColor: '#5f338f' },
         ],
     },
 
@@ -617,6 +624,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     },
                 //                     {
                 //                         "title": "Purchase Auth",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Employ Dashboard",
                 //                         "href": "/"
                 //                     },
                 //                 ]

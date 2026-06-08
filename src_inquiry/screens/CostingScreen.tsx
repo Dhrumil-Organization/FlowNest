@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   View,
+  TouchableOpacity
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -17,6 +18,8 @@ import Button from '../components/Button';
 import { formatCurrency } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import theme from '../../android/app/src/theme';
+import TourOverlay, { COSTING_TOUR } from '../components/TourOverlay';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Costing'>;
 
@@ -37,6 +40,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [getUserPrptype, setUserPrptype] = useState<string>('');
+  const [showTour, setShowTour] = useState(false);
 
 
   useEffect(() => {
@@ -137,6 +141,35 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
           <Text style={styles.party}>{inquiry.party_name}</Text>
         </View>
 
+        <View style={styles.switchBanner}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchTitle}>Need detailed cost breakdown?</Text>
+            <Text style={styles.switchSubtitle}>
+              Use the new Cost Sheet with greige rate, dyeing, overheads & GM%
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.switchBtn}
+            onPress={() => {
+              if (rows.length > 0) {
+                navigation.replace('CostSheet', {
+                  inquiryId: id,
+                  designId: rows[0].inquiry_design_id,
+                });
+              }
+            }}>
+            <Text style={styles.switchBtnText}>Cost Sheet →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.helpRow}>
+          <TouchableOpacity
+            onPress={() => setShowTour(true)}
+            style={styles.helpBtn}>
+            <Text style={styles.helpBtnText}>? Help</Text>
+          </TouchableOpacity>
+        </View>
+
         {rows.map((row, idx) => {
           const cost = parseFloat(row.cost_per_mtr) || 0;
           const gst = parseFloat(row.gst_percent) || 0;
@@ -196,6 +229,12 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
           style={{ marginTop: spacing.md }}
         />
       </ScrollView>
+      <TourOverlay
+        tourKey="costing"
+        steps={COSTING_TOUR}
+        visible={showTour}
+        onClose={() => setShowTour(false)}
+      />
     </>
   );
 };
@@ -213,7 +252,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  designName: { fontSize: fontSize.base, fontWeight: '500' },
+  designName: { fontSize: fontSize.base, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   meta: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
   construction: {
     fontSize: fontSize.sm,
@@ -248,6 +287,56 @@ const styles = StyleSheet.create({
   },
   previewLabel: { fontSize: fontSize.sm, color: colors.success, fontWeight: '500' },
   previewValue: { fontSize: fontSize.lg, color: colors.success, fontWeight: '500' },
+  switchBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.infoBg,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.info,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  switchTitle: {
+    fontSize: fontSize.sm,
+    color: colors.info,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  switchSubtitle: {
+    fontSize: fontSize.xs,
+    color: colors.info,
+    opacity: 0.85,
+  },
+  switchBtn: {
+    backgroundColor: colors.info,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+  },
+  switchBtnText: {
+    color: colors.white,
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+  },
+  helpRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: spacing.sm,
+  },
+  helpBtn: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 6,
+    backgroundColor: colors.infoBg,
+    borderRadius: radius.md,
+  },
+  helpBtnText: {
+    fontSize: fontSize.sm,
+    color: colors.info,
+    fontWeight: '500',
+  },
+
 });
 
 export default CostingScreen;

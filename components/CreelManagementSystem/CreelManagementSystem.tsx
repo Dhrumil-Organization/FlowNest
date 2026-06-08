@@ -107,6 +107,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const [showList, setShowList] = useState(false);
 
+    console.log("getchees", getchees);
+
     const styles = StyleSheet.create({
         field: {
             marginBottom: 12
@@ -1413,26 +1415,70 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             console.log("📦 Raw QR Value 👉", value);
             try {
                 const parts = value.split("~");
-                if (parts.length < 13) {
+                let parsed = {};
+
+                if (parts.length >= 13) {
+                    // Full format
+                    parsed = {
+                        PrpCode: parts[0] || '',
+                        PUId: parts[1] || '',
+                        PSrNo: parts[2] || '',
+                        PSubSr: parts[3] || '',
+                        TranType: parts[4] || '',
+                        CartNo: parts[5] || '',
+                        ItmCode: parts[6] || '',
+                        MerCode: parts[7] || '',
+                        GrdCode: parts[8] || '',
+                        ShdCode: parts[9] || '',
+                        Denier: parts[10] || '',
+                        Wt: parts[11] || 0,
+                        Chees: parts[12] || 0,
+                        Rate: parts[13] || 0,
+                        yearNo: parts[14] || ''
+                    };
+                    console.log("✅ Parsed 1111 👉", parsed);
+                } else if (parts.length >= 11) {
+                    // Short format (without Chees)
+                    parsed = {
+                        PUId: parts[0] || '',
+                        PSrNo: parts[1] || '',
+                        PSubSr: parts[2] || '',
+                        TranType: parts[3] || '',
+                        CartNo: parts[4] || '',
+                        ItmCode: parts[5] || '',
+                        MerCode: parts[6] || '',
+                        GrdCode: parts[7] || '',
+                        ShdCode: parts[8] || '',
+                        Denier: parts[9] || '',
+                        Wt: parts[10] || 0,
+                        Chees: 0,
+                        yearNo: parts[11] || ''
+                    };
+                    console.log("✅ Parsed 22", parsed);
+                } else {
                     throw new Error("Invalid format");
                 }
-                const parsed = {
-                    PUId: parts[0],
-                    PSrNo: parts[1],
-                    PSubSr: parts[2],
-                    TranType: parts[3],
-                    CartNo: parts[4],
-                    ItmCode: parts[5],
-                    MerCode: parts[6],
-                    GrdCode: parts[7],
-                    ShdCode: parts[8],
-                    Denier: parts[9],
-                    Wt: parts[10],
-                    Chees: parts[11],
-                    yearNo: parts[12]
-                };
+                // const parsed = {}
+                // if (parts.length < 13) {
+                //     throw new Error("Invalid format");
+                // } else
+                //     parsed = {
+                //         PUId: parts[0],
+                //         PSrNo: parts[1],
+                //         PSubSr: parts[2],
+                //         TranType: parts[3],
+                //         CartNo: parts[4],
+                //         ItmCode: parts[5],
+                //         MerCode: parts[6],
+                //         GrdCode: parts[7],
+                //         ShdCode: parts[8],
+                //         Denier: parts[9],
+                //         Wt: parts[10],
+                //         Chees: parts[11],
+                //         yearNo: parts[12]
+                //     };
 
-                console.log("✅ Parsed 👉", parsed);
+
                 setScannedObj(parsed);
                 setCartonNo(parsed.CartNo || '');
                 setYearNo(parsed.yearNo || '');
@@ -1500,7 +1546,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const handleAddCarton = () => {
-        if (!CartonNo || !getchees || !getavgwt) {
+        if (!CartonNo) {
             Alert.alert("Error", "Please scan carton first");
             return;
         }
@@ -1514,20 +1560,33 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             return;
         }
 
-        const enteredChees = parseFloat(getchees);
-        const enteredQty = parseFloat(getavgwt);
+        // const enteredChees = parseFloat(getchees);
+        // const enteredQty = parseFloat(getavgwt);
+
+        const enteredChees = parseFloat(getchees || 0);
+        const enteredQty = parseFloat(getavgwt || 0);
+
+
+        const availableCheesValue = getScannedObj?.Chees;
+        const availableQtyValue = getScannedObj?.Wt;
+
         const availableChees = parseFloat(getScannedObj?.Chees || 0);
         const availableQty = parseFloat(getScannedObj?.Wt || 0);
 
-        if (enteredChees > availableChees) {
+        // if (enteredChees > availableChees) {
+        if (
+            availableChees > 0 &&
+            enteredChees > availableChees
+        ) {
             Alert.alert(
                 "Validation Error",
-                `Entered Chees (${enteredChees}) Cannot not be greater than Available Chees (${availableChees}).`
+                `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableChees}).`
             );
             return;
         }
 
-        if (enteredQty > availableQty) {
+        // if (enteredQty > availableQty) {
+        if (enteredQty > 0 && enteredQty > availableQty) {
             Alert.alert(
                 "Validation Error",
                 `Entered Quantity (${enteredQty}) Cannot not be greater than Available Quantity (${availableQty}).`
@@ -1565,6 +1624,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             yearNo: getScannedObj?.yearNo,
             SrNo: getScannedObj.SrNo,
             SubSr: getScannedObj.SubSr,
+            PrpCode: getScannedObj.PrpCode,
+            Rate: getScannedObj.Rate,
             UId: mainUId?.UId,
         };
         setCartonSummary(prev => [...prev, newCarton]);
@@ -1697,6 +1758,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 shdcode: parsedData?.ShdCode,
 
             };
+
+            console.log("payload", payload);
+
             const res = await axios.post(`${API}/api/get_item_detail_from_carton`, payload, {
                 headers: {
                     Authorization: `Bearer ${getToken()}`,
@@ -1787,7 +1851,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             if (response.data.success && response.data.response.data) {
                 setData(response.data.response.data);
                 setIsLoading(false);
-            } else {
+            }
+            else {
                 setIsLoading(false);
                 console.error('Unexpected response structure:', response.data);
                 Alert.alert(`${response.data}`);
@@ -1822,6 +1887,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 DsnCode: 0,
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId,
+                    PrpCode: item.PrpCode || '',
                     CartNo: item.cartonNo || '',
                     Chees: item.chees || '',
                     Wt: item.qty || '',
@@ -1839,6 +1905,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
                     yearno: item.yearNo || '',
+                    Rate: item.Rate || '',
                     ExpProdQty: 0,
                     DsnRcpSrNo: 0,
                     DsnCode: 0,
@@ -1866,19 +1933,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             // }
             if (response.data.success === true) {
                 setDataSaved(true);
-
                 setSuccessMessage('Data Updated Successfully ✅');
                 setShowSuccess(true);
-
-                // ✅ RESET + CLOSE
-                resetAllFields();
-                setIsScanModalVisible(false);
-
             }
             else if (response.data.success === false) {
                 setIsLoading(false);
                 setDataSaved(false);
-
                 Snackbar.show({
                     text: response.data.message,
                     duration: Snackbar.LENGTH_LONG,
@@ -1886,11 +1946,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     textColor: '#fff',
                     action: { text: 'OK', textColor: 'yellow' },
                 });
-            }
-            else {
+            } else {
                 setIsLoading(false);
                 setDataSaved(false);
-
                 Snackbar.show({
                     text: response.data.message,
                     duration: Snackbar.LENGTH_LONG,
@@ -1932,6 +1990,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 DsnCode: 0,
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId || '',
+                    PrpCode: item.PrpCode || '',
                     CartNo: item.cartonNo || '',
                     Chees: item.chees || '',
                     Wt: item.qty || '',
@@ -1948,6 +2007,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     ShdCode: item.ShdCode || '',
                     ShdName: item.ShdName || '',
                     Denier: item.Denier || '',
+                    Rate: item.Rate || '',
                     yearno: item.yearNo || '',
                     ExpProdQty: 0,
                     DsnRcpSrNo: 0,
@@ -2790,6 +2850,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         Denier: selectedItem.Denier,
                                                         yearNo: selectedItem.yearno,
                                                         SrNo: selectedItem.SrNo,
+                                                        PrpCode: selectedItem.PrpCode,
+                                                        Rate: selectedItem.Rate
                                                     };
 
                                                     setCartonNo(data.CartNo || '');

@@ -7,6 +7,7 @@ import {
   View,
   Linking,
   Alert,
+  TouchableOpacity
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,14 +22,20 @@ import TatTimeline from '../components/TatTimeline';
 import Button from '../components/Button';
 import { formatCurrency, formatDate } from '../utils/validators';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { masterApi } from '../services/masterApi';
+import theme from '../../android/app/src/theme';
+import { costSheetApi } from '../services/costSheetApi';
+import { CostSheet } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryDetail'>;
 
-const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) => {
+const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, getUserId }) => {
   const { id } = route.params;
   const [inquiry, setInquiry] = useState<InquiryDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [getUserPrptype, setUserPrptype] = useState<string>('');
+  const [getUserRights, setUserRights] = useState([]);
+  const [costSheets, setCostSheets] = useState<Record<number, CostSheet | null>>({});
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -45,9 +52,25 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
     initializeApp();
   }, []);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    if (!inquiry?.designs) return;
+    (async () => {
+      const sheets: Record<number, CostSheet | null> = {};
+      for (const design of inquiry.designs) {
+        try {
+          const sheet = await costSheetApi.show(inquiry.id, design.id, getUserPrptype, '27');
+          sheets[design.id] = sheet;
+        } catch {
+          sheets[design.id] = null;
+        }
+      }
+      setCostSheets(sheets);
+    })();
+  }, [inquiry?.id, getUserPrptype]);
+
+  const load = useCallback(async (getUserPrptype) => {
     try {
-      const data = await inquiryApi.show(id, {
+      const data = await inquiryApi.show(id, getUserPrptype, '27', {
         prptype: getUserPrptype,
         yearno: "27"
       });
@@ -55,13 +78,31 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
     } finally {
       setLoading(false);
     }
-  }, [id, getUserPrptype]);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load]),
+      load(getUserPrptype);
+    }, [load, getUserPrptype]),
   );
+
+  const checkRightsAPI = useCallback(async (showSpinner = true, getUserId) => {
+    if (showSpinner) setLoading(true);
+    try {
+      const data = await masterApi.checkRights('', getUserId, 'mob_inquiry');
+      console.log("Rights res:", data?.response?.module_rights);
+      setUserRights(data?.response?.module_rights);
+    } catch (e: any) {
+      Alert.alert('Error', e || 'Unable to fetch Rights');
+    } finally {
+      setLoading(false);
+    }
+  }, [getUserId],
+  );
+
+  useEffect(() => {
+    checkRightsAPI(true, getUserId);
+  }, [getUserId]);
 
   const downloadPdf = async () => {
     if (!inquiry) return;
@@ -165,6 +206,108 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
                 </Text>
               </View>
             ) : null}
+            {/*  */}
+            {costSheets[d.id] ? (
+              <View style={styles.costSheetBlock}>
+                <View style={styles.csHead}>
+                  <Text style={styles.csTitle}>Cost Sheet</Text>
+                  {(() => {
+                    const cs = costSheets[d.id]!;
+                    if (cs.auth_status === 'awaiting_auth') {
+                      return (
+                        <View style={[styles.csPill, { backgroundColor: colors.warningBg }]}>
+                          <Text style={[styles.csPillText, { color: colors.warning }]}>
+                            Awaiting Auth
+                          </Text>
+                        </View>
+                      );
+                    }
+                    if (cs.auth_status === 'approved') {
+                      return (
+                        <View style={[styles.csPill, { backgroundColor: colors.successBg }]}>
+                          <Text style={[styles.csPillText, { color: colors.success }]}>
+                            Approved
+                          </Text>
+                        </View>
+                      );
+                    }
+                    if (cs.auth_status === 'rejected') {
+                      return (
+                        <View style={[styles.csPill, { backgroundColor: colors.dangerBg }]}>
+                          <Text style={[styles.csPillText, { color: colors.danger }]}>
+                            Rejected
+                          </Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <View style={[styles.csPill, { backgroundColor: colors.bgSecondary }]}>
+                        <Text style={[styles.csPillText, { color: colors.textSecondary }]}>
+                          Draft
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+
+                <View style={styles.csStats}>
+                  <View style={styles.csStat}>
+                    <Text style={styles.csStatLabel}>Total cost</Text>
+                    <Text style={styles.csStatValue}>
+                      {formatCurrency(costSheets[d.id]!.total_cost)}
+                    </Text>
+                  </View>
+                  <View style={styles.csStat}>
+                    <Text style={styles.csStatLabel}>Sale rate</Text>
+                    <Text style={styles.csStatValue}>
+                      {formatCurrency(costSheets[d.id]!.sale_rate)}
+                    </Text>
+                  </View>
+                  <View style={styles.csStat}>
+                    <Text style={styles.csStatLabel}>GM</Text>
+                    <Text style={[
+                      styles.csStatValue,
+                      {
+                        color: costSheets[d.id]!.gross_margin_pct < 5
+                          ? colors.danger
+                          : costSheets[d.id]!.gross_margin_pct < 10
+                            ? colors.warning
+                            : colors.success
+                      }
+                    ]}>
+                      {costSheets[d.id]!.gross_margin_pct}%
+                    </Text>
+                  </View>
+                </View>
+
+                {costSheets[d.id]!.auth_status === 'rejected' && costSheets[d.id]!.rejection_reason ? (
+                  <View style={styles.rejectBox}>
+                    <Text style={styles.rejectTitle}>
+                      Rejected: {costSheets[d.id]!.rejection_reason}
+                    </Text>
+                    {costSheets[d.id]!.rejection_remarks ? (
+                      <Text style={styles.rejectText}>
+                        {costSheets[d.id]!.rejection_remarks}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  style={styles.csOpenBtn}
+                  onPress={() => navigation.navigate('CostSheet', {
+                    inquiryId: inquiry.id,
+                    designId: d.id,
+                  })}
+                >
+                  <Text style={styles.csOpenText}>
+                    {costSheets[d.id]!.auth_status === 'awaiting_auth' || costSheets[d.id]!.auth_status === 'approved'
+                      ? 'View Cost Sheet'
+                      : 'Edit Cost Sheet'} →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         ))}
 
@@ -218,12 +361,34 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username }) =
 
         {/* Action buttons */}
         <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
-          {canCost ? (
-            <Button
-              title="Add Costing"
-              onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
-            />
-          ) : null}
+          {/* {getUserRights[0].assign === "1" || getUserRights[0].attachtds === "1" ? (
+            null
+          ) : (
+            <>
+              {canCost ? (
+                <Button
+                  title="Add Costing"
+                  onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
+                />
+              ) : null}
+            </>
+          )} */}
+          <>
+            {canCost ? (
+              <Button
+                title="Add Costing"
+                // onPress={() => navigation.navigate('Costing', { id: inquiry.id })}
+                // onPress={() => navigation.navigate('CostSheet', {
+                //   inquiryId: inquiry.id,
+                //   designId: inquiry.designs[0].id, // or pick the design from a picker
+                // })}
+                onPress={() =>
+                  navigation.navigate('CostSheetDesignPicker', { id: inquiry.id })
+                }
+              />
+            ) : null}
+          </>
+
 
           {canSend ? (
             <>
@@ -301,7 +466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  designName: { fontSize: fontSize.base, fontWeight: '500', flex: 1, paddingRight: 8 },
+  designName: { fontSize: fontSize.base, fontWeight: '500', flex: 1, paddingRight: 8, color: theme.BRAND_GRADIENT_END },
   costedBadge: {
     fontSize: fontSize.xs,
     color: colors.success,
@@ -346,6 +511,54 @@ const styles = StyleSheet.create({
   },
   grandLabel: { fontSize: fontSize.base, fontWeight: '500' },
   grandValue: { fontSize: fontSize.lg, fontWeight: '500' },
+  costSheetBlock: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    marginTop: spacing.sm,
+  },
+  csHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  csTitle: { fontSize: fontSize.sm, fontWeight: '500' },
+  csPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  csPillText: { fontSize: fontSize.xs, fontWeight: '500' },
+  csStats: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  csStat: {
+    flex: 1,
+    backgroundColor: colors.cardBg,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  csStatLabel: { fontSize: 10, color: colors.textSecondary },
+  csStatValue: { fontSize: fontSize.sm, fontWeight: '500', marginTop: 2 },
+  rejectBox: {
+    backgroundColor: colors.dangerBg,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    marginBottom: spacing.sm,
+  },
+  rejectTitle: { fontSize: fontSize.xs, color: colors.danger, fontWeight: '500' },
+  rejectText: { fontSize: fontSize.xs, color: colors.danger, marginTop: 2 },
+  csOpenBtn: {
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: colors.info,
+    borderRadius: radius.sm,
+  },
+  csOpenText: { color: colors.white, fontSize: fontSize.sm, fontWeight: '500' },
 });
 
 export default InquiryDetailScreen;

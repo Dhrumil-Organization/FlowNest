@@ -119,7 +119,7 @@ const HeaderBar: React.FC<HeaderProps> = ({ userName, onSearch, placeholder = 'S
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.iconBtn}
-                onPress={() => navigation.navigate('Settings' as never)}
+                onPress={() => navigation.navigate('Settings_old' as never)}
               >
                 <Icon name="settings" size={22} color="#E8F7F6" />
               </TouchableOpacity>

@@ -31,6 +31,9 @@ import EmptyState from '../components/EmptyState';
 import { formatDate } from '../utils/validators';
 import theme from '../../android/app/src/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import TourOverlay, { DASHBOARD_TOUR } from '../components/TourOverlay';
+import { settingsApi } from '../services/settingsApi';
+import { costSheetApi } from '../services/costSheetApi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
@@ -53,6 +56,22 @@ const TAT_FILTERS: { key: TatFilterKey; label: string }[] = [
   { key: 'breached', label: '🔴 Breached' },
 ];
 
+const formatNoteTime = (iso: string): string => {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDay < 7) return `${diffDay}d ago`;
+
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+};
+
 const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,6 +82,10 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
   const [counts, setCounts] = useState<DashboardCounts | null>(null);
   const [tatCounts, setTatCounts] = useState<TatCounts | null>(null);
   const [getUserPrptype, setUserPrptype] = useState<string>('');
+  const [getUserRights, setUserRights] = useState([]);
+  const [isAuthorizer, setIsAuthorizer] = useState(false);
+  const [pendingAuth, setPendingAuth] = useState(0);
+  const [showTour, setShowTour] = useState(false);
 
   console.log('getUserId from login :', getUserId, 'getUserPrptype from login :', getUserPrptype);
 
@@ -81,8 +104,38 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
     initializeApp();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const perms = await settingsApi.myPermissions(getUserPrptype, '27');
+        setIsAuthorizer(perms.is_authorizer);
+        if (perms.is_authorizer) {
+          const queue = await costSheetApi.pendingQueue(getUserPrptype, '27');
+          setPendingAuth(queue.counts.pending);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [getUserPrptype]);
+
+
+  const checkRightsAPI = useCallback(async (showSpinner = true, getUserId) => {
+    if (showSpinner) setLoading(true);
+    try {
+      const data = await masterApi.checkRights('', getUserId, 'mob_inquiry');
+      console.log("Rights res:", data?.response?.module_rights);
+      setUserRights(data?.response?.module_rights);
+    } catch (e: any) {
+      Alert.alert('Error', e || 'Unable to fetch Rights');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, tatFilter, search, getUserId],
+  );
+
   const load = useCallback(
-    async (showSpinner = true) => {
+    async (showSpinner = true, getUserPrptype, getUserRights) => {
       if (showSpinner) setLoading(true);
       try {
         const res = await inquiryApi.list({
@@ -90,7 +143,8 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
           tat: tatFilter === 'all' ? undefined : tatFilter,
           search: search || undefined,
           prptype: getUserPrptype,
-          yearno: "27"
+          yearno: "27",
+          rights: getUserRights[0].assign === "1" ? 3 : getUserRights[0].attachtds === "1" ? 1 : getUserRights[0].detachtds === "1" ? 2 : 0,
         });
         console.log("Inquery:", res);
         setItems(res.data);
@@ -103,24 +157,28 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
         setRefreshing(false);
       }
     },
-    [statusFilter, tatFilter, search, getUserPrptype],
+    [statusFilter, tatFilter, search, getUserPrptype, getUserRights],
   );
-  const right = async (getUserId) => {
-    const user_id = getUserId;
-    const permission = 'mob_app';
-    const txntype = 'mob_inquiry';
 
-    setLoading(true);
-    try {
-      const data = await masterApi.checkRights(user_id, permission, txntype);
-      console.log("Rights:", data);
-    } catch (e: any) {
-      // Convert error to string (handles ReadableNativeMap, objects, etc.)
-      Alert.alert('Error', String(e || 'Unable to fetch Rights'));
-    } finally {
-      setLoading(false);
-    }
-  };
+
+  // console.log('getUserRights :', getUserRights[0]);
+
+  // const right = async (getUserId) => {
+  //   const user_id = getUserId;
+  //   const permission = 'mob_app';
+  //   const txntype = 'mob_inquiry';
+
+  //   setLoading(true);
+  //   try {
+  //     const data = await masterApi.checkRights(user_id, permission, txntype);
+  //     console.log("Rights:", data);
+  //   } catch (e: any) {
+  //     // Convert error to string (handles ReadableNativeMap, objects, etc.)
+  //     Alert.alert('Error', String(e || 'Unable to fetch Rights'));
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   // const right = useCallback(
   //   async (showSpinner = true) => {
@@ -143,47 +201,178 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
 
   useFocusEffect(
     useCallback(() => {
-      load(false);
+      load(false, getUserPrptype, getUserRights);
     }, [load]),
   );
 
   useEffect(() => {
-    load();
-  }, [statusFilter, tatFilter, getUserId, getUserPrptype]);
+    load(true, getUserPrptype, getUserRights);
+  }, [statusFilter, tatFilter, getUserId, getUserPrptype, getUserRights]);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkRightsAPI(false, getUserId);
+    }, [checkRightsAPI]),
+  );
 
   useEffect(() => {
-    right(getUserId);
-  }, [getUserId]);
+    checkRightsAPI(true, getUserId);
+  }, [statusFilter, tatFilter, getUserId, getUserPrptype]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    load(false);
+    load(false, getUserPrptype, getUserRights);
   };
 
-  const renderItem = ({ item }: { item: Inquiry }) => (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      style={styles.card}
-      onPress={() => navigation.navigate('InquiryDetail', { id: item.id })}>
-      <View style={styles.cardHead}>
-        <Text style={styles.inqNo}>{item.inquiry_no}</Text>
-        <StatusBadge status={item.status} />
-      </View>
-      <Text style={styles.partyName} numberOfLines={1}>
-        {item.party_name}
-      </Text>
-      <View style={styles.cardFooter}>
-        <Text style={styles.meta}>
-          {(item.designs_count ?? 0)} design{(item.designs_count ?? 0) > 1 ? 's' : ''}
-          {' • '}
-          {formatDate(item.inquiry_date)}
+  const handleDelete = (item: Inquiry) => {
+    Alert.alert(
+      'Delete Inquiry?',
+      `Are you sure you want to delete ${item.inquiry_no}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await inquiryApi.delete({ item: item.id, prptype: getUserPrptype, yearno: "27" });
+              load(false, getUserPrptype, getUserRights);
+            } catch (e: any) {
+              Alert.alert(
+                'Error',
+                e?.response?.data?.message || 'Failed to delete inquiry',
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // const renderItem = ({ item }: { item: Inquiry }) => (
+  //   <TouchableOpacity
+  //     activeOpacity={0.7}
+  //     style={styles.card}
+  //     onPress={() => navigation.navigate('InquiryDetail', { id: item.id })}>
+  //     <View style={styles.cardHead}>
+  //       <Text style={styles.inqNo}>{item.inquiry_no}</Text>
+  //       <StatusBadge status={item.status} />
+  //     </View>
+  //     <Text style={styles.partyName} numberOfLines={1}>
+  //       {item.party_name}
+  //     </Text>
+  //     <View style={styles.cardFooter}>
+  //       <Text style={styles.meta}>
+  //         {(item.designs_count ?? 0)} {getUserPrptype === 'S' ? 'design' : 'item,'}{(item.designs_count ?? 0) > 1 ? 's' : ''}
+  //         {' • '}
+  //         {formatDate(item.inquiry_date)}
+  //       </Text>
+  //       {item.tat?.overall_status && item.tat.overall_status !== 'not_applicable' ? (
+  //         <TatBadge status={item.tat.overall_status} />
+  //       ) : null}
+  //     </View>
+  //   </TouchableOpacity>
+  // );
+  const renderItem = ({ item }: { item: Inquiry }) => {
+    const isEditable = item.can_edit ?? (item.status === 'pending_costing');
+    const isDeletable = item.can_delete ?? (item.status === 'pending_costing');
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={styles.card}
+        onPress={() => navigation.navigate('InquiryDetail', { id: item.id })}>
+        <View style={styles.cardHead}>
+          <Text style={styles.inqNo}>{item.inquiry_no}</Text>
+          <StatusBadge status={item.status} />
+        </View>
+
+        <Text style={styles.partyName} numberOfLines={1}>
+          {item.party_name}
         </Text>
-        {item.tat?.overall_status && item.tat.overall_status !== 'not_applicable' ? (
-          <TatBadge status={item.tat.overall_status} />
+
+        <View style={styles.cardFooter}>
+          <Text style={styles.meta}>
+            {(item.designs_count ?? 0)}{' '}
+            {getUserPrptype === 'S' ? 'design' : 'item'}
+            {(item.designs_count ?? 0) > 1 ? 's' : ''}
+            {' • '}
+            {formatDate(item.inquiry_date)}
+          </Text>
+          {item.tat?.overall_status &&
+            item.tat.overall_status !== 'not_applicable' ? (
+            <TatBadge status={item.tat.overall_status} />
+          ) : null}
+        </View>
+
+        {/* Notes preview row */}
+        {item.latest_note ? (
+          <View style={styles.notesPreview}>
+            <Text style={styles.notesIcon}>💬</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.notesPreviewText} numberOfLines={1}>
+                {item.latest_note.created_by_name
+                  ? `${item.latest_note.created_by_name}: `
+                  : ''}
+                {item.latest_note.note}
+              </Text>
+              <Text style={styles.notesPreviewTime}>
+                {formatNoteTime(item.latest_note.created_at)}
+                {item.notes_count && item.notes_count > 1
+                  ? ` • ${item.notes_count} notes`
+                  : ''}
+              </Text>
+            </View>
+          </View>
         ) : null}
-      </View>
-    </TouchableOpacity>
-  );
+
+        {/* Action row */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            disabled={getUserRights[0]?.detachtds === "1" ? true : false}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              navigation.navigate('InquiryNotes', {
+                inquiryId: item.id,
+                inquiryNo: item.inquiry_no,
+              });
+            }}>
+            <Text style={styles.actionIcon}>📝</Text>
+            <Text style={styles.actionText}>
+              Notes {item.notes_count ? `(${item.notes_count})` : ''}
+            </Text>
+          </TouchableOpacity>
+
+          {isEditable ? (
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                navigation.navigate('InquiryForm', { inquiryId: item.id });
+              }}>
+              <Text style={styles.actionIcon}>✏️</Text>
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {isDeletable ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnDanger]}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleDelete(item);
+              }}>
+              <Text style={styles.actionIcon}>🗑️</Text>
+              <Text style={[styles.actionText, { color: colors.danger }]}>
+                Delete
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <>
@@ -192,16 +381,46 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
         header={'Inquiries Dashboard'}
         subHeader={'Manage your inquiries records'}
       />
-      <TouchableOpacity
-        onPress={() => navigation.navigate('TatAnalytics')}
-        style={styles.iconBtn}>
-        <Text style={styles.iconBtnText}>📊</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('TatConfig')}
-        style={styles.iconBtn1}>
-        <Text style={styles.iconBtnText}>⚙</Text>
-      </TouchableOpacity>
+      {getUserRights[0]?.detachtds === "1" ? null : (
+        <>
+          {/* <TouchableOpacity
+            onPress={() => navigation.navigate('TatAnalytics')}
+            style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}>📊</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity
+            onPress={() => setShowTour(true)}
+            style={styles.iconBtn}>
+            <Text style={styles.iconBtnText}> ?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('TatConfig')}
+            style={styles.iconBtn1}>
+            <Text style={styles.iconBtnText}>⚙</Text>
+          </TouchableOpacity>
+          {getUserPrptype !== 'S' ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.iconBtn2}>
+              <Text style={styles.iconBtnText}>⚙</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {isAuthorizer && getUserPrptype !== 'S' ? (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AuthQueue')}
+              style={[styles.iconBtn3, pendingAuth > 0 && styles.iconBtnAlert]}>
+              <Text style={styles.iconBtnText}>🔔</Text>
+              {pendingAuth > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingAuth}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          ) : null}
+
+        </>
+      )}
       <View style={styles.container}>
         {/* Top bar with admin shortcut */}
         {/* <View style={styles.topBar}>
@@ -258,7 +477,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
         <TextInput
           value={search}
           onChangeText={setSearch}
-          onSubmitEditing={() => load()}
+          onSubmitEditing={() => load(true, getUserPrptype, getUserRights)}
           placeholder="Search by inquiry no or party"
           placeholderTextColor={colors.textTertiary}
           style={styles.search}
@@ -328,15 +547,24 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
             }
           />
         )}
-
-        {/* FAB */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate('InquiryForm')}
-          style={styles.fab}>
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
+        {getUserRights[0]?.detachtds === "1" ? null : (<>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('InquiryForm')}
+            style={styles.fab}>
+            <Text style={styles.fabText}>+</Text>
+          </TouchableOpacity>
+        </>)}
       </View>
+      <TourOverlay
+        tourKey="dashboard"
+        steps={DASHBOARD_TOUR}
+        autoStart
+        visible={showTour}
+        onClose={() => setShowTour(false)}
+        //  language="hi"
+        language="en"
+      />
     </>
   );
 };
@@ -374,6 +602,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     borderRadius: 3,
     padding: 4,
+    height: 35,
+    width: 30,
+    alignContent: 'center',
+    textAlign: 'center',
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
   iconBtn1: {
     // padding: spacing.sm,
@@ -381,6 +615,45 @@ const styles = StyleSheet.create({
     // borderRadius: radius.md,
     position: 'absolute',
     top: 150,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtn2: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 200,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: '#000',
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtn3: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 250,
+    right: 2.5,
+    zIndex: 10,
+    backgroundColor: theme.BRAND_GRADIENT_END,
+    color: '#fff',
+    borderRadius: 3,
+    padding: 7,
+  },
+  iconBtn4: {
+    // padding: spacing.sm,
+    // backgroundColor: colors.bgSecondary,
+    // borderRadius: radius.md,
+    position: 'absolute',
+    top: 250,
     right: 2.5,
     zIndex: 10,
     backgroundColor: theme.BRAND_GRADIENT_END,
@@ -459,7 +732,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   inqNo: { fontSize: fontSize.md, fontWeight: '500', color: colors.textPrimary },
-  partyName: { fontSize: fontSize.base, color: colors.textPrimary, marginBottom: 6 },
+  partyName: { fontSize: fontSize.base, color: theme.BRAND_GRADIENT_END, marginBottom: 6 },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -483,6 +756,77 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   fabText: { color: colors.white, fontSize: 28, fontWeight: '300', lineHeight: 30 },
+  notesPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.infoBg,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.info,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  notesIcon: { fontSize: 16 },
+  notesPreviewText: {
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  notesPreviewTime: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: spacing.xs,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: radius.sm,
+    gap: 4,
+  },
+  actionBtnDanger: {
+    backgroundColor: colors.dangerBg,
+  },
+  actionIcon: { fontSize: 12 },
+  actionText: {
+    fontSize: fontSize.xs,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
+  iconBtnAlert: {
+    backgroundColor: colors.warningBg,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: colors.danger,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '500',
+  },
 });
 
 export default DashboardScreen;

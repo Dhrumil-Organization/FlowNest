@@ -459,6 +459,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                                     newRow.Remark ||
                                     next[existsIndex].Remark ||
                                     '',
+                                // IsDyeing: newRow.isDyeing ||
+                                //     next[existsIndex].isDyeing ||
+                                //     ''
                             };
                         } else {
                             next.push(newRow);
@@ -805,6 +808,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 row.Remark1 ||
                 row.Remark ||
                 '',
+            IsDyeing: row.IsDyeing || 0,
 
             Raw: row,
         }));
@@ -1215,6 +1219,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     row.HSNName ||
                     raw.HSNName ||
                     '',
+                IsDyeing: row.IsDyeing || 0
             };
         });
     };
@@ -1541,8 +1546,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
                         <View style={styles.rowBetween}>
                             <Text style={styles.designText}>
-                                Denier : {item.Denier||item.denier} 
-                            </Text>                           
+                                Denier : {item.Denier || item.denier}
+                            </Text>
                         </View>
 
                         {/* {!!item.Remark && ( */}

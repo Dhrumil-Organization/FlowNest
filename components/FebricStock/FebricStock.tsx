@@ -55,7 +55,10 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
     const [isShadeVisible, setIsShadeVisible] = useState(false);
     const [isSubDesignDetailVisible, setIsSubDesignDetailVisible] = useState(false);
     const [selectedSubDesign, setSelectedSubDesign] = useState<any>(null);
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // Default: ascending
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder1, setSortOrder1] = useState<'asc' | 'desc'>('asc'); // Default: ascending
+    const [sortOrder3, setSortOrder3] = useState<'asc' | 'desc'>('asc');
+    const [sortOrder4, setSortOrder4] = useState<'asc' | 'desc'>('asc');
 
     const fetchPrpCode = async () => {
         await axios
@@ -386,9 +389,37 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
     // }, [selectedDesign, selectedSubDesign, salesdata]);
 
+    // const shadeData = useMemo(() => {
+
+    //     let data = []
+
+    //     if (activeTab === 'grey') {
+
+    //         data = getShadeWiseSummary(selectedSubDesign, salesdata, 'yes');
+
+    //     } else {
+
+    //         data = getShadeWiseSummary(selectedSubDesign, salesdata, 'no');
+    //     }
+
+
+    //     if (searchQueryPOT.trim()) {
+
+    //         const search = searchQueryPOT.toLowerCase();
+
+    //         data = data.filter((item: any) =>
+    //             String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
+    //             String(item?.TOTQTY || '').toLowerCase().includes(search)
+    //         );
+    //     }
+
+    //     return data;
+
+    // }, [selectedDesign, selectedSubDesign, salesdata, activeTab, searchQueryPOT]);
+
     const shadeData = useMemo(() => {
 
-        let data = []
+        let data = [];
 
         if (activeTab === 'grey') {
 
@@ -399,19 +430,46 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             data = getShadeWiseSummary(selectedSubDesign, salesdata, 'no');
         }
 
+        // SORT
+        const sortedData = [...data].sort((a, b) => {
+
+            const qtyA = parseFloat(a.TOTQTY || '0');
+            const qtyB = parseFloat(b.TOTQTY || '0');
+
+            return sortOrder4 === 'asc'
+                ? qtyA - qtyB
+                : qtyB - qtyA;
+        });
+
+        // SEARCH FILTER
         if (searchQueryPOT.trim()) {
 
             const search = searchQueryPOT.toLowerCase();
 
-            data = data.filter((item: any) =>
-                String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
-                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            return sortedData.filter((item: any) =>
+
+                String(item?.MDSNNAME || '')
+                    .toLowerCase()
+                    .includes(search)
+
+                ||
+
+                String(item?.TOTQTY || '')
+                    .toLowerCase()
+                    .includes(search)
             );
         }
 
-        return data;
+        return sortedData;
 
-    }, [selectedDesign, selectedSubDesign, salesdata, activeTab, searchQueryPOT]);
+    }, [
+        selectedDesign,
+        selectedSubDesign,
+        salesdata,
+        activeTab,
+        searchQueryPOT,
+        sortOrder4
+    ]);
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -697,20 +755,41 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
             data = getAllDesignData(selectedItem, salesdata, 'no');
         }
 
+
+        const sortedData = [...data].sort((a, b) => {
+            const qtyA = parseFloat(a.TOTQTY || '0');
+            const qtyB = parseFloat(b.TOTQTY || '0');
+            return sortOrder1 === 'asc'
+                ? qtyA - qtyB
+                : qtyB - qtyA;
+        });
+
         // SEARCH FILTER
         if (searchQueryPOT.trim()) {
 
             const search = searchQueryPOT.toLowerCase();
 
-            data = data.filter((item: any) =>
-                String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
-                String(item?.TOTQTY || '').toLowerCase().includes(search)
+            // data = data.filter((item: any) =>
+            //     String(item?.MDSNNAME || '').toLowerCase().includes(search) ||
+            //     String(item?.TOTQTY || '').toLowerCase().includes(search)
+            // );
+
+            return sortedData.filter((item: any) =>
+                String(item?.MDSNNAME || '')
+                    .toLowerCase()
+                    .includes(search)
+
+                ||
+
+                String(item?.TOTQTY || '')
+                    .toLowerCase()
+                    .includes(search)
             );
         }
 
-        return data;
-
-    }, [selectedItem, salesdata, finishStockData, activeTab, searchQueryPOT]);
+        // return data;
+        return sortedData;
+    }, [selectedItem, salesdata, finishStockData, activeTab, searchQueryPOT, sortOrder1]);
 
     // const getAllSubDesignData = (mainItm = {}, data = [], flag = 'yes') => {
 
@@ -852,20 +931,56 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
 
             }
 
+            const sortedData = [...data].sort((a, b) => {
+
+                const qtyA = parseFloat(a.TOTQTY || '0');
+                const qtyB = parseFloat(b.TOTQTY || '0');
+
+                return sortOrder3 === 'asc'
+                    ? qtyA - qtyB
+                    : qtyB - qtyA;
+            });
+
+            // if (searchQueryPOT.trim()) {
+
+            //     const search = searchQueryPOT.toLowerCase();
+
+            //     data = data.filter((item: any) =>
+            //         String(item?.SDSNNAME || '').toLowerCase().includes(search) ||
+            //         String(item?.SDSNCODE || '').toLowerCase().includes(search) ||
+            //         String(item?.TOTQTY || '').toLowerCase().includes(search)
+            //     );
+            // }
+
+            // return data;
+
             if (searchQueryPOT.trim()) {
 
                 const search = searchQueryPOT.toLowerCase();
 
-                data = data.filter((item: any) =>
-                    String(item?.SDSNNAME || '').toLowerCase().includes(search) ||
-                    String(item?.SDSNCODE || '').toLowerCase().includes(search) ||
-                    String(item?.TOTQTY || '').toLowerCase().includes(search)
+                return sortedData.filter((item: any) =>
+
+                    String(item?.SDSNNAME || '')
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    String(item?.SDSNCODE || '')
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    String(item?.TOTQTY || '')
+                        .toLowerCase()
+                        .includes(search)
                 );
             }
 
-            return data;
+            return sortedData;
 
-        }, [selectedDesign, salesdata, finishStockData, activeTab, searchQueryPOT]
+        }, [selectedDesign, salesdata, finishStockData, activeTab, searchQueryPOT, sortOrder3]
     )
 
 
@@ -1004,11 +1119,65 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         justifyContent: 'space-between', alignItems: 'center'
                     }}>
                         <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1 }}> Item:    {selectedItem?.ITMNAME} </Text>
+                        {/* <TouchableOpacity
+                            onPress={() => setSortOrder1(sortOrder1 === 'asc' ? 'desc' : 'asc')}
+                            style={{ marginLeft: 12 }}
+                        >
+                            <Icon
+                                name={sortOrder1 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                size={20}
+                                color="#fff"
+                            />
+                        </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => setIsDetailVisible(false)}
+                            onPress={() => {
+                                setSortOrder1('asc')
+                                setIsDetailVisible(false)
+                            }}
                             style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }} >
                             <Icon name="close" size={18} color="#fff" />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 10,
+                                marginLeft: 8,
+                            }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => setSortOrder1(sortOrder1 === 'asc' ? 'desc' : 'asc')}
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    borderRadius: 20,
+                                    padding: 7,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Icon
+                                    name={sortOrder1 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                    size={20}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSortOrder1('asc');
+                                    setIsDetailVisible(false);
+                                }}
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    borderRadius: 20,
+                                    padding: 7,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Icon name="close" size={18} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
                     <View
                         style={{
@@ -1042,6 +1211,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                             }}
                         />
                     </View>
+
                     <FlatList
                         //data={detailData}
                         data={designDataLevel1}
@@ -1132,9 +1302,52 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         justifyContent: 'space-between', alignItems: 'center'
                     }}>
                         <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1 }}> M. design:    {selectedDesign?.MDSNNAME} </Text>
-                        <TouchableOpacity onPress={() => setIsSubDesignDetailVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
+                        {/* <TouchableOpacity onPress={() => setIsSubDesignDetailVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
                             <Icon name="close" size={18} color="#fff" />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 10,
+                                marginLeft: 8,
+                            }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => setSortOrder3(sortOrder3 === 'asc' ? 'desc' : 'asc')}
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    borderRadius: 20,
+                                    padding: 7,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Icon
+                                    name={sortOrder3 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                    size={20}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSortOrder3('asc');
+                                    setIsSubDesignDetailVisible(false);
+                                }}
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    borderRadius: 20,
+                                    padding: 7,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Icon name="close" size={18} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
                     </View>
                     <View
                         style={{
@@ -1254,9 +1467,50 @@ const PurchaseOrderTracking: React.FC<{ token: string, navigation: any; username
                         justifyContent: 'space-between', alignItems: 'center'
                     }}>
                         <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', flex: 1 }}> S. design:   {selectedSubDesign?.SDSNNAME} </Text>
-                        <TouchableOpacity onPress={() => setIsShadeVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
+                        {/* <TouchableOpacity onPress={() => setIsShadeVisible(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 6 }}>
                             <Icon name="close" size={18} color="#fff" />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 10,
+                                marginLeft: 8,
+                            }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => setSortOrder4(sortOrder4 === 'asc' ? 'desc' : 'asc')}
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    borderRadius: 20,
+                                    padding: 7,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Icon
+                                    name={sortOrder4 === 'asc' ? 'arrow-upward' : 'arrow-downward'}
+                                    size={20}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setSortOrder4('asc');
+                                    setIsShadeVisible(false);
+                                }}
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    borderRadius: 20,
+                                    padding: 7,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Icon name="close" size={18} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View

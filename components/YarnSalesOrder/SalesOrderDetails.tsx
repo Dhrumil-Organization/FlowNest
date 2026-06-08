@@ -69,8 +69,10 @@ const SalesOrderDetails = ({ navigation, route }) => {
   const [stockData, setStockData] = useState([]);
   const [totalStockQty, setTotalStockQty] = useState(0);
   const [stockModalVisible, setStockModalVisible] = useState(false);
+  const [isDyeing, setIsDyeing] = useState(0);
 
-  console.log("remark", remark)
+
+  console.log("remark", remark, isDyeing)
 
   let cancelToken: any;
 
@@ -319,6 +321,8 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
         Remark: remark,
 
+        IsDyeing: isDyeing ? 1 : 0,
+
         RowKey:
           `${selectedItem?.ItmCode || ''}_` +
           `${selectedGrade?.GrdCode || ''}_` +
@@ -544,6 +548,16 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
       setTotalStockQty(totalQty);
 
+
+      if (totalQty > 0) {
+
+        setIsDyeing(1);
+
+      } else {
+
+        setIsDyeing(0);
+      }
+
       console.log('TOTAL STOCK:', totalQty);
 
       console.log('stock data:', data);
@@ -719,6 +733,47 @@ const SalesOrderDetails = ({ navigation, route }) => {
             <Text style={styles.stockValue}>
               {Number(totalStockQty).toFixed(3)}
             </Text>
+          </View>
+
+          <View style={styles.checkboxRow}>
+
+            <TouchableOpacity
+              onPress={() => {
+
+                setIsDyeing(prev =>
+                  prev === 1 ? 0 : 1
+                );
+
+              }}
+            >
+
+              <Icon
+                name={
+                  isDyeing === 1
+                    ? 'check-box'
+                    : 'check-box-outline-blank'
+                }
+                size={24}
+                color={
+                  totalStockQty > 0
+                    ? '#13879A'
+                    : '#999'
+                }
+              />
+
+            </TouchableOpacity>
+
+            <Text
+              style={[
+                styles.checkboxLabel,
+                {
+                  color: '#000'
+                }
+              ]}
+            >
+              Stock Sales
+            </Text>
+
           </View>
 
           {/* INFO BUTTON */}
@@ -975,5 +1030,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#667085',
     fontWeight: '700',
+  },
+
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+
+  checkboxLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#101828',
+    marginLeft: 8,
   },
 });

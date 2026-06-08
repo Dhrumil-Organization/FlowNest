@@ -7,7 +7,7 @@ import {
     TextInput,
     TouchableOpacity,
     ActivityIndicator,
-    SafeAreaView,
+    // SafeAreaView,
     RefreshControl,
     Alert
 } from 'react-native';
@@ -16,6 +16,7 @@ import { API } from "../../common/API/dynamicAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSalesOrder } from './SalesOrderContext';
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const PartyListScreen = ({ navigation, route, token }) => {
     // const { prpcode, yearno, strcode,token } = route.params || {};
@@ -223,7 +224,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
                         {item.Address}
                     </Text>
 
-                     <Text style={styles.address}>
+                    <Text style={styles.address}>
                         {item.SExeName}
                     </Text>
 
@@ -238,7 +239,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.back}>‹</Text>

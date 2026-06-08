@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-    View, Text, StyleSheet, SafeAreaView, TextInput,
+    View, Text, StyleSheet, TextInput,
     TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
-    ScrollView, Modal
+    ScrollView, Modal, StatusBar
 } from 'react-native';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -12,6 +12,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { API } from "../../common/API/dynamicAPI";
 import { useSalesOrder } from './SalesOrderContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 
@@ -29,6 +30,8 @@ const todayYmd = () => {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}${mm}${dd}`;
 };
+
+const HEADER_HEIGHT = 52;
 
 const SalesOrderNew = ({ token, navigation, route }) => {
     const { startNewOrder, loadExistingOrder } = useSalesOrder();
@@ -556,8 +559,16 @@ const SalesOrderNew = ({ token, navigation, route }) => {
     };
 
     return (
-        <SafeAreaView style={styles.safe}>
-            <View style={styles.header}>
+        <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+            <StatusBar
+                translucent={false}
+                backgroundColor="#00838f"
+                barStyle="light-content"
+            />
+            <View
+                // style={styles.header}
+                style={[styles.header, { height: HEADER_HEIGHT }]}
+            >
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.back}>‹</Text>
                 </TouchableOpacity>

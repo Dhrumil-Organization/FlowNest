@@ -55,7 +55,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
     initializeApp();
   }, []);
 
-  const verifyGstin = async () => {
+  const verifyGstin = async (getUserPrptype) => {
     const g = gstin.trim().toUpperCase();
     if (!isValidGSTIN(g)) {
       Alert.alert('Invalid GSTIN', 'Please enter a valid 15-digit GSTIN');
@@ -63,7 +63,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
     }
     setVerifying(true);
     try {
-      const data = await masterApi.fetchGstin(g);
+      const data = await masterApi.fetchGstin(g, getUserPrptype, '27');
       setName(data.trade_name || data.legal_name);
       setAddress(data.address);
       setCity(data.city);
@@ -168,111 +168,111 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
 
   return (
     <>
-     <HeaderBarwithBack
+      <HeaderBarwithBack
         userName={username}
         header={'Party via GSTIN'}
         subHeader={'Enter your Party details'}
       />
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
-      <View style={styles.gstinRow}>
-        <View style={{ flex: 1 }}>
-          <Input
-            label="GSTIN"
-            required
-            value={gstin}
-            onChangeText={t => {
-              setGstin(t.toUpperCase());
-              setVerified(false);
-            }}
-            placeholder="22AAAAA0000A1Z5"
-            autoCapitalize="characters"
-            maxLength={15}
-          />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }}>
+        <View style={styles.gstinRow}>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="GSTIN"
+              required
+              value={gstin}
+              onChangeText={t => {
+                setGstin(t.toUpperCase());
+                setVerified(false);
+              }}
+              placeholder="22AAAAA0000A1Z5"
+              autoCapitalize="characters"
+              maxLength={15}
+            />
+          </View>
+          <TouchableOpacity
+            onPress={() => verifyGstin(getUserPrptype)}
+            disabled={verifying}
+            style={styles.verifyBtn}>
+            <Text style={styles.verifyText}>
+              {verifying ? '...' : 'Verify'}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={verifyGstin}
-          disabled={verifying}
-          style={styles.verifyBtn}>
-          <Text style={styles.verifyText}>
-            {verifying ? '...' : 'Verify'}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      {verified ? (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>✓ GSTIN verified - data fetched</Text>
+        {verified ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerText}>✓ GSTIN verified - data fetched</Text>
+          </View>
+        ) : null}
+
+        <Input
+          label="Party Name"
+          required
+          value={name}
+          onChangeText={setName}
+          error={errors.name}
+          placeholder="Enter party name"
+        />
+
+        <Input
+          label="Address"
+          value={address}
+          onChangeText={setAddress}
+          multiline
+          placeholder="Enter address"
+        />
+
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <Input label="City" value={city} onChangeText={setCity} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Input label="Pincode" value={pincode} onChangeText={setPincode} keyboardType="numeric" />
+          </View>
         </View>
-      ) : null}
 
-      <Input
-        label="Party Name"
-        required
-        value={name}
-        onChangeText={setName}
-        error={errors.name}
-        placeholder="Enter party name"
-      />
+        <Input label="State" value={state} onChangeText={setState} />
 
-      <Input
-        label="Address"
-        value={address}
-        onChangeText={setAddress}
-        multiline
-        placeholder="Enter address"
-      />
+        <Input
+          label="Contact Person"
+          value={contact}
+          onChangeText={setContact}
+          placeholder="Enter contact name"
+        />
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <Input label="City" value={city} onChangeText={setCity} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Mobile"
+              value={mobile}
+              onChangeText={setMobile}
+              keyboardType="phone-pad"
+              error={errors.mobile}
+              placeholder="10-digit"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              error={errors.email}
+              placeholder="email@..."
+            />
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Input label="Pincode" value={pincode} onChangeText={setPincode} keyboardType="numeric" />
-        </View>
-      </View>
 
-      <Input label="State" value={state} onChangeText={setState} />
-
-      <Input
-        label="Contact Person"
-        value={contact}
-        onChangeText={setContact}
-        placeholder="Enter contact name"
-      />
-
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <Input
-            label="Mobile"
-            value={mobile}
-            onChangeText={setMobile}
-            keyboardType="phone-pad"
-            error={errors.mobile}
-            placeholder="10-digit"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Input
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            error={errors.email}
-            placeholder="email@..."
-          />
-        </View>
-      </View>
-
-      <Button
-        title="Save & Continue"
-        onPress={save}
-        loading={saving}
-        style={{ marginTop: spacing.md }}
-      />
-    </ScrollView>
+        <Button
+          title="Save & Continue"
+          onPress={save}
+          loading={saving}
+          style={{ marginTop: spacing.md }}
+        />
+      </ScrollView>
     </>
   );
 };

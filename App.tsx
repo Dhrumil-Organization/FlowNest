@@ -127,12 +127,14 @@ import PdfViewerScreen from './components/YarnSalesOrder/PdfViewerScreen';
 import PdfViewerScreenMain from './screens/PdfViewerScreenMain';
 import ProductionMergeAuth from './components/ProductionMergeAuth/ProductionMergeAuth';
 import ShadeSelectionScreen from './src_inquiry/screens/ShadeSelectionScreen';
-import EmployDashboard from './components/EmployDashboard/DashboardScreen';
+import EmployDashboard from './components/EmployDashboard/rn-app/screens/EmployDashboard';
 import CostSheetScreen from './src_inquiry/screens/CostSheetScreen';
 import AuthQueueScreen from './src_inquiry/screens/AuthQueueScreen';
 import AuthReviewScreen from './src_inquiry/screens/AuthReviewScreen';
 import SettingsScreen from './src_inquiry/screens/SettingsScreen';
 import CostSheetDesignPickerScreen from './src_inquiry/screens/CostSheetDesignPickerScreen';
+import SalesExecDashboardScreen from './components/EmployDashboard/rn-app/screens/SalesExecDashboardScreen';
+import PartyDashboardScreen from './components/EmployDashboard/rn-app/screens/PartyDashboardScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -1517,17 +1519,43 @@ export default function App() {
                           />
                         )}
                       </Stack.Screen>
+                      {/* Employ Dashboard */}
                       <Stack.Screen name="Employ Dashboard">
                         {props => (
-                          <EmployDashboard
-                            {...props}
-                            token={gettoken || ''}
-                            isConnected={isConnected}
-                            username={getUserDetails}
-                          />
+                          <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <EmployDashboard
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </ErrorBoundary>
                         )}
                       </Stack.Screen>
-
+                      <Stack.Screen name="SalesExecDashboard">
+                        {props => (
+                          <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <SalesExecDashboardScreen
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </ErrorBoundary>
+                        )}
+                      </Stack.Screen>
+                      <Stack.Screen name="PartyDashboardNew">
+                        {props => (
+                          <ErrorBoundary FallbackComponent={ErrorFallback}>
+                            <PartyDashboardScreen
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                            />
+                          </ErrorBoundary>
+                        )}
+                      </Stack.Screen>
                     </Stack.Navigator>
                     {/* </Stack.Navigator> */}
 

@@ -18,6 +18,7 @@ import { costSheetApi } from '../services/costSheetApi';
 import Button from '../components/Button';
 import { formatCurrency } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
+import theme from '../../android/app/src/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CostSheetDesignPicker'>;
 
@@ -483,7 +484,7 @@ const CostSheetDesignPickerScreen: React.FC<Props> = ({ route, navigation, usern
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { marginBottom: spacing.md },
-  inqNo: { fontSize: fontSize.lg, fontWeight: '500' },
+  inqNo: { fontSize: fontSize.lg, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   party: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
 
   progressBox: {
@@ -496,7 +497,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  progressTitle: { fontSize: fontSize.base, fontWeight: '500' },
+  progressTitle: { fontSize: fontSize.base, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   progressSub: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 4 },
   progressCircle: {
     width: 56,
@@ -538,7 +539,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   designNumber: { fontSize: fontSize.sm, fontWeight: '500', color: colors.textPrimary },
-  designName: { fontSize: fontSize.base, fontWeight: '500' },
+  designName: { fontSize: fontSize.base, fontWeight: '500', color: theme.BRAND_GRADIENT_END },
   designMeta: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
   statusPill: {
     paddingHorizontal: spacing.sm + 2,

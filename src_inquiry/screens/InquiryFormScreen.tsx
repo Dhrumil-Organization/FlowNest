@@ -187,14 +187,137 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
     });
   };
 
+  // const save = async () => {
+  //   if (!party) {
+  //     Alert.alert('Select Party', 'Please select a party first');
+  //     return;
+  //   }
+
+  //   for (const d of designs) {
+  //     if (!d.design_name_snapshot.trim()) {
+  //       Alert.alert(` ${getUserPrptype === 'S' ? 'Design name required, Please add a design' : 'Item name required, Please add a item'} name for each row`);
+  //       return;
+  //     }
+  //     if (d.is_new_design && !d.construction_remarks.trim()) {
+  //       Alert.alert(
+  //         'Construction details required',
+  //         `Please add construction details for new ${getUserPrptype === 'S' ? 'designs' : 'items'}`,
+  //       );
+  //       return;
+  //     }
+  //     if (!d.shades || d.shades.length <= 0) {
+  //       Alert.alert(`At least one shade required', 'Select at least one shade for each ${getUserPrptype === 'S' ? 'design' : 'item'}`);
+  //       return;
+  //     }
+  //     if (!d.quantity || d.quantity <= 0) {
+  //       Alert.alert(`Quantity required', 'Enter a valid quantity for each ${getUserPrptype === 'S' ? 'design' : 'item'} from selected shades`);
+  //       return;
+  //     }
+  //     console.log('expected_delivery_date', d.expected_delivery_date);
+  //     // if (!d.expected_delivery_date) {
+  //     //   Alert.alert('Missing Date', `Delivery date required for ${getUserPrptype === 'S' ? 'design' : 'item'} #${idx + 1}`);
+  //     //   return;
+  //     // }
+  //   }
+
+  //   for (let idx = 0; idx < designs.length; idx++) {
+  //     const d = designs[idx];
+  //     if (!d.expected_delivery_date) {
+  //       Alert.alert('Missing Date', `Delivery date required for ${getUserPrptype === 'S' ? 'design' : 'item'} #${idx + 1}`);
+  //       return;
+  //     }
+  //   }
+  //   setSaving(true);
+  //   try {
+  //     const created = await inquiryApi.store({
+  //       party_prp_code: party.prp_code,
+  //       party_acc_code: party.acc_code,
+  //       party_name_snapshot: party.name,
+  //       party_gstin: party.gstin,
+  //       party_address: party.address,
+  //       remarks,
+  //       prptype: getUserPrptype,
+  //       yearno: "27",
+  //       designs: designs.map(({ _id, ...rest }) => rest),
+  //     });
+
+  //     const payload = {
+  //       party_prp_code: party.prp_code,
+  //       party_acc_code: party.acc_code,
+  //       party_name_snapshot: party.name,
+  //       party_gstin: party.gstin,
+  //       party_address: party.address,
+  //       remarks,
+  //       prptype: getUserPrptype,
+  //       yearno: "27",
+  //       designs: designs.map(({ _id, ...rest }) => rest),
+  //     };
+
+  //     // Alert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
+  //     //   {
+  //     //     text: 'OK',
+  //     //     onPress: () => {
+  //     //       navigation.replace('InquiryDetail', { id: created.id });
+  //     //     },
+  //     //   },
+  //     // ]);
+  //     if (isEditMode) {
+  //       const updated = await inquiryApi.update(inquiryId!, payload);
+  //       Alert.alert('Success', `Inquiry ${updated.inquiry_no} updated`, [
+  //         {
+  //           text: 'OK',
+  //           onPress: () => {
+  //             navigation.goBack();
+  //           },
+  //         },
+  //       ]);
+  //     } else {
+  //       const created = await inquiryApi.store(payload);
+  //       if (created.designs && created.designs.length) {
+  //         for (let i = 0; i < created.designs.length; i++) {
+  //           const savedDesign = created.designs[i];
+  //           const localDesign = designs[i];
+  //           if (localDesign?.shades && localDesign.shades.length > 0) {
+  //             await shadesApi.save(
+  //               savedDesign.id,
+  //               getUserPrptype,
+  //               '27',   // design ID from backend
+  //               localDesign.shades.map(sh => ({
+  //                 shade_name: sh.shade_name,
+  //                 shade_code: sh.shade_code,
+  //                 quantity: sh.quantity,
+  //                 rate: sh.rate,
+  //               }))
+  //             );
+  //           }
+  //         }
+  //       }
+  //       Alert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
+  //         {
+  //           text: 'OK',
+  //           onPress: () => {
+  //             navigation.replace('InquiryDetail', { id: created.id });
+  //           },
+  //         },
+  //       ]);
+  //     }
+  //   } catch (e: any) {
+  //     Alert.alert('Error', e?.response?.data?.message || 'Failed to save inquiry');
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
   const save = async () => {
     if (!party) {
       Alert.alert('Select Party', 'Please select a party first');
       return;
     }
-    for (const d of designs) {
+
+    // Validation loop
+    for (let idx = 0; idx < designs.length; idx++) {
+      const d = designs[idx];
       if (!d.design_name_snapshot.trim()) {
-        Alert.alert(` ${getUserPrptype === 'S' ? 'Design name required, Please add a design' : 'Item name required, Please add a item'} name for each row`);
+        Alert.alert(getUserPrptype === 'S' ? 'Design name required, Please add a design' : 'Item name required, Please add an item');
         return;
       }
       if (d.is_new_design && !d.construction_remarks.trim()) {
@@ -204,8 +327,12 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
         );
         return;
       }
+      if (!d.shades || d.shades.length <= 0) {
+        Alert.alert('At least one shade required', `Select at least one shade for each ${getUserPrptype === 'S' ? 'design' : 'item'}`);
+        return;
+      }
       if (!d.quantity || d.quantity <= 0) {
-        Alert.alert(`Quantity required', 'Enter a valid quantity for each ${getUserPrptype === 'S' ? 'design' : 'item'}`);
+        Alert.alert('Quantity required', `Enter a valid quantity for each ${getUserPrptype === 'S' ? 'design' : 'item'} from selected shades`);
         return;
       }
       if (!d.expected_delivery_date) {
@@ -216,18 +343,6 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
 
     setSaving(true);
     try {
-      const created = await inquiryApi.store({
-        party_prp_code: party.prp_code,
-        party_acc_code: party.acc_code,
-        party_name_snapshot: party.name,
-        party_gstin: party.gstin,
-        party_address: party.address,
-        remarks,
-        prptype: getUserPrptype,
-        yearno: "27",
-        designs: designs.map(({ _id, ...rest }) => rest),
-      });
-
       const payload = {
         party_prp_code: party.prp_code,
         party_acc_code: party.acc_code,
@@ -240,23 +355,10 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
         designs: designs.map(({ _id, ...rest }) => rest),
       };
 
-      // Alert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
-      //   {
-      //     text: 'OK',
-      //     onPress: () => {
-      //       navigation.replace('InquiryDetail', { id: created.id });
-      //     },
-      //   },
-      // ]);
       if (isEditMode) {
         const updated = await inquiryApi.update(inquiryId!, payload);
         Alert.alert('Success', `Inquiry ${updated.inquiry_no} updated`, [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.goBack();
-            },
-          },
+          { text: 'OK', onPress: () => navigation.goBack() },
         ]);
       } else {
         const created = await inquiryApi.store(payload);
@@ -268,7 +370,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
               await shadesApi.save(
                 savedDesign.id,
                 getUserPrptype,
-                '27',   // design ID from backend
+                '27',
                 localDesign.shades.map(sh => ({
                   shade_name: sh.shade_name,
                   shade_code: sh.shade_code,
@@ -280,12 +382,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
           }
         }
         Alert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
-          {
-            text: 'OK',
-            onPress: () => {
-              navigation.replace('InquiryDetail', { id: created.id });
-            },
-          },
+          { text: 'OK', onPress: () => navigation.replace('InquiryDetail', { id: created.id }) },
         ]);
       }
     } catch (e: any) {

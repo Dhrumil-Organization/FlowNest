@@ -1144,7 +1144,7 @@ const CostSheetScreen: React.FC<Props> = ({ route, navigation }) => {
         ) : null}
 
         {/* TAB 1: Simple Costing */}
-        {tab === 'simple' ? (
+        {getUserPrptype === 'S' && tab === 'simple' ? (
           <View style={styles.card}>
             <Text style={styles.sectionLabel}>Simple Rate Entry</Text>
             <Text style={styles.hint}>

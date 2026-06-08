@@ -161,11 +161,27 @@ const SalesOrderDetails = ({ navigation, route }) => {
         updatedRows = [...workingRows, newRow];
       }
     } else {
+      // const existsIndex = workingRows.findIndex(
+      //   x => makeRowKey(x) === makeRowKey(newRow),
+      // );
+
+      // if (existsIndex >= 0) {
+      //   Alert.alert(
+      //     'Duplicate Shade',
+      //     'This shade is already added for same item and design.',
+      //   );
+      //   return;
+      // }
+
       const existsIndex = workingRows.findIndex(
         x => makeRowKey(x) === makeRowKey(newRow),
       );
 
-      if (existsIndex >= 0) {
+      const shadeName = String(newRow.ShdName || '').trim().toLowerCase();
+
+      if (existsIndex >= 0
+        && shadeName !== 'apc'
+      ) {
         Alert.alert(
           'Duplicate Shade',
           'This shade is already added for same item and design.',

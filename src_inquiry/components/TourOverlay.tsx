@@ -448,17 +448,17 @@ export const INQUIRY_FORM_TOUR: TourStep[] = [
       hi: 'हर डिज़ाइन/आइटम के लिए "मौजूदा" या "नई डिज़ाइन/आइटम" चुनें। मौजूदा डिज़ाइन/आइटम खोजने के लिए सर्च करें।',
     },
   },
-  {
-    emoji: '🧵',
-    title: {
-      en: 'Select Fabric Type',
-      hi: 'फैब्रिक टाइप चुनें',
-    },
-    description: {
-      en: 'After selecting a design/item, choose the fabric type (Cotton, Poly, Blended, etc.). This is mandatory.',
-      hi: 'डिज़ाइन/आइटम चुनने के बाद फैब्रिक टाइप चुनें (कॉटन, पॉली, ब्लेंडेड, आदि) — यह अनिवार्य है।',
-    },
-  },
+  // {
+  //   emoji: '🧵',
+  //   title: {
+  //     en: 'Select Fabric Type',
+  //     hi: 'फैब्रिक टाइप चुनें',
+  //   },
+  //   description: {
+  //     en: 'After selecting a design/item, choose the fabric type (Cotton, Poly, Blended, etc.). This is mandatory.',
+  //     hi: 'डिज़ाइन/आइटम चुनने के बाद फैब्रिक टाइप चुनें (कॉटन, पॉली, ब्लेंडेड, आदि) — यह अनिवार्य है।',
+  //   },
+  // },
 ];
 
 export const COSTING_TOUR: TourStep[] = [

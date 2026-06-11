@@ -14,6 +14,7 @@ import { tatApi } from '../services/tatApi';
 import EmptyState from '../components/EmptyState';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TatAnalytics'>;
 
@@ -47,7 +48,7 @@ const TatAnalyticsScreen: React.FC<Props> = ({ username }) => {
   useEffect(() => {
     (async () => {
       try {
-        const data = await tatApi.analytics({ prptype: getUserPrptype, yearno: "27" });
+        const data = await tatApi.analytics({ prptype: getUserPrptype, yearno: getCurrentFinancialYear() });
         setRows(data);
       } finally {
         setLoading(false);

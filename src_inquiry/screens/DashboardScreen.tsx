@@ -34,6 +34,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import TourOverlay, { DASHBOARD_TOUR } from '../components/TourOverlay';
 import { settingsApi } from '../services/settingsApi';
 import { costSheetApi } from '../services/costSheetApi';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
 
@@ -107,10 +108,10 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
   useEffect(() => {
     (async () => {
       try {
-        const perms = await settingsApi.myPermissions(getUserPrptype, '27');
+        const perms = await settingsApi.myPermissions(getUserPrptype, getCurrentFinancialYear());
         setIsAuthorizer(perms.is_authorizer);
         if (perms.is_authorizer) {
-          const queue = await costSheetApi.pendingQueue(getUserPrptype, '27');
+          const queue = await costSheetApi.pendingQueue(getUserPrptype, getCurrentFinancialYear());
           setPendingAuth(queue.counts.pending);
         }
       } catch {
@@ -143,7 +144,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
           tat: tatFilter === 'all' ? undefined : tatFilter,
           search: search || undefined,
           prptype: getUserPrptype,
-          yearno: "27",
+          yearno: getCurrentFinancialYear(),
           rights: getUserRights[0].assign === "1" ? 3 : getUserRights[0].attachtds === "1" ? 1 : getUserRights[0].detachtds === "1" ? 2 : 0,
         });
         console.log("Inquery:", res);
@@ -159,45 +160,6 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
     },
     [statusFilter, tatFilter, search, getUserPrptype, getUserRights],
   );
-
-
-  // console.log('getUserRights :', getUserRights[0]);
-
-  // const right = async (getUserId) => {
-  //   const user_id = getUserId;
-  //   const permission = 'mob_app';
-  //   const txntype = 'mob_inquiry';
-
-  //   setLoading(true);
-  //   try {
-  //     const data = await masterApi.checkRights(user_id, permission, txntype);
-  //     console.log("Rights:", data);
-  //   } catch (e: any) {
-  //     // Convert error to string (handles ReadableNativeMap, objects, etc.)
-  //     Alert.alert('Error', String(e || 'Unable to fetch Rights'));
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
-  // const right = useCallback(
-  //   async (showSpinner = true) => {
-  //     if (showSpinner) setLoading(true);
-  //     try {
-  //       const res = await MasterApi.userRights({ getUserId: getUserId, permission: 'mob_app', txntype: "mob_inquiry" });
-  //       console.log("Right:", res);
-  //       // setItems(res.data);
-  //       // setCounts(res.counts);
-  //       // setTatCounts(res.tatCounts);
-  //     } catch (e) {
-  //       // ignore
-  //     } finally {
-  //       setLoading(false);
-  //       // setRefreshing(false);
-  //     }
-  //   },
-  //   [getUserId],
-  // );
 
   useFocusEffect(
     useCallback(() => {
@@ -235,7 +197,7 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
           style: 'destructive',
           onPress: async () => {
             try {
-              await inquiryApi.delete({ item: item.id, prptype: getUserPrptype, yearno: "27" });
+              await inquiryApi.delete({ item: item.id, prptype: getUserPrptype, yearno: getCurrentFinancialYear() });
               load(false, getUserPrptype, getUserRights);
             } catch (e: any) {
               Alert.alert(

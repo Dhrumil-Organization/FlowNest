@@ -359,7 +359,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
+                        Accept: 'application/json',
+                        'x-platform': 'mob'
                     },
                     params: {
                         txntype: '/receivables-view'
@@ -401,7 +402,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
+                        Accept: 'application/json',
+                        'x-platform': 'mob'
                     },
                     params: {
                         ...payload
@@ -446,7 +448,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
+                        Accept: 'application/json',
+                        'x-platform': 'mob'
                     },
                     params: {
                         ...payload
@@ -459,7 +462,8 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                     headers: {
                         Authorization: `Bearer ${token}`,
                         'Content-Type': 'application/javascript',
-                        Accept: 'application/json'
+                        Accept: 'application/json',
+                        'x-platform': 'mob'
                     },
                     params: {
                         ...payloadSexe
@@ -500,6 +504,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             Authorization: `Bearer ${getToken()}`,
             'Content-Type': 'application/json',
             'X-Requested-with': 'XMLHttpRequest',
+            'x-platform': 'mob'
         };
         try {
             // const response = await axios.post(`https://apig.tms-webapp.com/api/get_dashoutshead`, payload, { headers });
@@ -599,6 +604,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/x-www-form-urlencoded',
+                    'x-platform': 'mob'
                 },
                 params: payload,
                 paramsSerializer: params => qs.stringify(params, { arrayFormat: 'brackets' }),
@@ -694,6 +700,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
             Accept: 'application/json',
+            'x-platform': 'mob'
         },
         params: props.params,
         cancelToken: cancelToken?.token,
@@ -943,6 +950,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
+                'x-platform': 'mob'
             };
 
             // const response = await axios.post(`https://apig.tms-webapp.com/api/dashdata`, payload, { headers });
@@ -1051,6 +1059,7 @@ const Receivables: React.FC<Props> = ({ token, navigation, isConnected, username
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
+                'x-platform': 'mob'
             };
 
             // const response = await axios.post(`https://apig.tms-webapp.com/api/dashdata`, payload, { headers });

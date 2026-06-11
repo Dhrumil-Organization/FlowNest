@@ -332,6 +332,30 @@ const APP_SECTIONS = [
             { id: '35', name: 'Employ Dashboard', screen: 'Employ Dashboard', icon: 'fact-check', iconColor: '#5f338f' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '37', name: 'Sales Order Dashborad', screen: 'Sales Order Dashborad', icon: 'assessment', iconColor: '#10B981' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '38', name: 'Sudamo Sales Order Entry', screen: 'Sudamo Sales Order Entry', icon: 'shopping-cart-checkout', iconColor: '#4169E1' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '39', name: 'Poy Rate Entry', screen: 'Poy Rate Entry', icon: 'price-change', iconColor: '#6A1B9A' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '40', name: 'Price List', screen: 'Price List', icon: 'assessment', iconColor: '#1E3A5F' },
+        ],
+    },
 
 ];
 

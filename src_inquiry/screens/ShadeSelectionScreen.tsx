@@ -14,6 +14,7 @@ import { colors, fontSize, radius, spacing } from '../utils/theme';
 import { RootStackParamList } from '../types';
 import EmptyState from '../components/EmptyState';
 import { shadesApi } from '../services/shadesApi';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ShadeSelection'>;
 
@@ -51,7 +52,7 @@ const ShadeSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
                 const prpType = getUserPrptype?.toString().trim().toUpperCase();
                 const apiPrpType = prpType === 'S' ? 'SIP' : 'SK';
                 console.log('apiPrpType:', apiPrpType); // Debug: Check the final value
-                const response = await shadesApi.listShades(apiPrpType, '27', '002', 'sales_order');
+                const response = await shadesApi.listShades(apiPrpType, getCurrentFinancialYear(), '002', 'sales_order');
                 setShades(response.response.data || []);
             } catch (e) {
                 console.error('Failed to load shades', e);

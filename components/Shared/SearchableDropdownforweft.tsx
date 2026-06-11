@@ -160,27 +160,27 @@ const SearchableDropdownforweft = forwardRef<any, Props>(({
 
         // ================= DESIGN VALIDATION =================
 
-        if (item?.DsnCode) {
+        // if (item?.DsnCode) {
 
-            const selectedDsnCode = String(item?.DsnCode || "").trim();
-            const latestDsnCode = String(item?.latest_WfIssDsnCode || "").trim();
-            const isReturnDone = String(
-                item?.Is_IssRet_done_of_latest_WfIssDsnCode || "0"
-            ).trim();
+        //     const selectedDsnCode = String(item?.DsnCode || "").trim();
+        //     const latestDsnCode = String(item?.latest_WfIssDsnCode || "").trim();
+        //     const isReturnDone = String(
+        //         item?.Is_IssRet_done_of_latest_WfIssDsnCode || "0"
+        //     ).trim();
 
-            if (
-                selectedDsnCode !== latestDsnCode &&
-                isReturnDone === "0"
-            ) {
+        //     if (
+        //         selectedDsnCode !== latestDsnCode &&
+        //         isReturnDone === "0"
+        //     ) {
 
-                Alert.alert(
-                    "Validation",
-                    "Issue Return Is Pending"
-                );
+        //         Alert.alert(
+        //             "Validation",
+        //             "Issue Return Is Pending"
+        //         );
 
-                return; // 👈 dropdown close nahi hoga
-            }
-        }
+        //         return; // 👈 dropdown close nahi hoga
+        //     }
+        // }
 
         // ================= NORMAL SELECT =================
 

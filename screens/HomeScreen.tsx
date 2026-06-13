@@ -356,6 +356,12 @@ const APP_SECTIONS = [
             { id: '40', name: 'Price List', screen: 'Price List', icon: 'assessment', iconColor: '#1E3A5F' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '41', name: 'Sales Order Price List Auth', screen: 'Sales Order Price List Auth', icon: 'receipt-long', iconColor: '#740cea' },
+        ],
+    },
 
 ];
 

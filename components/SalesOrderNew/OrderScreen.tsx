@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import { fetchPropertyData } from '../../common/API/Functions';
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
 
 // ── Helpers ───────────────────────────────────────────────────────
 const todayYmd = () => {
@@ -119,8 +120,20 @@ const P = StyleSheet.create({
 // ── ─────────────────────────────────────────────────────────────
 //    NEW ORDER TAB
 // ── ─────────────────────────────────────────────────────────────
-function NewOrderTab({ token }) {
+function NewOrderTab({ token, userid }) {
     // Config
+    const {
+        loadDefaultPreference,
+        savePreference,
+        loadPreferenceList,
+    } = useMobileUserPreference({
+        UserId: userid || 0,
+        ModuleCode: 'SALES ORDER ENTRY',
+        ModuleName: 'SALES ORDER',
+        ScreenCode: 'SALES_ORDER_BROWSER',
+        ScreenName: 'Sales Order Entry',
+        token: token,
+    });
     const [propertyData, setPropertyData] = useState([]);
     const [selectedProp, setSelectedProp] = useState(null);
     const [yearOptions, setYearOptions] = useState([]);
@@ -176,6 +189,16 @@ function NewOrderTab({ token }) {
     const [submitting, setSubmitting] = useState(false);
     const [successSO, setSuccessSO] = useState(null);
     const [saving, setSaving] = useState(false);
+    const normalizeCriteria = (criteria: any) => {
+        return {
+            PrpCode: criteria?.PrpCode || '',
+            YearNo: criteria?.YearNo || '',
+            // fromdate: criteria?.fromdate || formatDate(firstDay),
+            // todate: criteria?.todate || formatDate(today),
+            // status: criteria?.status || 'P',
+            // StkType: criteria?.StkType || '',
+        };
+    };
 
     const yrno = selectedYear ? selectedYear.slice(-2) : '';
     const prpcode = selectedProp?.PrpCode || '';
@@ -184,6 +207,48 @@ function NewOrderTab({ token }) {
         headers: authHdr(token),
         params,
     });
+
+    useEffect(() => {
+        const loadPreferenceData = async () => {
+
+            if (!token) return;
+
+            const saved = await loadDefaultPreference();
+
+            console.log("saved", saved);
+
+            if (saved?.criteria) {
+
+                const prpcode =
+                    saved.criteria.prpcode ||
+                    '';
+
+                const yearno =
+                    saved.criteria.yearno ||
+                    '';
+
+                // Property
+                const property = propertyData.find(
+                    x => String(x.PrpCode) === String(prpcode)
+                );
+
+                if (property) {
+                    setSelectedProp(property);
+                }
+
+                // Year
+                const year = yearOptions.find(
+                    y => String(y).slice(-2) === String(yearno)
+                );
+
+                if (year) {
+                    setSelectedYear(year);
+                }
+            }
+        };
+
+        loadPreferenceData();
+    }, [token, propertyData, yearOptions]);
 
     console.log("selectedYear", selectedYear)
     // Init: load property and year options
@@ -222,6 +287,24 @@ function NewOrderTab({ token }) {
                 grntype: '', fetch: '', acccode: '', billdate: '', strtype: '', isfaint: '',
             }));
             setParties(res.data?.response?.data || []);
+            if (userid) {
+
+                await savePreference({
+                    CriteriaName: 'Default',
+                    IsDefault: true,
+                    PreferenceJson: {
+                        criteria: {
+                            prpcode: prpcode,
+                            yearno: yrno,
+                            strcode: '012',
+                            fromdate: '',
+                            todate: '',
+                            show_authorized: false,
+                        },
+                    },
+                });
+
+            }
             console.log("Party data", res)
         } catch (e) { setParties([]); }
         finally { setPartyLoading(false); }
@@ -3222,8 +3305,8 @@ const SU = StyleSheet.create({
         paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999,
         backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB',
     },
-    pillOn: { backgroundColor: '#C2823A', borderColor: '#C2823A' },
-    pillText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+    pillOn: { backgroundColor: '#13879A', borderColor: '#13879A' },
+    pillText: { fontSize: 12, color: '#000', fontWeight: '600' },
     pillTextOn: { color: '#fff', fontWeight: '700' },
 
     // filter dropdowns
@@ -3233,7 +3316,7 @@ const SU = StyleSheet.create({
         alignItems: 'center', paddingHorizontal: 14,
     },
     filterText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#111827' },
-    filterArrow: { fontSize: 11, color: '#9CA3AF' },
+    filterArrow: { fontSize: 11, color: '#000' },
 
     // dark summary header
     summaryHeader: {
@@ -3335,7 +3418,7 @@ const TABS = [
     { id: 'summary', label: 'Summary' },
 ];
 
-export default function OrdersScreen({ token, apiBase }) {
+export default function OrdersScreen({ token, apiBase, userid }) {
     const [activeTab, setActiveTab] = useState('neworder');
     const [pendingCnt, setPendingCnt] = useState(0);
 
@@ -3374,7 +3457,7 @@ export default function OrdersScreen({ token, apiBase }) {
             </View>
 
             <View style={{ flex: 1, backgroundColor: '#f0ede8' }}>
-                {activeTab === 'neworder' && <NewOrderTab token={token} />}
+                {activeTab === 'neworder' && <NewOrderTab token={token} userid={userid} />}
                 {activeTab === 'auth' && <AuthTab token={token} />}
                 {activeTab === 'tracking' && <TrackingTab token={token} />}
                 {activeTab === 'summary' && <SummaryTab token={token} />}

@@ -119,6 +119,7 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    compileOnly fileTree(dir: 'libs', include: ['*.jar'])
     // 🔔 Firebase Cloud Messaging
     implementation platform("com.google.firebase:firebase-bom:34.0.0")
     implementation "com.google.firebase:firebase-messaging"

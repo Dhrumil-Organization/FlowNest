@@ -142,6 +142,7 @@ import PartyDashboardScreen from './components/EmployDashboard/rn-app/screens/Pa
 import AppNavigator from './components/SudoSalesOrderDashboard/AppNavigator';
 import PoyRateEntry from './components/PoyRateEntry/PoyRateEntry';
 import PriceList from './components/PriceList/PriceList';
+import SalesOrderPriceListAuth from './components/SalesOrderPriceListAuth/SalesOrderPriceListAuth'
 
 const Stack = createNativeStackNavigator();
 
@@ -1127,6 +1128,7 @@ export default function App() {
                                 token={gettoken || ''}
                                 isConnected={isConnected}
                                 username={getUserDetails}
+                                userid={getUserId}
                                 setIsLoggedIn={setIsLoggedIn}
                                 rightsMenuApps={
                                   (getDecodedMenuApps &&
@@ -1234,6 +1236,7 @@ export default function App() {
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
+                            userid={getUserId}
                           />
                         )}
                       </Stack.Screen>
@@ -1266,6 +1269,7 @@ export default function App() {
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
+                            userid={getUserId}
                           />
                         )}
                       </Stack.Screen>
@@ -1323,6 +1327,7 @@ export default function App() {
                               token={gettoken || ''}
                               isConnected={isConnected}
                               username={getUserDetails}
+                              userid={getUserId}
                             />
                           </SafeAreaProvider>
                         )}
@@ -1598,6 +1603,12 @@ export default function App() {
                         </>
                       }</Stack.Screen>
                       <Stack.Screen name="PoyRateEntry" component={PoyRateEntry} />
+                      <Stack.Screen name="Sales Order Price List Auth">{(props) =>
+                        <>
+                          <SalesOrderPriceListAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
                     </Stack.Navigator>
                     {/* </Stack.Navigator> */}
 

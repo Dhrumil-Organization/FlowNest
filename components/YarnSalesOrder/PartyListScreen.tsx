@@ -14,7 +14,6 @@ import axios from 'axios';
 import { API } from "../../common/API/dynamicAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSalesOrder } from './SalesOrderContext';
-const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 import { SafeAreaView } from 'react-native-safe-area-context';
 const PartyListScreen = ({ navigation, route, token }) => {
     // const { prpcode, yearno, strcode,token } = route.params || {};

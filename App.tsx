@@ -164,6 +164,8 @@ export default function App() {
   const [getUserId, setUserId] = useState<number>();
   const PRPTYPE_FOLDER = `${RNFS.DocumentDirectoryPath}/prptypes/`;
 
+  console.log("getuserId", getUserId);
+
   // App.tsx
   // In your App.tsx
   useEffect(() => {
@@ -1329,6 +1331,7 @@ export default function App() {
                               username={getUserDetails}
                               userid={getUserId}
                             />
+
                           </SafeAreaProvider>
                         )}
                       </Stack.Screen>

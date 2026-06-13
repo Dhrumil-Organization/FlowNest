@@ -35,6 +35,8 @@ const YarnSalesOrderModule = props => {
     userid: props.userid,
   };
 
+    console.log('User Id ', props.userid);
+
   return (
     <SalesOrderProvider>
       <SafeAreaView style={styles.safeRoot} edges={['top', 'left', 'right']}>

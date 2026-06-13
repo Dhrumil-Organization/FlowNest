@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -10,14 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "3",
+      "buildNumber": "5",
       "jsEngine": "jsc",
       "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "This app uses the camera to capture images.",
-        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to upload images.",
-        "NSPhotoLibraryAddUsageDescription": "This app saves images to your photo library.",
+        "NSCameraUsageDescription": "FlowNest uses the camera to capture property, collection, and cheque images for collection records and verification purposes.",
+        "NSPhotoLibraryUsageDescription": "FlowNest accesses your photo library so users can upload property, collection, and cheque images as attachments in collection entries.",
+        "NSPhotoLibraryAddUsageDescription": "FlowNest saves captured images to your photo library when users choose to store collection-related images.",
         "NSMicrophoneUsageDescription": "This app uses the microphone for voice input.",
         "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text."
       }

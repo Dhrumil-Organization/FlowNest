@@ -1,16 +1,16 @@
-import { crlimtreq_styles } from '@/common/Style';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
     View,
+    Text,
+    TouchableOpacity,
+    Modal,
+    ActivityIndicator,
+    TextInput,
+    FlatList,
+    StyleSheet,
 } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { crlimtreq_styles } from '@/common/Style';
 
 interface PartyData {
     ParCode: string;

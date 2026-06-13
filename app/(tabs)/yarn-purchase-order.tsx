@@ -25,8 +25,8 @@ export default function CRLimit_Request_Container() {
     return (
         <>
             {/* <AuthProvider> */}
-            <YarnPurchaseOrder token={token || ''} username={username} />
-            <Footer/>
+            <YarnPurchaseOrder token={token || ''} isConnected={true} username={username} />
+            {/* <Footer/> */}
             {/* </AuthProvider> */}
         </>
     );

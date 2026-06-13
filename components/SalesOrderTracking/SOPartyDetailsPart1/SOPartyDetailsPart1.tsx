@@ -465,13 +465,13 @@
 
 // export default SOPartyDetailsPart1;
 
-import HeaderBarwithBack from '@/components/Header';
-import Icon from '@expo/vector-icons/MaterialIcons';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, TextInput, Alert, Animated as RNAnimated, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams } from 'expo-router';
 import { debounce } from 'lodash';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Animated as RNAnimated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import HeaderBarwithBack from '@/components/Header';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
@@ -706,9 +706,10 @@ const AccordionTable = ({ data }: { data: ChallanData }) => {
     );
 };
 
-const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username }) => {
-    const party = "N/A";
+const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ route, token, navigation, username }) => {
+    // const { party } = route.params;
     const params = useLocalSearchParams();
+    const party = params?.party;
     const [getChallanResponse, setChallanResponse] = useState(null);
     const [renderedChallans, setRenderedChallans] = useState<ChallanData[]>([]);
     const [page, setPage] = useState(1);
@@ -834,11 +835,9 @@ const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username }) => {
             <>
                 <HeaderBarwithBack
                     userName={username}
-                    // header={typeof party === 'object' ? party.partyname : party}
+                    header={typeof party === 'object' ? party.partyname : party}
                     subHeader={'Manage your Challans'}
                     backNavigateScreen={'SOPartyDetails'}
-                    breadcrumbWithNoHome={params.party}
-                    SearchBar={false}
                 />
                 <View style={styles.loadingContainer}>
                     <Text>Loading...</Text>
@@ -875,10 +874,10 @@ const SOPartyDetailsPart1: React.FC<SOPartyDetailsProps> = ({ username }) => {
         <>
             <HeaderBarwithBack
                 userName={username}
-                // header={typeof party === 'object' ? party.partyname : party}
+                header={typeof party === 'object' ? party?.partyname : party}
                 subHeader={'Manage your Challans'}
-                backNavigateScreen={'SOPartyDetails'}
-                breadcrumbWithNoHome={params.party}
+                // backNavigateScreen={'SOPartyDetails'}
+                breadcrumb={typeof party === 'object' ? party?.partyname : party}
                 SearchBar={false}
             />
 

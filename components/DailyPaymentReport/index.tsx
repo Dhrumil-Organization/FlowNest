@@ -1145,75 +1145,76 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
 
 
             return (
+                <>
 
-                <Modal
-                    animationType="slide"
-                    transparent={false}
-                    visible={detailModalVisible}
-                    onRequestClose={closeModal}
-                >
+                    {detailModalVisible && (
+                        <View style={styles.detailOverlay101112}>
+                            <View style={styles.detailContainerLast}>
 
-                    <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
+                                <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
 
-                        {/* HEADER */}
+                                    {/* HEADER */}
 
-                        <LinearGradient
-                            colors={selectedCardColors || ["#4A6FA5", "#5C85D1"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                paddingTop: screenHeight > 800 ? 50 : 40,
-                                paddingBottom: 20,
-                                paddingHorizontal: 20,
-                                borderBottomLeftRadius: 20,
-                                borderBottomRightRadius: 20,
-                                elevation: 5
-                            }}
-                        >
+                                    <LinearGradient
+                                        colors={selectedCardColors || ["#4A6FA5", "#5C85D1"]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 0 }}
+                                        style={{
+                                            flexDirection: "row",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            paddingTop: screenHeight > 800 ? 50 : 40,
+                                            paddingBottom: 20,
+                                            paddingHorizontal: 20,
+                                            borderBottomLeftRadius: 20,
+                                            borderBottomRightRadius: 20,
+                                            elevation: 5
+                                        }}
+                                    >
 
-                            <Text
-                                style={{
-                                    color: "#fff",
-                                    fontSize: screenWidth <= 400 ? 18 : 20,
-                                    fontWeight: "bold",
-                                    flex: 1
-                                }}
-                            >
-                                Details - {selectedPartyName}
-                            </Text>
+                                        <Text
+                                            style={{
+                                                color: "#fff",
+                                                fontSize: screenWidth <= 400 ? 18 : 20,
+                                                fontWeight: "bold",
+                                                flex: 1
+                                            }}
+                                        >
+                                            Details - {selectedPartyName}
+                                        </Text>
 
-                            <TouchableOpacity
-                                onPress={closeModal}
-                                style={{
-                                    backgroundColor: "rgba(255,255,255,0.3)",
-                                    borderRadius: 20,
-                                    padding: 8
-                                }}
-                            >
-                                <Icon name="close" size={24} color="#fff" />
-                            </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={closeModal}
+                                            style={{
+                                                backgroundColor: "rgba(255,255,255,0.3)",
+                                                borderRadius: 20,
+                                                padding: 8
+                                            }}
+                                        >
+                                            <Icon name="close" size={24} color="#fff" />
+                                        </TouchableOpacity>
 
-                        </LinearGradient>
+                                    </LinearGradient>
 
 
-                        {/* CONTENT */}
+                                    {/* CONTENT */}
 
-                        <ScrollView
-                            style={{ flex: 1 }}
-                            contentContainerStyle={{ padding: 20 }}
-                        >
+                                    <ScrollView
+                                        style={{ flex: 1 }}
+                                        contentContainerStyle={{ padding: 20 }}
+                                    >
 
-                            {renderRows()}
+                                        {renderRows()}
 
-                        </ScrollView>
+                                    </ScrollView>
 
-                    </View>
+                                </View>
 
-                </Modal>
 
+                            </View>
+                        </View>
+                    )}
+                </>
             );
 
         }, [
@@ -1427,55 +1428,58 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
 
         // Main render
         return (
-            <View
-                style={{ flex: 1, backgroundColor: '#f8f9fa' }}
-                pointerEvents="box-none"
-            >
-                {/* MAIN SCROLLVIEW (Disabled if card is locked or modal is open) */}
-                <ScrollView
-                    ref={mainScrollRef}
-                    contentContainerStyle={{ paddingBottom: 120 }}
-                    showsVerticalScrollIndicator
-                    scrollEnabled={!isCardLocked && !isModalOpen}
-                    onScroll={handleScroll}
-                    scrollEventThrottle={16}
+            <>
+                <View
+                    style={{ flex: 1, backgroundColor: '#f8f9fa' }}
+                    pointerEvents="box-none"
                 >
-                    {Object.entries(groupedData).length > 0 ? (
-                        Object.entries(groupedData).map(([groupKey, items], index) => {
-                            const isExpanded = shouldGroup ? (expandedGroups[groupKey] !== false) : true;
+                    {/* MAIN SCROLLVIEW (Disabled if card is locked or modal is open) */}
+                    <ScrollView
+                        ref={mainScrollRef}
+                        contentContainerStyle={{ paddingBottom: 120 }}
+                        showsVerticalScrollIndicator
+                        scrollEnabled={!isCardLocked && !isModalOpen}
+                        onScroll={handleScroll}
+                        scrollEventThrottle={16}
+                    >
+                        {Object.entries(groupedData).length > 0 ? (
+                            Object.entries(groupedData).map(([groupKey, items], index) => {
+                                const isExpanded = shouldGroup ? (expandedGroups[groupKey] !== false) : true;
 
-                            return (
-                                <View key={groupKey} style={{ marginBottom: 16 }}>
-                                    {renderGroupHeader(groupKey, index, items.length)}
-                                    {(shouldGroup ? isExpanded : true) && items.length > 0 && (
-                                        <View style={{ marginTop: 8 }}>
-                                            {renderGroupContent(items, groupKey)}
-                                        </View>
-                                    )}
-                                </View>
-                            );
-                        })
-                    ) : (
-                        <EmptyState />
+                                return (
+                                    <View key={groupKey} style={{ marginBottom: 16 }}>
+                                        {renderGroupHeader(groupKey, index, items.length)}
+                                        {(shouldGroup ? isExpanded : true) && items.length > 0 && (
+                                            <View style={{ marginTop: 8 }}>
+                                                {renderGroupContent(items, groupKey)}
+                                            </View>
+                                        )}
+                                    </View>
+                                );
+                            })
+                        ) : (
+                            <EmptyState />
+                        )}
+                    </ScrollView>
+                    {/* HARD OVERLAY BLOCKER */}
+                    {isCardLocked && (
+                        <View
+                            pointerEvents="auto"
+                            style={{
+                                ...StyleSheet.absoluteFillObject,
+                                backgroundColor: 'transparent',
+                            }}
+                        />
                     )}
-                </ScrollView>
-                {/* HARD OVERLAY BLOCKER */}
-                {isCardLocked && (
-                    <View
-                        pointerEvents="auto"
-                        style={{
-                            ...StyleSheet.absoluteFillObject,
-                            backgroundColor: 'transparent',
-                        }}
-                    />
-                )}
 
-                {/* FIXED FOOTER */}
-                <Footer />
+                    {/* FIXED FOOTER */}
+                    <Footer />
 
-                {/* CARD DETAIL MODAL */}
+                    {/* CARD DETAIL MODAL */}
+
+                </View>
                 <CardDetailModal />
-            </View>
+            </>
         );
     };
 
@@ -2589,434 +2593,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                                     isLoadingSummary={isLoadingSummary}
                                     getSummaryData={getSummaryData}
                                 />
-                                <Modal
-                                    visible={sexeModalVisible}
-                                    animationType="slide"
-                                    onRequestClose={() => setSexeModalVisible(false)}
-                                >
-                                    <View style={{ flex: 1 }}>
 
-                                        <View style={{
-                                            flex: 1,
-                                            backgroundColor: "rgb(255, 255, 255)",
-                                            margin: 10,
-                                        }}>
-
-                                            {/* Header */}
-
-                                            <View style={{
-                                                flexDirection: "row",
-                                                justifyContent: "space-between",
-                                                alignItems: "center",
-                                                padding: 12,
-                                                borderBottomWidth: 1,
-                                                borderBottomColor: "#333",
-                                                backgroundColor: theme.BRAND_GRADIENT_END,
-                                                borderTopLeftRadius: 10,
-                                                borderTopRightRadius: 10,
-                                            }}>
-                                                {/* <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                                    {selectedSexeCard?.SalesExecutive || 'Sales Executive Details'}
-                                                </Text> */}
-
-                                                <TouchableOpacity onPress={() => setSexeModalVisible(false)}>
-                                                    <Icon name="close" size={24} color="#fff" />
-                                                </TouchableOpacity>
-
-                                            </View>
-
-
-                                            {/* Tabs */}
-
-                                            <View style={{
-                                                flexDirection: "row",
-                                                backgroundColor: "#f2f2f2",
-                                                borderBottomWidth: 1,
-                                                borderColor: "#ddd"
-                                            }}>
-
-                                                <TouchableOpacity
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: 12,
-                                                        alignItems: "center",
-                                                        borderBottomWidth: modalTab === "PartyWise" ? 3 : 0,
-                                                        borderBottomColor: theme.BRAND_GRADIENT_END
-                                                    }}
-                                                    onPress={() => setModalTab("PartyWise")}
-                                                >
-
-                                                    <Text style={{
-                                                        fontWeight: "600",
-                                                        color: modalTab === "PartyWise"
-                                                            ? theme.BRAND_GRADIENT_END
-                                                            : "#666"
-                                                    }}>
-                                                        Party Wise
-                                                    </Text>
-                                                </TouchableOpacity>
-
-                                                {/* <TouchableOpacity
-                                                    style={{
-                                                        flex: 1,
-                                                        padding: 12,
-                                                        alignItems: "center",
-                                                        borderBottomWidth: modalTab === "SalesExecutiveWise" ? 3 : 0,
-                                                        borderBottomColor: theme.BRAND_GRADIENT_END
-                                                    }}
-                                                    onPress={() => {
-                                                        if (isLoadingSummary) return;
-                                                        setModalTab("SalesExecutiveWise");
-                                                    }}
-                                                >
-
-                                                    <Text style={{
-                                                        fontWeight: "600",
-                                                        color: modalTab === "SalesExecutiveWise"
-                                                            ? theme.BRAND_GRADIENT_END
-                                                            : "#666"
-                                                    }}>
-                                                        Sales Executive Wise
-                                                    </Text>
-
-                                                </TouchableOpacity> */}
-                                            </View>
-                                            {/* Search */}
-                                            {getSexeLoading ? (
-                                                <View style={{
-                                                    padding: 12,
-                                                    borderWidth: 1,
-                                                    borderColor: "rgba(0,0,0,0.1)",
-                                                    borderRadius: 5,
-                                                    margin: 10,
-                                                    backgroundColor: "#fff"
-                                                }}>
-                                                    <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
-                                                </View>
-                                            ) : (
-                                                <TextInput
-                                                    placeholder="Search..."
-                                                    value={sexeSearchQuery}
-                                                    onChangeText={setSexeSearchQuery}
-                                                    style={{
-                                                        padding: 10,
-                                                        borderWidth: 1,
-                                                        borderColor: "rgba(0,0,0,0.1)",
-                                                        borderRadius: 5,
-                                                        margin: 10,
-                                                        fontSize: 11,
-                                                        color: "#000",
-                                                        backgroundColor: "#fff",
-                                                    }}
-                                                    placeholderTextColor="#999"
-                                                />
-
-                                            )}
-                                            <ScrollView
-                                                contentContainerStyle={{ paddingBottom: 120 }}
-                                                showsVerticalScrollIndicator={false}
-                                                keyboardShouldPersistTaps="handled"
-                                            >
-
-                                                {filteredData12.length > 0 ? (
-                                                    renderModalContent()
-                                                ) : (
-                                                    <View style={{
-                                                        flex: 1,
-                                                        justifyContent: "center",
-                                                        alignItems: "center",
-                                                        padding: 40,
-                                                        marginTop: 60
-                                                    }}>
-
-                                                        <Icon name="search-off" size={48} color="#666" />
-
-                                                        <Text style={{
-                                                            color: "#666",
-                                                            fontSize: 16,
-                                                            marginTop: 12,
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            No records found
-                                                        </Text>
-
-                                                    </View>
-
-                                                )}
-
-                                            </ScrollView>
-                                            {/* Totals Footer */}
-
-                                            <View style={{
-                                                position: "absolute",
-                                                bottom: 0,
-                                                left: 0,
-                                                right: 0,
-                                                padding: screenWidth <= 400 ? 10 : 12,
-                                                borderTopLeftRadius: 12,
-                                                borderTopRightRadius: 12,
-                                                elevation: 8,
-                                                shadowColor: "#000",
-                                                shadowOpacity: 0.2,
-                                                shadowRadius: 6,
-                                                shadowOffset: { width: 0, height: -2 },
-                                                backgroundColor: theme.BRAND_GRADIENT_END,
-                                                zIndex: 1000,
-                                            }}>
-
-                                                <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: screenWidth <= 400 ? 11 : 12,
-                                                    fontWeight: "600",
-                                                    marginBottom: 8,
-                                                }}>
-                                                    Totals
-                                                </Text>
-
-
-                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
-
-
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                                                        <Text style={{
-                                                            color: "rgba(255,255,255,0.9)",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "500",
-                                                            marginRight: 8,
-                                                        }}>
-                                                            Collection:
-                                                        </Text>
-
-                                                        <Text style={{
-                                                            color: "#fff",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "600",
-                                                        }}>
-                                                            ₹{parseFloat(
-                                                                filteredData12.reduce((sum, item) =>
-                                                                    sum + parseFloat(item.ToDaysCollection || '0'), 0)
-                                                            ).toLocaleString('en-IN', {
-                                                                minimumFractionDigits: 2,
-                                                                maximumFractionDigits: 2
-                                                            })}
-                                                        </Text>
-
-                                                    </View>
-
-
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                                                        <Text style={{
-                                                            color: "rgba(255,255,255,0.9)",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "500",
-                                                            marginRight: 8,
-                                                        }}>
-                                                            Credit in Bank:
-                                                        </Text>
-
-                                                        <Text style={{
-                                                            color: "#fff",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "600",
-                                                        }}>
-                                                            ₹{parseFloat(
-                                                                filteredData12.reduce((sum, item) =>
-                                                                    sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
-                                                            ).toLocaleString('en-IN', {
-                                                                minimumFractionDigits: 2,
-                                                                maximumFractionDigits: 2
-                                                            })}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </View>
-                                </Modal>
-
-                                <Modal
-                                    visible={partyWiseModalVisible}
-                                    animationType="slide"
-                                    onRequestClose={() => setPartyWiseModalVisible(false)}
-                                >
-                                    {/* <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)" }}> */}
-                                    <View style={{ flex: 1 }}>
-                                        <View style={{
-                                            flex: 1,
-                                            // backgroundColor: "#121212", // Dark modal background
-                                            backgroundColor: "rgb(255, 255, 255)", // Dark modal background
-                                            margin: 10,
-                                            // borderRadius: 10,
-                                            // borderWidth: 1,
-                                            // borderColor: "#333",
-                                        }}>
-                                            {/* Header */}
-                                            <View style={{
-                                                flexDirection: "row",
-                                                justifyContent: "space-between",
-                                                alignItems: "center",
-                                                padding: 12,
-                                                borderBottomWidth: 1,
-                                                borderBottomColor: "#333",
-                                                backgroundColor: theme.BRAND_GRADIENT_END,
-                                                borderTopLeftRadius: 10,
-                                                borderTopRightRadius: 10,
-                                            }}>
-                                                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                                    {selectedSexeCard?.SalesExecutive || 'Party Wise Detail'}
-                                                </Text>
-                                                <TouchableOpacity onPress={() => setPartyWiseModalVisible(false)}>
-                                                    <Icon name="close" size={24} color="#fff" />
-                                                </TouchableOpacity>
-                                            </View>
-
-                                            {/* Search */}
-                                            {getSexeLoading ? (
-                                                <View style={{
-                                                    padding: 12,
-                                                    borderWidth: 1,
-                                                    borderColor: "rgba(0, 0, 0, 0.1)",
-                                                    borderRadius: 5,
-                                                    margin: 10,
-                                                    // fontSize: 11,
-                                                    // color: "#000",
-                                                    backgroundColor: "#fff",
-                                                    display: "flex",
-                                                }}>
-                                                    <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
-                                                    {/* <Text>Loading...</Text> */}
-                                                </View>
-                                            ) : (
-                                                <TextInput
-                                                    placeholder="Search..."
-                                                    value={sexeSearchQuery}
-                                                    onChangeText={setSexeSearchQuery}
-                                                    style={{
-                                                        padding: 10,
-                                                        borderWidth: 1,
-                                                        borderColor: "rgba(0, 0, 0, 0.1)",
-                                                        borderRadius: 5,
-                                                        margin: 10,
-                                                        fontSize: 11,
-                                                        color: "#000",
-                                                        backgroundColor: "#fff",
-                                                    }}
-                                                    placeholderTextColor="#999"
-                                                />
-                                            )}
-
-
-
-                                            {/* Content */}
-                                            <ScrollView
-                                                contentContainerStyle={{ paddingBottom: 20 }}
-                                                showsVerticalScrollIndicator={false}
-                                                keyboardShouldPersistTaps="handled" // Fix search rerender focus issue
-                                            >
-                                                {filteredPartyData.length > 0 ? (
-                                                    // renderPartyItemsInGrid()
-                                                    renderPartyItemsInGrid(filteredPartyData)
-                                                ) : (
-                                                    <View style={{
-                                                        flex: 1,
-                                                        justifyContent: "center",
-                                                        alignItems: "center",
-                                                        padding: 40,
-                                                        marginTop: 60
-                                                    }}>
-                                                        <Icon name="search-off" size={48} color="#666" />
-                                                        <Text style={{
-                                                            color: "#666",
-                                                            fontSize: 16,
-                                                            marginTop: 12,
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            No records found
-                                                        </Text>
-                                                    </View>
-                                                )}
-                                            </ScrollView>
-                                            <View style={{
-                                                position: "absolute",
-                                                bottom: 0,
-                                                left: 0,
-                                                right: 0,
-                                                padding: screenWidth <= 400 ? 10 : 12,
-                                                borderTopLeftRadius: 12,
-                                                borderTopRightRadius: 12,
-                                                elevation: 8,
-                                                shadowColor: "#000",
-                                                shadowOpacity: 0.2,
-                                                shadowRadius: 6,
-                                                shadowOffset: { width: 0, height: -2 },
-                                                backgroundColor: theme.BRAND_GRADIENT_END,
-                                                zIndex: 1000,
-                                            }}>
-                                                <Text style={{
-                                                    color: "#fff",
-                                                    fontSize: screenWidth <= 400 ? 11 : 12,
-                                                    fontWeight: "600",
-                                                    marginBottom: 8,
-                                                }}>
-                                                    Totals
-                                                </Text>
-
-                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
-                                                    {/* ToDaysCollection Total */}
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                        <Text style={{
-                                                            color: "rgba(255,255,255,0.9)",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "500",
-                                                            marginRight: 8,
-                                                        }}>
-                                                            Today's Collection:
-                                                        </Text>
-                                                        <Text style={{
-                                                            color: "#fff",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "600",
-                                                        }}>
-                                                            ₹{parseFloat(
-                                                                filteredPartyData.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
-                                                            ).toLocaleString('en-IN', {
-                                                                minimumFractionDigits: 2,
-                                                                maximumFractionDigits: 2
-                                                            })}
-                                                        </Text>
-                                                    </View>
-
-                                                    {/* CrInBankAccCollection Total */}
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                        <Text style={{
-                                                            color: "rgba(255,255,255,0.9)",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "500",
-                                                            marginRight: 8,
-                                                        }}>
-                                                            Credit in Bank:
-                                                        </Text>
-                                                        <Text style={{
-                                                            color: "#fff",
-                                                            fontSize: screenWidth <= 400 ? 10 : 11,
-                                                            fontWeight: "600",
-                                                        }}>
-                                                            ₹{parseFloat(
-                                                                filteredPartyData.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
-                                                            ).toLocaleString('en-IN', {
-                                                                minimumFractionDigits: 2,
-                                                                maximumFractionDigits: 2
-                                                            })}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            </View>
-
-                                        </View>
-                                    </View>
-                                </Modal>
                             </>
 
                         ) : (
@@ -3068,66 +2645,495 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                 // selectedItemStatus={selectedItemStatus}
                 // onItemStatusChange={handleItemStatusChange}
                 />
-                <Modal
-                    visible={modalVisible}
-                    animationType="slide"
-                    onRequestClose={() => setModalVisible(false)}
-                >
-                    <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)" }}>
-                        <View style={{ flex: 1, backgroundColor: "#fff", borderRadius: 10 }}>
-                            {/* Header */}
-                            <View
-                                style={{
-                                    flexDirection: "row",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    padding: 12,
-                                    borderBottomWidth: 1,
-                                    borderBottomColor: "#eee",
-                                    backgroundColor: theme.BRAND_GRADIENT_END,
-                                    borderTopLeftRadius: 10,
-                                    borderTopRightRadius: 10,
-                                }}
-                            >
-                                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
-                                    Details - ({getSelectedSexeName})
-                                </Text>
-                                <TouchableOpacity onPress={() => {
-                                    setModalVisible(false);
-                                    setSelectedSexeName(null);
-                                }
-                                }>
-                                    <Icon name="close" size={24} color="#fff" />
-                                </TouchableOpacity>
+                {modalVisible && (
+                    <View style={styles.detailOverlay789}>
+                        <View style={styles.detailContainer}>
+                            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)" }}>
+                                <View style={{ flex: 1, backgroundColor: "#fff", borderRadius: 10 }}>
+                                    {/* Header */}
+                                    <View
+                                        style={{
+                                            flexDirection: "row",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            padding: 12,
+                                            borderBottomWidth: 1,
+                                            borderBottomColor: "#eee",
+                                            backgroundColor: theme.BRAND_GRADIENT_END,
+                                            borderTopLeftRadius: 10,
+                                            borderTopRightRadius: 10,
+                                        }}
+                                    >
+                                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
+                                            Details - ({getSelectedSexeName})
+                                        </Text>
+                                        <TouchableOpacity onPress={() => {
+                                            setModalVisible(false);
+                                            setSelectedSexeName(null);
+                                        }
+                                        }>
+                                            <Icon name="close" size={24} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Search */}
+                                    <TextInput
+                                        placeholder="Search..."
+                                        value={searchQueryPOT}
+                                        onChangeText={setSearchQueryPOT}
+                                        style={{
+                                            padding: 5,
+                                            borderWidth: 1,
+                                            borderColor: "#ddd",
+                                            borderRadius: 5,
+                                            margin: 10,
+                                            fontSize: 11,
+                                            color: "#000",
+                                        }}
+                                    />
+
+                                    {/* All Keys Cards View */}
+                                    <AllKeysCardsView
+                                        data={getDetailsData}
+                                        searchQuery={searchQueryPOT}
+                                        getDetailsDataSetting={getDetailsDataSetting}
+
+                                    // onCardPress={handleAllKeysCardPress} 
+                                    />
+                                </View>
                             </View>
-
-                            {/* Search */}
-                            <TextInput
-                                placeholder="Search..."
-                                value={searchQueryPOT}
-                                onChangeText={setSearchQueryPOT}
-                                style={{
-                                    padding: 5,
-                                    borderWidth: 1,
-                                    borderColor: "#ddd",
-                                    borderRadius: 5,
-                                    margin: 10,
-                                    fontSize: 11,
-                                    color: "#000",
-                                }}
-                            />
-
-                            {/* All Keys Cards View */}
-                            <AllKeysCardsView
-                                data={getDetailsData}
-                                searchQuery={searchQueryPOT}
-                                getDetailsDataSetting={getDetailsDataSetting}
-
-                            // onCardPress={handleAllKeysCardPress} 
-                            />
                         </View>
                     </View>
-                </Modal>
+                )}
+
+                {sexeModalVisible && (
+                    <View style={styles.detailOverlay123}>
+                        <View style={styles.detailContainer}>
+                            <View style={{ flex: 1 }}>
+
+                                <View style={{
+                                    flex: 1,
+                                    backgroundColor: "rgb(255, 255, 255)",
+                                    margin: 10,
+                                }}>
+
+                                    {/* Header */}
+
+                                    <View style={{
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        padding: 12,
+                                        borderBottomWidth: 1,
+                                        borderBottomColor: "#333",
+                                        backgroundColor: theme.BRAND_GRADIENT_END,
+                                        borderTopLeftRadius: 10,
+                                        borderTopRightRadius: 10,
+                                    }}>
+                                        {/* <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
+                                                    {selectedSexeCard?.SalesExecutive || 'Sales Executive Details'}
+                                                </Text> */}
+
+                                        <TouchableOpacity onPress={() => setSexeModalVisible(false)}>
+                                            <Icon name="close" size={24} color="#fff" />
+                                        </TouchableOpacity>
+
+                                    </View>
+
+
+                                    {/* Tabs */}
+
+                                    <View style={{
+                                        flexDirection: "row",
+                                        backgroundColor: "#f2f2f2",
+                                        borderBottomWidth: 1,
+                                        borderColor: "#ddd"
+                                    }}>
+
+                                        <TouchableOpacity
+                                            style={{
+                                                flex: 1,
+                                                padding: 12,
+                                                alignItems: "center",
+                                                borderBottomWidth: modalTab === "PartyWise" ? 3 : 0,
+                                                borderBottomColor: theme.BRAND_GRADIENT_END
+                                            }}
+                                            onPress={() => setModalTab("PartyWise")}
+                                        >
+
+                                            <Text style={{
+                                                fontWeight: "600",
+                                                color: modalTab === "PartyWise"
+                                                    ? theme.BRAND_GRADIENT_END
+                                                    : "#666"
+                                            }}>
+                                                Party Wise
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        {/* <TouchableOpacity
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: 12,
+                                                        alignItems: "center",
+                                                        borderBottomWidth: modalTab === "SalesExecutiveWise" ? 3 : 0,
+                                                        borderBottomColor: theme.BRAND_GRADIENT_END
+                                                    }}
+                                                    onPress={() => {
+                                                        if (isLoadingSummary) return;
+                                                        setModalTab("SalesExecutiveWise");
+                                                    }}
+                                                >
+
+                                                    <Text style={{
+                                                        fontWeight: "600",
+                                                        color: modalTab === "SalesExecutiveWise"
+                                                            ? theme.BRAND_GRADIENT_END
+                                                            : "#666"
+                                                    }}>
+                                                        Sales Executive Wise
+                                                    </Text>
+
+                                                </TouchableOpacity> */}
+                                    </View>
+                                    {/* Search */}
+                                    {getSexeLoading ? (
+                                        <View style={{
+                                            padding: 12,
+                                            borderWidth: 1,
+                                            borderColor: "rgba(0,0,0,0.1)",
+                                            borderRadius: 5,
+                                            margin: 10,
+                                            backgroundColor: "#fff"
+                                        }}>
+                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
+                                        </View>
+                                    ) : (
+                                        <TextInput
+                                            placeholder="Search..."
+                                            value={sexeSearchQuery}
+                                            onChangeText={setSexeSearchQuery}
+                                            style={{
+                                                padding: 10,
+                                                borderWidth: 1,
+                                                borderColor: "rgba(0,0,0,0.1)",
+                                                borderRadius: 5,
+                                                margin: 10,
+                                                fontSize: 11,
+                                                color: "#000",
+                                                backgroundColor: "#fff",
+                                            }}
+                                            placeholderTextColor="#999"
+                                        />
+
+                                    )}
+                                    <ScrollView
+                                        contentContainerStyle={{ paddingBottom: 120 }}
+                                        showsVerticalScrollIndicator={false}
+                                        keyboardShouldPersistTaps="handled"
+                                    >
+
+                                        {filteredData12.length > 0 ? (
+                                            renderModalContent()
+                                        ) : (
+                                            <View style={{
+                                                flex: 1,
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                padding: 40,
+                                                marginTop: 60
+                                            }}>
+
+                                                <Icon name="search-off" size={48} color="#666" />
+
+                                                <Text style={{
+                                                    color: "#666",
+                                                    fontSize: 16,
+                                                    marginTop: 12,
+                                                    textAlign: 'center'
+                                                }}>
+                                                    No records found
+                                                </Text>
+
+                                            </View>
+
+                                        )}
+
+                                    </ScrollView>
+                                    {/* Totals Footer */}
+
+                                    <View style={{
+                                        position: "absolute",
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        padding: screenWidth <= 400 ? 10 : 12,
+                                        borderTopLeftRadius: 12,
+                                        borderTopRightRadius: 12,
+                                        elevation: 8,
+                                        shadowColor: "#000",
+                                        shadowOpacity: 0.2,
+                                        shadowRadius: 6,
+                                        shadowOffset: { width: 0, height: -2 },
+                                        backgroundColor: theme.BRAND_GRADIENT_END,
+                                        zIndex: 1000,
+                                    }}>
+
+                                        <Text style={{
+                                            color: "#fff",
+                                            fontSize: screenWidth <= 400 ? 11 : 12,
+                                            fontWeight: "600",
+                                            marginBottom: 8,
+                                        }}>
+                                            Totals
+                                        </Text>
+
+
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
+
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                                                <Text style={{
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "500",
+                                                    marginRight: 8,
+                                                }}>
+                                                    Collection:
+                                                </Text>
+
+                                                <Text style={{
+                                                    color: "#fff",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "600",
+                                                }}>
+                                                    ₹{parseFloat(
+                                                        filteredData12.reduce((sum, item) =>
+                                                            sum + parseFloat(item.ToDaysCollection || '0'), 0)
+                                                    ).toLocaleString('en-IN', {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2
+                                                    })}
+                                                </Text>
+
+                                            </View>
+
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                                                <Text style={{
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "500",
+                                                    marginRight: 8,
+                                                }}>
+                                                    Credit in Bank:
+                                                </Text>
+
+                                                <Text style={{
+                                                    color: "#fff",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "600",
+                                                }}>
+                                                    ₹{parseFloat(
+                                                        filteredData12.reduce((sum, item) =>
+                                                            sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
+                                                    ).toLocaleString('en-IN', {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2
+                                                    })}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
+                {partyWiseModalVisible && (
+                    <View style={styles.detailOverlay456}>
+                        <View style={styles.detailContainer}>
+                            {/* <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.9)" }}> */}
+                            <View style={{ flex: 1 }}>
+                                <View style={{
+                                    flex: 1,
+                                    // backgroundColor: "#121212", // Dark modal background
+                                    backgroundColor: "rgb(255, 255, 255)", // Dark modal background
+                                    margin: 10,
+                                    // borderRadius: 10,
+                                    // borderWidth: 1,
+                                    // borderColor: "#333",
+                                }}>
+                                    {/* Header */}
+                                    <View style={{
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        padding: 12,
+                                        borderBottomWidth: 1,
+                                        borderBottomColor: "#333",
+                                        backgroundColor: theme.BRAND_GRADIENT_END,
+                                        borderTopLeftRadius: 10,
+                                        borderTopRightRadius: 10,
+                                    }}>
+                                        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
+                                            {selectedSexeCard?.SalesExecutive || 'Party Wise Detail'}
+                                        </Text>
+                                        <TouchableOpacity onPress={() => setPartyWiseModalVisible(false)}>
+                                            <Icon name="close" size={24} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Search */}
+                                    {getSexeLoading ? (
+                                        <View style={{
+                                            padding: 12,
+                                            borderWidth: 1,
+                                            borderColor: "rgba(0, 0, 0, 0.1)",
+                                            borderRadius: 5,
+                                            margin: 10,
+                                            // fontSize: 11,
+                                            // color: "#000",
+                                            backgroundColor: "#fff",
+                                            display: "flex",
+                                        }}>
+                                            <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} />
+                                            {/* <Text>Loading...</Text> */}
+                                        </View>
+                                    ) : (
+                                        <TextInput
+                                            placeholder="Search..."
+                                            value={sexeSearchQuery}
+                                            onChangeText={setSexeSearchQuery}
+                                            style={{
+                                                padding: 10,
+                                                borderWidth: 1,
+                                                borderColor: "rgba(0, 0, 0, 0.1)",
+                                                borderRadius: 5,
+                                                margin: 10,
+                                                fontSize: 11,
+                                                color: "#000",
+                                                backgroundColor: "#fff",
+                                            }}
+                                            placeholderTextColor="#999"
+                                        />
+                                    )}
+
+
+
+                                    {/* Content */}
+                                    <ScrollView
+                                        contentContainerStyle={{ paddingBottom: 20 }}
+                                        showsVerticalScrollIndicator={false}
+                                        keyboardShouldPersistTaps="handled" // Fix search rerender focus issue
+                                    >
+                                        {filteredPartyData.length > 0 ? (
+                                            // renderPartyItemsInGrid()
+                                            renderPartyItemsInGrid(filteredPartyData)
+                                        ) : (
+                                            <View style={{
+                                                flex: 1,
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                padding: 40,
+                                                marginTop: 60
+                                            }}>
+                                                <Icon name="search-off" size={48} color="#666" />
+                                                <Text style={{
+                                                    color: "#666",
+                                                    fontSize: 16,
+                                                    marginTop: 12,
+                                                    textAlign: 'center'
+                                                }}>
+                                                    No records found
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </ScrollView>
+                                    <View style={{
+                                        position: "absolute",
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        padding: screenWidth <= 400 ? 10 : 12,
+                                        borderTopLeftRadius: 12,
+                                        borderTopRightRadius: 12,
+                                        elevation: 8,
+                                        shadowColor: "#000",
+                                        shadowOpacity: 0.2,
+                                        shadowRadius: 6,
+                                        shadowOffset: { width: 0, height: -2 },
+                                        backgroundColor: theme.BRAND_GRADIENT_END,
+                                        zIndex: 1000,
+                                    }}>
+                                        <Text style={{
+                                            color: "#fff",
+                                            fontSize: screenWidth <= 400 ? 11 : 12,
+                                            fontWeight: "600",
+                                            marginBottom: 8,
+                                        }}>
+                                            Totals
+                                        </Text>
+
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingRight: 20 }}>
+                                            {/* ToDaysCollection Total */}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={{
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "500",
+                                                    marginRight: 8,
+                                                }}>
+                                                    Today's Collection:
+                                                </Text>
+                                                <Text style={{
+                                                    color: "#fff",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "600",
+                                                }}>
+                                                    ₹{parseFloat(
+                                                        filteredPartyData.reduce((sum, item) => sum + parseFloat(item.ToDaysCollection || '0'), 0)
+                                                    ).toLocaleString('en-IN', {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2
+                                                    })}
+                                                </Text>
+                                            </View>
+
+                                            {/* CrInBankAccCollection Total */}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={{
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "500",
+                                                    marginRight: 8,
+                                                }}>
+                                                    Credit in Bank:
+                                                </Text>
+                                                <Text style={{
+                                                    color: "#fff",
+                                                    fontSize: screenWidth <= 400 ? 10 : 11,
+                                                    fontWeight: "600",
+                                                }}>
+                                                    ₹{parseFloat(
+                                                        filteredPartyData.reduce((sum, item) => sum + parseFloat(item.CrInBankAccCollection || '0'), 0)
+                                                    ).toLocaleString('en-IN', {
+                                                        minimumFractionDigits: 2,
+                                                        maximumFractionDigits: 2
+                                                    })}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                )}
             </GestureHandlerRootView>
         </>
     );
@@ -3235,6 +3241,89 @@ const styles = StyleSheet.create({
     emptyText: {
         color: "#666",
         fontSize: 16,
+    },
+    detailOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 100, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    detailOverlay123: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 100, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    detailOverlay456: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 200, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    detailOverlay789: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 300, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    detailOverlay101112: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 500, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    // Detail Container
+    detailContainer: {
+        backgroundColor: '#fff',
+        // padding: 20,
+        paddingTop: 45,
+        borderRadius: 10,
+        width: '100%',
+        height: '100%',
+        elevation: 5, // Shadow for Android
+        shadowColor: '#000', // Shadow for iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+    },
+    detailContainerLast: {
+        backgroundColor: '#fff',
+        // padding: 20,
+        // paddingTop: 45,
+        borderRadius: 10,
+        width: '100%',
+        height: '100%',
+        elevation: 5, // Shadow for Android
+        shadowColor: '#000', // Shadow for iOS
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
     },
 });
 

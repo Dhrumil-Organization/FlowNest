@@ -27,7 +27,7 @@ export default function CRLimit_Request_Container() {
         <>
             {/* <AuthProvider> */}
             <SalesOrderTrackingPartyDetailsPart1 username={username} />
-            <Footer/>
+            {/* <Footer/> */}
             {/* </AuthProvider> */}
         </>
     );

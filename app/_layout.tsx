@@ -10,6 +10,8 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AccessDeniedScreen from '../common/access-denied';
 import FullScreenLoader from '../components/FullScreenLoader';
+import Snackbar, { SnackbarType } from '@/components/Snackbar';
+import { registerSnackbar } from '@/common/utils/snackbar';
 
 
 export default function RootLayout() {
@@ -17,6 +19,25 @@ export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [snackbar, setSnackbar] = useState({
+    visible: false,
+    message: '',
+    type: 'info' as SnackbarType,
+    action: undefined as { text: string; onPress: () => void } | undefined,
+    duration: 4000,
+  });
+
+  useEffect(() => {
+    registerSnackbar((message, type = 'info', action, duration) => {
+      setSnackbar({
+        visible: true,
+        message,
+        type,
+        action,
+        duration: duration || 4000,
+      });
+    });
+  }, []);
 
   initAPI();
   initAPIForPrinterList();
@@ -43,8 +64,11 @@ export default function RootLayout() {
     if (!isReady) return;
 
     // ❌ NOT LOGGED IN → FORCE LOGIN
+    // if (isAllowed && isLoggedIn === false) {
+    //   router.replace('/(auth)/login');
+    // }
     if (isAllowed && isLoggedIn === false) {
-      router.replace('/(auth)/login');
+      router.replace('/landing');
     }
 
     // ✅ LOGGED IN → FORCE HOMEx
@@ -117,6 +141,7 @@ export default function RootLayout() {
 
   // 🔥 FINAL ROUTING
   return (
+
     // <AuthProvider>
     // <Stack screenOptions={{ headerShown: false }}>
     //   {isAllowed && isLoggedIn === true ? (
@@ -153,16 +178,37 @@ export default function RootLayout() {
     //   )}
     // </Stack>
     // </AuthProvider>
-    <Stack screenOptions={{ headerShown: false }}>
-      {isAllowed && isLoggedIn === true ? (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* {isAllowed && isLoggedIn === true ? (
         <>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="index" />
         </>
       ) : (
         <Stack.Screen name="(auth)/login" />
-      )}
-    </Stack>
+      )} */}
+        {isAllowed && isLoggedIn === true ? (
+          <>
+            <Stack.Screen name="" />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="(all)" />
+            <Stack.Screen name="(auth)/login" />
+          </>
+        )}
+        {/* <Stack.Screen name="(all)" /> */}
+      </Stack>
+      <Snackbar
+        visible={snackbar.visible}
+        message={snackbar.message}
+        type={snackbar.type}
+        action={snackbar.action}
+        duration={snackbar.duration}
+        onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
+      />
+    </>
   );
 }
 

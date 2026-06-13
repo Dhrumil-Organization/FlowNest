@@ -35,7 +35,7 @@ export default function TabsIndex() {
     <>
       {/* <AuthProvider> */}
         <HomeScreen username={username} />
-        <Footer/>
+        {/* <Footer/> */}
       {/* </AuthProvider> */}
     </>
   );

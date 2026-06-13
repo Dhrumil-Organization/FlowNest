@@ -17,12 +17,14 @@ import {
     ActivityIndicator,
     Alert,
     Image,
+    ScrollView,
     StyleSheet,
     Text, TextInput, TouchableOpacity,
     View
 } from 'react-native';
 import { API, initAPI } from '../../common/API/dynamicAPI';
 import { theme } from '../../components/theme';
+import main from '../../assets/images/main.png';
 // import { getStoredToken } from '../../hooks/NotificationService';
 
 export default function LoginScreen() {
@@ -253,86 +255,280 @@ export default function LoginScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={{
+                backgroundColor: theme.NEUTRAL_BG,
+                flex: 1,
+                // justifyContent: 'center',
 
-            <Image
-                source={{ uri: 'https://via.placeholder.com/120' }}
-                style={styles.logo}
-            />
+            }}
+            // style={styles.container}
+            contentContainerStyle={{
+                paddingBottom: 40
+            }}
+        >
 
-            {/* 🔥 PROPERTY SELECT */}
-            <Text style={styles.label}>Select Property</Text>
-            {propertyData.map((item) => (
-                <TouchableOpacity
-                    key={item.value}
-                    style={[
-                        styles.selectBtn,
-                        selectedProperty === item.value && styles.selected
-                    ]}
-                    onPress={() => setSelectedProperty(item.value)}
-                >
-                    <Icon name="business" size={20} color={theme.BRAND_GRADIENT_END} />
-                    <Text style={{ marginLeft: 10 }}>{item.label}</Text>
-                </TouchableOpacity>
-            ))}
 
-            {/* USERNAME */}
-            <View style={styles.inputBox}>
-                <Icon name="person-outline" size={22} color={theme.BRAND_GRADIENT_END} />
-                <TextInput
-                    placeholder="Username"
-                    style={styles.input}
-                    value={username}
-                    onChangeText={setUsername}
-                />
-            </View>
+            {/* <LinearGradient
+                colors={[
+                    theme.BRAND_GRADIENT_START,
+                    theme.BRAND_GRADIENT_END
+                ]}
+                style={styles.header}
 
-            {/* PASSWORD */}
-            <View style={styles.inputBox}>
-                <Icon name="lock-outline" size={22} color={theme.BRAND_GRADIENT_END} />
-                <TextInput
-                    placeholder="Password"
-                    secureTextEntry={!showPassword}
-                    style={styles.input}
-                    value={password}
-                    onChangeText={setPassword}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <Icon name={showPassword ? "visibility-off" : "visibility"} size={22} color={theme.BRAND_GRADIENT_END} />
-                </TouchableOpacity>
-            </View>
-
-            {/* LOGIN BUTTON */}
-            <LinearGradient
-                colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
-                style={styles.button}
             >
-                <TouchableOpacity onPress={handleLogin} style={styles.btnTouch}>
-                    {isLoading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={styles.btnText}>Login</Text>
-                    )}
-                </TouchableOpacity>
-            </LinearGradient>
 
-        </View>
+                <TouchableOpacity
+                    onPress={() => router.replace('/(all)/landing')}
+
+                >
+
+                    <Icon
+                        name="arrow-back"
+                        size={24}
+                        color="#fff"
+                    /> </TouchableOpacity>
+
+                <Text style={styles.title}>
+                    Sign In
+                </Text>
+
+            </LinearGradient> */}
+            {/* <Image
+                // source={{ uri: 'https://via.placeholder.com/120' }}
+                source={{ uri: 'https://madhusudangroup.com/wp-content/uploads/2023/03/Logo-Post-2.png.webp' }}
+                style={styles.logo}
+            /> */}
+            <View style={styles.heroContainer}>
+                <View style={{ alignSelf: 'flex-start' }}>
+                    <TouchableOpacity onPress={() => router.replace('/(all)/landing')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Icon name="arrow-back" size={22} color={theme.BRAND_GRADIENT_END} />
+                        <Text style={{ color: theme.BRAND_GRADIENT_END }}>Back</Text>
+                    </TouchableOpacity>
+                </View>
+                <Image
+                    source={main}
+                    style={styles.logo}
+                />
+
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                        Textile ERP Platform
+                    </Text>
+                </View>
+
+                <Text style={styles.tagline}>
+                    Smart Business Operations Platform
+                </Text>
+
+                <Text style={styles.desc}>
+                    Manage production, receivables,
+                    collections, sales analysis and
+                    operational workflows from anywhere.
+                </Text>
+
+            </View>
+
+            <View style={styles.loginCard}>
+
+                {/* 🔥 PROPERTY SELECT */}
+                <Text style={styles.label}>Select Property</Text>
+                {propertyData.map((item) => (
+                    <TouchableOpacity
+                        key={item.value}
+                        style={[
+                            styles.selectBtn,
+                            selectedProperty === item.value && styles.selected
+                        ]}
+                        onPress={() => setSelectedProperty(item.value)}
+                    >
+                        <Icon name="business" size={20} color={theme.BRAND_GRADIENT_END} />
+                        <Text style={{ marginLeft: 10 }}>{item.label}</Text>
+                    </TouchableOpacity>
+                ))}
+
+                {/* USERNAME */}
+                <View style={styles.inputBox}>
+                    <Icon name="person-outline" size={22} color={theme.BRAND_GRADIENT_END} />
+                    <TextInput
+                        placeholder="Username"
+                        style={styles.input}
+                        value={username}
+                        onChangeText={setUsername}
+                    />
+                </View>
+
+                {/* PASSWORD */}
+                <View style={styles.inputBox}>
+                    <Icon name="lock-outline" size={22} color={theme.BRAND_GRADIENT_END} />
+                    <TextInput
+                        placeholder="Password"
+                        secureTextEntry={!showPassword}
+                        style={styles.input}
+                        value={password}
+                        onChangeText={setPassword}
+                    />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                        <Icon name={showPassword ? "visibility-off" : "visibility"} size={22} color={theme.BRAND_GRADIENT_END} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* LOGIN BUTTON */}
+                <LinearGradient
+                    colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
+                    style={styles.button}
+                >
+                    <TouchableOpacity onPress={handleLogin} style={styles.btnTouch}>
+                        {isLoading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.btnText}>Login</Text>
+                        )}
+                    </TouchableOpacity>
+                </LinearGradient>
+                <View style={{ marginTop: 20 }}>
+
+                    <TouchableOpacity
+                        style={styles.secondaryBtn}
+                        onPress={() => router.push('/signup')}
+                    >
+                        <Text style={styles.secondaryText}>
+                            Create Account
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.secondaryBtn}
+                        onPress={() => router.push('/free-trial')}
+                    >
+                        <Text style={styles.secondaryText}>
+                            Start Free Trial
+                        </Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.reviewText}>
+                        Explore FlowNest instantly using Guest Mode
+                        without creating an account.
+                    </Text>
+
+                    <TouchableOpacity
+                        style={styles.guestBtn}
+                    >
+                        <Icon
+                            name="visibility"
+                            size={20}
+                            color={theme.BRAND_GRADIENT_END}
+                        />
+
+                        <Text style={styles.guestText}>
+                            Continue as Guest
+                        </Text>
+                    </TouchableOpacity>
+
+                </View>
+            </View>
+
+        </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
+    logoImage: {
+        width: 30,
+        height: 30,
+    },
+    logoText: {
+        fontWeight: 'bold',
+        color: theme.BRAND_GRADIENT_END
+    },
+    hero: {
+        alignItems: 'center',
+        marginBottom: 30
+    },
+
+    heroTitle: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: theme.BRAND_GRADIENT_END
+    },
+
+    heroSub: {
+        fontSize: 16,
+        marginTop: 5,
+        fontWeight: '600'
+    },
+
+    heroDesc: {
+        textAlign: 'center',
+        marginTop: 10,
+        color: '#666',
+        lineHeight: 22
+    },
+    heroContainer: {
+        alignItems: 'center',
+        paddingTop: 60,
+        paddingHorizontal: 30
+    },
+
+    brand: {
+        fontSize: 34,
+        fontWeight: '800',
+        color: theme.BRAND_GRADIENT_END,
+        marginTop: 15
+    },
+
+    tagline: {
+        fontSize: 17,
+        fontWeight: '600',
+        marginTop: 5,
+        color: theme.TEXT_PRIMARY
+    },
+
+    desc: {
+        marginTop: 15,
+        textAlign: 'center',
+        color: theme.TEXT_SECONDARY,
+        lineHeight: 24,
+        maxWidth: 320
+    },
+
+    logo: {
+        width: 220,
+        height: 90,
+        resizeMode: 'contain',
+        alignSelf: 'center',
+    },
+    loginCard: {
+        backgroundColor: '#fff',
+        marginHorizontal: 20,
+        marginTop: 25,
+        borderRadius: 24,
+        padding: 22,
+
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 15,
+
+        elevation: 6
+    },
     container: {
         flex: 1,
         justifyContent: 'center',
         padding: 30,
         backgroundColor: theme.NEUTRAL_BG,
     },
-    logo: {
-        width: 120,
-        height: 120,
-        alignSelf: 'center',
-        marginBottom: 30,
+    header: {
+        paddingTop: 60,
+        paddingBottom: 25,
+        paddingHorizontal: 20
     },
+    title: {
+        color: '#fff',
+        fontSize: 28,
+        fontWeight: '700',
+        marginTop: 15
+    },
+
     label: {
         marginBottom: 10,
         fontWeight: '600'
@@ -352,9 +548,11 @@ const styles = StyleSheet.create({
     inputBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderBottomWidth: 1,
-        borderColor: theme.BRAND_GRADIENT_END,
-        marginBottom: 20,
+        backgroundColor: '#F5F8FA',
+        borderRadius: 14,
+        paddingHorizontal: 15,
+        height: 56,
+        marginBottom: 14
     },
     input: {
         flex: 1,
@@ -362,9 +560,10 @@ const styles = StyleSheet.create({
         height: 50,
     },
     button: {
-        height: 50,
-        borderRadius: 25,
+        height: 56,
+        borderRadius: 16,
         justifyContent: 'center',
+        marginTop: 10
     },
     btnTouch: {
         alignItems: 'center',
@@ -372,5 +571,49 @@ const styles = StyleSheet.create({
     btnText: {
         color: '#fff',
         fontWeight: 'bold',
+    },
+    secondaryBtn: {
+        marginTop: 10,
+        alignItems: 'center',
+    },
+
+    secondaryText: {
+        color: theme.BRAND_GRADIENT_END,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+
+    guestText: {
+        color: theme.BRAND_GRADIENT_END,
+        fontWeight: '700',
+        marginLeft: 4
+    },
+    guestBtn: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 56,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#D8E4E8',
+        backgroundColor: '#fff'
+    },
+    reviewText: {
+        textAlign: 'center',
+        color: '#666',
+        marginTop: 15,
+        lineHeight: 22
+    },
+    badge: {
+        backgroundColor: '#E8F7FA',
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 30,
+        marginTop: 10
+    },
+
+    badgeText: {
+        color: theme.BRAND_GRADIENT_END,
+        fontWeight: '600'
     },
 });

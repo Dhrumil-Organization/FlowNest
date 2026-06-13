@@ -1,10 +1,11 @@
-import theme from '@/components/theme';
-import SearchableDropdown from '@/Shared/SearchableDropdown';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Snackbar } from 'react-native-paper';
+import theme from '@/components/theme';
+import SearchableDropdown from '@/Shared/SearchableDropdown';
+// import Snackbar from 'react-native-snackbar';
+// import FullScreenLoader from '../Loader/Loader';
 
 const { height } = Dimensions.get('window');
 
@@ -22,8 +23,6 @@ const CriteriaForm = (props) => {
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
-    const [snackbarVisible, setSnackbarVisible] = useState(false);
-    const [snackbarMsg, setSnackbarMsg] = useState('');
     /*
     const handleLoaddata = async () => {
         if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') {
@@ -50,18 +49,16 @@ const CriteriaForm = (props) => {
     const handleLoaddata = async () => {
         if (isLoading) return;
 
-        if (!FormState.values.StrCode) {
-            // Snackbar.show({
-            //     text: 'Please select store',
-            //     duration: Snackbar.LENGTH_LONG,
-            //     backgroundColor: 'red',
-            //     textColor: '#fff',
-            //     action: { text: 'OK', textColor: 'white' },
-            // });
-            setSnackbarMsg('Please select store');
-            setSnackbarVisible(true);
-            return;
-        }
+        // if (!FormState.values.StrCode) {
+        //     Snackbar.show({
+        //         text: 'Please select store',
+        //         duration: Snackbar.LENGTH_LONG,
+        //         backgroundColor: 'red',
+        //         textColor: '#fff',
+        //         action: { text: 'OK', textColor: 'white' },
+        //     });
+        //     return;
+        // }
 
         if (activeTab1YPO === 'history') {
             fetchAllHistoryData();
@@ -133,15 +130,6 @@ const CriteriaForm = (props) => {
                     </Animated.View>
                 </View>
             </Modal>
-            <Snackbar
-                visible={snackbarVisible}
-                onDismiss={() => setSnackbarVisible(false)}
-                duration={3000}
-                // style={{ backgroundColor: 'red' }}
-                style={{ backgroundColor: snackbarMsg.includes('Error') ? 'red' : 'green' }}
-            >
-                {snackbarMsg}
-            </Snackbar>
         </>
     );
 };
@@ -168,7 +156,6 @@ const stylesCF = StyleSheet.create({
     closeButton: {
         alignSelf: 'flex-end',
         padding: 10,
-        marginTop: 50
     },
     label: {
         fontSize: 16,

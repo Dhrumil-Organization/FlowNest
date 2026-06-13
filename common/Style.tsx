@@ -902,10 +902,11 @@ export const crlimtreq_styles = StyleSheet.create({
     carouselModalOverlay: {
         // flex: 1,
         height: '100%',
+        width: '100%',
         backgroundColor: 'white',  // Full-screen white
         justifyContent: 'center',
-        alignContent: 'center',
-        alignItems: 'center'
+        // alignContent: 'center',
+        // alignItems: 'center'
     },
     modalCloseButton: {
         position: 'absolute',
@@ -1015,7 +1016,8 @@ export const crlimtreq_styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowOffset: { width: 0, height: 2 },
         shadowRadius: 4,
-        overflow: "hidden"
+        overflow: "hidden",
+        marginTop: 30
     },
 
     accordionHeader: {

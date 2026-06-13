@@ -30,6 +30,7 @@ interface PartyDetail {
     totamt: string;
     totmtr: string;
     uid: string;
+    UnitRate: string;
 }
 
 interface PartySummary {
@@ -54,10 +55,12 @@ interface SOPartyDetailsProps {
     username: string;
 }
 
-const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
+const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigation, username }) => {
     const router = useRouter();
     const params = useLocalSearchParams();
-    const party = router.setParams;
+    const party = params.party || route?.params?.party || "";
+    const selectedSalesExes = params.selectedSalesExes || route?.params?.selectedSalesExes || [];
+    // const { party, selectedSalesExes } = route?.params || "";
     const [getDetailData, setDetailData] = useState<{
         partydetails: PartyDetail[];
         party_summary: PartySummary[];
@@ -65,15 +68,15 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
     const [renderedOrders, setRenderedOrders] = useState<PartyDetail[]>([]);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [printAPILoading, setPrintAPILoading] = useState(false);
     const [apiloading, setAPILoading] = useState(false);
     const [isAccordionOpen, setIsAccordionOpen] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [getChallanPayload, setChallanPayload] = useState({});
     const [getPartyName, setPartyName] = useState("");
     const [filteredOrders, setFilteredOrders] = useState<PartyDetail[]>([]);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const itemsPerPage = 50;
-
-    console.log("got party:", params.party);
 
     useEffect(() => {
         const initializeApp = async () => {
@@ -123,18 +126,38 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                     order.noofchallan.toLowerCase().includes(query) ||
                     order.status.toLowerCase().includes(query)
             );
-            setFilteredOrders(filtered);
-            setRenderedOrders(filtered.slice(0, itemsPerPage));
-            setPage(1); // Reset pagination on search
+            const sorted = [...filtered].sort((a, b) => {
+                const dateA = new Date(a.sodate).getTime();
+                const dateB = new Date(b.sodate).getTime();
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            });
+            setFilteredOrders(sorted);
+            setRenderedOrders(sorted.slice(0, itemsPerPage));
+            setPage(1);
         }, 300);
 
         debouncedSearch();
         return () => debouncedSearch.cancel();
-    }, [searchQuery, getDetailData]);
+    }, [searchQuery, getDetailData, sortOrder]);
 
+    // const loadMoreOrders = useCallback(() => {
+    //     if (loading || !getDetailData || renderedOrders.length >= filteredOrders.length) return;
+
+    //     setLoading(true);
+    //     setTimeout(() => {
+    //         const nextPage = page + 1;
+    //         const startIndex = page * itemsPerPage;
+    //         const endIndex = startIndex + itemsPerPage;
+    //         setRenderedOrders(prev => [
+    //             ...prev,
+    //             ...filteredOrders.slice(startIndex, endIndex)
+    //         ]);
+    //         setPage(nextPage);
+    //         setLoading(false);
+    //     }, 500);
+    // }, [page, loading, filteredOrders, renderedOrders]);
     const loadMoreOrders = useCallback(() => {
         if (loading || !getDetailData || renderedOrders.length >= filteredOrders.length) return;
-
         setLoading(true);
         setTimeout(() => {
             const nextPage = page + 1;
@@ -158,9 +181,6 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                     header={getPartyName || ""}
                     subHeader={'Manage your Sales Orders'}
                     backNavigateScreen={'Sales Order Tracking'}
-                    breadcrumb={params.party}
-                    SearchBar={false}
-
                 />
                 <View style={styles.loadingContainer}>
                     <Text>Loading...</Text>
@@ -171,6 +191,10 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
 
     const summary = getDetailData.party_summary[0];
     const deliveryPercentage = Math.min(parseFloat(summary.linebar), 100);
+
+    const toggleSortOrder = () => {
+        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    };
 
     const getStatusColor = (status: string) => {
         switch (status.toUpperCase()) {
@@ -210,6 +234,16 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
             'X-Requested-with': 'XMLHttpRequest',
         };
         try {
+
+
+            let seArr = []
+            let seArrCntr = 0;
+            selectedSalesExes && selectedSalesExes.length > 0 && selectedSalesExes.filter((el, ind) => {
+
+                seArr[seArrCntr] = el.sexe;
+                seArrCntr++;
+
+            })
             // const yearValue = selectedYear.split('-')[1].substring(2);
             // const dsnCodes = selectedDesigns.map((design) => design.DsnCode);
             const payload = {
@@ -218,6 +252,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                 todate: "",
                 uid: order.uid,
                 srno: order.srno,
+                sexes: seArr,
             };
             const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
             // const response = {
@@ -480,11 +515,12 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                 console.log("I am here:", response.data);
                 // await AsyncStorage.setItem('parties_tracking_details', JSON.stringify(response.data.data));
                 await AsyncStorage.setItem('parties_tracking_details_challan_response', JSON.stringify(response.data));
-                // navigation.navigate('SOPartyDetailsPart1', { party: order.partyname });
-                // router.push('/SOPartyDetailsPart1', { party: order.partyname });
+                // navigation.navigate(' /SOPartyDetailsPart1', { party: order.partyname });
                 router.push({
                     pathname: '/SOPartyDetailsPart1',
-                    params: { party: order.partyname }
+                    params: {
+                        party: order.partyname
+                    }
                 });
                 // await saveLastViewedToCache(partyData.parcode);
                 // setLastViewedParcode(partyData.parcode);
@@ -498,6 +534,121 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
         } finally {
             setAPILoading(false);
             // setTrackingLoader(false);
+        }
+    };
+
+    const handleCardPressCurrent = async (order: PartyDetail) => {
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Requested-with': 'XMLHttpRequest',
+        };
+        const payload = {
+            ...getChallanPayload,
+            uid: order.uid,
+            srno: order.srno,
+        };
+
+        try {
+            setAPILoading(true);
+            const response = await axios.post(`${API}/api/sotrackcloseorder`, payload, { headers });
+            console.log("I am here CLosed Order :", response, payload);
+            if (response.data.success === true) {
+                // Update the status of the pressed card to "CLOSED"
+                setFilteredOrders(prevOrders =>
+                    prevOrders.map(prevOrder =>
+                        prevOrder.uid === order.uid && prevOrder.srno === order.srno
+                            ? { ...prevOrder, status: 'CLOSED' }
+                            : prevOrder
+                    )
+                );
+                // Also update the main data if needed
+                setDetailData(prevData => {
+                    if (!prevData) return null;
+                    return {
+                        ...prevData,
+                        partydetails: prevData.partydetails.map(prevOrder =>
+                            prevOrder.uid === order.uid && prevOrder.srno === order.srno
+                                ? { ...prevOrder, status: 'CLOSED' }
+                                : prevOrder
+                        )
+                    };
+                });
+            }
+        } catch (error) {
+            console.error("Error in handleCardPressCurrent:", error);
+            Alert.alert("Error", "Failed to close the order");
+        } finally {
+            setAPILoading(false);
+        }
+    };
+
+    const printSalesOrderPdf = async (item, format = 'A4') => {
+        setPrintAPILoading(true);
+        try {
+            // setPdfLoading(true);
+
+            const payload = {
+                prpcode: item.prpcode || '',
+                yearno: getChallanPayload?.yearno || '',
+                strcode: item.strcode || '',
+                uid: item.uid || '',
+                printTypes: ['sales_order'],
+                printFormat: format || 'A4',
+            };
+
+            console.log("'PDF PAYLOAD =>':", payload);
+            const res = await axios.post(
+                `${API}/api/saleschallanmultiprintnew`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'x-platform': 'mob',
+                    },
+                }
+            );
+
+            console.log("res", res)
+            console.log('PDF RESPONSE =>', res?.data);
+
+            if (res?.data?.success === true) {
+                setPrintAPILoading(false);
+                const pdfUrl = res?.data?.results?.sales_order;
+
+                if (!pdfUrl) {
+                    Alert.alert('PDF Error', 'PDF URL not found.');
+                    return;
+                }
+
+                // navigation.navigate('PdfViewerScreenMain', {
+                //     pdfUrl,
+                //     title: 'Sales Order',
+                // });
+                router.push({
+                    pathname: '/(tabs)/pdf-view',
+                    params: { pdfUrl, title: 'Sales Order' },
+                });
+            } else {
+                Alert.alert(
+                    'PDF Failed',
+                    res?.data?.message || 'PDF generation failed.'
+                );
+            }
+        } catch (error) {
+            console.log('PDF ERROR =>', error?.response?.data || error.message);
+            setPrintAPILoading(false);
+
+            Alert.alert(
+                'Error',
+                error?.response?.data?.message || 'Unable to generate PDF.'
+            );
+        } finally {
+            // setPdfLoading(false);
+            setPrintAPILoading(false);
         }
     };
 
@@ -534,15 +685,44 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                 style={styles.orderCard}
                 onPress={() => handleCardPress(item)}
             >
+                <View style={styles.orderHeadermain}>
+                    <Text style={styles.orderId}>{item.partyname}</Text>
+                    {/* <Text style={[styles.orderStatus, { color: getStatusColor(item.status) }]}>
+                        {item.status}
+                    </Text>
+                    <Icon name="chevron-right" size={20} color="#999" /> */}
+                    {item.status === 'PENDING' || item.status === 'PARTIAL' ? (
+                        <TouchableOpacity
+                            onPress={() => handleCardPressCurrent(item)}
+                            style={styles.orderButtonContainer}
+                        >
+                            <Text style={[styles.orderStatus, { color: '#FF0000' }]}>
+                                Closed Order
+                            </Text>
+                            <Icon name="close" size={20} color="#FF0000" />
+                        </TouchableOpacity>
+
+                    ) : null}
+                </View>
                 <View style={styles.orderHeader}>
                     <Text style={styles.orderId}>SO-{item.sono}</Text>
                     <Text style={[styles.orderStatus, { color: getStatusColor(item.status) }]}>
                         {item.status}
                     </Text>
-                    <Icon name="chevron-right" size={20} color="#999" />
+                    {/* <Icon name="chevron-right" size={20} color="#999" /> */}
+                    <TouchableOpacity
+                        onPress={() => printSalesOrderPdf(item, 'A4')}
+                        style={styles.orderButtonContainer}
+                    >
+                        {printAPILoading ? (
+                            <ActivityIndicator size={20} color="#0000ff" />
+                        ) : (
+                            <Icon name="print" size={20} color="blue" />
+                        )}
+                    </TouchableOpacity>
                 </View>
 
-                <Text style={styles.orderDate}>{item.sodate}</Text>
+                <Text style={styles.orderDate}>Sodate: {item.sodate} | Duedate: {item.duedate}</Text>
                 <Text style={styles.designShadeText}>
                     {item.Dsnname} | Shade: {item.shdname}
                 </Text>
@@ -575,6 +755,12 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                 )}
 
                 <Text style={styles.orderQty}>
+                    Bal Qty: {item.BQty}
+                </Text>
+                <Text style={styles.orderQty}>
+                    Unit Rate: {item.UnitRate}
+                </Text>
+                <Text style={styles.orderQty}>
                     Qty: {item.chalqty}/{item.totmtr}
                 </Text>
             </TouchableOpacity>
@@ -585,11 +771,10 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
         <>
             {apiloading && <FullScreenLoader />}
             <HeaderBarwithBack
-                userName={''}
-                // header={party && party?.partyname || party || ""}
+                userName={username}
+                header={party && party?.partyname || party || ""}
                 subHeader={'Manage your Sales Orders'}
-                backNavigateScreen={'Sales Order Tracking'}
-                breadcrumbWithNoHome={params.party}
+                breadcrumb={getPartyName}
                 SearchBar={false}
             />
 
@@ -684,7 +869,14 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
                     </>
                 )}
 
-                <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text>
+                {/* <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text> */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.sectionTitle}>SALES ORDERS ({filteredOrders.length})</Text>
+                    <TouchableOpacity onPress={toggleSortOrder} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Icon name={sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'} size={16} color="#333" />
+                        <Text style={{ fontSize: 12, color: '#333', marginLeft: 4 }}>Sort by Date</Text>
+                    </TouchableOpacity>
+                </View>
                 <View style={styles.deliveryContainer123}>
                     <FlatList
                         data={renderedOrders}
@@ -848,6 +1040,21 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 5,
+    },
+    orderHeadermain: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 5,
+        paddingBottom: 4,
+        // borderColor: 'rgba(0,0,0,0.1)',
+        borderColor: theme.BORDER,
+        // borderWidth: 2,
+        borderBottomWidth: 2,
+    },
+    orderButtonContainer: {
+        display: 'flex',
+        flexDirection: 'row'
     },
     orderId: {
         fontSize: 14,

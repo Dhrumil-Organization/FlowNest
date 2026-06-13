@@ -1,37 +1,42 @@
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+    View,
+    Text,
+    FlatList,
+    TextInput,
+    TouchableOpacity,
+    Alert,
+    TextInput as RNTextInput,
+    Modal,
+    ActivityIndicator,
+    Linking,
+    LayoutAnimation,
+    ScrollView,
+    ToastAndroid,
+    Share,
+    StyleSheet
+} from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    LayoutAnimation,
-    Modal,
-    Platform,
-    TextInput as RNTextInput,
-    ScrollView,
-    Share,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
 // import RNFS from 'react-native-fs';
+// import { Buffer } from 'buffer';
 // import Pdf from 'react-native-pdf';
-import { API } from '@/common/API/dynamicAPI';
-import { fetchAllStoredata } from '@/common/API/Functions';
-import { crlimtreq_styles } from '@/common/Style';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import HeaderBar from '@/components/Header';
-import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system/legacy';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as MediaLibrary from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
-import { WebView } from 'react-native-webview';
-import CriteriaForm from './CriteriaForm';
+import { crlimtreq_styles } from '@/common/Style';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
-
+import HeaderBar from '@/components/Header';
+// import { encode as btoa } from  'base-64';
+// import { urlSafeEncode } from './urlSafeEncode';
+// import { encodeData } from './encodingUtils';
+import { LinearGradient } from 'expo-linear-gradient';
+import theme from '@/components/theme';
+import { API } from '../../common/API/dynamicAPI';
+// import CriteriaForm from './CriteriaForm';
+import { fetchAllStoredata } from '../../common/API/Functions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// import { useNavigation } from '@react-navigation/native';
+// import { navigate } from '../../android/app/src/navigation/NavigationService';
+import { useRouter } from 'expo-router';
 interface CardData {
     [key: string]: string;
     isProcessed: boolean;
@@ -41,6 +46,8 @@ interface CardData {
 
 interface Props {
     token: string;
+    // navigation: any;
+    isConnected: boolean | null;
     username: string;
 }
 
@@ -125,7 +132,8 @@ interface D1datakeys {
     LastShade: string;
 }
 
-const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
+const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, username, ...rest }) => {
+    const router = useRouter();
     const [searchQueryYPO, setSearchQueryYPO] = useState('');
     const [searchhistoryQueryYPO, setSearchhistoryQueryYPO] = useState('');
     const [searchverifyQueryYPO, setSearchverifyQueryYPO] = useState('');
@@ -169,11 +177,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
     const [getAllStoreData, setAllStoreData] = useState([]);
     const [FormState, setFormState] = useState({
         values: {
+            PrpType: '',
             PrpCode: '',
             YearNo: '',
             StrCode: ''
         }
     })
+
+    const [mailLogData, setMailLogData] = useState([]);
+    const [mailLogModal, setMailLogModal] = useState(false);
+    const [prptype, setPrptype] = useState('');
+
     const didFetchStore = useRef(false);
     const cancelTokenRef = useRef(null);
     const didInitialFetch = useRef(false);
@@ -185,6 +199,342 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
     const [subCardData, setSubCardData] = useState<{ [key: string]: D1datakeys[] }>({});
     const [loadingSubCard, setLoadingSubCard] = useState<{ [key: string]: boolean }>({});
 
+    const [chartVisible, setChartVisible] = useState(false);
+    const [chartData, setChartData] = useState<any>(null);
+    const [chartLoading, setChartLoading] = useState(false);
+    const [chartPayload, setChartPayload] = useState(null);
+    const [ChartHelp, setChartHelpOpen] = useState(false);
+
+    // console.log("ROUTES:", navigation.getState()?.routeNames);
+    // const styles = StyleSheet.create({
+    //     modalContainer: {
+    //         flex: 1,
+    //         backgroundColor: 'rgba(0,0,0,0.4)',
+    //         justifyContent: 'center',
+    //         alignItems: 'center'
+    //     },
+
+    //     modalContent: {
+    //         width: '100%', // ✅ simple responsive
+    //         maxHeight: '90%',
+    //         backgroundColor: '#fff',
+    //         borderRadius: 16,
+    //         padding: 16
+    //     },
+
+    //     modalTitle: {
+    //         fontSize: 18, // ✅ fixed
+    //         fontWeight: '700',
+    //         marginBottom: 14,
+    //         color: '#1e88e5',
+    //         textAlign: 'center'
+    //     },
+
+    //     logCard: {
+    //         backgroundColor: '#f4f8f4',
+    //         borderRadius: 12,
+    //         padding: 14,
+    //         marginBottom: 12,
+    //     },
+
+    //     logHeaderBox: {
+    //         backgroundColor: '#6d756d',
+    //         paddingVertical: 6,
+    //         borderRadius: 6,
+    //         marginBottom: 10
+    //     },
+
+    //     logHeader: {
+    //         textAlign: 'center',
+    //         fontWeight: 'bold',
+    //         fontSize: 15,
+    //         color: '#fff'
+    //     },
+
+    //     rowBox: {
+    //         flexDirection: 'row',
+    //         justifyContent: 'space-between',
+    //         alignItems: 'flex-start',
+    //         marginBottom: 6
+    //     },
+
+    //     label: {
+    //         fontSize: 12,
+    //         color: '#555',
+    //         fontWeight: '600',
+    //         flex: 1
+    //     },
+
+    //     value: {
+    //         fontSize: 12,
+    //         color: '#0a0a0a',
+    //         flex: 1.2,
+    //         textAlign: 'left'
+    //     },
+
+    //     closeBtn: {
+    //         backgroundColor: '#1e88e5',
+    //         paddingVertical: 12,
+    //         borderRadius: 10,
+    //         alignItems: 'center',
+    //         marginTop: 10
+    //     },
+
+    //     closeText: {
+    //         color: '#fff',
+    //         fontSize: 15,
+    //         fontWeight: '600'
+    //     },
+
+    //     fixedCardWrapper: {
+    //         position: 'relative',   // 🔥 REQUIRED
+    //     },
+
+    //     fixedStampContainer: {
+    //         position: 'absolute',
+    //         top: 0,
+    //         right: 8,
+    //         zIndex: 999,
+    //     },
+
+    //     fixedStamp: {
+    //         paddingHorizontal: 10,
+    //         paddingVertical: 4,
+    //         borderRadius: 4,
+    //         minWidth: 100,
+    //         alignItems: 'center',
+    //         transform: [{ rotate: '-10deg' }], // less tilt
+    //         elevation: 4,
+    //     },
+
+    //     fixedStampText: {
+    //         color: '#fff',
+    //         fontWeight: 'bold',
+    //         fontSize: 11,
+    //         letterSpacing: 1,
+    //     },
+    // });
+
+    const styles = StyleSheet.create({
+
+        card: {
+            backgroundColor: '#fff',
+            marginVertical: 8,
+            marginHorizontal: 12,
+            borderRadius: 12,
+            padding: 14,
+            elevation: 3
+        },
+
+        acceptedCard: {
+            borderLeftWidth: 4,
+            borderLeftColor: '#4CAF50'
+        },
+
+        rejectedCard: {
+            borderLeftWidth: 4,
+            borderLeftColor: '#F44336'
+        },
+
+        headerRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+
+        poNo: {
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#333'
+        },
+
+        date: {
+            fontSize: 12,
+            color: '#777'
+        },
+
+        statusChip: {
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 20
+        },
+
+        party: {
+            marginTop: 6,
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#444'
+        },
+
+        row: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 6
+        },
+
+        label: {
+            color: '#888',
+            fontSize: 12
+        },
+
+        value: {
+            color: '#222',
+            fontWeight: '500'
+        },
+
+        actionRow: {
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            marginTop: 10
+        },
+
+        iconBtn: {
+            marginLeft: 8,
+            padding: 8,
+            borderRadius: 8,
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        // chatIconBtn: {
+        //     position: 'absolute',
+        //     top: 8,
+        //     right: 8,
+        //     backgroundColor: '#4A90E2',
+        //     padding: 6,
+        //     borderRadius: 20,
+        //     elevation: 3, // android shadow
+        //     shadowColor: '#000',
+        //     shadowOpacity: 0.2,
+        //     shadowOffset: { width: 0, height: 2 },
+        //     shadowRadius: 3,
+        //     zIndex: 10
+        // },
+
+        chatIconBottom: {
+            marginTop: 10,
+            alignSelf: 'flex-end',  // right side niche
+            backgroundColor: '#2196F3',
+            padding: 8,
+            borderRadius: 20
+        },
+
+        expandHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 12,
+            paddingTop: 10,
+            borderTopWidth: 1,
+            borderColor: '#eee'
+        },
+
+        expandText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#333'
+        },
+
+        itemContainer: {
+            marginTop: 8
+        },
+
+        itemCard: {
+            backgroundColor: '#fff',
+            borderRadius: 12,
+            padding: 14,
+            marginBottom: 12,
+            elevation: 3,
+        },
+
+        itemHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 10,
+        },
+
+        itemTitle: {
+            fontSize: 15,
+            color: '#222',
+            flex: 1,
+            paddingRight: 10,
+            fontWeight: 'bold',
+            marginBottom: 6,
+        },
+
+        chartBtn: {
+            backgroundColor: '#2196F3',
+            padding: 8,
+            borderRadius: 8,
+            elevation: 2,
+        },
+
+        itemGrid: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+        },
+
+        itemBox: {
+            width: '48%',
+            marginBottom: 10,
+        },
+
+        itemLabel: {
+            fontSize: 11,
+            color: '#888',
+        },
+
+        itemValue: {
+            fontSize: 13,
+            fontWeight: '500',
+            color: '#333',
+        },
+
+        // itemTitle: {
+        //     fontWeight: 'bold',
+        //     fontSize: 14,
+        //     marginBottom: 6,
+        //     color: '#222'
+        // },
+
+        itemRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 4
+        },
+
+        itemLabel: {
+            fontSize: 12,
+            color: '#888'
+        },
+
+        itemValue: {
+            fontSize: 13,
+            fontWeight: '500',
+            color: '#333'
+        },
+    });
+
+    useEffect(() => {
+        const getType = async () => {
+            const type = await AsyncStorage.getItem('user_prptype');
+            setPrptype(type);
+        };
+        getType();
+    }, []);
+
+    useEffect(() => {
+        if (!token) return;
+        if (activeTab1YPO === 'history') {
+            fetchAllHistoryData();
+        } else if (activeTab1YPO === 'requests') {
+            fetchData();
+        } else if (activeTab1YPO === 'verify') {
+            fetchAllVerifyData();
+        }
+    }, [activeTab1YPO, token]);
 
     const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
     const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
@@ -267,9 +617,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
         }
     };
     */
-    const fetchData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+    console.log("TESTING 1234123123123")
+
+    const fetchData = useCallback(async () => {
+        console.log("TESTING")
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -305,10 +658,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
+                    'x-platform': 'mob'
                 },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
+            console.log("response", response)
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => ({
                     ...item,
@@ -324,7 +679,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -378,7 +733,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
     */
     const fetchHistoryData = useCallback(async (parcode: string, prptype: string) => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -415,7 +770,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -467,7 +822,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
     */
     const fetchAllHistoryData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -497,20 +852,20 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 strtype: strtypeFromApi
             };
 
-            console.log("payload", payload);
+
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}`, 'x-platform': 'mob' },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
-
+            console.log("payloadAllHistory", payload, response);
             setAllHistoryDataYPO(response?.data?.response?.data || []);
             setData([]);
             setAllVerifyDataYPO([]);
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -564,7 +919,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
     */
     const fetchAllVerifyData = useCallback(async () => {
 
-        if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
+        // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
             cancelTokenRef.current.cancel();
@@ -596,7 +951,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
 
             console.log("payload", payload);
             const response = await axios.get(`${API}/api/purchaseorderbrowse`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { Authorization: `Bearer ${token}`, 'x-platform': 'mob' },
                 params: payload,
                 cancelToken: cancelTokenRef.current.token
             });
@@ -607,7 +962,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -615,24 +970,23 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
 
     }, [FormState.values.StrCode, token]);
 
-    useEffect(() => {
-        if (!token) return;
+    // useEffect(() => {
+    //     // if (!didInitialFetch.current) {
+    //     //     didInitialFetch.current = true;
+    //     //     return;
+    //     // }
+    //     if(!token) return;
 
-        if (!didInitialFetch.current) {
-            didInitialFetch.current = true;
-            return;
-        }
+    //     if (activeTab1YPO === 'history') {
+    //         fetchAllHistoryData();
+    //     } else if (activeTab1YPO === 'requests') {
+    //         fetchData();
+    //     } else if (activeTab1YPO === 'verify') {
+    //         fetchAllVerifyData();
+    //     }
 
-        if (activeTab1YPO === 'history') {
-            fetchAllHistoryData();
-        } else if (activeTab1YPO === 'requests') {
-            fetchData();
-        } else if (activeTab1YPO === 'verify') {
-            fetchAllVerifyData();
-        }
-
-        //}, [activeTab1YPO, fetchData, fetchAllHistoryData, fetchAllVerifyData]);
-    }, [activeTab1YPO, token]);
+    //     //}, [activeTab1YPO, fetchData, fetchAllHistoryData, fetchAllVerifyData]);
+    // }, [activeTab1YPO, token]);
 
     const handleListIconClick = async (prpcode: string, prptype: string, yearno: string, parcode: string) => {
         setActiveTabYPO('party');
@@ -665,7 +1019,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                // Alert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -825,7 +1179,65 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
         flatVerifyListRefYPO.current?.scrollToOffset({ offset: 0, animated: true });
     };
 
+    const sendmailorder = async (selectedItem) => {
+        try {
+            setIsLoadingYPO(true);
 
+            const yno = await AsyncStorage.getItem('yno');
+
+            const removed1 = { ...selectedItem };
+
+            const today = new Date().toISOString().split('T')[0];
+
+            const authItem = {
+                UId: selectedItemYPO?.UId,
+                IsAuth: selectedItemYPO?.IsAuth,
+                ParName: selectedItemYPO?.ParName,
+                Remark: selectedItemYPO?.Remark,
+                PODate: selectedItemYPO?.PODate,
+                PONo: selectedItemYPO?.PONo,
+                NPODate: selectedItemYPO?.NPODate,
+                mailsent: selectedItemYPO?.mailsent,
+                strcode: selectedItemYPO?.StrCode,
+                CreatedDate: today,
+                ARemark: editableValuesYPO[selectedItemYPO.UId]?.ARemark || selectedItemYPO.ARemark || ''
+            };
+
+            const authArray = [authItem];
+            // delete removed1.d1; // 
+
+            const payload = {
+                prpcode: selectedItem?.PrpCode || '',
+                yearno: yno,
+                strcode: selectedItem?.StrCode || '',
+                sodate: selectedItem?.PODate || '',
+                auth: authArray,
+                txntype: 'purchase_order_auth',
+                mailtxntype: 'purchase_order_detail'
+            };
+
+            console.log('📤 MAIL PAYLOAD:', payload);
+
+            const response = await axios.post(
+                `${API}/api/send_mail_order`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            console.log('📥 MAIL RESPONSE:', response);
+
+        } catch (error) {
+            console.log('❌ Mail Error:', error);
+            Alert.alert('Error', 'Mail API failed');
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    };
 
     const handleConfirmAction = async () => {
         if (!selectedItemYPO) return;
@@ -898,6 +1310,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                     setTimeout(() => {
                         setSuccessYPO(false);
                         setShowOverlayYPO(false);
+
+                        if (selectedActionYPO === 'accept' && prptype === 'R') {
+                            console.log('✅ Calling Mail API after success message...');
+                            sendmailorder(selectedItemYPO);
+                        }
+
                     }, 2000);
 
                     setData(prevData => {
@@ -933,74 +1351,61 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
         }
     };
 
-    // const handleCallURL = async (item: CardData) => {
-    //     setSelectedItem(item);
-    //     setLocationLoading(true);
-    //     setPdfLoading(true);
-    //     try {
-    //         const headers = {
-    //             Authorization: `Bearer ${getToken()}`,
-    //             'Content-Type': 'application/json',
-    //             'X-Requested-with': 'XMLHttpRequest',
-    //         };
-    //         const apiResp = await axios.post(
-    //             `${API}/api/saleschallanmultiprintnew`,
-    //             {
-    //                 prpcode: item.PrpCode,
-    //                 yearno: item.yearno,
-    //                 strcode: item.StrCode,
-    //                 printTypes: ['purchase_order_detail'],
-    //                 uid: item.UId,
-    //                 txntype: "purchase_order_detail",
-    //                 printFormat: 'A4',
-    //             },
-    //             { headers }
-    //         );
-    //         const pdfUrlFromApi = apiResp?.data?.results?.purchase_order_detail;
-    //         if (!pdfUrlFromApi) {
-    //             Alert.alert('Error', 'PDF URL not found in server response');
-    //             return;
-    //         }
-    //         const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
-    //         if (!pdfResp || !pdfResp.data) {
-    //             Alert.alert('Error', 'Failed to download PDF bytes');
-    //             return;
-    //         }
-    //         const buffer = Buffer.from(new Uint8Array(pdfResp.data));
-    //         const base64PDF = buffer.toString('base64');
-    //         const fileName = `yarn_purchase_order_${Date.now()}.pdf`;
-    //         // const localPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-    //         // await RNFS.writeFile(localPath, base64PDF, 'base64');
-    //         const localPath = `${FileSystem.documentDirectory}${fileName}`;
 
-    //         await FileSystem.writeAsStringAsync(localPath, base64PDF, {
-    //             encoding: 'base64' as any
-    //         });
-    //         // setPdfUrl(`file://${localPath}`);
-    //         setPdfUrl(localPath);
-    //         setPdfPublicUrl(pdfUrlFromApi);
-    //         setShowPdfModal(true);
-    //     } catch (err: any) {
-    //         console.error('handleCallURL error:', err);
-    //         Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
-    //     } finally {
-    //         setLocationLoading(false);
-    //         setPdfLoading(false);
-    //     }
-    // };
+    const handleInfoClick = async (selectedItem) => {
+        try {
+            setIsLoadingYPO(true);
+
+            const yno = await AsyncStorage.getItem('yno');
+
+            const payload = {
+                prpcode: selectedItem?.PrpCode || '',
+                uid: selectedItem?.UId || '',
+                yearno: yno,
+                strcode: selectedItem?.StrCode || '',
+                txntype: 'purchase_order_auth',
+            };
+
+            console.log("payload", payload);
+
+            const response = await axios.get(
+                `${API}/api/mailordersentlog`,
+                {
+                    params: payload,
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            console.log("response", response);
+
+            if (response?.data?.success && response.data.data?.length > 0) {
+                setMailLogData(response.data.data);
+                setMailLogModal(true);
+            } else {
+                Alert.alert('Info', 'No Data Found');
+            }
+
+        } catch (error) {
+            console.log('❌ Mail Error:', error);
+            Alert.alert('Error', 'Mail API failed');
+        } finally {
+            setIsLoadingYPO(false);
+        }
+    };
+
 
     const handleCallURL = async (item: CardData) => {
         setSelectedItem(item);
-        setLocationLoading(true);
+        setLocationLoading(item.UId);
         setPdfLoading(true);
-
         try {
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
-
             const apiResp = await axios.post(
                 `${API}/api/saleschallanmultiprintnew`,
                 {
@@ -1014,30 +1419,31 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 },
                 { headers }
             );
-
-            const pdfUrlFromApi = apiResp?.data?.results?.purchase_order_detail;
-
-            if (!pdfUrlFromApi) {
-                Alert.alert('Error', 'PDF URL not found');
-                return;
-            }
-
-            const fileName = `yarn_purchase_order_${Date.now()}.pdf`;
-            const fileUri = `${FileSystem.documentDirectory}${fileName}`;
-
-            // ✅ NEW DOWNLOAD METHOD
-            const downloadedFile = await FileSystem.downloadAsync(
-                pdfUrlFromApi,
-                fileUri
-            );
-
-            setPdfUrl(downloadedFile.uri);
-            setPdfPublicUrl(pdfUrlFromApi);
-            setShowPdfModal(true);
-
+            const pdfUrl = apiResp?.data?.results?.purchase_order_detail;
+            router.push({
+                pathname: '/(tabs)/pdf-view',
+                params: { pdfUrl, title: 'Purchase Order' },
+            });
+            // if (!pdfUrlFromApi) {
+            //     Alert.alert('Error', 'PDF URL not found in server response');
+            //     return;
+            // }
+            // const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
+            // if (!pdfResp || !pdfResp.data) {
+            //     Alert.alert('Error', 'Failed to download PDF bytes');
+            //     return;
+            // }
+            // const buffer = Buffer.from(new Uint8Array(pdfResp.data));
+            // const base64PDF = buffer.toString('base64');
+            // const fileName = `yarn_purchase_order_${Date.now()}.pdf`;
+            // const localPath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+            // await RNFS.writeFile(localPath, base64PDF, 'base64');
+            // setPdfUrl(`file://${localPath}`);
+            // setPdfPublicUrl(pdfUrlFromApi);
+            // setShowPdfModal(true);
         } catch (err: any) {
             console.error('handleCallURL error:', err);
-            Alert.alert('Error', err?.message || 'Failed to fetch PDF');
+            Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
         } finally {
             setLocationLoading(false);
             setPdfLoading(false);
@@ -1055,168 +1461,204 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
     };
 
     // PdfViewerModal inside component (updated handleDownload)
-    const PdfViewerModal = ({ visible, pdfUrl, pdfPublicUrl, onClose }: {
-        visible: boolean;
-        pdfUrl: string;
-        pdfPublicUrl?: string | null;
-        onClose: () => void;
-    }) => {
-        const [webViewKey, setWebViewKey] = useState(0);
-        const [saving, setSaving] = useState(false);
+    // const PdfViewerModal = ({ visible, pdfUrl, pdfPublicUrl, onClose }: {
+    //     visible: boolean;
+    //     pdfUrl: string;
+    //     pdfPublicUrl?: string | null;
+    //     onClose: () => void;
+    // }) => {
+    //     const [webViewKey, setWebViewKey] = useState(0);
+    //     const [saving, setSaving] = useState(false);
 
-        // const handleDownload = async () => {
-        //     try {
-        //         if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
-        //         if (Platform.OS === 'ios') {
-        //             await shareLocalFile(pdfUrl);
-        //             return;
-        //         }
-        //         const localPath = pdfUrl.startsWith('file://') ? pdfUrl.replace('file://', '') : pdfUrl;
-        //         const fileName = localPath.split('/').pop() || `document_${Date.now()}.pdf`;
-        //         const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+    //     // const handleDownload = async () => {
+    //     //     try {
+    //     //         if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //     //         if (Platform.OS === 'ios') {
+    //     //             await shareLocalFile(pdfUrl);
+    //     //             return;
+    //     //         }
+    //     //         const localPath = pdfUrl.startsWith('file://') ? pdfUrl.replace('file://', '') : pdfUrl;
+    //     //         const fileName = localPath.split('/').pop() || `document_${Date.now()}.pdf`;
+    //     //         const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+    //     //         console.log("localPath", localPath);
+    //     //         try {
+    //     //             await RNFS.copyFile(localPath, destPath);
+    //     //             if (ToastAndroid) {
+    //     //                 ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
+    //     //             } else {
+    //     //                 Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //     //             }
+    //     //         } catch (copyErr: any) {
+    //     //             console.error('copyFile failed', copyErr);
+    //     //             Alert.alert(
+    //     //                 'Save failed',
+    //     //                 'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
+    //     //                 [
+    //     //                     { text: 'Cancel', style: 'cancel' },
+    //     //                     { text: 'Open Settings', onPress: () => openManageAllFilesPermission() },
+    //     //                     { text: 'Share', onPress: () => shareLocalFile(pdfUrl) }
+    //     //                 ]
+    //     //             );
+    //     //         }
+    //     //     } catch (err) {
+    //     //         console.error('handleDownload error', err);
+    //     //         Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //     //     }
+    //     // };
 
-        //         try {
-        //             await RNFS.copyFile(localPath, destPath);
-        //             if (ToastAndroid) {
-        //                 ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
-        //             } else {
-        //                 Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
-        //             }
-        //         } catch (copyErr: any) {
-        //             console.error('copyFile failed', copyErr);
-        //             Alert.alert(
-        //                 'Save failed',
-        //                 'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
-        //                 [
-        //                     { text: 'Cancel', style: 'cancel' },
-        //                     { text: 'Open Settings', onPress: () => openManageAllFilesPermission() },
-        //                     { text: 'Share', onPress: () => shareLocalFile(pdfUrl) }
-        //                 ]
-        //             );
-        //         }
-        //     } catch (err) {
-        //         console.error('handleDownload error', err);
-        //         Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
-        //     }
-        // };
+    //     const handleClose = () => {
+    //         setWebViewKey(prev => prev + 1);
+    //         onClose();
+    //     };
 
-        const requestPermission = async () => {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            return status === 'granted';
-        };
+    //     const openDrawer = () => setChartHelpOpen(true);
+    //     const closeDrawer = () => setChartHelpOpen(false);
 
-        const handleDownload = async () => {
-            try {
-                if (!pdfPublicUrl) {
-                    Alert.alert('No file');
-                    return;
-                }
+    //     return (
+    //         <Modal visible={visible} animationType="slide" onRequestClose={handleClose} presentationStyle="fullScreen">
+    //             <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    //                 <View style={crlimtreq_styles.pdfHeader}>
+    //                     <TouchableOpacity onPress={handleDownload} style={crlimtreq_styles.pdfHeaderButton} disabled={saving || !pdfUrl}>
+    //                         <Icon name="download" size={24} color={saving ? "#999" : "#000"} />
+    //                         <Text style={crlimtreq_styles.pdfHeaderButtonText}>{saving ? 'Saving...' : 'Download'}</Text>
+    //                     </TouchableOpacity>
 
-                if (Platform.OS === 'android') {
-                    const fileName = `purchase_order_${Date.now()}.pdf`;
-                    const fileUri = FileSystem.documentDirectory + fileName;
+    //                     <TouchableOpacity onPress={handleClose} style={crlimtreq_styles.pdfHeaderButton}>
+    //                         <Icon name="close" size={24} color="#000" />
+    //                         <Text style={crlimtreq_styles.pdfHeaderButtonText}>Close</Text>
+    //                     </TouchableOpacity>
+    //                 </View>
 
-                    // 🔥 Download again directly
-                    const download = await FileSystem.downloadAsync(
-                        pdfPublicUrl,
-                        fileUri
-                    );
+    //                 <View style={{ flex: 1 }}>
+    //                     {
+    //                         pdfUrl ?
+    //                             (
+    //                                 <Pdf
+    //                                     source={{ uri: pdfUrl }}
+    //                                     style={{ flex: 1 }}
+    //                                     onError={(e) => {
+    //                                         console.error('react-native-pdf error', e);
+    //                                         Alert.alert('Error', 'Failed to render PDF');
+    //                                     }}
+    //                                 />
+    //                             )
+    //                             :
+    //                             (
+    //                                 <View style={crlimtreq_styles.pdfLoading}> <Text>No PDF</Text> </View>
+    //                             )
+    //                     }
+    //                 </View>
+    //             </View>
+    //         </Modal>
+    //     );
+    // };
 
-                    // 👉 Share (best reliable way Android)
-                    await Sharing.shareAsync(download.uri);
+    // const userPtype = await AsyncStorage.getItem('user_prptype');
 
-                    Alert.alert("✅ Done", "File ready to share/save");
+    const buildChartPayload = (item: any, d1Item: any) => ({
+        prptype: prptype,
+        yearno: item.yearno,
+        prpcode: item.PrpCode,
+        uid: item.UId,
+        strcode: item.StrCode,
+        itemcode: d1Item.ItmCode,
+        parcode: item.ParCode,
+    });
 
-                } else {
-                    // iOS
-                    await Sharing.shareAsync(pdfUrl);
-                }
+    console.log("PRPTYPE 1 ::- ", FormState.values.PrpType)
+    console.log("PRPTYPE 2 ::- ", prptype)
 
-            } catch (err) {
-                console.log("Download error:", err);
-                Alert.alert('Error', 'Download failed');
+    const fetchPurchaseOrderChart = async (payload: any) => {
+        try {
+            const response = await fetch(`${API}/api/purchase_order_chart`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            console.log("payload :- ", payload)
+
+            const result = await response.json();
+
+            console.log("result :- ", result)
+
+            if (!response.ok) {
+                throw new Error(result?.message || 'API Error');
             }
-        };
 
-        const handleClose = () => {
-            setWebViewKey(prev => prev + 1);
-            onClose();
-        };
+            return result;
 
-        return (
-            <Modal visible={visible} animationType="slide" onRequestClose={handleClose} presentationStyle="fullScreen">
-                <View style={{ flex: 1, backgroundColor: '#fff' }}>
-                    <View style={crlimtreq_styles.pdfHeader}>
-                        <TouchableOpacity onPress={handleDownload} style={crlimtreq_styles.pdfHeaderButton} disabled={saving || !pdfUrl}>
-                            <Icon name="download" size={24} color={saving ? "#999" : "#000"} />
-                            <Text style={crlimtreq_styles.pdfHeaderButtonText}>{saving ? 'Saving...' : 'Download'}</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={handleClose} style={crlimtreq_styles.pdfHeaderButton}>
-                            <Icon name="close" size={24} color="#000" />
-                            <Text style={crlimtreq_styles.pdfHeaderButtonText}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                        {/* {
-                            pdfUrl ?
-                                (
-                                    <Pdf
-                                        source={{ uri: pdfUrl }}
-                                        style={{ flex: 1 }}
-                                        onError={(e) => {
-                                            console.error('react-native-pdf error', e);
-                                            Alert.alert('Error', 'Failed to render PDF');
-                                        }}
-                                    />
-                                )
-                                :
-                                (
-                                    <View style={crlimtreq_styles.pdfLoading}> <Text>No PDF</Text> </View>
-                                )
-                        } */}
-                        {
-                            pdfUrl ? (
-                                // <WebView
-                                //     source={{ uri: pdfUrl }}
-                                //     style={{ flex: 1 }}
-                                //     startInLoadingState
-                                //     useWebKit={true}
-                                // />
-                                // <WebView
-                                //     source={{
-                                //         uri: pdfPublicUrl
-                                //             ? `https://docs.google.com/gview?embedded=true&url=${pdfPublicUrl}`
-                                //             : pdfUrl
-                                //     }}
-                                //     style={{ flex: 1 }}
-                                // />
-                                <WebView
-                                    source={{ uri: pdfUrl }}   // local file
-                                    style={{ flex: 1 }}
-                                    originWhitelist={['*']}
-                                    allowFileAccess
-                                    allowUniversalAccessFromFileURLs
-                                    startInLoadingState
-                                />
-                            ) : (
-                                <View>
-                                    <Text>No PDF</Text>
-                                </View>
-                            )
-                        }
-                    </View>
-                </View>
-            </Modal>
-        );
+        } catch (error) {
+            console.log('Chart API Error:', error);
+            throw error;
+        }
     };
 
+    const handleChartClick = async (item, d1Item) => {
+        const payload = {
+            prptype: prptype,
+            yearno: item.yearno,
+            prpcode: item.PrpCode,
+            uid: item.UId,
+            strcode: item.StrCode,
+            itmcode: d1Item.ItmCode,
+            parcode: item.ParCode,
+        };
+
+        console.log("📤 Chart Payload:", payload);
+
+        setChartLoading(true);
+        setChartVisible(true);
+
+        try {
+            const response = await fetch(`${API}/api/purchase_order_chart`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+
+            console.log("📊 Chart Response:", result);
+
+            if (result?.success && result?.response) {
+
+                const itemData = Array.isArray(result.response.itemwisedata)
+                    ? result.response.itemwisedata
+                    : [];
+
+                setChartData({
+                    labels: itemData.map(i => i?.label || ''),
+                    values: itemData.map(i => i?.value || 0),
+                    itemName: result.response?.itemdetail || '',
+                    partyName: result.response?.party_detail || ''
+                });
+
+            } else {
+                setChartData({
+                    labels: [],
+                    values: []
+                });
+            }
+            // setChartData(result);
+        } catch (error) {
+            console.log("❌ Chart Error:", error);
+        } finally {
+            setChartLoading(false);
+        }
+    };
 
     const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
 
         <View style={[
-            crlimtreq_styles.card,
+            crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
             item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
             {
                 item.isProcessed &&
@@ -1260,6 +1702,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Status:</Text>
                         <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
+                    </View>
+                </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
                     </View>
                 </View>
 
@@ -1358,11 +1811,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 }
             </View>
             <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={item.isProcessed ? "#ccc" : "#4CAF50"} />
+                <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
+                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={item.isProcessed}>
-                    <Icon name="cancel" size={40} color={item.isProcessed ? "#ccc" : "#F44336"} />
+                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
+                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity>
                 {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
@@ -1371,8 +1824,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                     </View>
                 </TouchableOpacity> */}
                 <TouchableOpacity
-                    onPress={() => { if (!item.isProcessed) handleCallURL(item); }}
-                    disabled={item.isProcessed || getLocationLoading}>
+                    onPress={() => { if (isConnected && !item.isProcessed) handleCallURL(item); }}
+                    disabled={!isConnected || item.isProcessed || getLocationLoading}>
                     {
                         getLocationLoading ?
                             (
@@ -1380,7 +1833,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                             )
                             :
                             (
-                                <Icon name="file-present" size={40} color={item.isProcessed ? "#ccc" : "#2196F3"} />
+                                <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
                             )
                     }
                 </TouchableOpacity>
@@ -1388,87 +1841,103 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
         </View >
     );
 
-    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
-        <View style={[
-            crlimtreq_styles.card,
-            item.IsAuth === '1' ? crlimtreq_styles.acceptedCard : item.IsAuth === '2' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card
-        ]}>
-            {
-                item.IsAuth && (
-                    <View style={crlimtreq_styles.stampContainerYOS}>
-                        <View style={[
-                            crlimtreq_styles.stamp,
-                            item.IsAuth === '1' ? crlimtreq_styles.stampAccepted : item.IsAuth === '2' ? crlimtreq_styles.stampRejected : crlimtreq_styles.stampPendingall
-                        ]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.IsAuth === '1' ? 'AUTHORISED' : item.IsAuth === '2' ? 'REJECTED' : 'PENDING'}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-            <View style={crlimtreq_styles.dateContainer}>
-                <Text style={crlimtreq_styles.dateText}>{item.PODate}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}>
-                    <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
-                </View>
-            </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.BAccName || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.NetAmt || ''}:
-                        </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.ARemark || ''}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Date:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>
-                            {item.AuthorisedDate || 'N/A'}
-                        </Text>
+    const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
+
+        const isApproved = item.IsAuth === '1';
+        const isRejected = item.IsAuth === '2';
+
+        return (
+            <View style={[
+                styles.card,
+                isApproved ? styles.acceptedCard :
+                    isRejected ? styles.rejectedCard : null
+            ]}>
+
+                {/* HEADER */}
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.poNo}>{item.PONo}</Text>
+                        <Text style={styles.date}>{item.PODate}</Text>
                     </View>
 
+                    {(isApproved || isRejected) && (
+                        <View style={[
+                            styles.statusChip,
+                            { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
+                        ]}>
+                            <Text style={{
+                                color: isApproved ? '#2E7D32' : '#C62828',
+                                fontWeight: '600'
+                            }}>
+                                {isApproved ? 'Approved' : 'Rejected'}
+                            </Text>
+                        </View>
+                    )}
                 </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth By:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthorisedBy || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.AuthStatus || ''}
-                        </Text>
-                    </View>
+
+                {/* PARTY */}
+                <Text style={styles.party}>{item.ParName}</Text>
+
+                {/* DETAILS */}
+                <View style={styles.row}>
+                    <Text style={styles.label}>Broker</Text>
+                    <Text style={styles.value}>{item.BAccName || '-'}</Text>
                 </View>
-            </View>
-            <View style={crlimtreq_styles.expandRow}>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Net Amount</Text>
+                    <Text style={styles.value}>{item.NetAmt || '-'}</Text>
+                </View>
+
+                {/* <View style={styles.row}>
+                    <Text style={styles.label}>Store</Text>
+                    <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                </View> */}
+
+                {API === "https://apiy.tms-webapp.com" && (
+                    < View style={styles.row}>
+                        <Text style={styles.label}>Store</Text>
+                        <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                    </View>
+                )}
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Auth By</Text>
+                    <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                </View>
+
+                {/* ACTION ROW */}
+                {(isApproved || isRejected) && (
+                    <View style={styles.actionRow}>
+
+                        <View style={[
+                            styles.iconBtn,
+                            { backgroundColor: isApproved ? '#4CAF50' : '#F44336' }
+                        ]}>
+                            <Icon
+                                name={isApproved ? 'check' : 'close'}
+                                size={20}
+                                color="#fff"
+                            />
+                        </View>
+
+                        {/* <TouchableOpacity
+                            style={[styles.iconBtn, { backgroundColor: '#2196F3' }]}
+                            onPress={() => console.log('Chart clicked', item)}
+                        >
+                            <Icon name="bar-chart" size={20} color="#fff" />
+                        </TouchableOpacity> */}
+
+                    </View>
+                )}
+
+                {/* 🔽 EXPAND BUTTON */}
                 <TouchableOpacity
-                    style={crlimtreq_styles.expandButton}
-                    onPress={() => toggleExpandHistory(item.UId, item)}
+                    style={styles.expandHeader}
+                    onPress={() => toggleExpandHistory(item.UId)}
                 >
-                    <Text style={crlimtreq_styles.expandText}>
-                        Items: {item.d1?.length || 0}
+                    <Text style={styles.expandText}>
+                        Items ({item.d1?.length || 0})
                     </Text>
 
                     <Icon
@@ -1477,92 +1946,130 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                         color="#333"
                     />
                 </TouchableOpacity>
-            </View>
-            {
-                expandedHistoryCards[item.UId] && item.d1.map((d1Item, index) => (
-                    <View key={index} style={crlimtreq_styles.subCard}>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
-                            </View>
 
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
-                            </View>
+                {/* 🔽 EXPANDED ITEMS */}
+                {expandedHistoryCards[item.UId] && (
+                    <View style={styles.itemContainer}>
+                        {item.d1?.map((d1Item, index) => (
+                            // <View key={index} style={styles.itemCard}>
 
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
-                            </View>
+                            //     <Text style={styles.itemTitle}>
+                            //         {d1Item.ItmName}
+                            //     </Text>
 
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
-                            </View>
-                        </View>
-                        <View style={crlimtreq_styles.subRow1}>
-                            <View style={crlimtreq_styles.subCol}>
-                                <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
-                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
-                            </View>
-                        </View>
-                        {
-                            activeTab1YPO === 'requests' &&
-                            (
-                                <>
-                                    <View style={crlimtreq_styles.subRow1}>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
-                                        </View>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
-                                        </View>
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Grade</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Shade</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Qty</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Rate</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                            //     </View>
+
+                            //     <View style={styles.itemRow}>
+                            //         <Text style={styles.itemLabel}>Amount</Text>
+                            //         <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                            //     </View>
+
+                            //     {/* 🔵 CHAT ICON (TOP RIGHT) */}
+                            //     <TouchableOpacity
+                            //         style={[styles.chatIconBottom, { backgroundColor: '#2196F3' }]}
+                            //         onPress={() => console.log('Chart clicked', item)}
+                            //     >
+                            //         <Icon name="bar-chart" size={20} color="#fff" />
+                            //     </TouchableOpacity>
+
+                            // </View>
+
+                            <View key={index} style={styles.itemCard}>
+
+                                {/* TOP ROW (TITLE + ICON) */}
+                                <View style={styles.itemHeader}>
+                                    <Text style={styles.itemTitle}>
+                                        {d1Item.ItmName}
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        style={styles.chartBtn}
+                                        onPress={() => {
+                                            console.log("NAV TEST", navigation);
+                                            // navigation.navigate('ChartScreen', {
+                                            //     item,
+                                            //     d1Item,
+                                            //     token
+                                            // });
+                                            router.push({
+                                                pathname: '/ChartScreen',
+                                                params: {
+                                                    item: JSON.stringify(item),
+                                                    d1Item: JSON.stringify(d1Item),
+                                                    token: token
+
+                                                }
+                                            });
+                                        }}
+                                    // onPress={() => {
+                                    //     console.log('Chart clicked', d1Item);
+                                    //     // handleChartClick(item, d1Item);
+                                    //     handleChartClick(item, d1Item)
+                                    // }}
+
+                                    //onPress={() => handleChartClick(item, d1Item)}
+                                    >
+                                        <Icon name="bar-chart" size={18} color="#fff" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* DETAILS GRID */}
+                                < View style={styles.itemGrid} >
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Grade</Text>
+                                        <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
                                     </View>
-                                    <View style={crlimtreq_styles.subRow1}>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
-                                        </View>
-                                        <View style={crlimtreq_styles.subCol}>
-                                            <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
-                                            <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
-                                        </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Shade</Text>
+                                        <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
                                     </View>
-                                </>
-                            )
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Qty</Text>
+                                        <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Rate</Text>
+                                        <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                                    </View>
+
+                                    <View style={styles.itemBox}>
+                                        <Text style={styles.itemLabel}>Amount</Text>
+                                        <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                                    </View>
+
+                                </View>
+
+                            </View>
+                        ))
                         }
-                    </View>
-                ))
-            }
-            {/* <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                    </View>
-                </TouchableOpacity>
-            </View> */}
-        </View>
-    );
+                    </View >
+                )}
+
+            </View >
+        );
+    };
 
     const renderAllCardVerify = ({ item }: { item: AllHistoryData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' | 'pending' } }) => (
         <View style={[
@@ -1653,6 +2160,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                         </Text>
                     </View>
                 </View>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
+                        <Text style={crlimtreq_styles.value}>
+                            {item.StoreName || 'N/A'}
+                        </Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+
+                    </View>
+                </View>
             </View>
             <View style={crlimtreq_styles.expandRow}>
                 <TouchableOpacity
@@ -1669,6 +2187,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                         color="#333"
                     />
                 </TouchableOpacity>
+
             </View>
             {
                 expandedVerifyCards[item.UId] && item.d1.map((d1Item, index) => (
@@ -1746,12 +2265,26 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 ))
             }
             <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={item.isProcessed ? "#ccc" : "#4CAF50"} />
+                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={item.isProcessed}>
-                    <Icon name="cancel" size={40} color={item.isProcessed ? "#ccc" : "#F44336"} />
+                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity>
+                {prptype === 'R' && item.mailsent === '1' && (
+                    <TouchableOpacity
+                        onPress={() => handleInfoClick(item)}
+                        disabled={!isConnected}
+                    >
+                        <View style={crlimtreq_styles.infoIconContainer}>
+                            <Icon
+                                name="email"
+                                size={32}
+                                color={!isConnected ? "#ccc" : theme.BRAND_GRADIENT_END}
+                            />
+                        </View>
+                    </TouchableOpacity>
+                )}
                 {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
@@ -1770,6 +2303,241 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
         </View>
     );
 
+    const renderCommonCard = ({ item, type }: { item: any, type: 'history' | 'request' | 'verify' }) => {
+
+        const isApproved = item.IsAuth === '1';
+        const isRejected = item.IsAuth === '2';
+
+        return (
+            <View style={[
+                styles.card,
+                isApproved ? styles.acceptedCard :
+                    isRejected ? styles.rejectedCard : null
+            ]}>
+
+                {/* HEADER */}
+                <View style={styles.headerRow}>
+                    <View>
+                        <Text style={styles.poNo}>{item.PONo}</Text>
+                        <Text style={styles.date}>{item.PODate}</Text>
+                    </View>
+
+                    {(isApproved || isRejected) && (
+                        <View style={[
+                            styles.statusChip,
+                            { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
+                        ]}>
+                            <Text style={{
+                                color: isApproved ? '#2E7D32' : '#C62828',
+                                fontWeight: '600'
+                            }}>
+                                {isApproved ? 'Approved' : 'Rejected'}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* PARTY */}
+                <Text style={styles.party}>{item.ParName}</Text>
+
+                {/* DETAILS */}
+                <View style={styles.row}>
+                    <Text style={styles.label}>Broker</Text>
+                    <Text style={styles.value}>{item.BAccName || '-'}</Text>
+                </View>
+
+                <View style={styles.row}>
+                    <Text style={styles.label}>Net Amount</Text>
+                    <Text style={styles.value}>{item.NetAmt || '-'}</Text>
+                </View>
+                {API === "https://apiy.tms-webapp.com" && (
+                    < View style={styles.row}>
+                        <Text style={styles.label}>Store</Text>
+                        <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                    </View>
+                )}
+                <View style={styles.row}>
+                    <Text style={styles.label}>Auth By</Text>
+                    <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                </View>
+
+                {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
+                {
+                    type === 'verify' && (
+                        <View style={styles.actionRow}>
+                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#4CAF50' }]}>
+                                <Icon name="check" size={20} color="#fff" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#F44336' }]}>
+                                <Icon name="close" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )
+                }
+
+                {
+                    type === 'request' && (
+                        <View style={styles.actionRow}>
+
+                            {/* ✅ ACCEPT */}
+                            <TouchableOpacity
+                                onPress={() => handleIconPress(item, 'accept')}
+                                disabled={!isConnected || item.IsAuth !== '0'}
+                            >
+                                <Icon
+                                    name="check-circle"
+                                    size={35}
+                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#4CAF50"}
+                                />
+                            </TouchableOpacity>
+
+                            {/* ❌ REJECT */}
+                            <TouchableOpacity
+                                onPress={() => handleIconPress(item, 'reject')}
+                                disabled={!isConnected || item.IsAuth !== '0'}
+                            >
+                                <Icon
+                                    name="cancel"
+                                    size={35}
+                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#F44336"}
+                                />
+                            </TouchableOpacity>
+
+                            {/* 📄 FILE */}
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (isConnected && item.IsAuth === '0') {
+                                        handleCallURL(item);
+                                    }
+                                }}
+                                disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
+                            >
+                                {
+                                    getLocationLoading === item.UId ? (
+                                        <ActivityIndicator size={35} color="#2196F3" />
+                                    ) : (
+                                        <Icon
+                                            name="file-present"
+                                            size={35}
+                                            color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
+                                        />
+                                    )
+                                }
+                            </TouchableOpacity>
+
+                        </View>
+                    )
+                }
+
+                {/* 🔽 EXPAND */}
+                <TouchableOpacity
+                    style={styles.expandHeader}
+                    onPress={() => toggleExpandHistory(item.UId)}
+                >
+                    <Text style={styles.expandText}>
+                        Items ({item.d1?.length || 0})
+                    </Text>
+
+                    <Icon
+                        name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                        size={24}
+                        color="#333"
+                    />
+                </TouchableOpacity>
+
+                {/* 🔽 ITEMS */}
+                {
+                    expandedHistoryCards[item.UId] && (
+                        <View style={styles.itemContainer}>
+                            {item.d1?.map((d1Item, index) => (
+
+                                <View key={index} style={styles.itemCard}>
+
+                                    <View style={styles.itemHeader}>
+                                        <Text style={styles.itemTitle}>
+                                            {d1Item.ItmName}
+                                        </Text>
+
+                                        {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
+                                        <TouchableOpacity
+                                            style={styles.chartBtn}
+                                            // onPress={() => 
+                                            //     navigation.navigate('ChartScreen', {
+                                            //     item,
+                                            //     d1Item,
+                                            //     token
+                                            // }
+                                            // onPress={() =>
+                                            //     // console.log('Chart clicked', d1Item);
+                                            //     // handleChartClick(item, d1Item);
+                                            //     router.push({
+                                            //         pathname: '/ChartScreen',
+                                            //         params: {
+                                            //             item: item,
+                                            //             d1Item: d1Item,
+                                            //             token: token
+
+                                            //         }
+                                            //     })
+                                            // }
+                                            onPress={() =>
+                                                // console.log('Chart clicked', d1Item);
+                                                // handleChartClick(item, d1Item);
+                                                router.push({
+                                                    pathname: '/ChartScreen',
+                                                    params: {
+                                                        item: JSON.stringify(item),
+                                                        d1Item: JSON.stringify(d1Item),
+                                                        token: token
+
+                                                    }
+                                                })
+                                            }
+
+
+                                        >
+                                            <Icon name="bar-chart" size={18} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={styles.itemGrid}>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Grade</Text>
+                                            <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Shade</Text>
+                                            <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Qty</Text>
+                                            <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Rate</Text>
+                                            <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                                        </View>
+
+                                        <View style={styles.itemBox}>
+                                            <Text style={styles.itemLabel}>Amount</Text>
+                                            <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                                        </View>
+
+                                    </View>
+
+                                </View>
+                            ))}
+                        </View>
+                    )
+                }
+            </View >
+        );
+    };
 
     const TabBar = ({ activeTabYPO, setActiveTabYPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>
@@ -1860,16 +2628,17 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 />
             ) : null}
             <View style={crlimtreq_styles.container}>
-                {isLoadingYPO && <FullScreenLoader message={'Loading...'} />}
+                {isLoadingYPO && <FullScreenLoader message={"Loading..."} />}
                 <TabBar activeTabYPO={activeTab1YPO} setActiveTabYPO={setActiveTab1YPO} />
-                <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
+                {/* <TouchableOpacity style={crlimtreq_styles.listIconContainer}>
                     <Icon name="list" size={24} color="white" onPress={handleCriteriaFormOpen} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
                 {activeTab1YPO === 'requests' ? (
                     <FlatList
                         ref={flatListRefYPO}
                         data={filteredDataSPO}
-                        renderItem={renderCard}
+                        // renderItem={renderCard}
+                        renderItem={({ item }) => renderCommonCard({ item, type: 'request' })}
                         keyExtractor={(item) => item.UId}
                         contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
@@ -1896,6 +2665,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                         ref={flatHistoryListRefYPO}
                         data={filteredhistoryDataSPO}
                         renderItem={renderAllCardHistory}
+                        // renderItem={({ item }) => renderCommonCard({ item, type: 'history' })}
                         keyExtractor={(item) => item.UId}
                         contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
@@ -1921,7 +2691,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                     <FlatList
                         ref={flatVerifyListRefYPO}
                         data={filteredverifyDataSPO}
-                        renderItem={renderAllCardVerify}
+                        // renderItem={renderAllCardVerify}
+                        renderItem={({ item }) => renderCommonCard({ item, type: 'verify' })}
                         keyExtractor={(item) => item.UId}
                         contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
@@ -2163,7 +2934,148 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 </Modal>
 
             </View>
-            <PdfViewerModal
+
+            {/* <ChartScreen
+                visible={chartVisible}
+                data={chartData}
+                loading={chartLoading}
+                token={token}
+                onClose={() => setChartVisible(false)}
+            /> */}
+
+            {/* ✅ CHART MODAL (YAHAN) */}
+            <Modal
+                visible={chartVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setChartVisible(false)}
+            >
+                <View style={{ flex: 1, padding: 12 }}>
+
+                    {chartLoading && (
+                        <ActivityIndicator size="large" color="#2196F3" />
+                    )}
+
+                    {!chartLoading && chartData?.labels?.length > 0 && (
+
+                        <ScrollView horizontal>
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+
+                                {chartData.labels.map((label, index) => {
+
+                                    const rate = chartData.rate[index] || 0;
+                                    const qty = chartData.qty[index] || 0;
+
+                                    return (
+                                        <View
+                                            key={index}
+                                            style={{
+                                                marginHorizontal: 8,
+                                                alignItems: 'center'
+                                            }}
+                                        >
+
+                                            {/* RATE BAR */}
+                                            <View style={{
+                                                height: rate / 2, // scale adjust karo
+                                                width: 20,
+                                                backgroundColor: '#4CAF50',
+                                                marginBottom: 4,
+                                                borderRadius: 4
+                                            }} />
+
+                                            {/* QTY BAR */}
+                                            <View style={{
+                                                height: qty / 2,
+                                                width: 20,
+                                                backgroundColor: '#2196F3',
+                                                borderRadius: 4
+                                            }} />
+
+                                            {/* LABEL */}
+                                            <Text style={{ fontSize: 10, marginTop: 6 }}>
+                                                {label}
+                                            </Text>
+
+                                        </View>
+                                    );
+                                })}
+
+                            </View>
+                        </ScrollView>
+                    )}
+
+                    {!chartLoading && (!chartData || chartData.labels?.length === 0) && (
+                        <Text style={{ textAlign: 'center', marginTop: 20 }}>
+                            No chart data available
+                        </Text>
+                    )}
+
+                </View>
+            </Modal>
+
+            <Modal visible={mailLogModal} animationType="slide" transparent>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+
+                        <Text style={styles.modalTitle}>
+                            {mailLogData.length} Sent Log(s) found
+                        </Text>
+
+                        <FlatList
+                            data={mailLogData}
+                            keyExtractor={(item, index) => index.toString()}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 10 }}
+                            renderItem={({ item }) => (
+                                <View style={styles.logCard}>
+
+                                    <View style={styles.logHeaderBox}>
+                                        <Text style={styles.logHeader}>
+                                            {item.usrname}
+                                        </Text>
+                                    </View>
+
+                                    {[
+                                        { label: 'Sent Date', value: item.sentdt },
+                                        { label: 'From', value: item.from },
+                                        { label: 'To', value: item.to },
+                                        { label: 'Subject', value: item.subject },
+                                        { label: 'Remarks', value: item.remarks },
+                                        { label: 'Sent', value: item.mailsent }
+                                    ].map((row, index) => (
+                                        <View key={index} style={styles.rowBox}>
+                                            <Text style={styles.label}>{row.label}</Text>
+                                            <Text
+                                                style={[
+                                                    styles.value,
+                                                    row.label === 'Sent' && {
+                                                        color: row.value === 'Yes' ? '#4CAF50' : '#F44336'
+                                                    }
+                                                ]}
+                                                numberOfLines={2} // 🔥 wrap control
+                                            >
+                                                {row.value}
+                                            </Text>
+                                        </View>
+                                    ))}
+
+                                </View>
+                            )}
+                        />
+
+                        <TouchableOpacity
+                            style={styles.closeBtn}
+                            onPress={() => setMailLogModal(false)}
+                        >
+                            <Text style={styles.closeText}>Close</Text>
+                        </TouchableOpacity>
+
+                    </View>
+                </View>
+            </Modal>
+
+            {/* <PdfViewerModal
                 visible={showPdfModal}
                 pdfUrl={pdfUrl}
                 pdfPublicUrl={pdfPublicUrl}
@@ -2172,10 +3084,10 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                     setPdfUrl('');
                     setPdfPublicUrl(null);
                 }}
-            />
+            /> */}
 
 
-            <CriteriaForm
+            {/* <CriteriaForm
                 isVisible={criteriaFormOpen}
                 onClose={handleCriteriaFormClose}
                 isLoading={isLoadingYPO}
@@ -2193,7 +3105,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, username }) => {
                 fetchAllHistoryData={fetchAllHistoryData}
                 fetchAllVerifyData={fetchAllVerifyData}
                 activeTab1YPO={activeTab1YPO}
-            />
+            /> */}
         </>
     );
 };

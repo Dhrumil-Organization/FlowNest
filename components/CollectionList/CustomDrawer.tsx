@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     },
     closeButton: {
         alignSelf: 'flex-end',
-        padding: 10,
+        padding: 35,
     },
     stepIndicator: {
         alignItems: 'center',

@@ -184,3 +184,7 @@ export interface LabelMap {
         hide?: boolean;
     };
 }
+export interface InternalDropdown {
+    lable: string;
+    value: string;
+}

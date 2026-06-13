@@ -27,7 +27,7 @@ export default function Receivables_Container() {
     return (
         <>
             <Receivables token={token} username={username} />
-            <Footer />
+            {/* <Footer /> */}
         </>
     );
 }

@@ -9,7 +9,7 @@ export default function Footer() {
 
   const handleLogout = async () => {
     await AsyncStorage.clear();
-    router.replace('/(auth)/login');
+    router.replace('/(all)/landing');
     // router.push({
     //   pathname: `/(auth)/login'`,
     //   params: {

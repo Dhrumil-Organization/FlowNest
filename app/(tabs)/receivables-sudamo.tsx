@@ -23,7 +23,7 @@ export default function Receivables_Container() {
         <>
 
             <ReceivablesSudamo token={token || ''} username={username} /> :
-            <Footer/>
+            {/* <Footer/> */}
         </>
     );
 }

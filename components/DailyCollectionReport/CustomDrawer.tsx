@@ -1,21 +1,24 @@
-import theme from '@/components/theme';
-import SearchableDropdown from '@/Shared/SearchableDropdown';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Modal,
-    ScrollView,
-    StyleSheet,
+    View,
     Text,
     TouchableOpacity,
-    View
+    Modal,
+    StyleSheet,
+    Animated,
+    Dimensions,
+    Platform,
+    ScrollView,
+    ActivityIndicator,
+    TextInput,
 } from 'react-native';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { CustomDrawerProps, CustomListDrawerProps, CustomListDrawerPropsNew, DesignData, ItemData, ItemStatus } from './Modal';
+import theme from '@/components/theme';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { CustomListDrawerPropsNew, DesignData, ItemData, ItemStatus } from './Modal';
+import SearchableDropdown from '@/Shared/SearchableDropdown';
 
 const { height } = Dimensions.get('window');
 
@@ -76,6 +79,10 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
     setForm,
     setSelectedSexe,
     SelectedSexe,
+    internal_dropdown,
+    onExeChangeInternal,
+    selectedInternal,
+
     form
 }) => {
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -85,6 +92,7 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
     const [isExeDropdownOpen, setIsExeDropdownOpen] = useState(false);
     const [checkingDatePickerVisible, setCheckingDatePickerVisible] = useState(false);
     const [checkingDatePickerVisible1, setCheckingDatePickerVisible1] = useState(false);
+    const [isIntDropdownOpen, setIsIntDropdownOpen] = useState(false);
     // 
     const [searchQuery, setSearchQuery] = useState('');
     // const [selectedDesigns, setSelectedDesigns] = useState<DesignData[]>([]);
@@ -102,6 +110,8 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
     const scrollViewRefItem = useRef<ScrollView>(null);
     const [isDesignAccordionOpenItem, setIsDesignAccordionOpenItem] = useState(false);
     const [localItemStatus, setLocalItemStatus] = useState<ItemStatus>(selectedItemStatus || 'All');
+    const isPrpgrpAutoSelected = useRef(false);
+    const isInternalAutoSelected = useRef(false);
 
     const [step, setStep] = useState(1);
 
@@ -252,6 +262,12 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
         return `${day}-${month}-${year}`;
     };
 
+    useEffect(() => {
+        if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "") && !isInternalAutoSelected.current) {
+            onExeChangeInternal(internal_dropdown[0]);
+            isInternalAutoSelected.current = true;
+        }
+    }, [internal_dropdown, selectedInternal, onExeChangeInternal]);
 
     return (
         <Modal visible={isVisible} transparent animationType="none" onRequestClose={onClose}>
@@ -404,6 +420,46 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
                                 />
 
                             </View>
+                            <View style={styles.inputGroup}>
+                                {/* <Text style={styles.label}>Sales Property Group</Text> */}
+                                <TouchableOpacity
+                                    style={styles.dropdownButton}
+                                    onPress={() => setIsIntDropdownOpen(!isIntDropdownOpen)}
+                                >
+                                    <Text style={styles.dropdownText}>{selectedInternal}</Text>
+                                </TouchableOpacity>
+                                {isIntDropdownOpen && (
+                                    <View style={styles.dropdownOptionsContainer}>
+                                        <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
+                                            {/* <TouchableOpacity
+                                                                            style={styles.dropdownOption}
+                                                                            onPress={() => {
+                                                                                onExeChangeInternal(null); // Send empty value
+                                                                                setIsExeDropdownOpen(false);
+                                                                            }}
+                                                                        >
+                                                                            <Text style={styles.dropdownOptionText}>Select</Text>
+                                                                        </TouchableOpacity> */}
+                                            {internal_dropdown.map((internal) => (
+                                                <TouchableOpacity
+                                                    key={internal.value}
+                                                    style={[
+                                                        styles.dropdownOption,
+                                                        selectedInternal === internal.lable && styles.selectedOption,
+                                                    ]}
+                                                    onPress={() => {
+                                                        onExeChangeInternal(internal);
+                                                        setIsIntDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    <Text style={styles.dropdownOptionText}>{internal.lable}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
+
+                            </View>
                         </ScrollView>
 
                         {/* Load Button (Fixed at Bottom) */}
@@ -445,8 +501,7 @@ const styles = StyleSheet.create({
     },
     closeButton: {
         alignSelf: 'flex-end',
-        padding: 10,
-        marginTop: 25
+        padding: 35,
     },
     stepIndicator: {
         alignItems: 'center',

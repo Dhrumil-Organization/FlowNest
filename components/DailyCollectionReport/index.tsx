@@ -1,25 +1,23 @@
-import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '@/common/API/Functions';
-import { crlimtreq_styles } from '@/common/Style';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+    View, Text, FlatList, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Modal, ActivityIndicator, Linking, ScrollView, StyleSheet,
+    Dimensions, useWindowDimensions
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import FullScreenLoader from '@/components/FullScreenLoader';
+import { crlimtreq_styles } from '@/common/Style';
+import axios from 'axios';
+// import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
-import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    FlatList,
-    ScrollView, StyleSheet,
-    Text,
-    TextInput, TouchableOpacity,
-    useWindowDimensions,
-    View
-} from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { API } from '../../common/API/dynamicAPI';
+import { fetchPropertyData, fetchCurrentYearData, fetchPropertyGroupDataDCR, fetchPropertyDataDCR, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';
+import CollectionCard from './CollectionCard';
+// import Footer from '../Footer/Footer';
+import { API } from '../../common/API/dynamicAPI';
 
 interface CardData {
     [key: string]: string;
@@ -82,11 +80,19 @@ export interface Party {
 
 interface Props {
     token: string;
+    navigation: any;
+    isConnected: boolean | null;
     username: string;
+    setIsLoggedIn: (value: boolean) => void;
     rightsMenuApps: Array<string>;
 }
 
-const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApps }) => {
+export interface InternalDropdown {
+    lable: string;
+    value: string;
+}
+
+const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected, username, setIsLoggedIn, rightsMenuApps }) => {
     const filterKey = 'all';
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingSummary, setIsLoadingSummary] = useState(false);
@@ -105,6 +111,21 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
     const [activeTab, setActiveTab] = useState<'SalesExecutiveWise'>('SalesExecutiveWise');
     const [activeTab1, setActiveTab1] = useState<'account requests'>('account requests');
     const [selectedProperty, setSelectedProperty] = useState<PropertyData[] | null>(null);
+    const [internal_dropdown, setInternalDropdown] = useState<InternalDropdown[]>(
+        [{
+            lable: 'Internal',
+            value: '1'
+        },
+        {
+            lable: 'External',
+            value: '0'
+        },
+        {
+            lable: 'Both',
+            value: '-1'
+        }
+        ]);
+    const [selectedInternal, setSelectedInternal] = useState<InternalDropdown | "">("");
     const [SelectedSexe, setSelectedSexe] = useState<SexeData[] | null>(null);
     const [selectedPropertyGroup, setSelectedPropertyGroup] = useState<PropertyGroupData | null>(null);
     const [selectedParty, setSelectedParty] = useState<PartyData | null>(null);
@@ -168,6 +189,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
     const [sexeModalVisible, setSexeModalVisible] = useState(false);
     const [getSexeLoading, setSexeLoading] = useState(false);
     const [sexeSearchQuery, setSexeSearchQuery] = useState("");
+    const [partydetailSearchQuery, setPartyDetailSearchQuery] = useState("");
     const [gePOTData, setPOTData] = useState([])
     const [getSummaryData, setSummaryData] = useState([])
     const [getpayload, setPayload] = useState([])
@@ -193,6 +215,12 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
         setFromDate(today);
         setToDate(today);
     }, []);
+
+    useEffect(() => {
+        if (internal_dropdown.length > 0 && (!selectedInternal || selectedInternal === "")) {
+            setSelectedInternal(internal_dropdown[1]);
+        }
+    }, [internal_dropdown, selectedInternal]);
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -281,7 +309,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
             rpttype: 0,
             sexe: form?.SexeCode || [],
             fromdate: formatDate(form.fromdate),
-            todate: formatDate(form.todate)
+            todate: formatDate(form.todate),
+            internal: selectedInternal?.value || ""
         }
         fetchBrowseData(payload as any);
     };
@@ -297,7 +326,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
         };
         try {
             const params = { ...payload };
-            // console.log("🔵 payload browse", params);
+            console.log("🔵 payload browse", params);
             setPayload(params as any);
             const response = await axios.post(`${API}/api/collection_crud`, params, { headers });
             console.log("response", response)
@@ -357,7 +386,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
             rpttype: 2,
             txntype: item?.acccode && item.acccode.length > 0
                 ? "collection_acc"
-                : "collection_sexe"
+                : "collection_sexe",
+            internal: selectedInternal?.value || ""
         }
         setSexeLoading(true);
         fetchBrowseDataSEXE(payload as any);
@@ -386,7 +416,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
             };
 
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
-            // console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
+            console.log('🔵 DHRUMIL main summary\'s sexe\'s res:', payload, response);
             if (response.data.success) {
                 setSexeLoading(false);
                 const res_data = response.data.data.data.filter(
@@ -436,7 +466,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
             fromdate: formatDate(form.fromdate),
             todate: formatDate(form.todate),
             uid: item.uid,
-            srno: item.srno
+            srno: item.srno,
+            internal: selectedInternal?.value || ""
         }
         fetchcarddata(payload);
     };
@@ -453,6 +484,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                 "X-Requested-with": "XMLHttpRequest",
             };
 
+            console.log("payload", payload);
             const response = await axios.post(`${API}/api/collection_crud`, payload, { headers });
 
             // console.log("CARD DETAIL RESPONSE:", response?.data);
@@ -486,7 +518,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
     // cards detail api end here 
 
     useEffect(() => {
-        if (!token) return;
         const yearValue = selectedYear.split('-')[1].substring(2);
         const payload = {
             fromDate: new Date().toISOString().split('T')[0],
@@ -497,7 +528,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
             txntype: "mob_collection",
         }
         fetchBrowseData(payload);
-    }, [token]);
+    }, []);
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -1142,8 +1173,9 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
 
             return (
                 <>
+
                     {detailModalVisible && (
-                        <View style={styles.detailOverlay123}>
+                        <View style={styles.detailOverlay101112}>
                             <View style={styles.detailContainerLast}>
 
                                 <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
@@ -2277,9 +2309,10 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                 sexe: form?.SexeCode || [],
                 // sexe: payload.sexe,
                 fromdate: detailPayload.fromdate,
-                todate: detailPayload.todate
+                todate: detailPayload.todate,
+                internal: selectedInternal?.value || ""
             };
-            // console.log("Payload", payloadSexe)
+            console.log("Payload", payloadSexe)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
@@ -2402,9 +2435,10 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                 rpttype: 1,
                 sexe: payload?.sexe || [],
                 fromdate: detailPayload.fromdate,
-                todate: detailPayload.todate
+                todate: detailPayload.todate,
+                internal: selectedInternal?.value || ""
             };
-            // console.log("payloadSexe", payloadSexe)
+            console.log("payloadSexe", payloadSexe)
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
@@ -2585,7 +2619,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                                     getSummaryData={getSummaryData}
                                 />
 
-
                             </>
 
                         ) : (
@@ -2630,9 +2663,15 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                     selectedProperty={selectedProperty}
                     selectedPropertyGroup={selectedPropertyGroup}
                     setForm={setForm}
+                    setIsLoggedIn={setIsLoggedIn}
+                    isConnected={isConnected}
                     setSelectedSexe={setSelectedSexe}
                     SelectedSexe={SelectedSexe}
                     form={form}
+                    internal_dropdown={internal_dropdown}
+                    selectedInternal={selectedInternal?.lable || 'Select Internal'}
+                    onExeChangeInternal={setSelectedInternal}
+
 
                 // selectedItemStatus={selectedItemStatus}
                 // onItemStatusChange={handleItemStatusChange}
@@ -2998,8 +3037,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                                     ) : (
                                         <TextInput
                                             placeholder="Search..."
-                                            value={sexeSearchQuery}
-                                            onChangeText={setSexeSearchQuery}
+                                            value={partySearchQuery}
+                                            onChangeText={setPartySearchQuery}
                                             style={{
                                                 padding: 10,
                                                 borderWidth: 1,
@@ -3126,7 +3165,6 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
                         </View>
                     </View>
                 )}
-
             </GestureHandlerRootView>
         </>
     );
@@ -3279,6 +3317,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    detailOverlay101112: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
+        zIndex: 500, // Higher than summary modal
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 
     // Detail Container
     detailContainer: {
@@ -3294,7 +3343,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 4,
     },
-      detailContainerLast: {
+    detailContainerLast: {
         backgroundColor: '#fff',
         // padding: 20,
         // paddingTop: 45,
@@ -3342,44 +3391,6 @@ const modalStyles = StyleSheet.create({
         borderRadius: 5,
         margin: 10,
         fontSize: 11,
-    },
-    // 
-    detailOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        zIndex: 100, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    detailOverlay123: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent black
-        // zIndex: 100, // Higher than summary modal
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    // Detail Container
-    detailContainer: {
-        backgroundColor: '#fff',
-        // padding: 20,
-        paddingTop: 45,
-        borderRadius: 10,
-        width: '100%',
-        height: '100%',
-        elevation: 5, // Shadow for Android
-        shadowColor: '#000', // Shadow for iOS
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
     },
 });
 

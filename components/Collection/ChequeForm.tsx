@@ -18,7 +18,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 // import { launchImageLibrary } from 'react-native-image-picker';
 import * as ImagePicker from 'expo-image-picker';
 import theme from '@/components/theme';
-import CameraPage from './CameraPage'; // modal camera component
+// import CameraPage from './CameraPage'; // modal camera component
 import SearchableDropdown from '@/Shared/SearchableDropdown';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownType from '@/Shared/PartyDropdownType';
@@ -1092,13 +1092,13 @@ const ChequeForm: React.FC<Props> = ({
                                         <Text style={styles.attachText}>Gallery</Text>
                                     </TouchableOpacity>
 
-                                    <TouchableOpacity
+                                    {/* <TouchableOpacity
                                         style={[styles.primaryAttach, { marginLeft: 8 }]}
                                         onPress={() => setCameraModalVisible(true)}
                                     >
                                         <Icon name="photo-camera" size={18} color="#fff" />
                                         <Text style={styles.attachText}>Camera</Text>
-                                    </TouchableOpacity>
+                                    </TouchableOpacity> */}
                                 </>
                             )}
 
@@ -1259,7 +1259,7 @@ const ChequeForm: React.FC<Props> = ({
                 )}
 
                 {/* CAMERA MODAL */}
-                <Modal visible={isCameraModalVisible} animationType="slide" onRequestClose={() => setCameraModalVisible(false)}>
+                {/* <Modal visible={isCameraModalVisible} animationType="slide" onRequestClose={() => setCameraModalVisible(false)}>
                     <CameraPage
                         onCapture={(dataUrl) => {
                             handleCameraCapture(dataUrl);
@@ -1267,7 +1267,7 @@ const ChequeForm: React.FC<Props> = ({
                         onClose={() => setCameraModalVisible(false)}
                         isConnected={true} // Pass your connection status here
                     />
-                </Modal>
+                </Modal> */}
 
                 {/* PREVIEW MODAL */}
                 <Modal

@@ -73,6 +73,8 @@ export interface RowSelectData {
 export interface DesignData {
     DsnCode: string;
     DsnName: string;
+    ItmCode: string;
+    ItmName: string;
 }
 export interface DesignCode {
     DsnCode: string;
@@ -103,6 +105,8 @@ export interface POTData {
 }
 
 export type ItemStatus = 'All' | 'Open' | 'Closed';
+
+export type WiseStatus = 'Party Wise' | 'Item Wise';
 
 export interface LabelMap {
     [key: string]: {

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   Alert,
   FlatList,
@@ -18,6 +19,7 @@ import {
   useCodeScanner,
 } from "react-native-vision-camera";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useUrovoScanner } from "./components/useUrovoScanner";
 
 const EXPECTED_LENGTH = 14;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -207,24 +209,32 @@ export default function WarehouseQRScanner({ navigation, route }) {
   const scaleAnim = useRef(new Animated.Value(0.4)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
-  const device = useCameraDevice("back");
+  //const device = useCameraDevice("back");
+  const device = null;
+  const [lastRawScan, setLastRawScan] = useState("");
+  const [scannerMessage, setScannerMessage] = useState("Ready: press orange trigger button");
 
+
+
+  // useEffect(() => {
+  //   const requestPermission = async () => {
+  //     const permission = await Camera.requestCameraPermission();
+
+  //     if (permission !== "granted") {
+  //       Alert.alert("Camera Permission Required", "Please allow camera permission.", [
+  //         { text: "OK", onPress: () => navigation.goBack() },
+  //       ]);
+  //       return;
+  //     }
+
+  //     setHasPermission(true);
+  //   };
+
+  //   requestPermission();
+  // }, [navigation]);
   useEffect(() => {
-    const requestPermission = async () => {
-      const permission = await Camera.requestCameraPermission();
-
-      if (permission !== "granted") {
-        Alert.alert("Camera Permission Required", "Please allow camera permission.", [
-          { text: "OK", onPress: () => navigation.goBack() },
-        ]);
-        return;
-      }
-
-      setHasPermission(true);
-    };
-
-    requestPermission();
-  }, [navigation]);
+    setHasPermission(true);
+  }, []);
 
   const scanMap = useMemo(() => {
     const map = new Map();
@@ -370,6 +380,80 @@ export default function WarehouseQRScanner({ navigation, route }) {
     onScanResult?.(finalRows);
     navigation.goBack();
   };
+  // ── Urovo hardware scan engine (laser trigger) ───────────────
+  // Same dedupe gate + same processScan as the camera path. On
+  // non-Urovo devices this hook is a no-op and camera still works.
+  const handleHardwareScan = value => {
+    if (processingRef.current) return;
+
+    processingRef.current = true;
+    processScan(value);
+
+    setTimeout(() => {
+      processingRef.current = false;
+    }, 800); // laser scans are deliberate — shorter cooldown than camera
+  };
+
+  const hwStatus = useUrovoScanner(handleHardwareScan);
+
+  // Keyboard-wedge fallback: if the device's Scanner Settings output
+  // mode is "keyboard", scans type into this invisible input + Enter.
+  // Works with ZERO native code — last-resort path for blind deploys.
+  const [wedgeBuffer, setWedgeBuffer] = useState("");
+  const wedgeRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      wedgeRef.current?.focus?.();
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // const handleWedgeSubmit = () => {
+  //   const v = wedgeBuffer;
+  //   setWedgeBuffer("");
+  //   if (v) handleHardwareScan(v);
+  //   // re-focus so the next scan is captured too
+  //   setTimeout(() => wedgeRef.current?.focus?.(), 50);
+  // };
+  const handleWedgeChange = text => {
+  setWedgeBuffer(text);
+
+  const clean = cleanScannerValue(text);
+
+  if (clean.length > 5) {
+    setTimeout(() => {
+      const finalValue = cleanScannerValue(text);
+
+      if (finalValue) {
+        setWedgeBuffer("");
+        setLastRawScan(finalValue);
+        setScannerMessage(`Scan received: ${finalValue.substring(0, 40)}`);
+        handleHardwareScan(finalValue);
+        setTimeout(() => wedgeRef.current?.focus?.(), 50);
+      }
+    }, 120);
+  }
+};
+  const handleWedgeSubmit = () => {
+    const v = cleanScannerValue(wedgeBuffer);
+
+    setWedgeBuffer("");
+
+    if (!v) {
+      setScannerMessage("No scan text received. Check Scanner Output Mode.");
+      return;
+    }
+
+    setLastRawScan(v);
+    setScannerMessage(`Scan received: ${v.substring(0, 40)}`);
+
+    handleHardwareScan(v);
+
+    setTimeout(() => wedgeRef.current?.focus?.(), 50);
+  };
+
   const codeScanner = useCodeScanner({
     codeTypes: ["qr", "ean-13", "code-128"],
     onCodeScanned: codes => {
@@ -413,28 +497,73 @@ export default function WarehouseQRScanner({ navigation, route }) {
     );
   }
 
-  if (!device) {
-    return (
-      <View style={screenStyles.centerBlack}>
-        <Text style={screenStyles.whiteBold}>Camera not available</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={screenStyles.closeButton}>
-          <Text style={screenStyles.closeButtonText}>CLOSE</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // if (!device) {
+  //   return (
+  //     <View style={screenStyles.centerBlack}>
+  //       <Text style={screenStyles.whiteBold}>Camera not available</Text>
+  //       <TouchableOpacity onPress={() => navigation.goBack()} style={screenStyles.closeButton}>
+  //         <Text style={screenStyles.closeButtonText}>CLOSE</Text>
+  //       </TouchableOpacity>
+  //     </View>
+  //   );
+  // }
+
 
   return (
     <View style={screenStyles.screen}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      <Camera
+      {/* Invisible keyboard-wedge capture (hardware scanner in keyboard mode) */}
+      <TextInput
+        ref={wedgeRef}
+        value={wedgeBuffer}
+        onChangeText={handleWedgeChange}
+        onSubmitEditing={handleWedgeSubmit}
+        onKeyPress={({ nativeEvent }) => {
+          if (nativeEvent.key === "Enter") {
+            handleWedgeSubmit();
+          }
+        }}
+        blurOnSubmit={false}
+        autoFocus
+        showSoftInputOnFocus={false}
+        caretHidden
+        style={hwStyles.wedgeInput}
+      />
+
+      {/* Hardware scanner status pill — tells the operator what mode is live */}
+      <View
+        pointerEvents="none"
+        style={[
+          hwStyles.statusPill,
+          { backgroundColor: hwStatus.state === "active" ? "#16a34a" : hwStatus.state === "listening" ? "#d97706" : "#475569" },
+        ]}
+      >
+        <Text style={hwStyles.statusPillText}>
+          {hwStatus.state === "active"
+            ? "HW SCANNER: ACTIVE — use trigger"
+            : hwStatus.state === "listening"
+              ? "HW: listening (check Scanner Settings)"
+              : "CAMERA ONLY"}
+        </Text>
+      </View>
+
+      {/* <Camera
         style={screenStyles.fullCamera}
         device={device}
         isActive={true}
         codeScanner={codeScanner}
         torch={torch}
-      />
+      /> */}
+      {device && (
+        <Camera
+          style={screenStyles.fullCamera}
+          device={device}
+          isActive={true}
+          codeScanner={codeScanner}
+          torch={torch}
+        />
+      )}
 
       <View style={screenStyles.darkOverlay} />
 
@@ -458,7 +587,7 @@ export default function WarehouseQRScanner({ navigation, route }) {
       </SafeAreaView>
 
       <View style={screenStyles.scanCenter}>
-        <Text style={screenStyles.scanHint}>Scan Carton QR Code</Text>
+        <Text style={screenStyles.scanHint}>Press orange trigger button</Text>
 
         <View style={screenStyles.scanBox}>
           <View style={screenStyles.cornerTL} />
@@ -533,6 +662,12 @@ export default function WarehouseQRScanner({ navigation, route }) {
           )}
           ListEmptyComponent={<Text style={screenStyles.emptyText}>No cartons scanned yet</Text>}
         />
+        <View style={hwStyles.debugBox}>
+          <Text style={hwStyles.debugText}>{scannerMessage}</Text>
+          {!!lastRawScan && (
+            <Text style={hwStyles.debugText}>Last: {lastRawScan.substring(0, 60)}</Text>
+          )}
+        </View>
 
         <SafeAreaView>
           <TouchableOpacity onPress={handleDone} style={screenStyles.doneButton}>
@@ -656,4 +791,45 @@ const screenStyles = StyleSheet.create({
     justifyContent: "center",
   },
   closeButtonText: { color: "#fff", fontWeight: "900" },
+});
+
+const hwStyles = StyleSheet.create({
+  wedgeInput: {
+    position: "absolute",
+    top: -100,
+    left: 0,
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+  statusPill: {
+    position: "absolute",
+    bottom: BOTTOM_SHEET_HEIGHT + 12,
+    alignSelf: "center",
+    zIndex: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  statusPillText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  debugBox: {
+    position: "absolute",
+    top: 90,
+    left: 12,
+    right: 12,
+    zIndex: 60,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 10,
+    padding: 10,
+  },
+  debugText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 });

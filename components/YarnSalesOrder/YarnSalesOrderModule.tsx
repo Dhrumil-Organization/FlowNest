@@ -32,6 +32,7 @@ const YarnSalesOrderModule = props => {
     token: props.token,
     isConnected: props.isConnected,
     username: props.username,
+    userid: props.userid,
   };
 
   return (

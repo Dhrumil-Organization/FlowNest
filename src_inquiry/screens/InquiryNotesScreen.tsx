@@ -17,6 +17,7 @@ import { colors, fontSize, radius, spacing } from '../utils/theme';
 import { InquiryNote, RootStackParamList } from '../types';
 import { notesApi } from '../services/notesApi';
 import EmptyState from '../components/EmptyState';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryNotes'>;
 
@@ -112,7 +113,7 @@ const InquiryNotesScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const load = useCallback(async (getUserPrptype) => {
     try {
-      const data = await notesApi.list(inquiryId, getUserPrptype, '27');
+      const data = await notesApi.list(inquiryId, getUserPrptype, getCurrentFinancialYear());
       setNotes(data);
     } catch (e) {
       // ignore
@@ -144,7 +145,7 @@ const InquiryNotesScreen: React.FC<Props> = ({ route, navigation }) => {
     if (editingNote) {
       // Editing existing
       try {
-        const updated = await notesApi.update(inquiryId, editingNote.id, trimmed, getUserPrptype, '27');
+        const updated = await notesApi.update(inquiryId, editingNote.id, trimmed, getUserPrptype, getCurrentFinancialYear());
         setNotes(prev => prev.map(n => (n.id === updated.id ? updated : n)));
         setEditingNote(null);
         setText('');
@@ -166,7 +167,7 @@ const InquiryNotesScreen: React.FC<Props> = ({ route, navigation }) => {
       is_edited: false,
       edited_at: null,
       prptype: getUserPrptype,
-      yearno: '27',
+      yearno: getCurrentFinancialYear(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -174,7 +175,7 @@ const InquiryNotesScreen: React.FC<Props> = ({ route, navigation }) => {
     setText('');
 
     try {
-      const realNote = await notesApi.send(inquiryId, {note: trimmed, prptype: getUserPrptype, yearno: '27'});
+      const realNote = await notesApi.send(inquiryId, {note: trimmed, prptype: getUserPrptype, yearno: getCurrentFinancialYear()});
       // Replace temp with real
       setNotes(prev => prev.map(n => (n.id === tempNote.id ? realNote : n)));
     } catch (e: any) {
@@ -207,7 +208,7 @@ const InquiryNotesScreen: React.FC<Props> = ({ route, navigation }) => {
               style: 'destructive',
               onPress: async () => {
                 try {
-                  await notesApi.delete(inquiryId, note.id, getUserPrptype, '27');
+                  await notesApi.delete(inquiryId, note.id, getUserPrptype, getCurrentFinancialYear());
                   setNotes(prev => prev.filter(n => n.id !== note.id));
                 } catch (e: any) {
                   Alert.alert(

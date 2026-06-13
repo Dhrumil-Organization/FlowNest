@@ -71,6 +71,7 @@ import {
   initGlobalCacheDB,
   updateGlobalCacheInBackground,
 } from './common/utils/sqliteCacheManager';
+import OrderScreen from './components/SalesOrderNew/OrderScreen';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -89,6 +90,9 @@ import CreelManagementSystem from './components/CreelManagementSystem/CreelManag
 import BeamGaiting from './components/BeamGaiting/BeamGaiting';
 import YarnStock from './components/YarnStock/YarnStock';
 import YarnManagementSystem from './components/YarnManagementSystem/YarnManagementSystem';
+// import PartyListScreen from './components/SalesOrderNew_08_jun/PartyListScreen';
+// import OrderSummaryScreen from './components/SalesOrderNew_08_jun/OrderSummaryScreen';
+// import { SalesOrderProvider } from './components/SalesOrderNew_08_jun/SalesOrderContext';
 import PartyDashboard from './components/PartyDashboard/PartyDashboard';
 import PartyDetailScreen from './components/PartyDashboard/PartyDetailScreen';
 import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
@@ -99,7 +103,7 @@ import SalesOrderNew from './components/SalesOrderNew/SalesOrderNew';
 import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
 import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
 import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
-import SalesOrderModule from './components/SalesOrderNew/SalesOrderModule';
+import SalesOrderModule from './components/SalesOrderNew_08_jun/SalesOrderModule';
 import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
 import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueReturnEntry';
 import CreelIssueReturnModifyEntry from './components/CreelIssueReturn/CreelIssueReturnModifyEntry';
@@ -135,6 +139,10 @@ import SettingsScreen from './src_inquiry/screens/SettingsScreen';
 import CostSheetDesignPickerScreen from './src_inquiry/screens/CostSheetDesignPickerScreen';
 import SalesExecDashboardScreen from './components/EmployDashboard/rn-app/screens/SalesExecDashboardScreen';
 import PartyDashboardScreen from './components/EmployDashboard/rn-app/screens/PartyDashboardScreen';
+import AppNavigator from './components/SudoSalesOrderDashboard/AppNavigator';
+import PoyRateEntry from './components/PoyRateEntry/PoyRateEntry';
+import PriceList from './components/PriceList/PriceList';
+import SalesOrderPriceListAuth from './components/SalesOrderPriceListAuth/SalesOrderPriceListAuth'
 
 const Stack = createNativeStackNavigator();
 
@@ -418,6 +426,7 @@ export default function App() {
   const handleAuth = useCallback(async () => {
     console.log('✅ Checkdevice Calling...');
     const payload = { deviceid: getDeviceId };
+    // const payload = { deviceid: "bbbbbbb" };
     const headers = {
       'Content-Type': 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
@@ -433,7 +442,7 @@ export default function App() {
       );
       console.log('✅ Checkdevice API Response:', response);
       if (Number(response.data) === 1) {
-        console.log('✅ Checkdevice API Response:', response);
+        console.log('✅ Checkdevice API Response:', response, payload);
         setIsLoading(false);
         setAuth(true);
       } else {
@@ -1119,6 +1128,7 @@ export default function App() {
                                 token={gettoken || ''}
                                 isConnected={isConnected}
                                 username={getUserDetails}
+                                userid={getUserId}
                                 setIsLoggedIn={setIsLoggedIn}
                                 rightsMenuApps={
                                   (getDecodedMenuApps &&
@@ -1221,11 +1231,33 @@ export default function App() {
                       </Stack.Screen>
                       <Stack.Screen name="Sales Order Entry">
                         {props => (
+                          <OrderScreen
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                            userid={getUserId}
+                          />
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Sudamo Sales Order Entry">
+                        {props => (
                           <SalesOrderModule
                             {...props}
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
+                          />
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Sales Order Dashborad">
+                        {props => (
+                          <AppNavigator
+                            {...props}
+                            token={gettoken || ''}
+                            apiBase={API}
                           />
                         )}
                       </Stack.Screen>
@@ -1237,6 +1269,7 @@ export default function App() {
                             token={gettoken || ''}
                             isConnected={isConnected}
                             username={getUserDetails}
+                            userid={getUserId}
                           />
                         )}
                       </Stack.Screen>
@@ -1294,6 +1327,7 @@ export default function App() {
                               token={gettoken || ''}
                               isConnected={isConnected}
                               username={getUserDetails}
+                              userid={getUserId}
                             />
                           </SafeAreaProvider>
                         )}
@@ -1556,6 +1590,25 @@ export default function App() {
                           </ErrorBoundary>
                         )}
                       </Stack.Screen>
+                      <Stack.Screen name="Poy Rate Entry">{(props) =>
+                        <>
+                          <PoyRateEntry {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="Price List">{(props) =>
+                        <>
+                          <PriceList {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="PoyRateEntry" component={PoyRateEntry} />
+                      <Stack.Screen name="Sales Order Price List Auth">{(props) =>
+                        <>
+                          <SalesOrderPriceListAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
                     </Stack.Navigator>
                     {/* </Stack.Navigator> */}
 

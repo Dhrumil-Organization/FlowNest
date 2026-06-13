@@ -19,6 +19,7 @@ import Button from '../components/Button';
 import { formatCurrency } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import theme from '../../android/app/src/theme';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CostSheetDesignPicker'>;
 
@@ -74,7 +75,7 @@ const CostSheetDesignPickerScreen: React.FC<Props> = ({ route, navigation, usern
     if (!userPrptype) return;
     setLoading(true);
     try {
-      const data = await inquiryApi.show(inquiryId, userPrptype, '27', {
+      const data = await inquiryApi.show(inquiryId, userPrptype, getCurrentFinancialYear(), {
         prptype: userPrptype,
         yearno: '27',
       });
@@ -85,7 +86,7 @@ const CostSheetDesignPickerScreen: React.FC<Props> = ({ route, navigation, usern
       for (const d of data.designs ?? []) {
         let sheet: CostSheet | null = null;
         try {
-          sheet = await costSheetApi.show(inquiryId, d.id, userPrptype, '27');
+          sheet = await costSheetApi.show(inquiryId, d.id, userPrptype, getCurrentFinancialYear());
         } catch {
           // No cost sheet exists yet
         }

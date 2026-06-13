@@ -22,12 +22,13 @@ import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../..
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import PartyDropdown from '../Shared/PartyDropdown';
 import SearchableDropdown from '../Shared/SearchableDropdown';
-
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
 interface Props {
     token: string;
     navigation: any;
     isConnected: boolean | null;
     username: string;
+    userid: number | string;
 }
 
 type GridItem = {
@@ -36,9 +37,21 @@ type GridItem = {
     design: string;
 };
 
-const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected, username }) => {
-
+const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected, username, userid }) => {
     const device = useCameraDevice('back');
+    const {
+        loadDefaultPreference,
+        savePreference,
+        loadPreferenceList,
+    } = useMobileUserPreference({
+        UserId: userid || 0,
+        ModuleCode: 'CREEL',
+        ModuleName: 'Creel',
+        ScreenCode: 'CREEL_BROWSER',
+        ScreenName: 'Creel Management Browser',
+        token: token,
+    });
+    console.log("User ID =>", userid);
     const scanLock = useRef(false);
     const [isScanning, setIsScanning] = useState(false);
     const { hasPermission, requestPermission } = useCameraPermission();
@@ -106,6 +119,16 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const screenWidth = Dimensions.get('window').width;
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const [showList, setShowList] = useState(false);
+    const normalizeCriteria = (criteria: any) => {
+        return {
+            PrpCode: criteria?.PrpCode || '',
+            YearNo: criteria?.YearNo || '',
+            fromdate: criteria?.fromdate || formatDate(firstDay),
+            todate: criteria?.todate || formatDate(today),
+            status: criteria?.status || 'P',
+            StkType: criteria?.StkType || '',
+        };
+    };
 
     console.log("getchees", getchees);
 
@@ -354,7 +377,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         cartonNo: {
             fontSize: 13,
-            fontWeight: '700',
+            fontWeight:'700',
             color: '#007EA7'
         },
 
@@ -494,7 +517,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         infoLabel: {
             fontSize: 13,
-            color: '#555',
+            // color: '#555',
             fontWeight: '600',
             color: '#000'
         },
@@ -1113,6 +1136,30 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     console.log("prptype", propertydata);
     console.log("stocktype", FormState.values.StkType);
 
+    useEffect(() => {
+        const loadPreferenceData = async () => {
+
+            if (!token) return;
+
+            const saved = await loadDefaultPreference();
+
+            if (saved?.criteria) {
+
+                const criteria = normalizeCriteria(saved.criteria);
+
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        ...criteria,
+                    }
+                }));
+            }
+        };
+
+        loadPreferenceData();
+    }, []);
+
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -1249,6 +1296,22 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             console.log("browse payload", params)
 
             const apiData = response?.data?.response?.data || [];
+            if (userid) {
+                await savePreference({
+                    CriteriaName: 'Default',
+                    IsDefault: true,
+                    PreferenceJson: {
+                        criteria: {
+                            PrpCode: FormState.values.PrpCode,
+                            YearNo: FormState.values.YearNo,
+                            fromdate: FormState.values.fromdate,
+                            todate: FormState.values.todate,
+                            status: FormState.values.status,
+                            StkType: FormState.values.StkType,
+                        },
+                    },
+                });
+            }
             if (response?.data?.success) {
                 let finalData = apiData || [];
                 if (FormState.values.status === 'C') {

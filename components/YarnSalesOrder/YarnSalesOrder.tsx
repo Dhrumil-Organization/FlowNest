@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+
 import { useFocusEffect } from '@react-navigation/native';
 import {
     View, Text, StyleSheet, TextInput,
@@ -14,8 +15,8 @@ import { API } from "../../common/API/dynamicAPI";
 import { useSalesOrder } from './SalesOrderContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
 
-const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 
 const money = value => {
     return Number(value || 0).toLocaleString('en-IN', {
@@ -34,8 +35,27 @@ const todayYmd = () => {
 
 const HEADER_HEIGHT = 52;
 
-const YarnSalesOrder = ({ token, navigation, route }) => {
+const YarnSalesOrder = ({ token,
+    navigation,
+    route,
+    userid,
+    username,
+    isConnected }) => {
     const insets = useSafeAreaInsets();
+    console.log('User Id ', userid, username);
+    const {
+        loadDefaultPreference,
+        savePreference,
+        loadPreferenceList,
+    } = useMobileUserPreference({
+        UserId: userid || 0,
+        ModuleCode: 'SALES',
+        ModuleName: 'Sales',
+        ScreenCode: 'SALES_ORDER_BROWSER',
+        ScreenName: 'Sales Order Browser',
+        token: token,
+    });
+
 
     const { startNewOrder, loadExistingOrder } = useSalesOrder();
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
@@ -60,6 +80,8 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
         todate: todayYmd(),
         show_authorized: false,
     });
+
+    //const filtersRef = useRef(filters);
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [showFromPicker, setShowFromPicker] = useState(false);
@@ -71,6 +93,22 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);
+    const memoryLoadedRef = useRef(false);
+    const normalizeCriteria = (criteria: any) => {
+        return {
+            prpcode: criteria?.prpcode || criteria?.PrpCode || '',
+            yearno: criteria?.yearno || criteria?.YearNo || '',
+            strcode: criteria?.strcode || criteria?.StrCode || '002',
+            fromdate: criteria?.fromdate || criteria?.FromDate || todayYmd(),
+            todate: criteria?.todate || criteria?.ToDate || todayYmd(),
+            show_authorized:
+                criteria?.show_authorized ??
+                criteria?.ShowAuthorized ??
+                false,
+        };
+    };
+
+
     useFocusEffect(
         useCallback(() => {
             StatusBar.setTranslucent(false);
@@ -160,18 +198,97 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
     //     };
     //     load();
     // }, []);
-
+    // useEffect(() => {
+    //     filtersRef.current = filters;
+    // }, [filters]);
     useEffect(() => {
-        const load = async () => {
-            const data = await fetchPropertyData(token);
+        if (!userid || !token) return;
 
+        const initScreen = async () => {
+            const data = await fetchPropertyData(token);
             setPropertyData(data || []);
 
-            console.log("data ::", data);
+            const saved = await loadDefaultPreference();
+
+            console.log('saved raw', saved);
+            console.log('saved keys', Object.keys(saved || {}));
+
+            let savedFilters = {
+                prpcode: '',
+                yearno: '',
+                strcode: '002',
+                fromdate: todayYmd(),
+                todate: todayYmd(),
+                show_authorized: false,
+            };
+
+            if (saved?.criteria) {
+                savedFilters = {
+                    ...savedFilters,
+                    prpcode: saved.prpcode || saved?.criteria?.prpcode || '',
+                    yearno: getShortYearNo(
+                        saved.yearno || saved?.criteria?.yearno || ''
+                    ),
+                    strcode: saved.strcode || saved?.criteria?.strcode || '002',
+                    fromdate: saved.fromdate || saved?.criteria?.fromdate || todayYmd(),
+                    todate: saved.todate || saved?.criteria?.todate || todayYmd(),
+                    show_authorized:
+                        saved.show_authorized ??
+                        saved?.criteria?.show_authorized ??
+                        false,
+                };
+            }
+
+            console.log('Final savedFilters:', savedFilters);
+
+            console.log('Final savedFilters:', savedFilters);
+
+            setFilters(savedFilters);
+            if (savedFilters.prpcode) {
+
+                const matchedProperty = data?.find(
+                    x => String(x.PrpCode) === String(savedFilters.prpcode)
+                );
+
+                matchedProperty && setSelectedProperty(matchedProperty);
+            }
+
+            if (savedFilters.yearno) {
+
+                const matchedYear = yearOptions?.find(
+                    y => String(y).slice(-2) === String(savedFilters.yearno)
+                );
+
+                matchedYear && setSelectedYear(matchedYear);
+            }
+            filtersRef.current = savedFilters;
+
+            if (savedFilters.fromdate) {
+                setFromDate(new Date(formatYmdToDateString(savedFilters.fromdate)));
+            }
+
+            if (savedFilters.todate) {
+                setToDate(new Date(formatYmdToDateString(savedFilters.todate)));
+            }
+
+            if (savedFilters.prpcode && data?.length > 0) {
+                const matched = data.find(
+                    x => String(x.PrpCode) === String(savedFilters.prpcode)
+                );
+
+                if (matched) {
+                    setSelectedProperty(matched);
+                }
+            }
+
+            memoryLoadedRef.current = true;
+            didInitialLoadRef.current = true;
+
+            loadOrders('', false, savedFilters);
         };
 
-        load();
-    }, []);
+        initScreen();
+    }, [userid, token]);
 
     useEffect(() => {
         const y = new Date().getFullYear();
@@ -227,79 +344,165 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
             [key]: value,
         }));
     };
+    const getShortYearNo = (yearValue: any) => {
+        if (!yearValue) return '';
 
-    const loadOrders = async (text = '', isFilter = false, customFilters = null) => {
+        const y = String(yearValue);
+
+        if (y.length === 2) return y;
+
+        if (y.includes('-')) {
+            return y.split('-')[1].slice(-2);
+        }
+
+        return y.slice(-2);
+    };
+    const loadOrders = async (
+        text = '',
+        isFilter = false,
+        customFilters = null
+    ) => {
+
         const userPtype = await AsyncStorage.getItem('user_prptype');
+
         const activeFilters = customFilters || filters;
 
+        console.log('loadOrders customFilters:', customFilters);
+        console.log('loadOrders activeFilters:', activeFilters);
+
+        const finalPrpCode = String(
+            activeFilters.prpcode ||
+            activeFilters.PrpCode ||
+            selectedProperty?.PrpCode ||
+            ''
+        ).trim();
+
+        const finalYearNo =
+            getShortYearNo(activeFilters.yearno) ||
+            getShortYearNo(activeFilters.YearNo) ||
+            getShortYearNo(selectedYear) ||
+            '';
+
+        console.log('final values', {
+            finalPrpCode,
+            finalYearNo,
+        });
+
+        if (!finalPrpCode || !finalYearNo) {
+            console.log('Skipping browse: property/year missing', {
+                finalPrpCode,
+                finalYearNo,
+            });
+            return;
+        }
+
         try {
+
             if (isFilter) {
                 setFilterLoading(true);
             } else {
                 setLoading(true);
             }
 
-            const yearno =
-                activeFilters.yearno
-                    ? String(activeFilters.yearno).slice(-2)
-                    : selectedYear
-                        ? selectedYear.slice(-2)
-                        : '';
-
             const payload = {
                 search: text,
-                prpcode: activeFilters.prpcode,
+                prpcode: finalPrpCode,
                 prptype: userPtype,
-                yearno: yearno,
-                strcode: '002',
+                yearno: finalYearNo,
+                strcode: activeFilters.strcode || '002',
                 fromdate: activeFilters.fromdate,
                 todate: activeFilters.todate,
                 isauth: activeFilters.show_authorized ? 1 : 0,
                 strtype: 'Y',
                 txntype: 'sales_order',
                 referrer: 'mob_yarn_sales_order',
-                // atype: 'B',
                 atype: activeFilters.show_authorized ? 'm' : 'b',
             };
 
-            console.log("browse payload", payload);
+            console.log('browse payload', payload);
 
             const res = await axios.get(
                 `${API}/api/sosortbrowse`,
-                getRequestConfig({ params: { ...payload } }),
+                getRequestConfig({
+                    params: payload,
+                }),
             );
-            console.log("browse res", res)
 
-            if (res.data.success === true) {
+            console.log('browse res', res.data);
+
+            if (
+                res.data.success === true &&
+                !res.data.response?.error
+            ) {
+
                 setOrders(res.data.response.data || []);
+
+                if (userid) {
+
+                    await savePreference({
+                        CriteriaName: 'Default',
+                        IsDefault: true,
+                        PreferenceJson: {
+                            criteria: {
+                                prpcode: finalPrpCode,
+                                yearno: finalYearNo,
+                                strcode: activeFilters.strcode || '002',
+                                fromdate: activeFilters.fromdate,
+                                todate: activeFilters.todate,
+                                show_authorized:
+                                    activeFilters.show_authorized,
+                            },
+                        },
+                    });
+
+                }
+
             } else {
+
+                console.log(
+                    'Browse API Error:',
+                    res.data.message ||
+                    res.data.response?.message
+                );
+
                 setOrders([]);
+
             }
+
         } catch (error) {
-            console.log('ERROR ::', error?.response?.data || error.message);
+
+            console.log(
+                'ERROR ::',
+                error?.response?.data ||
+                error?.message
+            );
+
             setOrders([]);
+
         } finally {
+
             setLoading(false);
             setFilterLoading(false);
             setRefreshing(false);
+
         }
     };
 
-    useEffect(() => {
+    // useEffect(() => {
 
-        if (didInitialLoadRef.current) {
-            return;
-        }
+    //     if (didInitialLoadRef.current) {
+    //         return;
+    //     }
 
-        didInitialLoadRef.current = true;
+    //     didInitialLoadRef.current = true;
 
-        if (route?.params?.refreshAfterDelete) {
-            return;
-        }
+    //     if (route?.params?.refreshAfterDelete) {
+    //         return;
+    //     }
 
-        loadOrders('');
+    //     loadOrders('');
 
-    }, []);
+    // }, []);
 
 
     // =====================================================
@@ -336,14 +539,30 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
     const applyFilter = () => {
         const updatedFilters = {
             ...filters,
-            prpcode: selectedProperty?.PrpCode || '',
-            yearno: selectedYear || '',
+
+            prpcode:
+                selectedProperty?.PrpCode ||
+                filters.prpcode ||
+                '',
+
+            yearno:
+                selectedYear ||
+                filters.yearno ||
+                '',
+
+            strcode:
+                filters.strcode ||
+                '002',
+
             fromdate: fromDate
                 ? `${fromDate.getFullYear()}${String(fromDate.getMonth() + 1).padStart(2, '0')}${String(fromDate.getDate()).padStart(2, '0')}`
-                : '',
+                : filters.fromdate,
+
             todate: toDate
                 ? `${toDate.getFullYear()}${String(toDate.getMonth() + 1).padStart(2, '0')}${String(toDate.getDate()).padStart(2, '0')}`
-                : '',
+                : filters.todate,
+
+            show_authorized: filters.show_authorized,
         };
 
         setFilters(updatedFilters);
@@ -820,6 +1039,12 @@ const YarnSalesOrder = ({ token, navigation, route }) => {
                                     style={styles.pickerItem}
                                     onPress={() => {
                                         setSelectedProperty(item);
+
+                                        setFilters(prev => ({
+                                            ...prev,
+                                            prpcode: item.PrpCode,
+                                        }));
+
                                         setPropertyPickerVisible(false);
                                         setPropertySearch("");
                                     }}

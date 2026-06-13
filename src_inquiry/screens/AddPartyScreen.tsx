@@ -17,6 +17,7 @@ import { RootStackParamList, Party } from '../types';
 import { isValidEmail, isValidGSTIN, isValidMobile } from '../utils/validators';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddParty'>;
 
@@ -63,7 +64,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
     }
     setVerifying(true);
     try {
-      const data = await masterApi.fetchGstin(g, getUserPrptype, '27');
+      const data = await masterApi.fetchGstin(g, getUserPrptype, getCurrentFinancialYear());
       setName(data.trade_name || data.legal_name);
       setAddress(data.address);
       setCity(data.city);
@@ -85,61 +86,6 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
-  // const save = async () => {
-  //   if (!validate()) return;
-  //   setSaving(true);
-  //   try {
-  //     const p = await masterApi.storeParty({
-  //       name,
-  //       address,
-  //       city,
-  //       state,
-  //       pincode,
-  //       gstin: gstin || undefined,
-  //       mobile,
-  //       email,
-  //       contact,
-  //       prpcode: "SIP",
-  //       yearno: "27"
-  //     },
-  //       "SIP",
-  //       "27"
-  //     );
-  //     onSaved(p);
-  //     navigation.goBack();
-  //   } catch (e: any) {
-  //     Alert.alert('Error', e?.response?.data?.message || 'Failed to save party');
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
-  // const save = async () => {
-  //   if (!validate()) return;
-  //   setSaving(true);
-  //   try {
-  //     // Create Party object (same format as PartySelection)
-  //     const partyData: Party = {
-  //       prp_code: null,          // Null because not stored in DB yet
-  //       acc_code: '',            // Empty string (required by interface)
-  //       name: name.trim(),
-  //       address: address.trim(),
-  //       city: city.trim(),
-  //       state: state.trim(),
-  //       pincode: pincode.trim(),
-  //       gstin: gstin.trim() || undefined,
-  //       mobile: mobile.trim() || undefined,
-  //       email: email.trim() || undefined,
-  //       contact: contact.trim() || undefined,
-  //     };
-  //     onSaved(partyData); // ✅ Pass to parent (PartySelection -> InquiryForm)
-  //     navigation.goBack(); // ✅ Go back to PartySelection, which will then go back to InquiryForm
-  //   } catch (e: any) {
-  //     Alert.alert('Error', e?.response?.data?.message || 'Failed to save party');
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
   const save = async () => {
     if (!validate()) return;
     setSaving(true);

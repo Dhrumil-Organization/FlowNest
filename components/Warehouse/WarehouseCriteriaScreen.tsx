@@ -17,6 +17,8 @@ import { styles, COLORS } from "./components/WarehouseStyles";
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
 import { Picker } from '@react-native-picker/picker';
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const RadioRow = ({ label, value, onChange, onSelectedPress, count = 0, }) => (
     <View style={[styles.between, { marginBottom: 12 }]}>
@@ -58,7 +60,20 @@ const RadioRow = ({ label, value, onChange, onSelectedPress, count = 0, }) => (
     </View>
 );
 
-export default function WarehouseCriteriaScreen({ token, navigation }) {
+export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
+    const {
+        loadDefaultPreference,
+        savePreference,
+        loadPreferenceList,
+    } = useMobileUserPreference({
+        UserId: userid || 0,
+        ModuleCode: 'WAREHOUSE',
+        ModuleName: 'Warehouse',
+        ScreenCode: 'WAREHOUSE',
+        ScreenName: 'Warehouse',
+        token: token,
+    });
+    console.log("userid", userid);
     const [selectionLoading, setSelectionLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
@@ -111,6 +126,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
         cancelToken: cancelToken?.token,
     });
 
+
     useEffect(() => {
         loadMaster();
     }, []);
@@ -125,6 +141,94 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
             setLoading(false);
         }
     };
+
+
+    useEffect(() => {
+        if (!userid || !token) return;
+
+        const initScreen = async () => {
+            try {
+
+                // Load Property List
+                const properties = await fetchPropertyData(token);
+                setPropertyData(properties || []);
+                const saved = await loadDefaultPreference();
+
+                console.log(
+                    "saved preference =>",
+                    JSON.stringify(saved, null, 2)
+                );
+                const criteria = saved?.criteria || {};
+                const loadedForm = {
+                    prpgroup: "Yarn Division",
+                    prpcode: criteria?.prpcodes || criteria?.prpcode || "",
+                    strcode: criteria?.strcode || "",
+                    yearno: criteria?.yearno || getCurrentFinancialYear(),
+                    stockType: criteria?.stocktype || criteria?.stockType || "ALL",
+                };
+
+                console.log(
+                    "loadedForm =>",
+                    JSON.stringify(loadedForm, null, 2)
+                );
+
+                // Form Restore
+                setForm(prev => ({
+                    ...prev,
+                    ...loadedForm,
+                }));
+
+                // Property Restore
+                if (
+                    loadedForm.prpcode &&
+                    properties?.length > 0
+                ) {
+                    const matchedProperty = properties.find(
+                        x =>
+                            String(x.PrpCode) ===
+                            String(loadedForm.prpcode)
+                    );
+
+                    if (matchedProperty) {
+                        setSelectedProperty(matchedProperty);
+                    }
+
+                    // Store Load
+                    const stores = await fetchAllStoredata(
+                        token,
+                        loadedForm.prpcode
+                    );
+
+                    setStoreData(stores || []);
+
+                    // Store Restore
+                    if (
+                        loadedForm.strcode &&
+                        stores?.length > 0
+                    ) {
+                        const matchedStore = stores.find(
+                            x =>
+                                String(x.StrCode) ===
+                                String(loadedForm.strcode)
+                        );
+
+                        if (matchedStore) {
+                            setSelectedStore(matchedStore);
+                        }
+                    }
+                }
+
+            } catch (err) {
+                console.log(
+                    "initScreen error =>",
+                    err?.response?.data || err
+                );
+            }
+        };
+
+        initScreen();
+
+    }, [userid, token]);
 
     const setValue = (key, value) => {
         setForm(prev => ({ ...prev, [key]: value }));
@@ -157,7 +261,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
             Alert.alert("Validation", "Store is required");
             return;
         }
-
+        const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
             setLoading(true);
             const payload = {
@@ -168,7 +272,7 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
                 schedtype: "",
                 rptid: 501,
                 rptaction: "rpt_gateway",
-                prptype: "R",
+                prptype: userPtype,
                 prpcodes: form.prpcode,
                 strcode: form.strcode,
                 stocktype: form.stockType,
@@ -184,7 +288,28 @@ export default function WarehouseCriteriaScreen({ token, navigation }) {
 
             console.log("preview response ::", res?.data);
             const responseData = res?.data?.data?.prodwarehouselocations || [];
-
+            if (userid) {
+                await savePreference({
+                    CriteriaName: 'Default',
+                    IsDefault: true,
+                    PreferenceJson: {
+                        criteria: {
+                            yearno: getCurrentFinancialYear(),
+                            savereportsettings: 0,
+                            settingsname: "",
+                            schedtype: "",
+                            rptid: 501,
+                            rptaction: "rpt_gateway",
+                            prptype: userPtype,
+                            prpcodes: form.prpcode,
+                            strcode: form.strcode,
+                            stocktype: form.stockType,
+                            inverse: [],
+                            extravalidate: {}
+                        },
+                    },
+                });
+            }
             console.log("dashboard data ::", responseData);
 
             if (

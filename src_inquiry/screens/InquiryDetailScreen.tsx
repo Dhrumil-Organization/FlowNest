@@ -26,6 +26,7 @@ import { masterApi } from '../services/masterApi';
 import theme from '../../android/app/src/theme';
 import { costSheetApi } from '../services/costSheetApi';
 import { CostSheet } from '../types';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InquiryDetail'>;
 
@@ -58,7 +59,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
       const sheets: Record<number, CostSheet | null> = {};
       for (const design of inquiry.designs) {
         try {
-          const sheet = await costSheetApi.show(inquiry.id, design.id, getUserPrptype, '27');
+          const sheet = await costSheetApi.show(inquiry.id, design.id, getUserPrptype, getCurrentFinancialYear());
           sheets[design.id] = sheet;
         } catch {
           sheets[design.id] = null;
@@ -70,9 +71,9 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
 
   const load = useCallback(async (getUserPrptype) => {
     try {
-      const data = await inquiryApi.show(id, getUserPrptype, '27', {
+      const data = await inquiryApi.show(id, getUserPrptype, getCurrentFinancialYear(), {
         prptype: getUserPrptype,
-        yearno: "27"
+        yearno: getCurrentFinancialYear()
       });
       setInquiry(data);
     } finally {
@@ -107,7 +108,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
   const downloadPdf = async () => {
     if (!inquiry) return;
     try {
-      const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id, getUserPrptype, "27");
+      const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id, getUserPrptype, getCurrentFinancialYear());
       Linking.openURL(pdf_url);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to download PDF');

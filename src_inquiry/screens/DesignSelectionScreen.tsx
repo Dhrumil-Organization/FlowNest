@@ -15,6 +15,7 @@ import { Design, RootStackParamList } from '../types';
 import EmptyState from '../components/EmptyState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import theme from '../../android/app/src/theme';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DesignSelection'>;
 
@@ -46,7 +47,7 @@ const DesignSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await masterApi.searchDesigns(search, getUserPrptype, '27');
+        const res = await masterApi.searchDesigns(search, getUserPrptype, getCurrentFinancialYear());
         if (!cancelled) setItems(res);
       } finally {
         if (!cancelled) setLoading(false);

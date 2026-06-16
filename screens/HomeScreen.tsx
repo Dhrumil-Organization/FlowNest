@@ -362,7 +362,12 @@ const APP_SECTIONS = [
             { id: '41', name: 'Sales Order Price List Auth', screen: 'Sales Order Price List Auth', icon: 'receipt-long', iconColor: '#740cea' },
         ],
     },
-
+    {
+        title: 'Y',
+        data: [
+            { id: '41', name: 'Febric Stock Verification', screen: 'Febric Stock Verification', icon: 'receipt-long', iconColor: '#740cea' },
+        ],
+    },
 ];
 
 interface Props {
@@ -658,6 +663,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                     },
                 //                     {
                 //                         "title": "Employ Dashboard",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Febric Stock Verification",
                 //                         "href": "/"
                 //                     },
                 //                 ]

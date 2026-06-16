@@ -143,6 +143,7 @@ import AppNavigator from './components/SudoSalesOrderDashboard/AppNavigator';
 import PoyRateEntry from './components/PoyRateEntry/PoyRateEntry';
 import PriceList from './components/PriceList/PriceList';
 import SalesOrderPriceListAuth from './components/SalesOrderPriceListAuth/SalesOrderPriceListAuth'
+import FebricStockVerificationModule from './components/FebricStockVerification/FebricStockVerificationModule';
 
 const Stack = createNativeStackNavigator();
 
@@ -1612,6 +1613,18 @@ export default function App() {
 
                         </>
                       }</Stack.Screen>
+
+                       <Stack.Screen name="Febric Stock Verification">
+                        {props => (
+                          <FebricStockVerificationModule
+                            {...props}
+                            token={gettoken || ''}
+                            isConnected={isConnected}
+                            username={getUserDetails}
+                            userid={getUserId}
+                          />
+                        )}
+                      </Stack.Screen>
                     </Stack.Navigator>
                     {/* </Stack.Navigator> */}
 

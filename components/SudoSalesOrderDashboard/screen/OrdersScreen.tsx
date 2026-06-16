@@ -82,7 +82,7 @@ function OrderCard({ order }) {
 
 // ── Main screen ───────────────────────────────────────────────────
 export default function OrdersScreen({ token, apiBase }) {
-  const BASE = apiBase || 'https://erp.sharpskillit.com/api';
+  const BASE = apiBase || '';
 
   const [tab, setTab]           = useState('pending');
   const [search, setSearch]     = useState('');

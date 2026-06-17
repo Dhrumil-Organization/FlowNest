@@ -12,6 +12,7 @@ import AccessDeniedScreen from '../common/access-denied';
 import FullScreenLoader from '../components/FullScreenLoader';
 import Snackbar, { SnackbarType } from '@/components/Snackbar';
 import { registerSnackbar } from '@/common/utils/snackbar';
+import { View, StyleSheet } from 'react-native';
 
 
 export default function RootLayout() {
@@ -88,19 +89,19 @@ export default function RootLayout() {
         await AsyncStorage.setItem('cache_deviceId', deviceId);
 
         // 🔥 1. DEVICE CHECK
-        const res = await axios.post(
-          "https://apig.tms-webapp.com/api/checkdevice",
-          { deviceid: deviceId }
-        );
+        // const res = await axios.post(
+        //   "https://apig.tms-webapp.com/api/checkdevice",
+        //   { deviceid: deviceId }
+        // );
 
-        console.log("✅ checkdevice:", res.data);
+        // console.log("✅ checkdevice:", res.data);
         console.log("Monthly:", deviceId);
 
         // ❌ ACCESS DENIED
-        if (Number(res.data) !== 1) {
-          setIsAllowed(false);
-          return;
-        }
+        // if (Number(res.data) !== 1) {
+        //   setIsAllowed(false);
+        //   return;
+        // }
 
         // ✅ ALLOWED
         setIsAllowed(true);
@@ -179,8 +180,9 @@ export default function RootLayout() {
     // </Stack>
     // </AuthProvider>
     <>
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* {isAllowed && isLoggedIn === true ? (
+      <View style={styles.rootContainer}>
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* {isAllowed && isLoggedIn === true ? (
         <>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="index" />
@@ -188,26 +190,29 @@ export default function RootLayout() {
       ) : (
         <Stack.Screen name="(auth)/login" />
       )} */}
-        {isAllowed && isLoggedIn === true ? (
-          <>
-            <Stack.Screen name="" />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="(all)" />
-            <Stack.Screen name="(auth)/login" />
-          </>
-        )}
-        {/* <Stack.Screen name="(all)" /> */}
-      </Stack>
-      <Snackbar
-        visible={snackbar.visible}
-        message={snackbar.message}
-        type={snackbar.type}
-        action={snackbar.action}
-        duration={snackbar.duration}
-        onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
-      />
+          {isAllowed && isLoggedIn === true ? (
+            <>
+              <Stack.Screen name="" />
+            </>
+          ) : (
+            <>
+              <Stack.Screen name="(all)" />
+              <Stack.Screen name="(auth)/login" />
+            </>
+          )}
+          {/* <Stack.Screen name="(all)" /> */}
+        </Stack>
+        <View style={styles.snackbarHost} pointerEvents="box-none">
+          <Snackbar
+            visible={snackbar.visible}
+            message={snackbar.message}
+            type={snackbar.type}
+            action={snackbar.action}
+            duration={snackbar.duration}
+            onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
+          />
+        </View>
+      </View>
     </>
   );
 }
@@ -226,3 +231,18 @@ function setupNotificationHandlers(handleNotification) {
     handleNotification(data);
   });
 }
+
+const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+  },
+  // ✅ Container jo pure screen cover karega, sirf last mein rendered
+  snackbarHost: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // ❌ NO background color, NO zIndex
+  }
+});

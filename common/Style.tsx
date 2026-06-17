@@ -918,7 +918,7 @@ export const crlimtreq_styles = StyleSheet.create({
         // padding: 8,
         // paddingTop: "10",
         justifyContent: 'flex-end',
-       
+
     },
     verticalScrollContainer: {
         paddingTop: 50,  // Close button ke neeche space
@@ -1283,7 +1283,7 @@ export const checkingScannerStyles = StyleSheet.create({
         flexDirection: 'row',
         //margin: 20
         paddingHorizontal: 10,
-        paddingVertical: 20
+        paddingVertical: 20,
     },
     titleTextWithIcon: {
         fontSize: 18,
@@ -1360,7 +1360,7 @@ export const checkingScannerStyles = StyleSheet.create({
         //marginTop: 5
     },
     inputDisabled: {
-        backgroundColor: '#DDD',
+        backgroundColor: '#fff',
         paddingVertical: 0,
         paddingHorizontal: 20,
         color: '#000000',
@@ -1386,6 +1386,34 @@ export const checkingScannerStyles = StyleSheet.create({
         padding: 12,
         borderRadius: 8,
         alignItems: "center"
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 20,
+        gap: 12, // React Native latest versions
+    },
+
+    submitBtn1: {
+        flex: 1, // dono button same width
+        flexDirection: 'row',
+        backgroundColor: "#007EA7",
+        justifyContent: 'center',
+        alignItems: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 18,
+        borderRadius: 14,
+
+        // Shadow
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4.65,
+        elevation: 6,
     },
 
     submitText: {
@@ -1439,7 +1467,8 @@ export const checkingScannerStyles = StyleSheet.create({
         marginTop: 5,
         height: 40,
         justifyContent: 'center',
-        width: '90%'
+        width: '100%',
+        color: '#000'
 
 
     },
@@ -1497,6 +1526,187 @@ export const checkingScannerStyles = StyleSheet.create({
     switch: {
         lineHeight: 1,
         marginTop: 10
+    },
+    formGroup: {
+        marginBottom: 12,
+    },
+
+    rowHorizontal: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+
+    labelHorizontal: {
+        width: 110,
+        fontWeight: 'bold',
+        fontSize: 12,
+        color: '#0a0a0a',
+    },
+
+    inputHorizontal: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        backgroundColor: '#fff',
+    },
+
+    inputDisabledHorizontal: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        backgroundColor: '#f2f2f2',
+    },
+    dropdownWrapper: {
+        flex: 1,
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+        position: 'relative',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+
+    modalBox: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 15,
+        elevation: 10
+    },
+
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        textAlign: 'center'
+    },
+    scannerModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+
+    scannerModalContainer: {
+        height: '85%',
+        backgroundColor: '#F5F7FB',
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        padding: 16,
+    },
+
+    scannerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 18,
+    },
+
+    headerContainer: {
+        paddingTop: 55,
+        paddingHorizontal: 18,
+        paddingBottom: 18,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+
+    closeButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#F4F4F4',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        marginHorizontal: 16,
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        marginBottom: 14,
+        height: 52,
+    },
+
+    billCard: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 14,
+        marginBottom: 14,
+
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+
+        elevation: 3,
+    },
+
+    leftBorder: {
+        width: 4,
+        borderRadius: 10,
+        backgroundColor: '#00C896',
+        marginRight: 12,
+    },
+
+    iconContainer: {
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: '#F1F7FA',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    title: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#111',
+    },
+
+    subText: {
+        fontSize: 13,
+        color: '#666',
+        marginTop: 3,
+        fontWeight: '600',
+    },
+
+    deleteButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 19,
+        backgroundColor: '#E53935',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    qty: {
+        marginTop: 18,
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#007EA7',
     },
 });
 
@@ -2480,5 +2690,547 @@ export const StyleSheetPCA = StyleSheet.create({
         textAlign: 'left'
     },
 
+
+});
+
+export const yarnmanagementsystemstyle = StyleSheet.create({
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+
+    emptyTextRed: {
+        color: '#ff3b30',
+        fontSize: 16,
+        fontWeight: '600',
+        textAlign: 'center',
+        // backgroundColor: '#ffe5e5',
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+        overflow: 'hidden'
+    },
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+
+    mainCard: {
+        flex: 1,
+        padding: 15,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2
+    },
+
+    title: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#222'
+    },
+
+    subTitle: {
+        fontSize: 12,
+        color: '#777',
+        marginBottom: 10
+    },
+
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#eee',
+        borderRadius: 8,
+        overflow: 'hidden',
+        marginVertical: 10
+    },
+
+    tab: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+
+    activeTab: {
+        backgroundColor: '#555'
+    },
+
+    tabText: {
+        color: '#555',
+        fontSize: 13
+    },
+
+    activeTabText: {
+        color: '#fff',
+        fontWeight: '600'
+    },
+
+    addButton: {
+        backgroundColor: '#007EA7',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        alignContent: 'center',
+        marginTop: 5,
+        width: '50%'
+    },
+
+    addButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600'
+    },
+    emptyBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 50
+    },
+    emptyText: {
+        fontSize: 13,
+        color: '#555'
+    },
+
+    emptySubText: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 5
+    },
+    formCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 15,
+        borderWidth: 1,
+        borderColor: '#eee'
+    },
+
+    formTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 15,
+        color: '#222'
+    },
+
+    inputGroup: {
+        marginBottom: 15
+    },
+
+    label: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 6
+    },
+
+    dropdownBox: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        height: 45,
+        justifyContent: 'center'
+    },
+
+    inputBox: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        height: 45,
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+        color: '#000000'
+    },
+    inputBoxDisabled: {
+        backgroundColor: '#f1f3f6',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: '#d0d5dd'
+    },
+
+    inputTextDisabled: {
+        color: '#080808',
+        fontSize: 14,
+
+    },
+    cardWrapper: {
+        marginTop: 12,
+    },
+
+    itemCard: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 16,
+        elevation: 4,
+    },
+
+    rowBetween: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    itmCode: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#000000',
+        flexShrink: 1
+    },
+
+    badge: {
+        backgroundColor: '#E8F0FE',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        marginLeft: 10
+    },
+
+    badgeText: {
+        fontSize: 12,
+        color: '#1A73E8',
+        fontWeight: '600'
+    },
+
+    itmName: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#444',
+        fontWeight: '500'
+    },
+
+    categoryText: {
+        marginTop: 4,
+        fontSize: 12,
+        color: '#777'
+    },
+
+    subItemBtn: {
+        marginTop: 14,
+        backgroundColor: '#1976D2',
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+        width: '100%'
+    },
+
+    subItemBtnText: {
+        color: '#fff',
+        fontWeight: '600'
+    },
+
+    buttonRow: {
+        marginTop: 0,
+        flexDirection: 'row',
+        justifyContent: 'flex-end'
+    },
+
+    subItemBtnSmall: {
+        backgroundColor: '#007EA7',
+        paddingVertical: 6,
+        paddingHorizontal: 14,
+        borderRadius: 8,
+        alignItems: 'center'
+    },
+    formHeader: {
+        marginBottom: 15,
+        marginTop: 0,
+        backgroundColor: '#007EA7',
+        width: '100%',
+        height: 80,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 10,
+    },
+
+    formTitleNew: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#ffffff'
+    },
+
+    formSubTitle: {
+        fontSize: 12,
+        color: '#ffffff',
+        marginTop: 3
+    },
+    itemCard1: {
+        backgroundColor: '#fff',
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 6
+    },
+
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    itmTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#ffffff',
+        flex: 1
+    },
+
+    divider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        marginVertical: 8
+    },
+
+    infoText: {
+        fontSize: 13,
+        color: '#ffffff',
+        marginBottom: 4,
+        fontWeight: '600',
+    },
+
+    infoValue: {
+        fontWeight: '600',
+        color: '#ffffff'
+    },
+    categoryBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20
+    },
+
+    spunBadge: {
+        backgroundColor: '#ffffff'
+    },
+
+    filamentBadge: {
+        backgroundColor: '#E8F8F0'
+    },
+
+    categoryBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#000'
+    },
+    buttonRowRight: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 12
+    },
+    smallButton: {
+        width: '48%',
+        backgroundColor: '#0E7490',
+        paddingVertical: 10,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    smallButtonText: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '600',
+        letterSpacing: 0.3
+    },
+    loader: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        zIndex: 9999,
+        elevation: 10
+    },
+    fab: {
+        position: 'absolute',
+        bottom: 25,
+        left: 20,
+        backgroundColor: '#007EA7',
+        width: 45,
+        height: 45,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+        elevation: 10
+    },
+    fabAdd: {
+        position: 'absolute',
+        bottom: 50,
+        left: 20,
+        backgroundColor: '#007EA7',
+        width: 45,
+        height: 45,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 999,
+        elevation: 10
+    },
+    topHeader: {
+        backgroundColor: '#0e7490',
+        paddingTop: 30,
+        paddingBottom: 15,
+        paddingHorizontal: 15,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    topHeaderTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600'
+    },
+
+    browseCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 26,   // 👈 height badha diya
+        paddingHorizontal: 14,
+        borderRadius: 14,
+        marginBottom: 12
+    },
+
+    browseText: {
+        fontSize: 14,
+        color: '#fff',
+        fontWeight: '700'
+    },
+
+    subText: {
+        fontSize: 12,
+        color: '#fff',
+        marginTop: 4
+    },
+
+    selectBtn: {
+        // backgroundColor: '#fff',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8
+    },
+
+    selectText: {
+        color: '#000',
+        fontSize: 12,
+        fontWeight: '600'
+    },
+    noDataBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 50
+    },
+    noDataText: {
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '500'
+    },
+    selectedItemBox: {
+        backgroundColor: '#fff',
+        padding: 12,
+        marginHorizontal: 15,
+        marginTop: 10,
+        borderRadius: 12,
+        elevation: 3,
+    },
+
+    selectedRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+
+    selectedValue: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#222',
+        marginRight: 10
+    },
+
+    codeBadge: {
+        backgroundColor: '#4A6FA5',
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 20
+    },
+
+    // codeText: {
+    //     color: '#fff',
+    //     fontSize: 12,
+    //     fontWeight: '600'
+    // },
+    inlineRow: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    codeText: {
+        backgroundColor: '#4A6FA5',
+        color: '#fff',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+        marginRight: 8
+    },
+    addBtnInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#007EA7',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10
+    },
+
+    cancelBtnInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#007EA7',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10,
+        marginRight: 10
+    },
+
+    addBtnText: {
+        color: '#fff',
+        fontWeight: '600',
+        marginLeft: 5
+    },
+
+    cancelBtnText: {
+        color: '#fff',
+        fontWeight: '600',
+        marginLeft: 5
+    },
+
+    listBox: {
+        marginTop: 15,
+        borderTopWidth: 1,
+        borderColor: '#eee'
+    },
+
+    listRow: {
+        flexDirection: 'row',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderColor: '#f0f0f0'
+    },
+
+    listCode: {
+        fontWeight: '600',
+        color: '#007EA7',
+        marginRight: 10
+    },
+
+    listName: {
+        flex: 1,
+        color: '#333'
+    }
 
 });

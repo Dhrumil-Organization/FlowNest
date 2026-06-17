@@ -1,6 +1,6 @@
-// components/Snackbar.tsx
+// components/Snackbar.tsx - COMPLETE REPLACEMENT
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, fontSize, radius, spacing } from '@/common/theme';
 
 export type SnackbarType = 'success' | 'error' | 'info' | 'warning';
@@ -25,7 +25,7 @@ const Snackbar: React.FC<SnackbarProps> = ({
   duration = 4000,
   onHide,
 }) => {
-  const translateY = useRef(new Animated.Value(100)).current;
+  const translateY = useRef(new Animated.Value(200)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -54,7 +54,7 @@ const Snackbar: React.FC<SnackbarProps> = ({
   const hideSnackbar = () => {
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: 100,
+        toValue: 200,
         duration: 250,
         useNativeDriver: true,
       }),
@@ -71,59 +71,83 @@ const Snackbar: React.FC<SnackbarProps> = ({
   const getBackgroundColor = () => {
     switch (type) {
       case 'success':
-        return '#28a745'; // green
+        return '#28a745';
       case 'error':
-        return '#dc3545'; // red
+        return '#dc3545';
       case 'warning':
-        return '#ffc107'; // yellow
+        return '#ffc107';
       default:
-        return '#333333'; // dark
+        return '#333333';
     }
   };
 
+  // ❌ NO <Modal> tag
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          backgroundColor: getBackgroundColor(),
-          transform: [{ translateY }],
-          opacity,
-        },
-      ]}>
-      <View style={styles.content}>
-        <Text style={styles.text} numberOfLines={2}>
-          {message}
-        </Text>
-        {action ? (
-          <TouchableOpacity
-            onPress={() => {
-              action.onPress();
-              hideSnackbar();
-            }}
-            style={styles.actionBtn}>
-            <Text style={styles.actionText}>{action.text}</Text>
-          </TouchableOpacity>
-        ) : null}
+    // ✅ Full screen transparent overlay (sirf press handle karega, click through nahi hoga)
+    <Pressable
+      style={styles.fullScreenOverlay}
+      onPress={hideSnackbar}  // Tap to dismiss
+    >
+      {/* ✅ Bottom area for Snackbar - touches pass through */}
+      <View style={styles.bottomArea} pointerEvents="box-none">
+        <Animated.View
+          style={[
+            styles.snackbar,
+            {
+              backgroundColor: getBackgroundColor(),
+              transform: [{ translateY }],
+              opacity,
+            },
+          ]}>
+          <View style={styles.content}>
+            <Text style={styles.text} numberOfLines={3}>
+              {message}
+            </Text>
+            {action ? (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  action.onPress();
+                  hideSnackbar();
+                }}
+                style={styles.actionBtn}>
+                <Text style={styles.actionText}>{action.text}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </Animated.View>
       </View>
-    </Animated.View>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  // ✅ Full screen overlay - on top of EVERYTHING
+ fullScreenOverlay: {
     position: 'absolute',
-    bottom: 80,
-    left: spacing.md,
-    right: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    elevation: 8,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.001)', // 0.001% black = almost invisible
+    zIndex: 999999,                          // 👈 ADD THIS
+    elevation: 999999,                       // 👈 ADD THIS
+},
+  // ✅ Bottom area for snackbar
+  bottomArea: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 80,
+    paddingHorizontal: 16,
+  },
+  snackbar: {
+    padding: 16,
+    borderRadius: 12,
+    elevation: 999999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    zIndex: 9999,
   },
   content: {
     flexDirection: 'row',
@@ -132,17 +156,17 @@ const styles = StyleSheet.create({
   },
   text: {
     color: '#fff',
-    fontSize: fontSize.md,
+    fontSize: 15,
     flex: 1,
   },
   actionBtn: {
-    marginLeft: spacing.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    marginLeft: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   actionText: {
     color: '#fff',
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontWeight: '600',
   },
 });

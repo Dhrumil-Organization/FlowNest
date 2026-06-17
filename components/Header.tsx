@@ -375,7 +375,19 @@ export default function Header({
                 text: 'Logout',
                 style: 'destructive',
                 onPress: async () => {
-                    await AsyncStorage.clear();
+                    // await AsyncStorage.clear();
+                    await AsyncStorage.removeItem('access_token');
+                    await AsyncStorage.removeItem('user_details');
+                    await AsyncStorage.removeItem('user_menu_apps');
+                    await AsyncStorage.removeItem('get_property');
+                    await AsyncStorage.removeItem('current_year');
+                    await AsyncStorage.removeItem('mastersyncData');
+                    await AsyncStorage.removeItem('login_user_name');
+                    await AsyncStorage.removeItem('login_user_passwd');
+                    await AsyncStorage.removeItem('receivables_sync_date');
+                    await AsyncStorage.removeItem('receivables_prpgroup');
+                    await AsyncStorage.removeItem('live_logs_unlocked');
+                    await AsyncStorage.removeItem('user_prptype');
                     router.replace('/(all)/landing');
                 },
             },
@@ -448,7 +460,7 @@ export default function Header({
                                     <Icon name="home" size={18} color="#fff" />
                                     {/* <Text style={styles.breadcrumbBackText}>Home</Text> */}
                                 </TouchableOpacity>
-                                    <Text style={styles.breadcrumbSeparator}>›</Text>
+                                <Text style={styles.breadcrumbSeparator}>›</Text>
                                 <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
                                     {breadcrumb}
                                 </Text>
@@ -478,7 +490,7 @@ export default function Header({
                     <View style={styles.sheet}>
                         <Text style={styles.sheetName}>{userName || 'User'}</Text>
 
-                        {['Home', 'Profile', 'Notifications', 'Settings'].map((item) => (
+                        {['Home', 'Profile', 'Settings'].map((item) => (
                             <TouchableOpacity
                                 key={item}
                                 style={styles.menuItem}
@@ -486,6 +498,7 @@ export default function Header({
                                     closeMenu();
                                     if (item === 'Home') router.replace('/(tabs)');
                                     if (item === 'Settings') router.replace('/settings_main');
+                                    if (item === 'Profile') router.replace('/profile');
                                 }}>
                                 <Text>{item}</Text>
                             </TouchableOpacity>

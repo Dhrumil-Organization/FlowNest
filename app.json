@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "5",
+      "buildNumber": "6",
       "jsEngine": "jsc",
       "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {
@@ -23,7 +23,6 @@
       }
     },
     "android": {
-      // "jsEngine": "jsc",
       "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -60,9 +59,16 @@
           }
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes and capture images for collection records."
+        }
+      ],
       "@react-native-community/datetimepicker",
       "expo-mail-composer",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true,

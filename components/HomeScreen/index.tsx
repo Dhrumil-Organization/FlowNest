@@ -848,6 +848,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import axios from 'axios';
 
 const { width } = Dimensions.get('window');
 const getNumColumns = () => {
@@ -879,11 +880,15 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
     // const flatListRef = useRef<FlatList>(null);
     const router = useRouter();
     const [prp, setPrp] = useState<string | null>(null);
+    const [checkDevice, setCheckDevice] = useState<string | null>(null);
     const [showHeaderTour, setShowHeaderTour] =
         useState(false);
 
     const [showHomeTour, setShowHomeTour] =
         useState(false);
+
+    const ENABLE_DEVICE_CHECK = true;
+
 
     // useEffect(() => {
 
@@ -908,7 +913,9 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
     useEffect(() => {
         const load = async () => {
             const prp = await AsyncStorage.getItem("selected_property");
+            const che = await AsyncStorage.getItem("ENABLE_DEVICE_CHECK");
             setPrp(prp);
+            setCheckDevice(che);
         };
         load();
     }, []);
@@ -925,6 +932,60 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
         };
         loadUsageCounts();
     }, []);
+
+    const checkDeviceAccess = async () => {
+        try {
+
+            if (!ENABLE_DEVICE_CHECK) {
+                return true;
+            }
+
+            const deviceId =
+                await AsyncStorage.getItem(
+                    'cache_deviceId'
+                );
+
+            const res = await axios.post(
+                'https://apig.tms-webapp.com/api/checkdevice',
+                {
+                    deviceid: deviceId,
+                }
+            );
+
+            console.log(
+                '✅ Home checkdevice:',
+                res.data
+            );
+
+            if (Number(res.data) !== 1) {
+
+                router.replace(
+                    '/access-denied'
+                );
+
+                return false;
+            }
+
+            return true;
+
+        } catch (e) {
+
+            console.log(
+                '❌ checkDeviceAccess',
+                e
+            );
+
+            return false;
+        }
+    };
+
+    useEffect(() => {
+        if (!checkDevice) return;
+        if (checkDevice === 'true') {
+            checkDeviceAccess();
+        }
+
+    }, [checkDevice]);
 
     const replayTour = () => {
 
@@ -1016,6 +1077,18 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
         { name: 'Process complete auth.', icon: 'autorenew', route: 'process-complete-auth', color: '#dd5c98', category: 'Production' },
         { name: 'Febric Stock', icon: 'autorenew', route: 'febric-stock', color: '#dd5c98', category: 'Stocks' },
         { name: 'Checking Scanner', icon: 'document-scanner', route: 'checking-scanner', color: '#4169E1', category: 'Finance' },
+        { name: 'Design Authorization', route: 'design-authorization', icon: 'edit', color: '#4B0082', category: 'Production' },
+        { name: 'Packing Grade Auth', route: 'packing-grade-auth', icon: 'admin-panel-settings', color: '#3a70a3c9', category: 'Production' },
+        { name: 'Production Merge Auth', route: 'production-merge-auth', icon: 'merge-type', color: '#8b55d1', category: 'Production' },
+        { name: 'Creel Management System', route: 'creel-management-system', icon: 'settings-system-daydream', color: '#008080', category: 'Production' },
+        { name: 'Beam Gaiting', route: 'beam-gaiting', icon: 'edit', color: '#142af5', category: 'Production' },
+        { name: 'Yarn Management System', route: 'yarn-management-system', icon: 'inventory', color: '#4B0082', category: 'Production' },
+        { name: 'Weft Issue', route: 'weft-issue', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
+        { name: 'Party Dashboard', route: 'party-dashboard', icon: 'precision-manufacturing', color: '#4169E1', category: 'Finance' },
+        { name: 'Production Report', route: 'production-report', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
+        { name: 'Feedback', route: 'feedback', icon: 'feedback', color: '#F2D43D', category: 'details' },
+        { name: 'Yarn Manufacturing', route: 'yarn-manufacturing', icon: 'touch-app', color: '#008080', category: 'details' },
+        { name: 'Profile', route: 'profile', icon: 'person-pin', color: '#000000', category: 'profile' },
     ];
 
     useEffect(() => {
@@ -1157,7 +1230,16 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
                     //                         "title": "Weft Issue",
                     //                         "href": "/"
                     //                     },
+                    //                     {
 
+                    //                         "title": "Design Authorization",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+
+                    //                         "title": "Packing Grade Auth",
+                    //                         "href": "/"
+                    //                     },
                     //                 ]
                     //             }
                     //         ]

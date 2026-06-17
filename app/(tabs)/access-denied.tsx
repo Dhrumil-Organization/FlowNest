@@ -63,12 +63,12 @@ export default function AccessDeniedScreen({ fromInit = false }: { fromInit?: bo
             </Text>
 
             {/* 🔥 SHOW ONLY IF FROM INIT */}
-            {fromInit === 'true' && (
+            {/* {fromInit === 'true' && ( */}
                 <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
                     <Icon name="refresh" size={22} color="#fff" />
                     <Text style={styles.retryText}>Retry</Text>
                 </TouchableOpacity>
-            )}
+            {/* )} */}
 
         </View>
     );

@@ -399,7 +399,7 @@ const DashboardScreen: React.FC<Props> = ({ username, getUserId }) => {
             <TouchableOpacity
               onPress={() =>
                 // navigation.navigate('Settings')
-                router.push('/Settings')
+                router.push('/settings')
               }
               style={styles.iconBtn2}>
               {/* <Text style={styles.iconBtnText}>⚙</Text> */}

@@ -27,7 +27,6 @@ import * as Sharing from 'expo-sharing';
 import Header from '../Header';
 import jsQR from 'jsqr';
 import * as ImageManipulator from 'expo-image-manipulator';
-// import QRLocalImage from 'react-native-qrcode-local-image';
 import TourOverlay from '@/common/TourOverlay';
 import { CHECKING_SCANNER_TOUR } from '@/common/TourJson'
 

@@ -65,10 +65,8 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan QR codes and capture images for collection records."
         }
       ],
-      "@react-native-community/datetimepicker",
       "expo-mail-composer",
-      "expo-sqlite",
-      "expo-barcode-scanner"
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

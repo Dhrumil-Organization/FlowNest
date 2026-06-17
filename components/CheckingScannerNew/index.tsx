@@ -21,7 +21,6 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-// import * as BarcodeScanner from 'expo-barcode-scanner';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import Header from '../Header';
@@ -129,61 +128,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
     // ═══════════════════════════════════════════════════
     // 🎯 SCAN QR FROM IMAGE
     // ═══════════════════════════════════════════════════
-    // const scanQRFromImage = async (imageUri: string) => {
-    //     try {
-    //         // Use expo-barcode-scanner to scan QR from the image
-    //         const { data } = await BarcodeScanner.scanFromURLAsync(imageUri, [
-    //             BarcodeScanner.BarCodeScannerConstants.BarCodeType.qr
-    //         ]);
-
-    //         if (data) {
-    //             try {
-    //                 const parsed = JSON.parse(data);
-    //                 return parsed; // Return parsed JSON
-    //             } catch (e) {
-    //                 Alert.alert('⚠️ Error', 'Scanned QR is not valid JSON.');
-    //                 return null;
-    //             }
-    //         } else {
-    //             Alert.alert('⚠️ Error', 'No QR code detected in the image.');
-    //             return null;
-    //         }
-    //     } catch (err) {
-    //         console.log('QR Scan Error:', err);
-    //         Alert.alert('❌ Error', 'Failed to scan QR from image.');
-    //         return null;
-    //     }
-    // };
-    // const scanQRFromImage = async (imageUri: string) => {
-    //     try {
-    //         Alert.alert(
-    //             'QR Image Scan',
-    //             'Image selected successfully.\n\nExpo SDK 54 does not support direct scanFromURLAsync.\nNeed Vision Camera implementation.'
-    //         );
-
-    //         return null;
-    //     } catch (err) {
-    //         console.log(err);
-    //         return null;
-    //     }
-    // };
-    // const scanQRFromImage = async (imageUri: string) => {
-    //     try {
-    //         console.log('Scanning image:', imageUri);
-
-    //         const result = await QRLocalImage.decode(imageUri);
-
-    //         console.log('QR Result:', result);
-
-    //         const parsed = JSON.parse(result);
-
-    //         return parsed;
-    //     } catch (e) {
-    //         console.log('QR Scan Error:', e);
-    //         Alert.alert('QR not found or invalid JSON');
-    //         return null;
-    //     }
-    // };
+    
     const scanQRFromImage = async (imageUri: string) => {
         try {
             console.log('Scanning image:', imageUri);

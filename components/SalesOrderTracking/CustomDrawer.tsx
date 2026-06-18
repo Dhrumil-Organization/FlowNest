@@ -1043,7 +1043,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               </View>
 
               <View style={styles.radioGroup}>
-                {(['Party Wise', 'Item Wise'] as WiseStatus[]).map(wise => (
+                {(['Party Wise', 'Design Wise'] as WiseStatus[]).map(wise => (
                   <TouchableOpacity
                     key={wise}
                     style={styles.radioButton}

@@ -832,7 +832,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
 
@@ -956,7 +956,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: dsnCodes,
@@ -1049,7 +1049,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: [],
@@ -1148,7 +1148,7 @@ const SalesOrderTracking: React.FC<{
             wise:
                 selectedItemStatus1 === 'Party Wise'
                     ? 'party'
-                    : selectedItemStatus1 === 'Item Wise'
+                    : selectedItemStatus1 === 'Design Wise'
                         ? 'design'
                         : '',
             dsncodes: customPayload.dsncodes,
@@ -1239,7 +1239,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: item?.dsncode ? [item?.dsncode] : [],
@@ -1267,7 +1267,7 @@ const SalesOrderTracking: React.FC<{
                 );
                 await AsyncStorage.setItem(
                     'parties_tracking_details_party_name',
-                    selectedItemStatus1 === 'Item Wise'
+                    selectedItemStatus1 === 'Design Wise'
                         ? dsnname.dsnname
                         : parname.parname,
                 );
@@ -1276,7 +1276,7 @@ const SalesOrderTracking: React.FC<{
                 setLastViewedParcode(getDData.parcode);
                 navigation.navigate('SOPartyDetails', {
                     party:
-                        selectedItemStatus1 === 'Item Wise'
+                        selectedItemStatus1 === 'Design Wise'
                             ? dsnname.dsnname
                             : parname.parname,
                     selectedSalesExes: seArr
@@ -1588,7 +1588,7 @@ const SalesOrderTracking: React.FC<{
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Main Item Summary</Text>
+                        <Text style={styles.modalTitle}>Main Design Summary</Text>
                         <TouchableOpacity onPress={closeDesignModal}>
                             <Icon name="close" size={24} color="#333" />
                         </TouchableOpacity>
@@ -1611,7 +1611,7 @@ const SalesOrderTracking: React.FC<{
                         <TouchableOpacity
                             key={index}
                             style={
-                                selectedItemStatus1 === 'Item Wise'
+                                selectedItemStatus1 === 'Design Wise'
                                     ? styles.summaryCard123
                                     : styles.summaryCard
                             }
@@ -1625,12 +1625,12 @@ const SalesOrderTracking: React.FC<{
                                 setisALL(true);
                             }}
                         >
-                            {selectedItemStatus1 === 'Item Wise' ? null : (
+                            {selectedItemStatus1 === 'Design Wise' ? null : (
                                 <Text style={styles.partyNameInSummary}>
                                     Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
                                 </Text>
                             )}
-                            {selectedItemStatus1 === 'Item Wise' ? (
+                            {selectedItemStatus1 === 'Design Wise' ? (
                                 <>
                                     <View style={styles.summaryContainer}>
                                         <View
@@ -1726,7 +1726,7 @@ const SalesOrderTracking: React.FC<{
                             alignItems: 'center',
                         }}
                     >
-                        <Text style={styles.sectionTitle}>Main Item Details</Text>
+                        <Text style={styles.sectionTitle}>Main Design Details</Text>
                         <TouchableOpacity
                             onPress={toggleSortOrder1}
                             style={{ flexDirection: 'row', alignItems: 'center' }}
@@ -1831,7 +1831,7 @@ const SalesOrderTracking: React.FC<{
                     {!isAll ? (
                         <>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Sub Item Summary</Text>
+                                <Text style={styles.modalTitle}>Sub Design Summary</Text>
                                 <TouchableOpacity
                                     onPress={() => setIsPartyDetailsModalVisible(false)}
                                 >
@@ -1867,13 +1867,13 @@ const SalesOrderTracking: React.FC<{
                                                 parname:
                                                     selectedPartyDetails?.designdetails[0].partyname,
                                             },
-                                            { dsnname: 'All Items' },
+                                            { dsnname: 'All Designs' },
                                             selectedPartyDetails?.payload,
                                             summary,
                                         );
                                     }}
                                 >
-                                    {selectedItemStatus1 === 'Item Wise' ? null : (
+                                    {selectedItemStatus1 === 'Design Wise' ? null : (
                                         <Text style={styles.partyNameInSummary}>
                                             Party:{' '}
                                             {selectedPartyDetails?.designdetails[0]?.partyname || ''}
@@ -1914,7 +1914,7 @@ const SalesOrderTracking: React.FC<{
                     ) : (
                         <View>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Sub Item Summary</Text>
+                                <Text style={styles.modalTitle}>Sub Design Summary</Text>
                                 <TouchableOpacity
                                     onPress={() => setIsPartyDetailsModalVisible(false)}
                                 >
@@ -1979,7 +1979,7 @@ const SalesOrderTracking: React.FC<{
                             alignItems: 'center',
                         }}
                     >
-                        <Text style={styles.sectionTitle}>Sub Item Details</Text>
+                        <Text style={styles.sectionTitle}>Sub Design Details</Text>
                         <TouchableOpacity
                             onPress={toggleSortOrder2}
                             style={{ flexDirection: 'row', alignItems: 'center' }}

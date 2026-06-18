@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { colors, fontSize, radius, spacing } from '../utils/theme';
 import { inquiryApi } from '../services/inquiryApi';
-import { RootStackParamList } from '../types';
+import { Inquiry, RootStackParamList } from '../types';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
 import Input from '../components/Input';
 import Button from '../components/Button';
@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 type Props = NativeStackScreenProps<RootStackParamList, 'ConfirmInquiry'>;
 
 const ConfirmInquiryScreen: React.FC<Props> = ({ route, navigation, username }) => {
-  const { id } = route.params;
+  const { id, prpcode, strcode, yearno, txntype, fetch } = route.params;
   const [paymentTerms, setPaymentTerms] = useState('');
   const [deliveryTerms, setDeliveryTerms] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -35,9 +35,50 @@ const ConfirmInquiryScreen: React.FC<Props> = ({ route, navigation, username }) 
     initializeApp();
   }, []);
 
+  // const handleAutoEntry = async () => {
+  //   try {
+  //     // setLoading(true);
+  //     const payload = {
+  //       uid: id,
+  //       prpcode: prpcode,
+  //       strcode: strcode,
+  //       // prptype: getUserPrptype,
+  //       yearno: yearno,
+  //       txntype: txntype,
+  //       fetch: fetch,
+  //     };
+
+  //     console.log("Auto Entry Payload:", payload);
+  //     // Alert.alert(
+  //     //   "Auto Entry Success",
+  //     //   `Auto Entry completed for ${item.inquiry_no}`
+  //     // );
+  //     console.log("Auto Entry Response:", payload);
+  //     const response = await inquiryApi.autoEntry(payload as any);
+  //     console.log("Auto Entry Response:", response);
+
+  //     // Show the response in the card (e.g., as a toast or inline message)
+  //     // Alert.alert(
+  //     //   "Auto Entry Success",
+  //     //   `Auto Entry completed for ${item.inquiry_no}. Response: ${JSON.stringify(response)}`
+  //     // );
+
+  //     // Optionally: Update the card to show the response
+  //     // You can add a new state to track the response for each card
+  //   } catch (e: any) {
+  //     Alert.alert(
+  //       "Error",
+  //       e?.response?.data?.message || "Failed to perform Auto Entry"
+  //     );
+  //   } finally {
+  //     // setLoading(false);
+  //   }
+  // };
+
   const submit = async () => {
     setSaving(true);
     try {
+      // handleAutoEntry();
       const res = await inquiryApi.confirm(id, {
         payment_terms: paymentTerms,
         delivery_terms: deliveryTerms,

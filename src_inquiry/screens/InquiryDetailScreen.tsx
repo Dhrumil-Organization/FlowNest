@@ -410,7 +410,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
               <Button
                 title="Mark Confirmed"
                 variant="secondary"
-                onPress={() => navigation.navigate('ConfirmInquiry', { id: inquiry.id })}
+                onPress={() => navigation.navigate('ConfirmInquiry', { id: inquiry.id, prpcode: inquiry.party_prp_code, strcode: '', yearno: getCurrentFinancialYear(), txntype: 'mob_inquiry', fetch: 'autoso_from_inquiries' })}
                 style={{ flex: 1 }}
               />
               <Button

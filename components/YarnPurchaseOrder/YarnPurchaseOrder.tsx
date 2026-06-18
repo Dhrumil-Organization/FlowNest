@@ -204,7 +204,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [chartPayload, setChartPayload] = useState(null);
     const [ChartHelp, setChartHelpOpen] = useState(false);
 
-    console.log("ROUTES:", navigation.getState()?.routeNames);
+    // console.log("ROUTES:", navigation.getState()?.routeNames);
     // const styles = StyleSheet.create({
     //     modalContainer: {
     //         flex: 1,
@@ -372,7 +372,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         },
 
         label: {
-            color: '#888',
+            color: '#000',
             fontSize: 12
         },
 
@@ -514,6 +514,62 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             fontWeight: '500',
             color: '#333'
         },
+        stampContainer: {
+            position: 'absolute',
+            right: 35,      // right side se distance
+            top: 115,
+            // top: '80%',
+            left: '80%',
+            marginLeft: -50,
+            marginTop: 20,
+            zIndex: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        stampContainerPOS: {
+            position: 'absolute',
+            right: 20,
+            top: 120,
+            zIndex: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+
+        stampContainerYOS: {
+            position: 'absolute',
+            right: 20,
+            top: 120,
+            zIndex: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+
+        stamp: {
+            width: 100,
+            height: 60,
+            borderRadius: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            transform: [{ rotate: '0deg' }],
+        },
+
+        stampAccepted: {
+            backgroundColor: 'rgba(76, 175, 80, 0.7)',
+            borderColor: 'rgba(46, 125, 50, 0.9)',
+        },
+
+        stampRejected: {
+            backgroundColor: 'rgba(244, 67, 54, 0.7)',
+            borderColor: 'rgba(198, 40, 40, 0.9)',
+        },
+
+        stampText: {
+            color: '#fff',
+            fontWeight: 'bold',
+            fontSize: 12,
+            textAlign: 'center',
+        },
     });
 
     useEffect(() => {
@@ -615,10 +671,10 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
     */
 
-    console.log("TESTING 1234123123123")
+    // console.log("TESTING 1234123123123")
 
     const fetchData = useCallback(async () => {
-        console.log("TESTING")
+        // console.log("TESTING")
         // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
@@ -1298,9 +1354,16 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         },
                         params
                     };
+
+                    console.log('params', params);
+
                     return requestconfig;
                 };
+
                 const response = await axios.get(`${API}/api/authpo`, getRequestConfig({ params: payload }));
+
+                console.log("response", response);
+
                 if (response.data.success) {
                     setresponsemessageYPO(response.data.message || 'Success');
                     setTimeout(() => {
@@ -1557,8 +1620,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         parcode: item.ParCode,
     });
 
-    console.log("PRPTYPE 1 ::- ", FormState.values.PrpType)
-    console.log("PRPTYPE 2 ::- ", prptype)
+    // console.log("PRPTYPE 1 ::- ", FormState.values.PrpType)
+    // console.log("PRPTYPE 2 ::- ", prptype)
 
     const fetchPurchaseOrderChart = async (payload: any) => {
         try {
@@ -2293,10 +2356,37 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         return (
             <View style={[
-                styles.card,
-                isApproved ? styles.acceptedCard :
-                    isRejected ? styles.rejectedCard : null
-            ]}>
+                crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
+                item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
+                {/* {
+                    item.isProcessed &&
+                    (
+                        <View style={[crlimtreq_styles.stampContainerYOS,]}>
+                            <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
+                                <Text style={crlimtreq_styles.stampText}>
+                                    {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                                </Text>
+                            </View>
+                        </View>
+                    )
+                } */}
+
+                {item.isProcessed && (
+                    <View style={styles.stampContainerYOS}>
+                        <View
+                            style={[
+                                styles.stamp,
+                                item.actionType === 'accept'
+                                    ? styles.stampAccepted
+                                    : styles.stampRejected,
+                            ]}
+                        >
+                            <Text style={styles.stampText}>
+                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
 
                 {/* HEADER */}
                 <View style={styles.headerRow}>
@@ -2344,17 +2434,35 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
                 </View>
 
+                <View style={styles.row}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={styles.label}>Auth Remark:</Text>
+                        <RNTextInput
+                            style={crlimtreq_styles.editableValueBlack}
+                            value={editableValuesYPO[item.UId]?.ARemark || ''}
+                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                        />
+                    </View>
+                </View>
+
                 {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
                 {
                     type === 'verify' && (
                         <View style={styles.actionRow}>
-                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#4CAF50' }]}>
-                                <Icon name="check" size={20} color="#fff" />
+                            <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="check-circle" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#F44336' }]}>
-                                <Icon name="close" size={20} color="#fff" />
+                            <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                             </TouchableOpacity>
+
+                            {/* <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                            </TouchableOpacity> */}
                         </View>
                     )
                 }
@@ -2366,24 +2474,26 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             {/* ✅ ACCEPT */}
                             <TouchableOpacity
                                 onPress={() => handleIconPress(item, 'accept')}
-                                disabled={!isConnected || item.IsAuth !== '0'}
+                                // disabled={!isConnected || item.IsAuth !== '0'}
+                                disabled={!isConnected || item.isProcessed}
                             >
                                 <Icon
                                     name="check-circle"
                                     size={35}
-                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#4CAF50"}
+                                    color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"}
                                 />
                             </TouchableOpacity>
 
                             {/* ❌ REJECT */}
                             <TouchableOpacity
                                 onPress={() => handleIconPress(item, 'reject')}
-                                disabled={!isConnected || item.IsAuth !== '0'}
+                                // disabled={!isConnected || item.IsAuth !== '0'}
+                                disabled={!isConnected || item.isProcessed}
                             >
                                 <Icon
                                     name="cancel"
                                     size={35}
-                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#F44336"}
+                                    color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"}
                                 />
                             </TouchableOpacity>
 

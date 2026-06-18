@@ -128,6 +128,28 @@ const DoffEntry = ({ navigation, token, username }) => {
   );
   const [firstIncompleteDoff, setFirstIncompleteDoff] = useState(null);
 
+  const parseProductionDate = (proddate) => {
+    if (!proddate || proddate.length !== 8) return null;
+    const year = parseInt(proddate.substring(0, 4), 10);
+    const month = parseInt(proddate.substring(4, 6), 10) - 1; // Months are 0-indexed
+    const day = parseInt(proddate.substring(6, 8), 10);
+    return new Date(year, month, day);
+  };
+
+  const validateStartDateTime = (date, time, proddate) => {
+    const productionDate = parseProductionDate(proddate);
+    if (!productionDate) return { valid: true, message: '' }; // No production date to compare
+
+    const selectedDateTime = combineDateTime(date, time);
+    if (selectedDateTime < productionDate) {
+      return {
+        valid: false,
+        message: `Date and time cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`
+      };
+    }
+    return { valid: true, message: '' };
+  };
+
   // Add this useEffect to handle orientation changes
   useEffect(() => {
     const onChange = ({ window }) => {
@@ -242,6 +264,15 @@ const DoffEntry = ({ navigation, token, username }) => {
   //     setHasLastDoff(false); // Reset if no data
   //   }
   // }, [getAllDoffData]);
+  const proddate = getSelectedFilteredMachine[0]?.proddate;
+  const productionDate = parseProductionDate(proddate);
+  console.log('Proddate:', proddate);
+  console.log('Production Date Object:', productionDate);
+  console.log('Production Date Type:', typeof productionDate);
+  console.log('Production Date Instance:', productionDate instanceof Date);
+  console.log(
+    'dddate :', productionDate, proddate
+  )
   useEffect(() => {
     if (getAllDoffData.length > 0) {
       // Check for anyLastDoff
@@ -782,6 +813,13 @@ const DoffEntry = ({ navigation, token, username }) => {
 
   // Aur final payload mein daaldo:
   const doffAdd = async () => {
+
+    const proddate = getSelectedFilteredMachine[0]?.proddate;
+    const validation = validateStartDateTime(startDate, startTime, proddate);
+    if (!validation.valid) {
+      showWarning(validation.message);
+      return; // Stop execution if validation fails
+    }
     // Merged payload create karo
     const mergedPayload = createMergedPayload(getAllDoffDataNew, getSelectedFilteredMachine);
 
@@ -858,6 +896,12 @@ const DoffEntry = ({ navigation, token, username }) => {
 
 
   const doffUpdateEnd = async () => {
+    const proddate = getSelectedFilteredMachine[0]?.proddate;
+    const validation = validateStartDateTime(startDateEnd, startTimeEnd, proddate);
+    if (!validation.valid) {
+      showWarning(validation.message);
+      return; // Stop execution if validation fails
+    }
     // Merged payload create karo
     let prp3 = selectedProperty ? selectedProperty?.PrpCode : '';
     let yearnumber3 = selectedYear?.slice(-2) ? selectedYear?.slice(-2) : '';
@@ -990,6 +1034,7 @@ const DoffEntry = ({ navigation, token, username }) => {
   };
 
   const sums = calculateSums();
+
 
   return (
     <>
@@ -1152,6 +1197,35 @@ const DoffEntry = ({ navigation, token, username }) => {
                       </View>
 
                       {/* Date Picker Modal */}
+                      {/* {showStartDatePicker && (
+                        <DateTimePicker
+                          value={startDate}
+                          mode="date"
+                          display="default"
+                          // onChange={(event, date) => {
+                          //   setShowStartDatePicker(false);
+                          //   if (event.type === 'set' && date) {
+                          //     setStartDate(date);
+                          //   }
+                          // }}
+                          onChange={(event, date) => {
+                            setShowStartDatePicker(false);
+                            if (event.type === 'set' && date) {
+                              const proddate = getSelectedFilteredMachine[0]?.proddate;
+                              const productionDate = parseProductionDate(proddate);
+                              if (productionDate && date < productionDate) {
+                                showWarning(`Start date cannot be earlier than ${getDisplayDateFromYYYYMMDD(proddate)}`);
+                                return;
+                              }
+                              setStartDate(date);
+                            }
+                          }}
+                          minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || new Date()}
+                          // minimumDate={new Date()}
+                          textColor="#000"
+                          locale="en-IN"
+                        />
+                      )} */}
                       {showStartDatePicker && (
                         <DateTimePicker
                           value={startDate}
@@ -1160,10 +1234,16 @@ const DoffEntry = ({ navigation, token, username }) => {
                           onChange={(event, date) => {
                             setShowStartDatePicker(false);
                             if (event.type === 'set' && date) {
+                              const proddate = getSelectedFilteredMachine[0]?.proddate;
+                              const productionDate = parseProductionDate(proddate);
+                              if (productionDate && date < productionDate) {
+                                showWarning(`Start date cannot be earlier than ${getDisplayDateFromYYYYMMDD(proddate)}`);
+                                return;
+                              }
                               setStartDate(date);
                             }
                           }}
-                          minimumDate={new Date()}
+                          minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || new Date()}
                           textColor="#000"
                           locale="en-IN"
                         />
@@ -1269,6 +1349,35 @@ const DoffEntry = ({ navigation, token, username }) => {
                         </View>
 
                         {/* Date Picker Modal */}
+                        {/* {showStartDatePickerEnd && (
+                          <DateTimePicker
+                            value={startDateEnd}
+                            mode="date"
+                            display="default"
+                            // onChange={(event, date) => {
+                            //   setShowStartDatePickerEnd(false);
+                            //   if (event.type === 'set' && date) {
+                            //     setStartDateEnd(date);
+                            //   }
+                            // }}
+                            // minimumDate={new Date()}
+                            onChange={(event, date) => {
+                              setShowStartDatePickerEnd(false);
+                              if (event.type === 'set' && date) {
+                                const proddate = getSelectedFilteredMachine[0]?.proddate;
+                                const productionDate = parseProductionDate(proddate);
+                                if (productionDate && date < productionDate) {
+                                  showWarning(`End date cannot be earlier than ${getDisplayDateFromYYYYMMDD(proddate)}`);
+                                  return;
+                                }
+                                setStartDateEnd(date);
+                              }
+                            }}
+                            minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || new Date()}
+                            textColor="#000"
+                            locale="en-IN"
+                          />
+                        )} */}
                         {showStartDatePickerEnd && (
                           <DateTimePicker
                             value={startDateEnd}
@@ -1277,10 +1386,20 @@ const DoffEntry = ({ navigation, token, username }) => {
                             onChange={(event, date) => {
                               setShowStartDatePickerEnd(false);
                               if (event.type === 'set' && date) {
+                                const proddate = getSelectedFilteredMachine[0]?.proddate;
+                                const productionDate = parseProductionDate(proddate);
+                                if (productionDate && date < productionDate) {
+                                  showWarning(`End date cannot be earlier than ${getDisplayDateFromYYYYMMDD(proddate)}`);
+                                  return;
+                                }
+                                if (date < startDate) {
+                                  showWarning('End date must be after or equal to start date.');
+                                  return;
+                                }
                                 setStartDateEnd(date);
                               }
                             }}
-                            minimumDate={new Date()}
+                            minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || new Date()}
                             textColor="#000"
                             locale="en-IN"
                           />
@@ -1403,18 +1522,47 @@ const DoffEntry = ({ navigation, token, username }) => {
 
                 // --- Field change handler (only updates state, no refreshKey increment) ---
                 const validateDates = (startDateStr, endDateStr) => {
-                  // if (!startDateStr && !endDateStr) return { valid: true, message: '' };
-                  if (!startDateStr) return { valid: true, message: '' }; // Both empty is okay
-                  // if (startDateStr && !endDateStr) {
-                  //   return { valid: false, message: 'End date is required if start date is provided.' };
-                  // }
-                  if (startDateStr && endDateStr) {
-                    const startDate = parseYYYYMMDD(startDateStr);
-                    const endDate = parseYYYYMMDD(endDateStr);
-                    if (endDate < startDate) {
-                      return { valid: false, message: 'End date must be after or equal to start date.' };
-                    }
+                  // If both dates are empty, it's valid
+                  if (!startDateStr && !endDateStr) return { valid: true, message: '' };
+
+                  // If only start date is provided, it's valid (end date can be empty)
+                  if (!startDateStr) return { valid: true, message: '' };
+
+                  // Parse production date
+                  const proddate = getSelectedFilteredMachine[0]?.proddate;
+                  const productionDate = parseProductionDate(proddate);
+
+                  // Parse start and end dates
+                  const startDate = parseYYYYMMDD(startDateStr);
+                  const endDate = endDateStr ? parseYYYYMMDD(endDateStr) : null;
+
+                  // Log the values for debugging
+                  console.log('Start Date (startDateStr):', startDateStr);
+                  console.log('Parsed Start Date:', startDate);
+                  console.log('End Date (endDateStr):', endDateStr);
+                  console.log('Parsed End Date:', endDate);
+
+                  // Check if start date is earlier than production date
+                  if (productionDate && startDate < productionDate) {
+                    return {
+                      valid: false,
+                      message: `Start date cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`
+                    };
                   }
+
+                  // Check if end date is earlier than start date
+                  if (endDate && endDate < startDate) {
+                    return { valid: false, message: 'End date must be after or equal to start date.' };
+                  }
+
+                  // Check if end date is earlier than production date
+                  if (productionDate && endDate && endDate < productionDate) {
+                    return {
+                      valid: false,
+                      message: `End date cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`
+                    };
+                  }
+
                   return { valid: true, message: '' };
                 };
 
@@ -1457,11 +1605,10 @@ const DoffEntry = ({ navigation, token, username }) => {
                 // --- Date/Time picker helpers (using YYYYMMDD) ---
                 const parseYYYYMMDD = (dateStr) => {
                   if (!dateStr || dateStr.length !== 8) return new Date();
-                  return new Date(
-                    parseInt(dateStr.substring(0, 4), 10),
-                    parseInt(dateStr.substring(4, 6), 10) - 1,
-                    parseInt(dateStr.substring(6, 8), 10)
-                  );
+                  const year = parseInt(dateStr.substring(0, 4), 10);
+                  const month = parseInt(dateStr.substring(4, 6), 10) - 1; // Months are 0-indexed
+                  const day = parseInt(dateStr.substring(6, 8), 10);
+                  return new Date(year, month, day);
                 };
                 const formatDateYYYYMMDD = (date) => {
                   const y = date.getFullYear();
@@ -1552,17 +1699,50 @@ const DoffEntry = ({ navigation, token, username }) => {
                             {getDisplayDate(currentEditableData.startdate || item.startdate)}
                           </Text>
                         </TouchableOpacity>
-                        {pickerVisibility[doffId]?.startDate && (
+                        {/* {pickerVisibility[doffId]?.startDate && (
+                          // <DateTimePicker
+                          //   value={parseYYYYMMDD(currentEditableData.startdate || item.startdate)}
+                          //   mode="date"
+                          //   display="default"
+                          //   // Inside your DateTimePicker onChange for startDate
+                          //   onChange={(event, date) => {
+                          //     hidePicker(doffId, 'startDate');
+                          //     if (event.type === 'set' && date) {
+                          //       const formatted = formatDateYYYYMMDD(date);
+                          //       const endDate = currentEditableData.enddate || item.enddate;
+
+                          //       const validation = validateDates(formatted, endDate);
+                          //       if (!validation.valid) {
+                          //         showWarning(validation.message);
+                          //         return;
+                          //       }
+
+                          //       handleFieldChange('startdate', formatted);
+                          //     }
+                          //   }}
+                          //   textColor="#000"
+                          //   minimumDate={minDate}
+                          //   maximumDate={maxDate}
+                          // />
                           <DateTimePicker
                             value={parseYYYYMMDD(currentEditableData.startdate || item.startdate)}
                             mode="date"
                             display="default"
-                            // Inside your DateTimePicker onChange for startDate
                             onChange={(event, date) => {
                               hidePicker(doffId, 'startDate');
                               if (event.type === 'set' && date) {
                                 const formatted = formatDateYYYYMMDD(date);
                                 const endDate = currentEditableData.enddate || item.enddate;
+
+                                // Validate against production date and end date
+                                const proddate = getSelectedFilteredMachine[0]?.proddate;
+                                const productionDate = parseProductionDate(proddate);
+                                const parsedDate = parseYYYYMMDD(formatted);
+
+                                if (productionDate && parsedDate < productionDate) {
+                                  showWarning(`Start date cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`);
+                                  return;
+                                }
 
                                 const validation = validateDates(formatted, endDate);
                                 if (!validation.valid) {
@@ -1574,7 +1754,50 @@ const DoffEntry = ({ navigation, token, username }) => {
                               }
                             }}
                             textColor="#000"
-                            minimumDate={minDate}
+                            minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || minDate}
+                            maximumDate={maxDate}
+                          />
+                        )} */}
+                        {pickerVisibility[doffId]?.startDate && (
+                          <DateTimePicker
+                            value={parseYYYYMMDD(currentEditableData.startdate || item.startdate)}
+                            mode="date"
+                            display="default"
+                            onChange={(event, date) => {
+                              hidePicker(doffId, 'startDate');
+                              if (event.type === 'set' && date) {
+                                const formatted = formatDateYYYYMMDD(date);
+                                const endDate = currentEditableData.enddate || item.enddate;
+
+                                // Parse production date and selected date
+                                const proddate = getSelectedFilteredMachine[0]?.proddate;
+                                const productionDate = parseProductionDate(proddate);
+                                const parsedDate = parseYYYYMMDD(formatted);
+
+                                // Log the values for debugging
+                                console.log('Production Date (proddate):', proddate);
+                                console.log('Parsed Production Date:', productionDate);
+                                console.log('Selected Date (formatted):', formatted);
+                                console.log('Parsed Selected Date:', parsedDate);
+
+                                // Validate against production date
+                                if (productionDate && parsedDate < productionDate) {
+                                  showWarning(`Start date cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`);
+                                  return;
+                                }
+
+                                // Validate against end date
+                                const validation = validateDates(formatted, endDate);
+                                if (!validation.valid) {
+                                  showWarning(validation.message);
+                                  return;
+                                }
+
+                                handleFieldChange('startdate', formatted);
+                              }
+                            }}
+                            textColor="#000"
+                            minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || minDate}
                             maximumDate={maxDate}
                           />
                         )}
@@ -1621,17 +1844,52 @@ const DoffEntry = ({ navigation, token, username }) => {
                             {getDisplayDate(currentEditableData.enddate || item.enddate)}
                           </Text>
                         </TouchableOpacity>
-                        {pickerVisibility[doffId]?.endDate && (
+                        {/* {pickerVisibility[doffId]?.endDate && (
+                          // <DateTimePicker
+                          //   value={parseYYYYMMDD(currentEditableData.enddate || item.enddate)}
+                          //   mode="date"
+                          //   display="default"
+                          //   // Inside your DateTimePicker onChange for endDate
+                          //   onChange={(event, date) => {
+                          //     hidePicker(doffId, 'endDate');
+                          //     if (event.type === 'set' && date) {
+                          //       const formatted = formatDateYYYYMMDD(date);
+                          //       const startDate = currentEditableData.startdate || item.startdate;
+
+                          //       const validation = validateDates(startDate, formatted);
+                          //       if (!validation.valid) {
+                          //         showWarning(validation.message);
+                          //         return;
+                          //       }
+
+                          //       handleFieldChange('enddate', formatted);
+                          //     }
+                          //   }}
+                          //   textColor="#000"
+                          //   minimumDate={minDate}
+                          //   maximumDate={maxDate}
+                          // />
                           <DateTimePicker
                             value={parseYYYYMMDD(currentEditableData.enddate || item.enddate)}
                             mode="date"
                             display="default"
-                            // Inside your DateTimePicker onChange for endDate
                             onChange={(event, date) => {
                               hidePicker(doffId, 'endDate');
                               if (event.type === 'set' && date) {
                                 const formatted = formatDateYYYYMMDD(date);
                                 const startDate = currentEditableData.startdate || item.startdate;
+
+                                // Validate against production date and start date
+                                const proddate = getSelectedFilteredMachine[0]?.proddate;
+                                const productionDate = parseProductionDate(proddate);
+                                const parsedDate = parseYYYYMMDD(formatted);
+
+                                console.log('Production Date:', parsedDate);
+
+                                if (productionDate && parsedDate < productionDate) {
+                                  showWarning(`End date cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`);
+                                  return;
+                                }
 
                                 const validation = validateDates(startDate, formatted);
                                 if (!validation.valid) {
@@ -1643,7 +1901,50 @@ const DoffEntry = ({ navigation, token, username }) => {
                               }
                             }}
                             textColor="#000"
-                            minimumDate={minDate}
+                            minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || minDate}
+                            maximumDate={maxDate}
+                          />
+                        )} */}
+                        {pickerVisibility[doffId]?.endDate && (
+                          <DateTimePicker
+                            value={parseYYYYMMDD(currentEditableData.enddate || item.enddate)}
+                            mode="date"
+                            display="default"
+                            onChange={(event, date) => {
+                              hidePicker(doffId, 'endDate');
+                              if (event.type === 'set' && date) {
+                                const formatted = formatDateYYYYMMDD(date);
+                                const startDate = currentEditableData.startdate || item.startdate;
+
+                                // Parse production date and selected date
+                                const proddate = getSelectedFilteredMachine[0]?.proddate;
+                                const productionDate = parseProductionDate(proddate);
+                                const parsedDate = parseYYYYMMDD(formatted);
+
+                                // Log the values for debugging
+                                console.log('Production Date (proddate):', proddate);
+                                console.log('Parsed Production Date:', productionDate);
+                                console.log('Selected Date (formatted):', formatted);
+                                console.log('Parsed Selected Date:', parsedDate);
+
+                                // Validate against production date
+                                if (productionDate && parsedDate < productionDate) {
+                                  showWarning(`End date cannot be earlier than the production date (${getDisplayDateFromYYYYMMDD(proddate)})`);
+                                  return;
+                                }
+
+                                // Validate against start date
+                                const validation = validateDates(startDate, formatted);
+                                if (!validation.valid) {
+                                  showWarning(validation.message);
+                                  return;
+                                }
+
+                                handleFieldChange('enddate', formatted);
+                              }
+                            }}
+                            textColor="#000"
+                            minimumDate={parseProductionDate(getSelectedFilteredMachine[0]?.proddate) || minDate}
                             maximumDate={maxDate}
                           />
                         )}

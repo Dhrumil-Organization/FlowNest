@@ -28,6 +28,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const { hasPermission, requestPermission } = useCameraPermission();
     const [scannedValue, setScannedValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isDeleteLoading, setIsDeleteLoading] = useState(false);
     const [getData, setData] = useState([]);
     const [Designdata, setDesigndata] = useState([]);
     const [getdesigndata, setdesigndata] = useState([]);
@@ -58,6 +59,9 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [selecteddesign, setselecteddesign] = useState(null);
     //
 
+    const [selectedGrade, setSelectedGrade] = useState(null);
+    const [selectedChecker, setSelectedChecker] = useState(null);
+
     const [showManualPopup, setShowManualPopup] = useState(false);
     const [machinedata, setMachineData] = useState([]);
     const [FormState, setFormState] = useState({
@@ -77,6 +81,23 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);// true = manual, false = scanner
     // const [isScanning, setIsScanning] = useState(false);
     // console.log("scannerCardData", scannerCardData);
+
+
+    const resetScanFields = () => {
+        setDesign('');
+        setGrade('');
+        setChecker('');
+
+        setGradeData([]);
+        setCheckerData([]);
+
+        setselecteddesign(null);
+
+        setMeter('');
+        setKgs('');
+        setavgWt('');
+        setWarpLen('0');
+    };
 
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
@@ -104,6 +125,10 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
     const codeScanner = useCodeScanner({
         codeTypes: ['qr'],
         onCodeScanned: (codes) => {
+            setselecteddesign(null);
+            setSelectedGrade(null);
+            setSelectedChecker(null);
+            resetScanFields();
             setBeamNo('');
             setTakaNo('');
             setBeamUid('');
@@ -237,20 +262,54 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 )
             );
 
-            if (response.data.success && response.data.response.data.length > 0) {
-                setCheckerData(response.data.response.data);
-                let tempChecker = '';
-                tempChecker = await AsyncStorage.getItem('csChecker');
+            console.log("checker response", response);
 
-                if (typeof tempChecker != 'undefined' && tempChecker != null && tempChecker != '') {
-                    response.data.response.data && response.data.response.data.filter((el, ind) => {
-                        if (el.EmpCode == tempChecker) {
-                            setChecker(tempChecker);
-                        }
-                    })
+            // if (response.data.success && response.data.response.data.length > 0) {
+            //     setCheckerData(response.data.response.data);
+            //     let tempChecker = '';
+            //     tempChecker = await AsyncStorage.getItem('csChecker');
+
+            //     if (typeof tempChecker != 'undefined' && tempChecker != null && tempChecker != '') {
+            //         response.data.response.data && response.data.response.data.filter((el, ind) => {
+            //             if (el.EmpCode == tempChecker) {
+            //                 setChecker(tempChecker);
+            //             }
+            //         })
+            //     }
+            // } else {
+            //     setCheckerData([]);
+            // }
+
+            if (response.data.success && response.data.response.data.length > 0) {
+
+                const checkerList = response.data.response.data;
+
+                const userId = response.data.response.user_id; // <-- response se
+
+                if (
+                    userId &&
+                    userId !== '' &&
+                    userId !== '0'
+                ) {
+
+                    const matchedData = checkerList.filter(
+                        item => String(item.EmpCode) === String(userId)
+                    );
+
+                    if (matchedData.length > 0) {
+
+                        setCheckerData(matchedData);
+                        setChecker(matchedData[0].EmpCode);
+
+                    } else {
+
+                        setCheckerData(checkerList);
+                    }
+
+                } else {
+
+                    setCheckerData(checkerList);
                 }
-            } else {
-                setCheckerData([]);
             }
         } catch (error) {
             console.log("API getCheckers error:", error);
@@ -392,61 +451,191 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
         }
     };
 
-    const handleMeterChange = (value: string) => {
+    // const handleMeterChange = (value: string) => {
 
-        if (typeof design == 'undefined' || design == null || design == '') {
-            Alert.alert("Design", "Please select design first");
-            return;
-        } else {
-            let qltWt = 0.00;
-            getData && getData.filter((el, ind) => {
-                if (el.DsnCode == design) {
-                    qltWt = el.QltWt;
-                }
-            })
+    //     if (typeof design == 'undefined' || design == null || design == '') {
+    //         Alert.alert("Design", "Please select design first");
+    //         return;
+    //     } else {
+    //         let qltWt = 0.00;
 
-            value = value.replace(',', '.');
-            const regex = /^\d*(?:\.\d{0,2})?$/;
+    //         console.log("design =", design);
+    //         console.log("getData =", getData);
 
-            if (value === '' || regex.test(value)) {
-                setMeter(value);
-                setValidMeter(value);
-            }
+    //         getData && getData.filter((el, ind) => {
+    //             if (el.DsnCode == design) {
+    //                 qltWt = el.QltWt;
+    //             }
+    //         })
+
+    //         value = value.replace(',', '.');
+    //         const regex = /^\d*(?:\.\d{0,2})?$/;
+
+    //         if (value === '' || regex.test(value)) {
+    //             setMeter(value);
+    //             setValidMeter(value);
+    //         }
+
+    //         let qty = 0.0;
+    //         qty = isNaN(value) ? 0.0 : parseFloat(value);
+
+    //         let wt = 0.0;
+    //         wt = isNaN(qty) || isNaN(qltWt) || parseFloat(qty) == 0 || parseFloat(qltWt) == 0 ? 0.0 : (parseFloat(qty) * parseFloat(qltWt)).toFixed(2);
+
+    //         let avgWt = 0.0;
+    //         avgWt = isNaN(qty) || isNaN(wt) || parseFloat(qty) == 0 || parseFloat(wt) == 0 ? 0.0 : ((parseFloat(wt) * 100) / parseFloat(qty)).toFixed(2);
+
+    //         setKgs(wt);
+    //         setavgWt(avgWt);
+    //     }
+    // };
+
+
+    const handleMeterChange = (value) => {
+
+        value = value.replace(',', '.');
+
+        const regex = /^\d{0,3}(?:\.\d{0,3})?$/;
+
+        if (value === '' || regex.test(value)) {
+
+            setMeter(value);
 
             let qty = 0.0;
             qty = isNaN(value) ? 0.0 : parseFloat(value);
 
+            let qltWt = 0.0;
+
+            if (
+                Designdata &&
+                Designdata.length > 0 &&
+                Designdata[0].QltWt
+            ) {
+                qltWt = parseFloat(Designdata[0].QltWt);
+            }
+
             let wt = 0.0;
-            wt = isNaN(qty) || isNaN(qltWt) || parseFloat(qty) == 0 || parseFloat(qltWt) == 0 ? 0.0 : (parseFloat(qty) * parseFloat(qltWt)).toFixed(2);
+
+            wt =
+                isNaN(qty) ||
+                    isNaN(qltWt) ||
+                    qty === 0 ||
+                    qltWt === 0
+                    ? 0.0
+                    : (qty * qltWt).toFixed(2);
 
             let avgWt = 0.0;
-            avgWt = isNaN(qty) || isNaN(wt) || parseFloat(qty) == 0 || parseFloat(wt) == 0 ? 0.0 : ((parseFloat(wt) * 100) / parseFloat(qty)).toFixed(2);
 
-            setKgs(wt);
-            setavgWt(avgWt);
+            avgWt =
+                isNaN(qty) ||
+                    isNaN(parseFloat(wt)) ||
+                    qty === 0 ||
+                    parseFloat(wt) === 0
+                    ? 0.0
+                    : ((parseFloat(wt) * 100) / qty).toFixed(2);
+
+            setKgs(wt.toString());
+            setavgWt(avgWt.toString());
+
+            console.log("Qty =", qty);
+            console.log("QltWt =", qltWt);
+            console.log("Wt =", wt);
+            console.log("AvgWt =", avgWt);
         }
     };
 
-    const handleKgsChange = (value: string) => {
+    // const handleMeterChange = (value) => {
+
+    //     value = value.replace(',', '.');
+
+    //     // 3 decimal places allow
+    //     const regex = /^\d*(?:\.\d{0,3})?$/;
+
+    //     if (value === '' || regex.test(value)) {
+
+    //         setMeter(value);
+
+    //         let qty = parseFloat(value) || 0;
+
+    //         let qltWt = 0;
+
+    //         if (
+    //             Designdata &&
+    //             Designdata.length > 0 &&
+    //             Designdata[0].QltWt
+    //         ) {
+    //             qltWt = parseFloat(Designdata[0].QltWt);
+    //         }
+
+    //         let wt =
+    //             qty === 0 || qltWt === 0
+    //                 ? 0
+    //                 : (qty * qltWt).toFixed(2);
+
+    //         let avgWt =
+    //             qty === 0 || parseFloat(wt) === 0
+    //                 ? 0
+    //                 : ((parseFloat(wt) * 100) / qty).toFixed(2);
+
+    //         setKgs(wt.toString());
+    //         setavgWt(avgWt.toString());
+    //     }
+    // };
+
+    // const handleKgsChange = (value: string) => {
+
+    //     value = value.replace(',', '.');
+    //     const regex = /^\d*(?:\.\d{0,2})?$/;
+
+    //     if (value === '' || regex.test(value)) {
+
+    //         setKgs(value);
+
+    //         let qty = parseFloat(meter) || 0;
+    //         let wt = parseFloat(value) || 0;
+
+    //         let avgWt =
+    //             qty === 0 || wt === 0
+    //                 ? 0
+    //                 : ((wt * 100) / qty).toFixed(2);
+
+    //         setavgWt(avgWt);
+    //     }
+    // }
+
+    const handleKgsChange = (value) => {
 
         value = value.replace(',', '.');
-        const regex = /^\d*(?:\.\d{0,2})?$/;
+
+        const regex = /^\d{0,3}(?:\.\d{0,3})?$/;
 
         if (value === '' || regex.test(value)) {
 
             setKgs(value);
 
-            let qty = parseFloat(meter) || 0;
-            let wt = parseFloat(value) || 0;
+            let qty =
+                isNaN(meter)
+                    ? 0.0
+                    : parseFloat(meter);
 
-            let avgWt =
-                qty === 0 || wt === 0
-                    ? 0
+            let wt =
+                isNaN(value)
+                    ? 0.0
+                    : parseFloat(value);
+
+            let avgWt = 0.0;
+
+            avgWt =
+                isNaN(qty) ||
+                    isNaN(wt) ||
+                    qty === 0 ||
+                    wt === 0
+                    ? 0.0
                     : ((wt * 100) / qty).toFixed(2);
 
-            setavgWt(avgWt);
+            setavgWt(avgWt.toString());
         }
-    }
+    };
 
     const handleSubmitScan = async () => {
 
@@ -846,7 +1035,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             const newMain = response?.data?.data?.new_main || [];
 
             // ✅ SAFE CHECK
-            if (response?.data?.success && mainData.length > 0) {
+            if (response?.data?.success && newMain.length > 0) {
 
                 console.log("Main Data 👉", mainData);
                 if (newMain.length > 0 && typeof newMain[0] === 'object') {
@@ -924,6 +1113,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 MacCode: "",
                 TakaNo: "",
                 DsnName: "",
+                DsnCode: "",
                 Qty: "",
                 BalQty: "",
                 UsrCode: "",
@@ -1147,7 +1337,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                 selectedDeleteItem
             );
 
-            setIsLoading(true);
+            setIsDeleteLoading(true);
 
             let infoPyload = {
 
@@ -1243,7 +1433,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
 
         } finally {
 
-            setIsLoading(false);
+            setIsDeleteLoading(false);
         }
     };
 
@@ -1372,7 +1562,13 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     <Button
                         title={isScanning ? "Stop scan" : "Start scan"}
                         color={'#007EA7'}
-                        onPress={() => setIsScanning(prev => !prev)}
+                        // onPress={() => setIsScanning(prev => !prev)}
+                        onPress={() => {
+
+                            resetScanFields();
+
+                            setIsScanning(prev => !prev);
+                        }}
                     />
 
                 </View>
@@ -1450,7 +1646,8 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                 valueKey="dsncode"
                                 pageSize={12}
                                 initialValue={null}
-                                selected={null}
+                                // selected={null}
+                                selected={selecteddesign}
                                 loading={false}
                                 type="checkingdesigndata"
                                 // onSelect={(item) => {
@@ -1468,14 +1665,23 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                                     console.log("👉 DESIGN SELECTED:", selectedDesign);
                                     console.log("👉 SCANNED VALUE:", scannedValue);
 
-                                    setDesign(selectedDesign);
-                                    // setWarpLen(item.WarpLen || '0');
+                                    // setDesign(selectedDesign);
+                                    // // setWarpLen(item.WarpLen || '0');
+
+                                    // if (scannedValue) {
+                                    //     console.log("🔥 CALLING API...");
+                                    //     sendScannedValue1(scannedValue, selectedDesign);
+                                    // } else {
+                                    //     console.log("❌ scannedValue missing");
+                                    // }
+
+
+                                    setselecteddesign(item);   // add this
+
+                                    setDesign(item.dsncode);
 
                                     if (scannedValue) {
-                                        console.log("🔥 CALLING API...");
-                                        sendScannedValue1(scannedValue, selectedDesign);
-                                    } else {
-                                        console.log("❌ scannedValue missing");
+                                        sendScannedValue1(scannedValue, item.dsncode);
                                     }
                                 }}
                                 setSelected={(val) => {
@@ -1538,12 +1744,17 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             valueKey="GrdCode"
                             pageSize={12}
                             initialValue={null}
-                            selected={null}
+                            // selected={null}
+                            selected={selectedGrade}
                             loading={false}
                             type="grd"
                             onSelect={(item) => {
+                                setSelectedGrade(item);
                                 setGrade(item.GrdCode);
                             }}
+                            // onSelect={(item) => {
+                            //     setGrade(item.GrdCode);
+                            // }}
                             setSelected={(val) => {
                                 if (!val) {
                                     setGrade('');
@@ -1576,12 +1787,17 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                             valueKey="EmpCode"
                             pageSize={12}
                             initialValue={null}
-                            selected={null}
+                            // selected={null}
+                            selected={selectedChecker}
                             loading={false}
                             type="checker"
                             onSelect={(item) => {
+                                setSelectedChecker(item);
                                 setChecker(item.EmpCode);
                             }}
+                            // onSelect={(item) => {
+                            //     setChecker(item.EmpCode);
+                            // }}
                             setSelected={(val) => {
                                 if (!val) {
                                     setChecker('');
@@ -1594,10 +1810,22 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
                     {/* </View> */}
                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}> *</Text></Text>
                     <View style={checkingScannerStyles.dropdown}>
-                        <Picker selectedValue={shift} onValueChange={setShift}>
-                            <Picker.Item label="Select shift" value="" enabled={false} />
+                        <Picker
+                            selectedValue={shift}
+                            onValueChange={setShift}
+                            dropdownIconColor="#000"
+                        >
+                            <Picker.Item
+                                label="Select shift"
+                                value=""
+                                enabled={false}
+                            />
                             {getShiftData.map((item, i) => (
-                                <Picker.Item key={i} label={item.ShfName} value={item.ShfCode} />
+                                <Picker.Item
+                                    key={i}
+                                    label={item.ShfName}
+                                    value={item.ShfCode}
+                                />
                             ))}
                         </Picker>
                     </View>
@@ -2188,7 +2416,7 @@ const CheckingScanner: React.FC<Props> = ({ token, navigation, isConnected, user
             }
 
             {
-                isLoading && (
+                isDeleteLoading && (
 
                     <Modal
                         transparent={true}

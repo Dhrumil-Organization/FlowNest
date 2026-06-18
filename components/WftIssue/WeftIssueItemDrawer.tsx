@@ -10,7 +10,6 @@ import axios from 'axios';
 // import FullScreenLoader from '../Loader/Loader';
 // import { checkingScannerStyles } from '../../common/Styles/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
-// import { Camera, useCameraDevice, useCodeScanner, useCameraPermiss   ion } from 'react-native-vision-camera';
 import { CameraView as Camera, useCameraPermissions as useCameraPermission } from 'expo-camera';
 import { useCameraDevice } from '@/Shared/expoScannerHelper';
 import { BarcodeScanningResult } from 'expo-camera';

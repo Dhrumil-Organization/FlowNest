@@ -1,123 +1,62 @@
-import React from 'react';
-import { Platform, StatusBar, View, StyleSheet } from 'react-native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import React from "react";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import CriteriaScreen from './CriteriaScreen';
-import FebricStockListScreen from './FebricStockListScreen';
-// import YarnStockDetailScreen from './YarnStockDetailScreen';
-import NewCartonScreen from './NewCartonScreen';
-
+import CriteriaScreen from './screens/CriteriaScreen';
+import StockListScreen from "./screens/StockListScreen";
+import StockDetailScreen from "./screens/StockDetailScreen";
+import NewCartonScreen from "./screens/NewCartonScreen";
 const Stack = createNativeStackNavigator();
 
-const HEADER_COLOR = '#13879A';
-
 const FebricStockVerificationModule = props => {
-  const insets = useSafeAreaInsets();
-
-  const commonProps = {
-    token: props.token,
-    isConnected: props.isConnected,
-    username: props.username,
-    userid: props.userid,
-    getUserPrptype: props.getUserPrptype,
-  };
-
   return (
-    <SafeAreaView
-      style={styles.safeRoot}
-      edges={['top', 'left', 'right']}
+    <Stack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Criteria"
     >
-      <StatusBar
-        translucent={false}
-        backgroundColor={HEADER_COLOR}
-        barStyle="light-content"
-      />
+      <Stack.Screen name="Criteria">
+        {(screenProps) => (
+          <CriteriaScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
 
-      <View
-        style={[
-          styles.stackWrapper,
-          {
-            paddingBottom:
-              Platform.OS === 'android'
-                ? insets.bottom
-                : 0,
-          },
-        ]}
-      >
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: styles.screenContent,
-            animation: 'slide_from_right',
-          }}
-        >
-          {/* Criteria Screen */}
+      <Stack.Screen name="StockList">
+        {(screenProps) => (
+          <StockListScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
 
-          <Stack.Screen name="CriteriaScreen">
-            {screenProps => (
-              <CriteriaScreen
-                {...screenProps}
-                {...commonProps}
-              />
-            )}
-          </Stack.Screen>
+      <Stack.Screen name="StockDetail">
+        {(screenProps) => (
+          <StockDetailScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
 
-          {/* Stock Browser */}
-
-          <Stack.Screen name="FebricStockListScreen">
-            {screenProps => (
-              <FebricStockListScreen
-                {...screenProps}
-                {...commonProps}
-              />
-            )}
-          </Stack.Screen>
-
-          {/* Card Detail */}
-
-          <Stack.Screen name="YarnStockDetailScreen">
-            {screenProps => (
-              <YarnStockDetailScreen
-                {...screenProps}
-                {...commonProps}
-              />
-            )}
-          </Stack.Screen>
-
-          {/* New Carton */}
-
-          <Stack.Screen name="NewCartonScreen">
-            {screenProps => (
-              <NewCartonScreen
-                {...screenProps}
-                {...commonProps}
-              />
-            )}
-          </Stack.Screen>
-        </Stack.Navigator>
-      </View>
-    </SafeAreaView>
+      <Stack.Screen name="NewCarton">
+        {(screenProps) => (
+          <NewCartonScreen
+            {...screenProps}
+            token={props.token}
+            isConnected={props.isConnected}
+            username={props.username}
+          />
+        )}
+      </Stack.Screen>
+    </Stack.Navigator>
   );
-};
-
-const styles = StyleSheet.create({
-  safeRoot: {
-    flex: 1,
-    backgroundColor: HEADER_COLOR,
-  },
-
-  stackWrapper: {
-    flex: 1,
-    backgroundColor: '#F4F7FC',
-  },
-
-  screenContent: {
-    backgroundColor: '#F4F7FC',
-  },
-});
-
+}
 export default FebricStockVerificationModule;

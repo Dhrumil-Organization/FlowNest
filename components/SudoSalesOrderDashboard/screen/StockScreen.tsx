@@ -195,7 +195,7 @@ export default function StockScreen({ token }: any) {
         headers: stockHdr,
         params: payload,
       });
-      console.log('appgreyinstockdata rows =>', fRes.data?.response?.data?.length);
+      console.log('appgreyinstockdata rows =>', fRes);
       if (fRes.data?.success === true) {
         setFabricRows(fRes.data?.response?.data || []);
       } else {
@@ -210,6 +210,7 @@ export default function StockScreen({ token }: any) {
           headers: stockHdr,
           params: { prpcodes: codes, prptype: 'S', txntype: 'mob_yarn_stock' },
         });
+        console.log('appgreyinstockdata rows =>', yRes);
         setYarnRows(
           yRes.data?.success === true
             ? (yRes.data?.response?.data || [])
@@ -240,7 +241,7 @@ export default function StockScreen({ token }: any) {
   const greigeFlag = activeTab === 'yarn'
     ? yarnMode === 'greige'
     : fabricMode === 'greige';
-  const unit = activeTab === 'yarn' ? 'kg' : 'm';
+  const unit = activeTab === 'yarn' ? '' : '';
 
   const modeRows = useMemo(
     () => activeTab === 'yarn'
@@ -286,10 +287,18 @@ export default function StockScreen({ token }: any) {
         (a, r) => ({ qty: a.qty + num(r.QTY), val: a.val + rowValue(r) }),
         { qty: 0, val: 0 });
     return [
-      { label: 'Greige Yarn', tag: 'godown', unit: 'kg', color: '#14532D', ...yrn(true) },
-      { label: 'Dyed Yarn', tag: 'godown', unit: 'kg', color: '#C2823A', ...yrn(false) },
-      { label: 'Greige Fabric', tag: 'godown', unit: 'm', color: '#1D4ED8', ...fab(true) },
-      { label: 'Finished Fabric', tag: 'ready stock', unit: 'm', color: '#7C3AED', ...fab(false) },
+      { label: 'Greige Yarn', tag: 'godown', 
+        // unit: 'kg', 
+        color: '#14532D', ...yrn(true) },
+      { label: 'Dyed Yarn', tag: 'godown', 
+        // unit: 'kg', 
+        color: '#C2823A', ...yrn(false) },
+      { label: 'Greige Fabric', tag: 'godown', 
+        // unit: 'm', 
+        color: '#1D4ED8', ...fab(true) },
+      { label: 'Finished Fabric', tag: 'ready stock', 
+        // unit: 'm', 
+        color: '#7C3AED', ...fab(false) },
     ];
   }, [fabricRows, yarnRows]);
   const flowTotal = flow.reduce((s, f) => s + f.val, 0);

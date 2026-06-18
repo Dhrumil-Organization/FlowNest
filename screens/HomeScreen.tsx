@@ -669,6 +669,17 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Febric Stock Verification",
                 //                         "href": "/"
                 //                     },
+                //                     {
+                //                         "title": "Sales Order Dashborad",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sudamo Sales Order Entry",
+                //                         "href": "/"
+                //                     },
+
+
+
                 //                 ]
                 //             }
                 //         ]

@@ -5,7 +5,6 @@ import axios from 'axios';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { checkingScannerStyles } from '@/common/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
-// import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import HeaderBarwithBack from '@/components/Header';
 // import { Picker } from '@react-native-picker/picker';

@@ -700,7 +700,7 @@ export default function LandingPage() {
                     onPress={() => router.push('/about')}
                 >
                     <Text style={styles.menuText}>
-                        About FlowNest
+                        About Us
                     </Text>
                 </TouchableOpacity>
 

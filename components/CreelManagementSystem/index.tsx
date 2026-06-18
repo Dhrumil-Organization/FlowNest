@@ -10,7 +10,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { checkingScannerStyles, yarnmanagementsystemstyle } from '@/common/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
-// import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
 // ✅ EXPO CAMERA (replaces react-native-vision-camera)
 import { Camera, useCameraDevice, BarcodeScanningResult } from '@/Shared/expoScannerHelper';
 import { CameraView, useCameraPermissions } from 'expo-camera';

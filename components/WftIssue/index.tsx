@@ -9,7 +9,6 @@ import axios from 'axios';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { yarnmanagementsystemstyle } from '@/common/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '@/common/API/dynamicAPI';
-// import { Camera, useCameraDevice, useCodeScanner, useCameraPermission } from 'react-native-vision-camera';
 import HeaderBarwithBack from '@/components/Header';
 // import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';

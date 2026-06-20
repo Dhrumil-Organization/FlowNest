@@ -143,6 +143,7 @@ import AppNavigator from './components/SudoSalesOrderDashboard/AppNavigator';
 import PoyRateEntry from './components/PoyRateEntry/PoyRateEntry';
 import PriceList from './components/PriceList/PriceList';
 import SalesOrderPriceListAuth from './components/SalesOrderPriceListAuth/SalesOrderPriceListAuth'
+import InquiryReport from './components/InquiryReport/InquiryReport';
 
 const Stack = createNativeStackNavigator();
 
@@ -1609,6 +1610,12 @@ export default function App() {
                       <Stack.Screen name="Sales Order Price List Auth">{(props) =>
                         <>
                           <SalesOrderPriceListAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="Inquiry Report">{(props) =>
+                        <>
+                          <InquiryReport {...props} token={gettoken || ''} username={getUserDetails} getUserPrptype={getUserPrptype} />
 
                         </>
                       }</Stack.Screen>

@@ -111,6 +111,7 @@ export const masterApi = {
     const res = await client.get<ApiResponse<Design[]>>('/api/designs/search', {
       params: {q, prptype: prptype , yearno: yearno},
     });
+    console.log("design api called", q, prptype, yearno, res);
     return res.data.data;
   },
 

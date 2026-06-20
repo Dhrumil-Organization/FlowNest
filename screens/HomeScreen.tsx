@@ -64,7 +64,7 @@ const useDebounce = (value: string, delay: number) => {
 
 //  #5B2CFF - Daily Collection Report
 
-//rgb(219, 148, 90) - Sales Order Tracking
+//rgb(90, 219, 161) - Sales Order Tracking
 
 const APP_SECTIONS = [
     {
@@ -360,6 +360,12 @@ const APP_SECTIONS = [
         title: 'Y',
         data: [
             { id: '41', name: 'Sales Order Price List Auth', screen: 'Sales Order Price List Auth', icon: 'receipt-long', iconColor: '#740cea' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '41', name: 'Inquiry Report', screen: 'Inquiry Report', icon: 'view-comfortable', iconColor: '#69e3ad' },
         ],
     },
 

@@ -48,6 +48,7 @@ const DesignSelectionScreen: React.FC<Props> = ({ route, navigation }) => {
       setLoading(true);
       try {
         const res = await masterApi.searchDesigns(search, getUserPrptype, getCurrentFinancialYear());
+        console.log('item/des res', res);
         if (!cancelled) setItems(res);
       } finally {
         if (!cancelled) setLoading(false);

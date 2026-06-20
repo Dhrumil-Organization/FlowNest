@@ -182,6 +182,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
           design_prp_code: d.prp_code,
           design_dsn_code: d.dsn_code,
           design_name_snapshot: d.name,
+          unit: d.UOM,
           is_new_design: false,
         });
       },

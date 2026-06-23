@@ -119,7 +119,7 @@ const CreditLimitRequest: React.FC<Props> = ({ token, navigation, isConnected, u
             );
             console.log('🔵 payload', payload);
             if (response.data.success && response.data.data.length > 0) {
-                console.log('✅ Data:', response.data.data);
+                console.log('✅ Request Data:', response.data.data);
                 setData(response.data.data);
                 setAllHistoryData([])
             } else {
@@ -595,6 +595,7 @@ const CreditLimitRequest: React.FC<Props> = ({ token, navigation, isConnected, u
                         setSuccess(false);
                         setShowOverlay(false);
                     }, 2000);
+                    fetchData();
                     // setProcessedCards(prev => new Set(prev).add(selectedItem.uid));
                     setData(prevData => {
                         const newData = prevData.filter(item => item.uid !== selectedItem.uid);

@@ -116,18 +116,18 @@ const InquiryReport: React.FC<{
 
     useEffect(() => {
         const initializeApp = async () => {
-          try {
-            const user_prptype = await AsyncStorage.getItem('user_prptype');
-            console.log('user_prptype', user_prptype);
-            setUserPrptype(user_prptype);
-          } catch (error) {
-            console.error('Initialization error:', error);
-          } finally {
-          }
+            try {
+                const user_prptype = await AsyncStorage.getItem('user_prptype');
+                console.log('user_prptype', user_prptype);
+                setUserPrptype(user_prptype);
+            } catch (error) {
+                console.error('Initialization error:', error);
+            } finally {
+            }
         };
-    
+
         initializeApp();
-      }, []);
+    }, []);
 
     // ─── ANIMATIONS ──────────────────────────────────────────────────────────
     useEffect(() => {
@@ -248,7 +248,7 @@ const InquiryReport: React.FC<{
         const partyCodes = selectedParty.map((item: any) => item.acccode);
 
         let seArr: string[] = [];
-        selectedSalesExes?.forEach((el: any) => seArr.push(el.sexe));
+        selectedSalesExes?.forEach((el: any) => seArr.push(el.user_id));
 
         const payload = {
             fromdate: formatDate(fromDate),
@@ -274,7 +274,7 @@ const InquiryReport: React.FC<{
             if (status === true) {
                 setConversionData(data_res);
                 const selectedNames =
-                    selectedSalesExes?.map((x: any) => x.SalesExecutive).join(', ') ||
+                    selectedSalesExes?.map((x: any) => x.user_name1).join(', ') ||
                     'All';
                 setSalesPerson(selectedNames);
                 closeDrawer();
@@ -347,12 +347,24 @@ const InquiryReport: React.FC<{
                 prptype: userPtype,
                 yearno: getCurrentFinancialYear(),
             };
-            const response = await axios.get(
-                `${API}/api/getsexes`,
-                getRequestConfig({ params: pload }),
+
+            const headers = {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            // const response = await axios.get(
+            //     `${API}/api/getsexes`,
+            //     getRequestConfig({ params: pload }),
+            // );
+            const response = await axios.post(
+                `${API}/api/get_users`,
+                pload,
+                { headers },
             );
             if (response.data.success) {
-                setSalesExeData(response.data.data);
+                setSalesExeData(response.data.response.data);
                 fetchParty();
             } else {
                 setSalesExeData([]);
@@ -383,7 +395,7 @@ const InquiryReport: React.FC<{
                 return { icon: 'check-circle', color: '#2E7D32', bg: '#E8F5E9' };
             case 'HOLD':
                 return { icon: 'pause-circle', color: '#E65100', bg: '#FFF3E0' };
-            case 'Not Converted':
+            case 'NotConverted':
                 return { icon: 'cancel', color: '#C62828', bg: '#FFEBEE' };
             case 'Grand Total':
                 return { icon: 'bar-chart', color: '#0D47A1', bg: '#E3F2FD' };
@@ -400,8 +412,8 @@ const InquiryReport: React.FC<{
         const isGrand = item.ConversionStatus === 'Grand Total';
         const config = getStatusConfig(item.ConversionStatus);
 
-        // Skip rendering "Not Converted" if all zeros
-        if (item.ConversionStatus === 'Not Converted' && item.GrandTotal === 0) {
+        // Skip rendering "NotConverted" if all zeros
+        if (item.ConversionStatus === 'NotConverted' && item.GrandTotal === 0) {
             return null;
         }
 
@@ -523,7 +535,7 @@ const InquiryReport: React.FC<{
                 onLoadPress={handleConfirmAction}
                 exeData={salesExeData}
                 onExeChange={setSelectedExe}
-                selectedExe={selectedExe?.SalesExecutive || 'Select Executive'}
+                selectedExe={selectedExe?.user_name1 || 'Select Executive'}
                 designData={designData}
                 getPartyData={getPartyData}
                 isLoading={isLoading}
@@ -575,7 +587,7 @@ const InquiryReport: React.FC<{
                     {/* ─── SALES PERSON ────────────────────────────────────── */}
                     <View style={styles.salesPersonCard}>
                         <Icon name="person" size={20} color="#1565C0" />
-                        <Text style={styles.salesPersonLabel}>Sales Person:</Text>
+                        {/* <Text style={styles.salesPersonLabel}>Sales Person:</Text> */}
                         <Text style={styles.salesPersonName}>{salesPerson || 'All'}</Text>
                     </View>
 
@@ -584,7 +596,7 @@ const InquiryReport: React.FC<{
                         {(() => {
                             const grand = conversionData.find(c => c.ConversionStatus === 'Grand Total');
                             const converted = conversionData.find(c => c.ConversionStatus === 'Converted');
-                            const notconverted = conversionData.find(c => c.ConversionStatus === 'Not Converted');
+                            const notconverted = conversionData.find(c => c.ConversionStatus === 'NotConverted');
                             const hold = conversionData.find(c => c.ConversionStatus === 'HOLD');
                             return (
                                 <>
@@ -598,7 +610,7 @@ const InquiryReport: React.FC<{
                                     </View>
                                     <View style={[styles.kpiCard, styles.kpiCardNotConverted]}>
                                         <Text style={styles.kpiValue}>{notconverted?.GrandTotal || 0}</Text>
-                                        <Text style={styles.kpiLabel}>Not Converted</Text>
+                                        <Text style={styles.kpiLabel}>NotConverted</Text>
                                     </View>
                                     <View style={[styles.kpiCard, styles.kpiCardHold]}>
                                         <Text style={styles.kpiValue}>{hold?.GrandTotal || 0}</Text>

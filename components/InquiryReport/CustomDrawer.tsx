@@ -187,8 +187,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
     const filteredsexe = sexeData1.filter(
       se =>
-        se.lngname?.toLowerCase().includes(searchQuerySexe.toLowerCase()) ||
-        se.sexe?.toLowerCase().includes(searchQuerySexe.toLowerCase()),
+        se.user_name1?.toLowerCase().includes(searchQuerySexe.toLowerCase()) ||
+        se.user_id?.toLowerCase().includes(searchQuerySexe.toLowerCase()),
     );
 
     setDisplayedDesigns(filtered.slice(0, 10));
@@ -431,8 +431,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setTimeout(() => {
       const filtered = sexeData1.filter(
         se =>
-          se.lngname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          se.sexe.toLowerCase().includes(searchQuery.toLowerCase()),
+          se.user_name1.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          se.user_id.toLowerCase().includes(searchQuery.toLowerCase()),
       );
       const newDisplayed = filtered.slice(0, displayedSexes.length + 10);
       setDisplayedExes(newDisplayed);
@@ -612,8 +612,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               >
                 <Text style={styles.accordionHeaderText}>
                   {isSalesExeAccordionOpen
-                    ? `Hide Sales exe.: (${selectedSalesExes.length})`
-                    : `Select Sales exe.: (${selectedSalesExes.length})`}
+                    ? `Hide User: (${selectedSalesExes.length})`
+                    : `Select User: (${selectedSalesExes.length})`}
                 </Text>
                 <Icon
                   name={
@@ -632,7 +632,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   <View style={styles.searchContainer}>
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search Sales exe...."
+                      placeholder="Search User...."
                       placeholderTextColor="#ccc"
                       value={searchQuerySexe}
                       onChangeText={setSearchQuerySexe}
@@ -653,10 +653,10 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                       onPress={() => {
                         const filteredpar = exeData.filter(
                           se =>
-                            se.lngname
+                            se.user_name1
                               .toLowerCase()
                               .includes(searchQuerySexe.toLowerCase()) ||
-                            se.sexe
+                            se.user_id
                               .toLowerCase()
                               .includes(searchQuerySexe.toLowerCase()),
                         );
@@ -684,11 +684,11 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   >
                     {(selectedSalesExes || []).map(se => (
                       <View
-                        key={se.sexe}
+                        key={se.user_id}
                         style={styles.selectedDesignChip}
                       >
                         <Text style={styles.selectedDesignText}>
-                          {se.lngname} ({se.sexe})
+                          {se.user_name1} ({se.user_id})
                         </Text>
                       </View>
                     ))}
@@ -722,17 +722,17 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                     {
                       displayedSexes.map(se => (
                         <TouchableOpacity
-                          key={se.sexe}
+                          key={se.user_id}
                           style={[
                             styles.designItem,
                             selectedSalesExes.some(
-                              d => d.sexe === se.sexe,
+                              d => d.user_id === se.user_id,
                             ) && styles.selectedDesignItem,
                           ]}
                           onPress={() => toggleSalesExeSelection(se)}
                         >
-                          <Text style={styles.designName}>{se.lngname}</Text>
-                          <Text style={styles.designCode}>{se.sexe}</Text>
+                          <Text style={styles.designName}>{se.user_name1}</Text>
+                          <Text style={styles.designCode}>{se.user_id}</Text>
                         </TouchableOpacity>
                       ))}
                     {isLoadingMore && (

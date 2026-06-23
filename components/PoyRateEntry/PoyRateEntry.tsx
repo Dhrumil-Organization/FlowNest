@@ -180,7 +180,16 @@ const POYRateEntry = ({ token, navigation }: any) => {
                     result.find((x: any) => x?.ItmCode === selectItmCode) || result[0];
 
                 setSelected(itemToSelect);
-                setAmount(getItemRate(itemToSelect)?.toString() || '');
+                // setAmount(getItemRate(itemToSelect)?.toString() || '');
+                const rate = getItemRate(itemToSelect);
+
+                if (Number(rate || 0) === 0) {
+                    setAmount('');
+                } else {
+                    setAmount(rate.toString());
+                }
+
+                console.log('RATE=>', getItemRate(itemToSelect));
                 setShowKeypad(true);
 
                 if (selectItmCode) {
@@ -306,7 +315,14 @@ const POYRateEntry = ({ token, navigation }: any) => {
 
     const selectItem = (item: any) => {
         setSelected(item);
-        setAmount(getItemRate(item)?.toString() || '');
+        // setAmount(getItemRate(item)?.toString() || '');
+        const rate = getItemRate(item);
+
+        if (Number(rate || 0) === 0) {
+            setAmount('');
+        } else {
+            setAmount(rate.toString());
+        }
         setShowKeypad(true);
     };
 
@@ -321,8 +337,15 @@ const POYRateEntry = ({ token, navigation }: any) => {
             return;
         }
 
+        // if (key === '.') {
+        //     if (amount.includes('.')) return;
+        //     setAmount(prev => (prev ? `${prev}.` : '0.'));
+        //     return;
+        // }
+
         if (key === '.') {
             if (amount.includes('.')) return;
+
             setAmount(prev => (prev ? `${prev}.` : '0.'));
             return;
         }
@@ -331,9 +354,20 @@ const POYRateEntry = ({ token, navigation }: any) => {
             return;
         }
 
+        // setAmount(prev => {
+        //     if (prev.length >= 8) return prev;
+        //     if (prev === '0') return key;
+        //     return `${prev}${key}`;
+        // });
         setAmount(prev => {
             if (prev.length >= 8) return prev;
-            if (prev === '0') return key;
+
+            // agar screen par sirf 0 dikh raha hai aur user digit press kare
+            // to 0 replace ho jaye
+            if (prev === '' || prev === '0') {
+                return key;
+            }
+
             return `${prev}${key}`;
         });
     };

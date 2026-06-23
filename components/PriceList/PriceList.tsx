@@ -529,15 +529,25 @@ const PriceList = ({ token, navigation }: any) => {
                                                                         `${item.ItmCode}_${col.rawDate}`
                                                                     );
 
+                                                                    // setEditingValue(
+                                                                    //     rowData?.PLRate || ''
+                                                                    // );
+
                                                                     setEditingValue(
-                                                                        rowData?.PLRate || ''
+                                                                        Number(rowData?.PLRate || 0) === 0
+                                                                            ? ''
+                                                                            : String(rowData?.PLRate)
                                                                     );
 
                                                                 }}
                                                             >
 
-                                                                <Text style={styles.rateText}>
+                                                                {/* <Text style={styles.rateText}>
                                                                     ₹ {rowData?.PLRate || '0.00'}
+                                                                </Text> */}
+
+                                                                <Text style={styles.rateText}>
+                                                                    ₹ {Number(rowData?.PLRate || 0) > 0 ? rowData?.PLRate : '0'}
                                                                 </Text>
 
                                                             </TouchableOpacity>

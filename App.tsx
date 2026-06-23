@@ -33,6 +33,7 @@ import TakaCheckingEntry from './components/TakaCheckingEntry/TakaCheckingEntry'
 import TakaCheckingViewData from './components/TakaCheckingViewData/TakaCheckingViewData';
 import InquiryAdd from './components/InquiryAdd/InquiryAdd';
 import Footer from './components/Footer/Footer';
+import PurchaseImportAuth from './components/PurchaseImportAuth/PurchaseImportAuth'
 import NetworkSpeed from './components/NetworkSpeed/NetworkSpeed';
 import {
   Alert,
@@ -1617,6 +1618,11 @@ export default function App() {
                         <>
                           <InquiryReport {...props} token={gettoken || ''} username={getUserDetails} getUserPrptype={getUserPrptype} />
 
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="Purchase Import Auth">{(props) =>
+                        <>
+                          <PurchaseImportAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         </>
                       }</Stack.Screen>
                     </Stack.Navigator>

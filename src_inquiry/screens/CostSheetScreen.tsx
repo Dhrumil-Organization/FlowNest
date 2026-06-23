@@ -84,57 +84,139 @@ const defaultSheet = (designId: number): CostSheet => ({
 //   };
 // };
 
+// const recompute = (s: CostSheet): CostSheet => {
+//   console.log('sheet', s);
+
+//   const freightBase =
+//     Number(s.greige_rate) +
+//     Number(s.purchase) +
+//     Number(s.brokerage) +
+//     Number(s.freight);
+
+//   const dyeShort =
+//     +(freightBase * (s.dyeing_shortage_pct / 100)).toFixed(2);
+
+//   const hiddenBase =
+//     Number(s.greige_rate) +
+//     Number(s.purchase) +
+//     Number(s.brokerage) +
+//     Number(s.freight) +
+//     dyeShort +
+//     Number(s.dyeing_charge) +
+//     Number(s.value_add) +
+//     Number(s.packaging_charge) +
+//     Number(s.overheads_exp);
+
+//   const hidden =
+//     +(hiddenBase * (s.hidden_cost_pct / 100)).toFixed(2);
+
+//   const dis =
+//     +(s.sale_rate * (s.sale_discount_pct / 100)).toFixed(2);
+
+//   const sBrk =
+//     +(s.sale_rate * (s.sale_brokerage_pct / 100)).toFixed(2);
+
+//   const total =
+//     +(
+//       hiddenBase +
+//       hidden +
+//       dis +
+//       sBrk
+//     ).toFixed(2);
+
+//   const gmAmt =
+//     +(s.sale_rate - total).toFixed(2);
+
+//   const gmPct =
+//     s.sale_rate > 0
+//       ? +((gmAmt / s.sale_rate) * 100).toFixed(2)
+//       : 0;
+
+//   console.log({
+//     dyeShort,
+//     hidden,
+//     total,
+//     gmAmt,
+//     gmPct,
+//   });
+
+//   return {
+//     ...s,
+//     dyeing_shortage_amount: dyeShort,
+//     hidden_cost_amount: hidden,
+//     sale_discount_amount: dis,
+//     sale_brokerage_amount: sBrk,
+//     total_cost: total,
+//     gross_margin_amount: gmAmt,
+//     gross_margin_pct: gmPct,
+//   };
+
+// };
+
 const recompute = (s: CostSheet): CostSheet => {
-  console.log('sheet', s);
+
+  const n = (v: any) => Number(v) || 0;
+
+  const brokerageAmt =
+    +(n(s.greige_rate) * (n(s.brokerage) / 100)).toFixed(2);
 
   const freightBase =
-    Number(s.greige_rate) +
-    Number(s.purchase) +
-    Number(s.brokerage) +
-    Number(s.freight);
+    n(s.greige_rate) +
+    n(s.purchase) +
+    brokerageAmt +
+    n(s.freight);
 
   const dyeShort =
-    +(freightBase * (s.dyeing_shortage_pct / 100)).toFixed(2);
+    +(freightBase * (n(s.dyeing_shortage_pct) / 100)).toFixed(2);
 
+  // const hiddenBase =
+  //   n(s.greige_rate) +
+  //   n(s.purchase) +
+  //   n(s.brokerage) +
+  //   n(s.freight) +
+  //   dyeShort +
+  //   n(s.dyeing_charge) +
+  //   n(s.value_add) +
+  //   n(s.packaging_charge) +
+  //   n(s.overheads_exp);
   const hiddenBase =
-    Number(s.greige_rate) +
-    Number(s.purchase) +
-    Number(s.brokerage) +
-    Number(s.freight) +
+    n(s.greige_rate) +
+    n(s.purchase) +
+    brokerageAmt +
+    n(s.freight) +
     dyeShort +
-    Number(s.dyeing_charge) +
-    Number(s.value_add) +
-    Number(s.packaging_charge) +
-    Number(s.overheads_exp);
+    n(s.dyeing_charge) +
+    n(s.value_add) +
+    n(s.packaging_charge) +
+    n(s.overheads_exp);
 
   const hidden =
-    +(hiddenBase * (s.hidden_cost_pct / 100)).toFixed(2);
+    +(hiddenBase * (n(s.hidden_cost_pct) / 100)).toFixed(2);
 
   const dis =
-    +(s.sale_rate * (s.sale_discount_pct / 100)).toFixed(2);
+    +(n(s.sale_rate) * (n(s.sale_discount_pct) / 100)).toFixed(2);
 
   const sBrk =
-    +(s.sale_rate * (s.sale_brokerage_pct / 100)).toFixed(2);
+    +(n(s.sale_rate) * (n(s.sale_brokerage_pct) / 100)).toFixed(2);
 
   const total =
-    +(
-      hiddenBase +
-      hidden +
-      dis +
-      sBrk
-    ).toFixed(2);
+    +(hiddenBase + hidden + dis + sBrk).toFixed(2);
 
   const gmAmt =
-    +(s.sale_rate - total).toFixed(2);
+    +(n(s.sale_rate) - total).toFixed(2);
 
   const gmPct =
-    s.sale_rate > 0
-      ? +((gmAmt / s.sale_rate) * 100).toFixed(2)
+    n(s.sale_rate) > 0
+      ? +((gmAmt / n(s.sale_rate)) * 100).toFixed(2)
       : 0;
 
   console.log({
+    freightBase,
     dyeShort,
+    hiddenBase,
     hidden,
+    dis,
+    sBrk,
     total,
     gmAmt,
     gmPct,
@@ -150,7 +232,6 @@ const recompute = (s: CostSheet): CostSheet => {
     gross_margin_amount: gmAmt,
     gross_margin_pct: gmPct,
   };
-
 };
 
 
@@ -517,8 +598,17 @@ const CostSheetScreen: React.FC<Props> = ({ route, navigation }) => {
                 onChange={v => updateSheet({ greige_rate: v })} readonly={readonly} />
               <Row label="Purchase" value={sheet.purchase}
                 onChange={v => updateSheet({ purchase: v })} readonly={readonly} />
-              <Row label="Brokerage" value={sheet.brokerage}
-                onChange={v => updateSheet({ brokerage: v })} readonly={readonly} />
+              {/* <Row label="Brokerage" value={sheet.brokerage}
+                onChange={v => updateSheet({ brokerage: v })} readonly={readonly} /> */}
+              <PctRow
+                label="Brokerage"
+                pct={sheet.brokerage}
+                amount={
+                  ((sheet.greige_rate || 0) * (sheet.brokerage || 0)) / 100
+                }
+                onChange={v => updateSheet({ brokerage: v })}
+                readonly={readonly}
+              />
               <Row label="Freight" value={sheet.freight}
                 onChange={v => updateSheet({ freight: v })} readonly={readonly} last />
             </View>
@@ -823,7 +913,10 @@ const PctRow: React.FC<PctRowProps> = ({ label, pct, amount, onChange, readonly,
             }
           }}
         />
-        <Text style={styles.kvAmt}>{formatCurrency(amount)}</Text>
+        {/* <Text style={styles.kvAmt}>{formatCurrency(amount)}</Text> */}
+        <Text style={styles.kvAmt}><Text style={styles.kvAmt}>
+          ₹ {Number(amount || 0).toFixed(2)}
+        </Text></Text>
       </View>
     </View>
   )

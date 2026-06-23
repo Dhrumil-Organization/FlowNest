@@ -368,6 +368,12 @@ const APP_SECTIONS = [
             { id: '41', name: 'Inquiry Report', screen: 'Inquiry Report', icon: 'view-comfortable', iconColor: '#69e3ad' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '42', name: 'Purchase Import Auth', screen: 'Purchase Import Auth', icon: 'task-alt', iconColor: '#991070' },
+        ],
+    },
 
 ];
 
@@ -666,6 +672,11 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Employ Dashboard",
                 //                         "href": "/"
                 //                     },
+                // {
+                //     "title": "Purchase Import Auth",
+                //     "href": "/"
+                // },
+
                 //                 ]
                 //             }
                 //         ]

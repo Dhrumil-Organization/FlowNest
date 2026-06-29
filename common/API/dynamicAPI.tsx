@@ -8,7 +8,7 @@ export let API: string = IS_LOCAL
         : "https://apig.tms-webapp.com";
 
 export let PRINTSTICKER = IS_LOCAL 
-        ? "http://192.168.13.100:4015/api/print-grey-in-stock" 
+        ? "http://192.168.13.100:4017/api/print-grey-in-stock" 
         : "https://apig.tms-webapp.com/api/print-grey-in-stock";
 
 export let PRINTERSLISTAPI = IS_LOCAL 

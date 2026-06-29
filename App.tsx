@@ -72,6 +72,7 @@ import {
   initGlobalCacheDB,
   updateGlobalCacheInBackground,
 } from './common/utils/sqliteCacheManager';
+import { initDb } from './components/Event/db'
 import OrderScreen from './components/SalesOrderNew/OrderScreen';
 
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -151,6 +152,9 @@ import WeftIssueReturnEntry from './components/WeftIssueReturn/WeftIssueReturnEn
 import WeftIssueReturnModifyEntry from './components/WeftIssueReturn/WeftIssueReturnModifyEntry';
 import DesignCreationModule from './components/DesignCreation/DesignCreationModule';
 import InquiryReport from './components/InquiryReport/InquiryReport';
+import Event from './components/Event/Event';
+import EnquiryReportScreen from './components/Event/EnquiryReportScreen';
+import EnquiryReportDrilldown from './components/Event/EnquiryReportDrilldownScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -230,6 +234,7 @@ export default function App() {
     try {
       await initDB(); // Initialize chat.db
       await initGlobalCacheDB(); // Initialize GlobalCache.db
+      // await initDb();
       console.log('✅ All databases initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing databases:', error);
@@ -241,6 +246,9 @@ export default function App() {
   useEffect(() => {
     initializeDatabases();
   }, []);
+
+
+
 
   // Add this to your App.tsx
   useEffect(() => {
@@ -295,6 +303,27 @@ export default function App() {
 
   console.log('getUserPrptype In App', getUserPrptype);
 
+
+  const initializeDatabasesEvent = async (gettoken, getUserPrptype) => {
+
+    try {
+      if (gettoken && getUserPrptype) {
+        await initDb(gettoken, getUserPrptype);
+        console.log('✅ Event databases and Event api called initialized successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing databases:', error);
+      // Retry or show user-friendly error
+    }
+  };
+
+  // Call this function when your app starts
+  useEffect(() => {
+    if (!gettoken) return;
+    if (!getUserPrptype) return;
+    initializeDatabasesEvent(gettoken, getUserPrptype);
+  }, [gettoken, getUserPrptype]);
+
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
@@ -308,7 +337,8 @@ export default function App() {
       } else {
         Snackbar.show({
           text: 'You are offline!',
-          duration: Snackbar.LENGTH_INDEFINITE,
+          // duration: Snackbar.LENGTH_INDEFINITE,
+          duration: Snackbar.LENGTH_SHORT,
           backgroundColor: '#FF5252',
         });
       }
@@ -1643,7 +1673,7 @@ export default function App() {
                           <PurchaseImportAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         </>
                       }</Stack.Screen>
-                      <Stack.Screen name="Weft Issue Return">{(props) =>
+                       <Stack.Screen name="Weft Issue Return">{(props) =>
                         <>
                           <WeftIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 
@@ -1651,23 +1681,22 @@ export default function App() {
                       }</Stack.Screen>
                       <Stack.Screen name="WeftIssueReturnEntry" component={WeftIssueReturnEntry} />
                       <Stack.Screen name="WeftIssueReturnModifyEntry" component={WeftIssueReturnModifyEntry} />
-
-
-                      <Stack.Screen name="Design Creation">
-                        {props => (
-                          <SafeAreaProvider>
-                            <DesignCreationModule
-                              {...props}
-                              token={gettoken || ''}
-                              isConnected={isConnected}
-                              username={getUserDetails}
-                              userid={getUserId}
-                            />
-
-                          </SafeAreaProvider>
-                        )}
-                      </Stack.Screen>
-                    </Stack.Navigator >
+                      <Stack.Screen name="Event">{(props) =>
+                        <>
+                          <Event {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="EnquiryReportScreen">{(props) =>
+                        <>
+                          <EnquiryReportScreen {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="EnquiryReportDrilldown">{(props) =>
+                        <>
+                          <EnquiryReportDrilldown {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        </>
+                      }</Stack.Screen>
+                    </Stack.Navigator>
                     {/* </Stack.Navigator> */}
 
 

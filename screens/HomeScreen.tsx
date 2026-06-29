@@ -377,19 +377,13 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
+            { id: '42', name: 'Event', screen: 'Event', icon: 'event', iconColor: '#923070' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
             { id: '45', name: 'Febric Stock Verification', screen: 'Febric Stock Verification', icon: 'receipt-long', iconColor: '#740cea' },
-        ],
-    },
-    {
-        title: 'W',
-        data: [
-            { id: '43', name: 'Weft Issue Return', screen: 'Weft Issue Return', icon: 'assignment-return', iconColor: '#F57C00', },
-        ],
-    },
-    {
-        title: 'D',
-        data: [
-            { id: '44', name: 'Design Creation', screen: 'Design Creation', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
 
@@ -418,6 +412,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
     const sectionListRef = useRef<SectionList>(null);
     const debouncedQuery = useDebounce(searchQuery, 300);
     const flatListRef = useRef<FlatList>(null);
+    const [eventAllowed, setEventAllowed] = useState(false);
 
     // CONSOLE
 
@@ -768,6 +763,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                             return child.title.replace('Yarn ', '');
                         });
 
+                        const hasEventAccess = mobileAppPage.children.some(
+                            (child: any) => child.title === 'Event'
+                        );
+
+                        setEventAllowed(hasEventAccess);
+
                         // Filter APP_SECTIONS to only include apps whose name is in allowedTitles
                         // const newSections = APP_SECTIONS.map(section => {
                         //     const newData = section.data.filter(app =>
@@ -878,7 +879,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
 
     // RENDER: professional tile — no "Tap to open" subtitle, name allowed to wrap but minimize lines.
     const renderAppItem = ({ item, index }: { item: any; index: number }) => {
-        const disabled = !isConnected;
+        // const disabled = !isConnected;
+        const disabled =
+            !isConnected &&
+            !(item.name === 'Event' && eventAllowed);
         const bg = hexToRgba(item.iconColor || theme.BRAND_PRIMARY, 0.12);
         const circleBg = item.iconColor || theme.BRAND_PRIMARY;
 

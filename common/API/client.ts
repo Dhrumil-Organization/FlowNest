@@ -1,17 +1,23 @@
+// src/api/client.ts  (or common/API/client.ts — match your path)
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-export const BASE_URL = 'http://192.168.13.100:8000/api';
+import { API, initAPI } from './dynamicAPI'; // adjust path as needed
+
+export const BASE_URL = `${API}/api`;
 
 const client = axios.create({ baseURL: BASE_URL, timeout: 15000 });
 
-// attach Bearer token on every request
 client.interceptors.request.use(async (config) => {
-    const token = await AsyncStorage.getItem('auth_token');
+    const base = await initAPI();
+    config.baseURL = `${base}/api`;
+
+    const token = await AsyncStorage.getItem('access_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
     return config;
 });
 
-// ── types ─────────────────────────────────────────────────────
+// ── Types (ERP fields added) ──────────────────────────────────
 export interface YarnLine {
     mi_id: string; blend_ratio: string | null;
     epi?: number; ppi?: number;
@@ -19,6 +25,7 @@ export interface YarnLine {
 }
 
 export interface Design {
+    // ── New Laravel backend fields ──
     id: string; code: string; category: string;
     type: 'YD' | 'PD'; weave?: string;
     reed_space: number; warp_shrink: number;
@@ -28,6 +35,12 @@ export interface Design {
     weft_yarns: YarnLine[];
     epi_total?: number; ppi_total?: number;
     cw_count?: number; latest_cost?: number;
+    // ── Your ERP fields from /api/getdesign ──
+    DsnCode?: string;
+    DsnName?: string;
+    ItmCode?: string;
+    ItmName?: string;
+    tag?: string;
 }
 
 export interface SubDesign {
@@ -80,29 +93,22 @@ export interface CostingRecord {
     created_at: string;
 }
 
+// ── Design API — bridges ERP endpoint to Design type ─────────
 // ── Design API ───────────────────────────────────────────────
 export const DesignAPI = {
 
-    // ✅ Updated for paginated response
-    list: (params?: {
-        category?: string;
-        search?: string;
-        page?: number;
-        limit?: number;
-    }) =>
-        client.get<{
-            success: boolean;
-            data: {
-                data: Design[];
-                total: number;
-                page: number;
-                limit: number;
-                total_pages: number;
-            }
-        }>('/designs', { params: { limit: 50, ...params } }),
+    list: (params?: { category?: string; search?: string }) =>
+        client.get<{ success: boolean; data: Design[] }>('/designs', {
+            params: {
+                yearno: '27',
+                ...params,
+            },
+        }),
 
     get: (id: string) =>
-        client.get<{ success: boolean; data: Design }>(`/designs/${id}`),
+        client.get<{ success: boolean; data: Design }>(`/designs/${id}`, {
+            params: { yearno: '27' },
+        }),
 
     create: (body: any) =>
         client.post<{ success: boolean; data: Design }>('/designs', body),
@@ -111,7 +117,9 @@ export const DesignAPI = {
         client.put<{ success: boolean; data: Design }>(`/designs/${id}`, body),
 
     colourways: (mdId: string) =>
-        client.get<{ success: boolean; data: SubDesign[] }>(`/designs/${mdId}/colourways`),
+        client.get<{ success: boolean; data: SubDesign[] }>(`/designs/${mdId}/colourways`, {
+            params: { yearno: '27' },
+        }),
 
     addColourway: (mdId: string, body: Partial<SubDesign>) =>
         client.post<{ success: boolean; data: SubDesign }>(`/designs/${mdId}/colourways`, body),
@@ -120,10 +128,14 @@ export const DesignAPI = {
         client.put<{ success: boolean; data: SubDesign }>(`/colourways/${sdId}`, body),
 
     yarns: () =>
-        client.get<{ success: boolean; data: YarnMaster[] }>('/yarns'),
+        client.get<{ success: boolean; data: YarnMaster[] }>('/yarns', {
+            params: { yearno: '27' },
+        }),
 
     yarnDyeing: (miId: string) =>
-        client.get<{ success: boolean; data: { average: number; recent: any[] } }>(`/yarns/${miId}/dyeing`),
+        client.get<{ success: boolean; data: { average: number; recent: any[] } }>(`/yarns/${miId}/dyeing`, {
+            params: { yearno: '27' },
+        }),
 };
 
 // ── Costing API ──────────────────────────────────────────────

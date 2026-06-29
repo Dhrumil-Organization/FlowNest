@@ -1,5 +1,5 @@
 // HeaderBarwithBack.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   UIManager,
   SafeAreaView,
+  Animated
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -31,10 +32,35 @@ const HeaderBarwithBack: React.FC<HeaderProps> = ({
   header,
   subHeader,
   backNavigateScreen = 'Home',
-  noBorderRadius = false
+  noBorderRadius = false,
+  headerConnect = false,
+  headerConnectColor = '#D9F0EE',
+  headerConnectAnimation = false
 }) => {
   const [isAvatarBarVisible, setIsAvatarBarVisible] = useState(false);
   const navigation = useNavigation<any>();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (headerConnectAnimation) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.08,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [headerConnectAnimation]);
 
   const toggleAvatarBar = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -68,11 +94,40 @@ const HeaderBarwithBack: React.FC<HeaderProps> = ({
             >
               <Icon name="arrow-back-ios" size={18} color="#EAF8F7" />
             </TouchableOpacity>
+            {headerConnect ? (
+              <View style={styles.titleContainer}>
+                <Text style={styles.brandTitle}>{header}</Text>
+                {/* <Text style={styles.brandSub}>{subHeader}</Text> */}
+                <Animated.View
+                  style={{
+                    alignSelf: 'flex-start',
+                    transform: [{ scale: pulseAnim }],
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: headerConnectColor,
+                      fontSize: 11,
+                      fontWeight: '600',
+                      marginTop: 2,
+                      backgroundColor: '#fff',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                    }}
+                  >
+                    {subHeader}
+                  </Text>
+                </Animated.View>
+              </View>
+            ) : (
+              <View style={styles.titleContainer}>
+                <Text style={styles.brandTitle}>{header}</Text>
+                <Text style={styles.brandSub}>{subHeader}</Text>
 
-            <View style={styles.titleContainer}>
-              <Text style={styles.brandTitle}>{header}</Text>
-              <Text style={styles.brandSub}>{subHeader}</Text>
-            </View>
+              </View>
+            )}
+
           </View>
 
           {/* Right side – avatar / profile (optional, looks professional) */}

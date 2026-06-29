@@ -92,6 +92,9 @@ function CatalogTab({ token, onSelectDesign, }: CatalogTabProps) {
     const [filter, setFilter] = useState('All');
     const [search, setSearch] = useState('');
     const [filteredDesigns, setFilteredDesigns] = useState<Design[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
     let cancelToken: any;
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -118,40 +121,60 @@ function CatalogTab({ token, onSelectDesign, }: CatalogTabProps) {
     //     }
     // }, [filter, search]);
 
-    const load = useCallback(async () => {
-        try {
-            const params = {
-                // category: filter !== 'All' ? filter : undefined,
-                prpcode: 'SIP',
-                yearno: '27',
-                strcode: '012',
-                page: '',
-                limit: '',
-                txntype: 'sales_order',
-                designbrand: '0',
-                category: filter === 'All' ? 'All' : filter,
-            };
+    // const load = useCallback(async () => {
+    //     try {
+    //         const params = {
+    //             // category: filter !== 'All' ? filter : undefined,
+    //             prpcode: 'SIP',
+    //             yearno: '27',
+    //             strcode: '012',
+    //             page: '',
+    //             limit: '',
+    //             txntype: 'sales_order',
+    //             designbrand: '0',
+    //             category: filter === 'All' ? 'All' : filter,
+    //         };
 
-            const response = await axios.get(
-                `${API}/api/getdesign`,
-                getRequestConfig({
-                    params,
-                })
-            );
-            console.log('response', params, response)
-            const data = response?.data?.response?.data || [];
-            setDesigns(data);
-            setFilteredDesigns(data);
+    //         const response = await axios.get(
+    //             `${API}/api/getdesign`,
+    //             getRequestConfig({
+    //                 params,
+    //             })
+    //         );
+    //         console.log('response', params, response)
+    //         const data = response?.data?.response?.data || [];
+    //         setDesigns(data);
+    //         setFilteredDesigns(data);
 
-        } catch (error) {
-            console.log("item API error:", error);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [filter, search]);
-
-
+    //     } catch (error) {
+    //         console.log("item API error:", error);
+    //     } finally {
+    //         setLoading(false);
+    //         setRefreshing(false);
+    //     }
+    // }, [filter, search]);
+const load = useCallback(async (page = 1) => {
+    try {
+        const res = await DesignAPI.list({
+            category: filter !== 'All' ? filter : undefined,
+            search:   search || undefined,
+            page,
+            limit:    50,
+        });
+        const result = res.data.data;           // paginated envelope
+        const rows   = result.data ?? [];
+        setDesigns(prev => page === 1 ? rows : [...prev, ...rows]);
+        setFilteredDesigns(prev => page === 1 ? rows : [...prev, ...rows]);
+        setTotalPages(result.total_pages ?? 1);
+        setTotal(result.total ?? 0);
+        setCurrentPage(page);
+    } catch (e: any) {
+        Alert.alert('Error', e.message);
+    } finally {
+        setLoading(false);
+        setRefreshing(false);
+    }
+}, [filter, search]);
     useEffect(() => { load(); }, [filter]);
 
     // debounce search
@@ -662,7 +685,7 @@ export function DesignsScreen({ token }: any) {
 }
 
 const hdr = StyleSheet.create({
-    wrap: { backgroundColor: T.nav, paddingHorizontal: 16, paddingVertical: 12, height:70 },
+    wrap: { backgroundColor: T.nav, paddingHorizontal: 16, paddingVertical: 12, height: 70 },
     brand: { fontSize: 10, fontWeight: '700', color: '#fff', letterSpacing: 1 },
     title: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 2 },
     sub: { fontSize: 11, color: '#000', marginTop: 2 },

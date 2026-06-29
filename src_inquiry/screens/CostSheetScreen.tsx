@@ -51,26 +51,176 @@ const defaultSheet = (designId: number): CostSheet => ({
 });
 
 // Compute totals locally (mirror of backend formula)
+// const recompute = (s: CostSheet): CostSheet => {
+//   const dyeShort = +(s.greige_rate * (s.dyeing_shortage_pct / 100)).toFixed(2);
+//   const subtotal =
+//     +s.greige_rate +
+//     +s.purchase +
+//     +s.brokerage +
+//     +s.freight +
+//     dyeShort +
+//     +s.dyeing_charge +
+//     +s.value_add +
+//     +s.packaging_charge +
+//     +s.overheads_exp;
+
+//   const hidden = +(subtotal * (s.hidden_cost_pct / 100)).toFixed(2);
+//   const dis = +(s.sale_rate * (s.sale_discount_pct / 100)).toFixed(2);
+//   const sBrk = +(s.sale_rate * (s.sale_brokerage_pct / 100)).toFixed(2);
+
+//   const total = +(subtotal + hidden + dis + sBrk).toFixed(2);
+//   const gmAmt = +(s.sale_rate - total).toFixed(2);
+//   const gmPct = s.sale_rate > 0 ? +((gmAmt / s.sale_rate) * 100).toFixed(2) : 0;
+
+//   return {
+//     ...s,
+//     dyeing_shortage_amount: dyeShort,
+//     hidden_cost_amount: hidden,
+//     sale_discount_amount: dis,
+//     sale_brokerage_amount: sBrk,
+//     total_cost: total,
+//     gross_margin_amount: gmAmt,
+//     gross_margin_pct: gmPct,
+//   };
+// };
+
+// const recompute = (s: CostSheet): CostSheet => {
+//   console.log('sheet', s);
+
+//   const freightBase =
+//     Number(s.greige_rate) +
+//     Number(s.purchase) +
+//     Number(s.brokerage) +
+//     Number(s.freight);
+
+//   const dyeShort =
+//     +(freightBase * (s.dyeing_shortage_pct / 100)).toFixed(2);
+
+//   const hiddenBase =
+//     Number(s.greige_rate) +
+//     Number(s.purchase) +
+//     Number(s.brokerage) +
+//     Number(s.freight) +
+//     dyeShort +
+//     Number(s.dyeing_charge) +
+//     Number(s.value_add) +
+//     Number(s.packaging_charge) +
+//     Number(s.overheads_exp);
+
+//   const hidden =
+//     +(hiddenBase * (s.hidden_cost_pct / 100)).toFixed(2);
+
+//   const dis =
+//     +(s.sale_rate * (s.sale_discount_pct / 100)).toFixed(2);
+
+//   const sBrk =
+//     +(s.sale_rate * (s.sale_brokerage_pct / 100)).toFixed(2);
+
+//   const total =
+//     +(
+//       hiddenBase +
+//       hidden +
+//       dis +
+//       sBrk
+//     ).toFixed(2);
+
+//   const gmAmt =
+//     +(s.sale_rate - total).toFixed(2);
+
+//   const gmPct =
+//     s.sale_rate > 0
+//       ? +((gmAmt / s.sale_rate) * 100).toFixed(2)
+//       : 0;
+
+//   console.log({
+//     dyeShort,
+//     hidden,
+//     total,
+//     gmAmt,
+//     gmPct,
+//   });
+
+//   return {
+//     ...s,
+//     dyeing_shortage_amount: dyeShort,
+//     hidden_cost_amount: hidden,
+//     sale_discount_amount: dis,
+//     sale_brokerage_amount: sBrk,
+//     total_cost: total,
+//     gross_margin_amount: gmAmt,
+//     gross_margin_pct: gmPct,
+//   };
+
+// };
+
 const recompute = (s: CostSheet): CostSheet => {
-  const dyeShort = +(s.greige_rate * (s.dyeing_shortage_pct / 100)).toFixed(2);
-  const subtotal =
-    +s.greige_rate +
-    +s.purchase +
-    +s.brokerage +
-    +s.freight +
+
+  const n = (v: any) => Number(v) || 0;
+
+  const brokerageAmt =
+    +(n(s.greige_rate) * (n(s.brokerage) / 100)).toFixed(2);
+
+  const freightBase =
+    n(s.greige_rate) +
+    n(s.purchase) +
+    brokerageAmt +
+    n(s.freight);
+
+  const dyeShort =
+    +(freightBase * (n(s.dyeing_shortage_pct) / 100)).toFixed(2);
+
+  // const hiddenBase =
+  //   n(s.greige_rate) +
+  //   n(s.purchase) +
+  //   n(s.brokerage) +
+  //   n(s.freight) +
+  //   dyeShort +
+  //   n(s.dyeing_charge) +
+  //   n(s.value_add) +
+  //   n(s.packaging_charge) +
+  //   n(s.overheads_exp);
+  const hiddenBase =
+    n(s.greige_rate) +
+    n(s.purchase) +
+    brokerageAmt +
+    n(s.freight) +
     dyeShort +
-    +s.dyeing_charge +
-    +s.value_add +
-    +s.packaging_charge +
-    +s.overheads_exp;
+    n(s.dyeing_charge) +
+    n(s.value_add) +
+    n(s.packaging_charge) +
+    n(s.overheads_exp);
 
-  const hidden = +(subtotal * (s.hidden_cost_pct / 100)).toFixed(2);
-  const dis = +(s.sale_rate * (s.sale_discount_pct / 100)).toFixed(2);
-  const sBrk = +(s.sale_rate * (s.sale_brokerage_pct / 100)).toFixed(2);
+  const hidden =
+    +(hiddenBase * (n(s.hidden_cost_pct) / 100)).toFixed(2);
 
-  const total = +(subtotal + hidden + dis + sBrk).toFixed(2);
-  const gmAmt = +(s.sale_rate - total).toFixed(2);
-  const gmPct = s.sale_rate > 0 ? +((gmAmt / s.sale_rate) * 100).toFixed(2) : 0;
+  const dis =
+    +(n(s.sale_rate) * (n(s.sale_discount_pct) / 100)).toFixed(2);
+
+  const sBrk =
+    +(n(s.sale_rate) * (n(s.sale_brokerage_pct) / 100)).toFixed(2);
+
+  const total =
+    +(hiddenBase + hidden + dis + sBrk).toFixed(2);
+
+  const gmAmt =
+    +(n(s.sale_rate) - total).toFixed(2);
+
+  const gmPct =
+    n(s.sale_rate) > 0
+      ? +((gmAmt / n(s.sale_rate)) * 100).toFixed(2)
+      : 0;
+
+  console.log({
+    freightBase,
+    dyeShort,
+    hiddenBase,
+    hidden,
+    dis,
+    sBrk,
+    total,
+    gmAmt,
+    gmPct,
+  });
 
   return {
     ...s,
@@ -83,6 +233,7 @@ const recompute = (s: CostSheet): CostSheet => {
     gross_margin_pct: gmPct,
   };
 };
+
 
 const CostSheetScreen: React.FC<Props> = ({ route, navigation }) => {
   const { inquiryId, designId } = route.params;
@@ -447,8 +598,17 @@ const CostSheetScreen: React.FC<Props> = ({ route, navigation }) => {
                 onChange={v => updateSheet({ greige_rate: v })} readonly={readonly} />
               <Row label="Purchase" value={sheet.purchase}
                 onChange={v => updateSheet({ purchase: v })} readonly={readonly} />
-              <Row label="Brokerage" value={sheet.brokerage}
-                onChange={v => updateSheet({ brokerage: v })} readonly={readonly} />
+              {/* <Row label="Brokerage" value={sheet.brokerage}
+                onChange={v => updateSheet({ brokerage: v })} readonly={readonly} /> */}
+              <PctRow
+                label="Brokerage"
+                pct={sheet.brokerage}
+                amount={
+                  ((sheet.greige_rate || 0) * (sheet.brokerage || 0)) / 100
+                }
+                onChange={v => updateSheet({ brokerage: v })}
+                readonly={readonly}
+              />
               <Row label="Freight" value={sheet.freight}
                 onChange={v => updateSheet({ freight: v })} readonly={readonly} last />
             </View>
@@ -626,25 +786,78 @@ interface RowProps {
   last?: boolean;
 }
 
-const Row: React.FC<RowProps> = ({ label, value, onChange, readonly, last }) => (
-  <View
-    style={[
-      styles.kvRow,
-      !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
-    ]}>
-    <Text style={styles.kvLabel}>{label}</Text>
-    <TextInput
-      editable={!readonly}
-      value={value ? String(value) : ''}
-      onChangeText={t => onChange(parseFloat(t) || 0)}
-      keyboardType="decimal-pad"
-      placeholder="0"
-      placeholderTextColor={colors.textTertiary}
-      style={styles.kvInput}
-    />
-  </View>
-);
+// const Row: React.FC<RowProps> = ({ label, value, onChange, readonly, last }) => (
+//   <View
+//     style={[
+//       styles.kvRow,
+//       !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
+//     ]}>
+//     <Text style={styles.kvLabel}>{label}</Text>
+//     <TextInput
+//       editable={!readonly}
+//       value={value ? String(value) : ''}
+//       onChangeText={t => onChange(parseFloat(t) || 0)}
+//       // onChangeText={t => onChange(t || 0)}
+//       // onChangeText={text => {
+//       //   const cleaned = text.replace(/[^0-9.]/g, '');
+//       //   onChange(parseFloat(cleaned) || 0);
+//       // }}
+//       keyboardType="numeric"
+//       // keyboardType="numeric"
+//       placeholder="0"
+//       placeholderTextColor={colors.textTertiary}
+//       style={styles.kvInput}
+//     />
+//   </View>
+// );
 
+const Row: React.FC<RowProps> = ({
+  label,
+  value,
+  onChange,
+  readonly,
+  last,
+}) => {
+
+  const [text, setText] = React.useState(
+    value !== undefined ? String(value) : ''
+  );
+
+  React.useEffect(() => {
+    setText(value !== undefined ? String(value) : '');
+  }, [value]);
+
+  return (
+    <View
+      style={[
+        styles.kvRow,
+        !last && {
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+        },
+      ]}>
+      <Text style={styles.kvLabel}>{label}</Text>
+
+      <TextInput
+        editable={!readonly}
+        value={text}
+        keyboardType="decimal-pad"
+        placeholder="0"
+        placeholderTextColor={colors.textTertiary}
+        style={styles.kvInput}
+        onChangeText={txt => {
+          setText(txt);
+
+          const num = parseFloat(txt);
+
+          if (!isNaN(num)) {
+            onChange(num);
+          }
+        }}
+      />
+    </View>
+  );
+};
 interface PctRowProps {
   label: string;
   pct: number;
@@ -654,30 +867,60 @@ interface PctRowProps {
   last?: boolean;
 }
 
-const PctRow: React.FC<PctRowProps> = ({ label, pct, amount, onChange, readonly, last }) => (
-  <View
-    style={[
-      styles.kvRow,
-      !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
-    ]}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.kvLabel}>{label}</Text>
-      <Text style={styles.kvSub}>{pct || 0}%</Text>
+const PctRow: React.FC<PctRowProps> = ({ label, pct, amount, onChange, readonly, last }) => {
+  const [text, setText] = React.useState(
+    pct !== undefined ? String(pct) : ''
+  );
+  React.useEffect(() => {
+    setText(pct !== undefined ? String(pct) : '');
+  }, [pct]);
+
+  return (
+    <View
+      style={[
+        styles.kvRow,
+        !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
+      ]}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.kvLabel}>{label}</Text>
+        <Text style={styles.kvSub}>{pct || 0}%</Text>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+        {/* <TextInput
+          editable={!readonly}
+          value={pct ? String(pct) : ''}
+          onChangeText={t => onChange(parseFloat(t) || 0)}
+          // onChangeText={t => onChange(t || 0)}
+          keyboardType="numeric"
+          placeholder="%"
+          placeholderTextColor={colors.textTertiary}
+          style={[styles.kvInput, { width: 60 }]}
+        /> */}
+        <TextInput
+          editable={!readonly}
+          value={text}
+          keyboardType="decimal-pad"
+          placeholder="%"
+          placeholderTextColor={colors.textTertiary}
+          style={[styles.kvInput, { width: 60 }]}
+          onChangeText={txt => {
+            setText(txt);
+
+            const num = parseFloat(txt);
+
+            if (!isNaN(num)) {
+              onChange(num);
+            }
+          }}
+        />
+        {/* <Text style={styles.kvAmt}>{formatCurrency(amount)}</Text> */}
+        <Text style={styles.kvAmt}><Text style={styles.kvAmt}>
+          ₹ {Number(amount || 0).toFixed(2)}
+        </Text></Text>
+      </View>
     </View>
-    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-      <TextInput
-        editable={!readonly}
-        value={pct ? String(pct) : ''}
-        onChangeText={t => onChange(parseFloat(t) || 0)}
-        keyboardType="decimal-pad"
-        placeholder="%"
-        placeholderTextColor={colors.textTertiary}
-        style={[styles.kvInput, { width: 60 }]}
-      />
-      <Text style={styles.kvAmt}>{formatCurrency(amount)}</Text>
-    </View>
-  </View>
-);
+  )
+};
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

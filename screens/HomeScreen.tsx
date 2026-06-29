@@ -64,7 +64,7 @@ const useDebounce = (value: string, delay: number) => {
 
 //  #5B2CFF - Daily Collection Report
 
-//rgb(219, 148, 90) - Sales Order Tracking
+//rgb(90, 219, 161) - Sales Order Tracking
 
 const APP_SECTIONS = [
     {
@@ -365,13 +365,19 @@ const APP_SECTIONS = [
     {
         title: 'Y',
         data: [
-            { id: '41', name: 'Febric Stock Verification', screen: 'Febric Stock Verification', icon: 'receipt-long', iconColor: '#740cea' },
+            { id: '41', name: 'Inquiry Report', screen: 'Inquiry Report', icon: 'view-comfortable', iconColor: '#69e3ad' },
         ],
     },
     {
         title: 'Y',
         data: [
             { id: '42', name: 'Purchase Import Auth', screen: 'Purchase Import Auth', icon: 'task-alt', iconColor: '#991070' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '45', name: 'Febric Stock Verification', screen: 'Febric Stock Verification', icon: 'receipt-long', iconColor: '#740cea' },
         ],
     },
     {
@@ -386,6 +392,7 @@ const APP_SECTIONS = [
             { id: '44', name: 'Design Creation', screen: 'Design Creation', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
+
 ];
 
 interface Props {
@@ -683,6 +690,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Employ Dashboard",
                 //                         "href": "/"
                 //                     },
+
                 //                     {
                 //                         "title": "Febric Stock Verification",
                 //                         "href": "/"
@@ -727,6 +735,13 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Design Creation",
                 //                         "href": "/"
                 //                     },
+
+                // {
+                //     "title": "Purchase Import Auth",
+                //     "href": "/"
+                // },
+
+
                 //                 ]
                 //             }
                 //         ]

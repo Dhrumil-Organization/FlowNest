@@ -33,6 +33,7 @@ import TakaCheckingEntry from './components/TakaCheckingEntry/TakaCheckingEntry'
 import TakaCheckingViewData from './components/TakaCheckingViewData/TakaCheckingViewData';
 import InquiryAdd from './components/InquiryAdd/InquiryAdd';
 import Footer from './components/Footer/Footer';
+// import PurchaseImportAuth from './components/PurchaseImportAuth/PurchaseImportAuth'
 import NetworkSpeed from './components/NetworkSpeed/NetworkSpeed';
 import {
   Alert,
@@ -149,6 +150,7 @@ import WeftIssueReturn from './components/WeftIssueReturn/WeftIssueReturn';
 import WeftIssueReturnEntry from './components/WeftIssueReturn/WeftIssueReturnEntry';
 import WeftIssueReturnModifyEntry from './components/WeftIssueReturn/WeftIssueReturnModifyEntry';
 import DesignCreationModule from './components/DesignCreation/DesignCreationModule';
+import InquiryReport from './components/InquiryReport/InquiryReport';
 
 
 const Stack = createNativeStackNavigator();
@@ -1619,7 +1621,6 @@ export default function App() {
 
                         </>
                       }</Stack.Screen>
-
                       <Stack.Screen name="Febric Stock Verification">
                         {props => (
                           <FebricStockVerificationModule
@@ -1631,13 +1632,17 @@ export default function App() {
                           />
                         )}
                       </Stack.Screen>
+                      <Stack.Screen name="Inquiry Report">{(props) =>
+                        <>
+                          <InquiryReport {...props} token={gettoken || ''} username={getUserDetails} getUserPrptype={getUserPrptype} />
 
+                        </>
+                      }</Stack.Screen>
                       <Stack.Screen name="Purchase Import Auth">{(props) =>
                         <>
                           <PurchaseImportAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         </>
                       }</Stack.Screen>
-
                       <Stack.Screen name="Weft Issue Return">{(props) =>
                         <>
                           <WeftIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
@@ -1662,11 +1667,11 @@ export default function App() {
                           </SafeAreaProvider>
                         )}
                       </Stack.Screen>
-                    </Stack.Navigator>
+                    </Stack.Navigator >
                     {/* </Stack.Navigator> */}
 
 
-                  </NavigationContainer>
+                  </NavigationContainer >
                 ) : isConnected === false ? (
                   <OfflineFallback />
                 ) : (
@@ -1692,11 +1697,12 @@ export default function App() {
                   checkConnectionQuality={checkConnectionQuality}
                   isLoading={isLoading}
                 />
-              )}
+              )
+              }
             </>
           )}
-        </ThemeProvider>
-      </SafeAreaProvider>
+        </ThemeProvider >
+      </SafeAreaProvider >
     </>
   );
 }

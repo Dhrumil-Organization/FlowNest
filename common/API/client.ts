@@ -82,13 +82,29 @@ export interface CostingRecord {
 
 // ── Design API ───────────────────────────────────────────────
 export const DesignAPI = {
-    list: (params?: { category?: string; search?: string }) =>
-        client.get<{ success: boolean; data: Design[] }>('/designs', { params }),
+
+    // ✅ Updated for paginated response
+    list: (params?: {
+        category?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+    }) =>
+        client.get<{
+            success: boolean;
+            data: {
+                data: Design[];
+                total: number;
+                page: number;
+                limit: number;
+                total_pages: number;
+            }
+        }>('/designs', { params: { limit: 50, ...params } }),
 
     get: (id: string) =>
         client.get<{ success: boolean; data: Design }>(`/designs/${id}`),
 
-    create: (body: Partial<Design> & { warp_yarns: any[]; weft_yarns: any[] }) =>
+    create: (body: any) =>
         client.post<{ success: boolean; data: Design }>('/designs', body),
 
     update: (id: string, body: Partial<Design>) =>

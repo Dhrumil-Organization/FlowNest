@@ -31,64 +31,55 @@ const CARD_COLORS = {
   '5': '#DBA7D7', // Stock not found
 };
 
-const stockData = [
-  {
-    id: 'C000123',
-    item: 'Polyester Yarn',
-    grade: 'A Grade',
-    shade: 'Black',
-    merge: 'M1',
-    denier: 80,
-    qty: '250.00',
-    user: 'ADMIN',
-    status: 1,
-  },
-  {
-    id: 'C000124',
-    item: 'Polyester Yarn',
-    grade: 'B Grade',
-    shade: 'White',
-    merge: 'M2',
-    denier: 100,
-    qty: '180.50',
-    user: 'RAMESH',
-    status: 2,
-  },
-  {
-    id: 'C000125',
-    item: 'Nylon Yarn',
-    grade: 'A Grade',
-    shade: 'Red',
-    merge: 'M3',
-    denier: 70,
-    qty: '320.00',
-    user: 'ADMIN',
-    status: 3,
-  },
-  {
-    id: 'C000126',
-    item: 'Cotton Yarn',
-    grade: 'C Grade',
-    shade: 'Blue',
-    merge: 'M1',
-    denier: 60,
-    qty: '95.75',
-    user: 'SURESH',
-    status: 5,
-  },
-];
-
-
-
-
-
-
+// const stockData = [
+//   {
+//     id: 'C000123',
+//     item: 'Polyester Yarn',
+//     grade: 'A Grade',
+//     shade: 'Black',
+//     merge: 'M1',
+//     denier: 80,
+//     qty: '250.00',
+//     user: 'ADMIN',
+//     status: 1,
+//   },
+//   {
+//     id: 'C000124',
+//     item: 'Polyester Yarn',
+//     grade: 'B Grade',
+//     shade: 'White',
+//     merge: 'M2',
+//     denier: 100,
+//     qty: '180.50',
+//     user: 'RAMESH',
+//     status: 2,
+//   },
+//   {
+//     id: 'C000125',
+//     item: 'Nylon Yarn',
+//     grade: 'A Grade',
+//     shade: 'Red',
+//     merge: 'M3',
+//     denier: 70,
+//     qty: '320.00',
+//     user: 'ADMIN',
+//     status: 3,
+//   },
+//   {
+//     id: 'C000126',
+//     item: 'Cotton Yarn',
+//     grade: 'C Grade',
+//     shade: 'Blue',
+//     merge: 'M1',
+//     denier: 60,
+//     qty: '95.75',
+//     user: 'SURESH',
+//     status: 5,
+//   },
+// ];
 
 export default function StockListScreen({ navigation, route, token }) {
-
-  // ✅ RECEIVE criteriaForm passed from CriteriaScreen
-
-  // const stockData = route?.params?.stockData || [];
+  const stockData = route?.params?.stockData || [];
   const criteriaForm = route?.params?.criteriaForm || {};
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -122,41 +113,63 @@ export default function StockListScreen({ navigation, route, token }) {
               '#FFFFFF';
     return (
       // <View style={styles.card}>
-      <View style={[styles.card, { backgroundColor: cardBg }]}>
-        <View style={styles.cardHeader}>
+      <View style={styles.card}>
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 5,
+            backgroundColor: cardBg,
+            borderTopLeftRadius: 16,
+            borderBottomLeftRadius: 16,
+          }}
+        />
+        {/* Header */}
+        <View style={styles.cardTop}>
           <View>
             <Text style={styles.cartonNo}>{item.id}</Text>
             <Text style={styles.itemName}>{item.item}</Text>
           </View>
-          {/* <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-          <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status}</Text>
-        </View> */}
-        </View>
 
-        <View style={styles.cardDetails}>
-          <View style={styles.detailsLeft}>
-            <Text style={styles.detailText}>Grade  :  {item.grade}</Text>
-            <Text style={styles.detailText}>Shade  :  {item.shade}</Text>
-            <Text style={styles.detailText}>Merge  :  {item.merge}</Text>
-            <Text style={styles.detailText}>Denier  :  {item.denier}</Text>
-          </View>
-          <View style={styles.detailsRight}>
-            <Text style={styles.qtyLabel}>Qty (KG)</Text>
+          <View style={styles.qtyBox}>
+            <Text style={styles.qtyLabel}>Qty</Text>
             <Text style={styles.qtyValue}>{item.qty}</Text>
-            <Text style={styles.userLabel}>User</Text>
-            <Text style={styles.userValue}>{item.user}</Text>
           </View>
         </View>
 
-        <View style={styles.cardActions}>
+        {/* Details */}
+        <View style={styles.detailSection}>
+          <View style={styles.left}>
+            <Text style={styles.detailText}>Grade : {item.grade}</Text>
+            <Text style={styles.detailText}>Shade : {item.shade}</Text>
+            <Text style={styles.detailText}>Merge : {item.merge}</Text>
+            <Text style={styles.detailText}>Denier : {item.denier}</Text>
+          </View>
+
+          <View style={styles.right}>
+            <Text style={{ color: '#000' }}>User</Text>
+            <Text style={styles.user}>{item.user}</Text>
+          </View>
+        </View>
+
+        {/* Footer */}
+        {/* <TouchableOpacity style={styles.actionBtn}>
+          <Icon name="visibility" size={18} color="#0F8F9A" />
+          <Text style={styles.actionText}>VIEW</Text>
+        </TouchableOpacity> */}
+
+
+        {/* <View style={styles.cardActions}> */}
 
           {(item.status === 1 && !savedCartons.includes(item.id)) && (
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => onView && onView(item)}
             >
-              <Text style={styles.actionIcon}>👁</Text>
-              <Text style={styles.actionText}>VIEW</Text>
+              {/* <Text style={styles.actionIcon}>👁</Text> */}
+              <Text style={styles.actionText}>Update Stock</Text>
             </TouchableOpacity>
           )}
 
@@ -165,13 +178,13 @@ export default function StockListScreen({ navigation, route, token }) {
               style={styles.actionBtn}
               onPress={() => onPrint(item)}
             >
-              <Text style={styles.actionIcon}>🖨</Text>
+              {/* <Text style={styles.actionIcon}>🖨</Text> */}
               <Text style={styles.actionText}>PRINT</Text>
             </TouchableOpacity>
           )}
 
-        </View>
-      </View>
+        {/* </View> */}
+      </View >
     );
   };
 
@@ -558,8 +571,6 @@ export default function StockListScreen({ navigation, route, token }) {
                 ))}
               </View>
             )}
-
-            {/* Message Box */}
             <View
               style={{
                 flexDirection: 'row',
@@ -769,45 +780,125 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
   listBody: { paddingHorizontal: 12, paddingBottom: 80 },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 10,
-    elevation: 2,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
-    shadowRadius: 4,
-    overflow: 'hidden',
+    shadowRadius: 8,
+    elevation: 4,
   },
-  cardHeader: {
+
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 12,
-    paddingBottom: 8,
+    alignItems: 'center',
   },
-  cartonNo: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
-  itemName: { fontSize: 13, color: '#555', marginTop: 2 },
+
+  qtyBox: {
+    backgroundColor: '#F4F7FA',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+  detailSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+  },
+
+  actionBtn: {
+    borderTopWidth: 1,
+    borderColor: '#EEE',
+    marginTop: 14,
+    paddingTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  actionText: {
+    marginLeft: 6,
+    fontWeight: '700',
+    color: '#0F8F9A',
+  },
+
+  cartonNo: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+
+  itemName: {
+    fontSize: 14,
+    color: '#000',
+    marginTop: 2,
+  },
+
+  qtyLabel: {
+    fontSize: 11,
+    color: '#000',
+  },
+
+  qtyValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+
+  left: {
+    flex: 1,
+  },
+
+  right: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+
+  userLabel: {
+    fontSize: 12,
+    color: '#000',
+  },
+
+  user: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000',
+    marginTop: 4,
+  },
+
+  detailText: {
+    color: '#000',
+    fontSize: 14,
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+
   statusBadge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontSize: 11, fontWeight: '600' },
   cardDetails: { flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 10 },
   detailsLeft: { flex: 1 },
-  detailText: { fontSize: 12, color: '#555', marginBottom: 3 },
+  // detailText: { fontSize: 12, color: '#555', marginBottom: 3 },
   detailsRight: { alignItems: 'flex-end' },
-  qtyLabel: { fontSize: 11, color: '#888' },
-  qtyValue: { fontSize: 17, fontWeight: '700', color: '#1A1A2E', marginBottom: 6 },
-  userLabel: { fontSize: 11, color: '#888' },
+  // qtyLabel: { fontSize: 11, color: '#888' },
+  // qtyValue: { fontSize: 17, fontWeight: '700', color: '#1A1A2E', marginBottom: 6 },
+  // userLabel: { fontSize: 11, color: '#888' },
   userValue: { fontSize: 12, fontWeight: '600', color: '#333' },
   cardActions: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F0F0F0' },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
+  // actionBtn: {
+  //   flex: 1,
+  //   flexDirection: 'row',
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   paddingVertical: 10,
+  // },
   actionIcon: { fontSize: 13 },
-  actionText: { fontSize: 12, color: '#555', fontWeight: '600' },
+  // actionText: { fontSize: 12, color: '#555', fontWeight: '600' },
   divider: { width: 1, backgroundColor: '#F0F0F0' },
   fab: {
     position: 'absolute',

@@ -99,10 +99,10 @@ import ChartScreen from './components/YarnPurchaseOrder/ChartScreen';
 import ProductionReport from './components/ProductionReport/ProductionReport';
 // import WftIssue from './components/WftIssue/WftIssue';
 import WftIssue from './components/WftIssue/WftIssue';
-import SalesOrderNew from './components/SalesOrderNew/SalesOrderNew';
-import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
-import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
-import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
+// import SalesOrderNew from './components/SalesOrderNew/SalesOrderNew';
+// import PartyListScreen from './components/SalesOrderNew/PartyListScreen';
+// import OrderSummaryScreen from './components/SalesOrderNew/OrderSummaryScreen';
+// import { SalesOrderProvider } from './components/SalesOrderNew/SalesOrderContext';
 import SalesOrderModule from './components/SalesOrderNew_08_jun/SalesOrderModule';
 import CreelIssueReturn from './components/CreelIssueReturn/CreelIssueReturn';
 import CreelIssueReturnEntry from './components/CreelIssueReturn/CreelIssueReturnEntry';
@@ -144,6 +144,12 @@ import PoyRateEntry from './components/PoyRateEntry/PoyRateEntry';
 import PriceList from './components/PriceList/PriceList';
 import SalesOrderPriceListAuth from './components/SalesOrderPriceListAuth/SalesOrderPriceListAuth'
 import FebricStockVerificationModule from './components/FebricStockVerification/FebricStockVerificationModule';
+import PurchaseImportAuth from './components/PurchaseImportAuth/PurchaseImportAuth';
+import WeftIssueReturn from './components/WeftIssueReturn/WeftIssueReturn';
+import WeftIssueReturnEntry from './components/WeftIssueReturn/WeftIssueReturnEntry';
+import WeftIssueReturnModifyEntry from './components/WeftIssueReturn/WeftIssueReturnModifyEntry';
+import DesignCreationModule from './components/DesignCreation/DesignCreationModule';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -1614,7 +1620,7 @@ export default function App() {
                         </>
                       }</Stack.Screen>
 
-                       <Stack.Screen name="Febric Stock Verification">
+                      <Stack.Screen name="Febric Stock Verification">
                         {props => (
                           <FebricStockVerificationModule
                             {...props}
@@ -1623,6 +1629,37 @@ export default function App() {
                             username={getUserDetails}
                             userid={getUserId}
                           />
+                        )}
+                      </Stack.Screen>
+
+                      <Stack.Screen name="Purchase Import Auth">{(props) =>
+                        <>
+                          <PurchaseImportAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                        </>
+                      }</Stack.Screen>
+
+                      <Stack.Screen name="Weft Issue Return">{(props) =>
+                        <>
+                          <WeftIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+
+                        </>
+                      }</Stack.Screen>
+                      <Stack.Screen name="WeftIssueReturnEntry" component={WeftIssueReturnEntry} />
+                      <Stack.Screen name="WeftIssueReturnModifyEntry" component={WeftIssueReturnModifyEntry} />
+
+
+                      <Stack.Screen name="Design Creation">
+                        {props => (
+                          <SafeAreaProvider>
+                            <DesignCreationModule
+                              {...props}
+                              token={gettoken || ''}
+                              isConnected={isConnected}
+                              username={getUserDetails}
+                              userid={getUserId}
+                            />
+
+                          </SafeAreaProvider>
                         )}
                       </Stack.Screen>
                     </Stack.Navigator>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
     SafeAreaView, View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, StyleSheet,
-    Modal, Animated, Dimensions, Keyboard
+    Modal, Animated, Dimensions, Keyboard, Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +9,8 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 
 const { width } = Dimensions.get('window');
+
+const screenWidth = Dimensions.get('window').width;
 
 const isTablet = width >= 768;
 
@@ -78,6 +80,9 @@ const PriceList = ({ token, navigation }: any) => {
     const [editingValue, setEditingValue] = useState('');
     const monthNo = String(selectedMonth + 1).padStart(2, '0');
     const searchRef = useRef<TextInput>(null);
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [infoMessage, setInfoMessage] = useState('');
+    const [selectedItemName, setSelectedItemName] = useState('');
     const dateColumns = useMemo(() => {
 
         const uniqueDates = [
@@ -194,8 +199,8 @@ const PriceList = ({ token, navigation }: any) => {
                 map.set(item.ItmCode, {
                     ItmCode: item.ItmCode,
                     ItmName: item.ItmName,
+                    Status: item.Status,
                 });
-
             }
 
         });
@@ -413,7 +418,7 @@ const PriceList = ({ token, navigation }: any) => {
                     />
                 </>
             ) : (
-                <ScrollView horizontal contentContainerStyle={{ minWidth: isTablet ? width - 30 : undefined, }} showsHorizontalScrollIndicator={false} >
+                <ScrollView horizontal contentContainerStyle={{ minWidth: screenWidth, }} showsHorizontalScrollIndicator={false} >
                     <View>
                         <View
                             style={[
@@ -458,8 +463,25 @@ const PriceList = ({ token, navigation }: any) => {
                             }}
                             renderItem={({ item, index }) => (
 
-                                <View key={index} style={styles.rowCard}>
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    onPress={() => {
+                                        if (item.Status === "0") {
+                                            setSelectedItemName(item.ItmName);
+
+                                            setInfoMessage(
+                                                'One or more recipe items are not mapped in the POY Rate Item List.'
+                                            );
+                                            setShowInfoModal(true);
+                                        }
+                                    }}
+                                    style={[
+                                        styles.rowCard,
+                                        item.Status === "0" && styles.highlightRow,
+                                    ]}
+                                >
                                     <View style={styles.itemColumn}>
+
                                         <Text style={styles.itemTitle}>
                                             {item.ItmName}
                                         </Text>
@@ -467,6 +489,7 @@ const PriceList = ({ token, navigation }: any) => {
                                         <Text style={styles.itemSub}>
                                             {item.ItmCode}
                                         </Text>
+
                                     </View>
 
                                     {dateColumns.map((col: any, idx: number) => {
@@ -529,15 +552,25 @@ const PriceList = ({ token, navigation }: any) => {
                                                                         `${item.ItmCode}_${col.rawDate}`
                                                                     );
 
+                                                                    // setEditingValue(
+                                                                    //     rowData?.PLRate || ''
+                                                                    // );
+
                                                                     setEditingValue(
-                                                                        rowData?.PLRate || ''
+                                                                        Number(rowData?.PLRate || 0) === 0
+                                                                            ? ''
+                                                                            : String(rowData?.PLRate)
                                                                     );
 
                                                                 }}
                                                             >
 
-                                                                <Text style={styles.rateText}>
+                                                                {/* <Text style={styles.rateText}>
                                                                     ₹ {rowData?.PLRate || '0.00'}
+                                                                </Text> */}
+
+                                                                <Text style={styles.rateText}>
+                                                                    ₹ {Number(rowData?.PLRate || 0) > 0 ? rowData?.PLRate : '0'}
                                                                 </Text>
 
                                                             </TouchableOpacity>
@@ -548,7 +581,7 @@ const PriceList = ({ token, navigation }: any) => {
                                         );
                                     }
                                     )}
-                                </View>
+                                </TouchableOpacity>
                             )}
                         />
                     </View>
@@ -616,6 +649,47 @@ const PriceList = ({ token, navigation }: any) => {
                                 </Text>
                             </TouchableOpacity>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={showInfoModal}
+                transparent
+                animationType="fade"
+            >
+                <View style={styles.infoOverlay}>
+                    <View style={styles.infoCard}>
+
+                        <View style={styles.infoIconWrap}>
+                            <Icon
+                                name="info-outline"
+                                size={24}
+                                color="#2563EB"
+                            />
+                        </View>
+
+                        {/* <Text style={styles.infoTitle}>
+                            Information
+                        </Text> */}
+
+                        <Text style={styles.infoTitle}>
+                            {selectedItemName}
+                        </Text>
+
+                        <Text style={styles.infoDesc}>
+                            {infoMessage}
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.infoBtn}
+                            onPress={() => setShowInfoModal(false)}
+                        >
+                            <Text style={styles.infoBtnText}>
+                                OK
+                            </Text>
+                        </TouchableOpacity>
+
                     </View>
                 </View>
             </Modal>
@@ -814,11 +888,11 @@ const styles = StyleSheet.create({
         borderColor: '#ECECEC',
     },
     itemColumn: {
-        width: isTablet ? 280 : 170,
-        padding: isTablet ? 20 : 15,
+        width: isTablet ? screenWidth * 0.35 : screenWidth * 0.38,
+        padding: isTablet ? 20 : 12,
     },
     dateColumn: {
-        width: isTablet ? 110 : 95,
+        width: isTablet ? screenWidth * 0.14 : screenWidth * 0.22,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -840,9 +914,11 @@ const styles = StyleSheet.create({
         color: '#777',
     },
     itemTitle: {
-        fontSize: isTablet ? 22 : 18,
+        fontSize: isTablet ? 22 : 16,
         fontWeight: '700',
         color: '#111',
+        lineHeight: 20,
+        paddingRight: 6,
     },
     itemSub: {
         marginTop: 5,
@@ -850,8 +926,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     rateBadge: {
-        minWidth: isTablet ? 95 : 75,
-        height: isTablet ? 52 : 45,
+        minWidth: isTablet ? screenWidth * 0.12 : screenWidth * 0.16,
+        height: isTablet ? 52 : 42,
         borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
@@ -870,7 +946,7 @@ const styles = StyleSheet.create({
     },
     rateText: {
         fontWeight: '700',
-        fontSize: isTablet ? 18 : 16,
+        fontSize: isTablet ? 18 : 14,
         color: '#000',
     },
     addBtn: {
@@ -995,5 +1071,82 @@ const styles = StyleSheet.create({
     applyText: {
         fontWeight: '700',
         color: '#FFF',
+    },
+    pendingBadge: {
+        alignSelf: 'flex-start',
+        marginTop: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        backgroundColor: '#FFF3E0',
+    },
+
+    pendingBadgeText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#E65100',
+    },
+    highlightRow: {
+        backgroundColor: '#d6eaff',
+        borderLeftWidth: 4,
+        borderLeftColor: '#9ab1e0',
+    },
+    infoOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+
+    infoCard: {
+        width: '88%',
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        alignItems: 'center',
+        elevation: 8,
+    },
+
+    infoIconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#EFF6FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    infoTitle: {
+        marginTop: 10,
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#111827',
+        textAlign: 'center',
+    },
+
+    infoDesc: {
+        marginTop: 10,
+        fontSize: 17,
+        textAlign: 'center',
+        color: '#000',
+        lineHeight: 22,
+    },
+
+    infoBtn: {
+        marginTop: 20,
+        width: '100%',
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: '#168A35',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    infoBtnText: {
+        color: '#FFF',
+        fontWeight: '700',
+        fontSize: 16,
     },
 });

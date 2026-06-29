@@ -112,6 +112,10 @@ export default function NewCartonScreen({ navigation, route, token }) {
   const [shadeData, setShadeData] = useState([]);
   const [getAllStockDataInserted, setAllStockDataInserted] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [itemLoading, setItemLoading] = useState(false);
+  const [mergeLoading, setMergeLoading] = useState(false);
+  const [gradeLoading, setGradeLoading] = useState(false);
+  const [shadeLoading, setShadeLoading] = useState(false);
 
 
   const getToken = () => {
@@ -160,7 +164,7 @@ export default function NewCartonScreen({ navigation, route, token }) {
   const getAllItems = async (token: string) => {
     if (cancelToken?.cancel) cancelToken.cancel();
     cancelToken = axios.CancelToken.source();
-
+    setItemLoading(true);
     try {
       const historyPayload = {
         prpcode: form.PrpCode,
@@ -192,13 +196,13 @@ export default function NewCartonScreen({ navigation, route, token }) {
     } catch (error) {
       console.log("item API error:", error);
     } finally {
-      //setIsLoading(false)
+      setItemLoading(false)
     }
   }
   const getAllMerges = async (token: string) => {
     if (cancelToken?.cancel) cancelToken.cancel();
     cancelToken = axios.CancelToken.source();
-
+    setMergeLoading(true);
     try {
       const historyPayload = {
         prpcode: form.PrpCode,
@@ -229,13 +233,13 @@ export default function NewCartonScreen({ navigation, route, token }) {
     } catch (error) {
       console.log("shade API error:", error);
     } finally {
-      //setIsLoading(false)
+      setMergeLoading(false)
     }
   }
   const getAllGrades = async (token: string) => {
     if (cancelToken?.cancel) cancelToken.cancel();
     cancelToken = axios.CancelToken.source();
-
+    setGradeLoading(true);
     try {
       const historyPayload = {
         prpcode: form.PrpCode,
@@ -268,14 +272,14 @@ export default function NewCartonScreen({ navigation, route, token }) {
     } catch (error) {
       console.log("grade API error:", error);
     } finally {
-      //setIsLoading(false)
+      setGradeLoading(false)
     }
   }
 
   const getAllShades = async (token: string) => {
     if (cancelToken?.cancel) cancelToken.cancel();
     cancelToken = axios.CancelToken.source();
-
+    setShadeLoading(true);
     try {
       const historyPayload = {
         prpcode: form.PrpCode,
@@ -305,10 +309,25 @@ export default function NewCartonScreen({ navigation, route, token }) {
     } catch (error) {
       console.log("grade API error:", error);
     } finally {
-      //setIsLoading(false)
+      setShadeLoading(false)
     }
   }
 
+  const ModalSkeleton = () => (
+    <View style={{ padding: 15 }}>
+      {[1, 2, 3, 4, 5, 6].map(i => (
+        <View
+          key={i}
+          style={{
+            height: 55,
+            backgroundColor: '#E5E7EB',
+            borderRadius: 8,
+            marginBottom: 10,
+          }}
+        />
+      ))}
+    </View>
+  );
 
   useEffect(() => {
     const loadAllFunctions = async () => {
@@ -546,7 +565,7 @@ export default function NewCartonScreen({ navigation, route, token }) {
         txntype: 'yarnStockVerification'
       };
 
-      console.log("payload",payload);
+      console.log("payload", payload);
 
       const headers = {
         Authorization: `Bearer ${getToken()}`,
@@ -742,14 +761,30 @@ export default function NewCartonScreen({ navigation, route, token }) {
 
       </ScrollView>
 
-      <Modal visible={propertyVisible} animationType="slide">
+      <Modal
+        visible={propertyVisible}
+        animationType="slide"
+        onRequestClose={() => setPropertyVisible(false)}
+      >
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Property</Text>
+
+            <TouchableOpacity onPress={() => setPropertyVisible(false)}>
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={getAllPropertyData}
             keyExtractor={(item) => item.PrpCode}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.modalItem}
+                style={[
+                  styles.modalItemNew,
+                  form.PrpCode === item.PrpCode && styles.selectedItem,
+                ]}
                 onPress={() => {
                   setForm(prev => ({
                     ...prev,
@@ -760,21 +795,39 @@ export default function NewCartonScreen({ navigation, route, token }) {
                   setPropertyVisible(false);
                 }}
               >
-                <Text>{item.PrpName}</Text>
+                <Text style={styles.itemText}>
+                  {item.PrpName}
+                </Text>
               </TouchableOpacity>
             )}
           />
         </View>
       </Modal>
 
-      <Modal visible={yearVisible} animationType="slide">
+      <Modal
+        visible={yearVisible}
+        animationType="slide"
+        onRequestClose={() => setYearVisible(false)}
+      >
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Year</Text>
+
+            <TouchableOpacity onPress={() => setYearVisible(false)}>
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={getAllYearData}
             keyExtractor={(item) => item.YearNo}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.modalItem}
+                style={[
+                  styles.modalItemNew,
+                  form.YearNo === item.YearNo && styles.selectedItem,
+                ]}
                 onPress={() => {
                   setForm(prev => ({
                     ...prev,
@@ -784,20 +837,39 @@ export default function NewCartonScreen({ navigation, route, token }) {
                   setYearVisible(false);
                 }}
               >
-                <Text>{item.YearName}</Text>
+                <Text style={styles.itemText}>
+                  {item.YearName}
+                </Text>
               </TouchableOpacity>
             )}
           />
         </View>
       </Modal>
-      <Modal visible={storeVisible} animationType="slide">
+
+      <Modal
+        visible={storeVisible}
+        animationType="slide"
+        onRequestClose={() => setStoreVisible(false)}
+      >
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Store</Text>
+
+            <TouchableOpacity onPress={() => setStoreVisible(false)}>
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={getAllStoreData}
             keyExtractor={(item) => item.StrCode}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.modalItem}
+                style={[
+                  styles.modalItemNew,
+                  form.StrCode === item.StrCode && styles.selectedItem,
+                ]}
                 onPress={() => {
                   setForm(prev => ({
                     ...prev,
@@ -806,20 +878,88 @@ export default function NewCartonScreen({ navigation, route, token }) {
                   setStoreVisible(false);
                 }}
               >
-                <Text>{item.StrName}</Text>
+                <Text style={styles.itemText}>
+                  {item.StrName}
+                </Text>
               </TouchableOpacity>
             )}
           />
         </View>
       </Modal>
-      <Modal visible={stockTypeVisible} animationType="slide">
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <FlatList
-            data={getStockTypesFilterForm}
-            keyExtractor={(item) => item.value}
-            renderItem={({ item }) => (
+
+      <Modal
+        visible={stockTypeVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStockTypeVisible(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setStockTypeVisible(false)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={{
+              width: '80%',
+              backgroundColor: '#fff',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: 15,
+                paddingVertical: 14,
+                backgroundColor: '#0B6B6F',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#fff',
+                  fontSize: 16,
+                  fontWeight: '700',
+                }}
+              >
+                Select Stock Type
+              </Text>
+
               <TouchableOpacity
-                style={styles.modalItem}
+                onPress={() => setStockTypeVisible(false)}
+              >
+                <Icon
+                  name="close"
+                  size={22}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {getStockTypesFilterForm.map(item => (
+              <TouchableOpacity
+                key={item.value}
+                style={{
+                  paddingVertical: 15,
+                  paddingHorizontal: 16,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#eee',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor:
+                    form.StkType === item.value
+                      ? '#E8F5F5'
+                      : '#fff',
+                }}
                 onPress={() => {
                   setForm(prev => ({
                     ...prev,
@@ -828,101 +968,186 @@ export default function NewCartonScreen({ navigation, route, token }) {
                   setStockTypeVisible(false);
                 }}
               >
-                <Text>{item.label}</Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    color: '#222',
+                    fontWeight: '500',
+                  }}
+                >
+                  {item.label}
+                </Text>
+
+                {form.StkType === item.value && (
+                  <Icon
+                    name="check-circle"
+                    size={20}
+                    color="#0B6B6F"
+                  />
+                )}
               </TouchableOpacity>
-            )}
-          />
-        </View>
+            ))}
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
 
       <Modal visible={itemVisible} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <FlatList
-            data={itemData}
-            keyExtractor={(item) => item.ItmCode}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalItem}
-                onPress={() => {
-                  setForm(prev => ({
-                    ...prev,
-                    ItmCode: item.ItmCode,
-                    Denier: item.Denier
-                  }));
-                  setItemVisible(false);
-                }}
-              >
-                <Text>{item.ItmName}</Text>
-              </TouchableOpacity>
-            )}
-          />
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Item</Text>
+
+            <TouchableOpacity
+              onPress={() => setItemVisible(false)}
+            >
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {itemLoading ? (
+            <ModalSkeleton />
+          ) : (
+            <FlatList
+              data={itemData}
+              keyExtractor={(item) => item.ItmCode}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItemNew}
+                  onPress={() => {
+                    setForm(prev => ({
+                      ...prev,
+                      ItmCode: item.ItmCode,
+                      Denier: item.Denier
+                    }));
+                    setItemVisible(false);
+                  }}
+                >
+                  <Text style={styles.itemText}>
+                    {item.ItmName}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
         </View>
       </Modal>
       <Modal visible={mergeVisible} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <FlatList
-            data={mergeData}
-            keyExtractor={(item) => item.MerCode}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalItem}
-                onPress={() => {
-                  setForm(prev => ({
-                    ...prev,
-                    MerCode: item.MerCode,
-                  }));
-                  setMergeVisible(false);
-                }}
-              >
-                <Text>{item.MerName}</Text>
-              </TouchableOpacity>
-            )}
-          />
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Merge</Text>
+
+            <TouchableOpacity
+              onPress={() => setMergeVisible(false)}
+            >
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {mergeLoading ? (
+            <ModalSkeleton />
+          ) : (
+            <FlatList
+              data={mergeData}
+              keyExtractor={(item) => item.MerCode}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItemNew}
+                  onPress={() => {
+                    setForm(prev => ({
+                      ...prev,
+                      MerCode: item.MerCode,
+                    }));
+                    setMergeVisible(false);
+                  }}
+                >
+                  <Text style={styles.itemText}>
+                    {item.MerName}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
         </View>
       </Modal>
       <Modal visible={gradeVisible} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <FlatList
-            data={gradeData}
-            keyExtractor={(item) => item.GrdCode}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalItem}
-                onPress={() => {
-                  setForm(prev => ({
-                    ...prev,
-                    GrdCode: item.GrdCode,
-                  }));
-                  setGradeVisible(false);
-                }}
-              >
-                <Text>{item.GrdName}</Text>
-              </TouchableOpacity>
-            )}
-          />
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Grade</Text>
+
+            <TouchableOpacity
+              onPress={() => setGradeVisible(false)}
+            >
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {gradeLoading ? (
+            <ModalSkeleton />
+          ) : (
+            <FlatList
+              data={gradeData}
+              keyExtractor={(item) => item.GrdCode}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItemNew}
+                  onPress={() => {
+                    setForm(prev => ({
+                      ...prev,
+                      GrdCode: item.GrdCode,
+                    }));
+                    setGradeVisible(false);
+                  }}
+                >
+                  <Text style={styles.itemText}>
+                    {item.GrdName}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
         </View>
       </Modal>
+
       <Modal visible={shadeVisible} animationType="slide">
         <View style={{ flex: 1, backgroundColor: '#fff' }}>
-          <FlatList
-            data={shadeData}
-            keyExtractor={(item) => item.ShdCode}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalItem}
-                onPress={() => {
-                  setForm(prev => ({
-                    ...prev,
-                    ShdCode: item.ShdCode,
-                  }));
-                  setShadeVisible(false);
-                }}
-              >
-                <Text>{item.ShdName}</Text>
-              </TouchableOpacity>
-            )}
-          />
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Shade</Text>
+
+            <TouchableOpacity
+              onPress={() => setShadeVisible(false)}
+            >
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {shadeLoading ? (
+            <ModalSkeleton />
+          ) : (
+            <FlatList
+              data={shadeData}
+              keyExtractor={(item) => item.ShdCode}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalItemNew}
+                  onPress={() => {
+                    setForm(prev => ({
+                      ...prev,
+                      ShdCode: item.ShdCode,
+                    }));
+                    setShadeVisible(false);
+                  }}
+                >
+                  <Text style={styles.itemText}>
+                    {item.ShdName}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
         </View>
       </Modal>
 
@@ -1049,5 +1274,32 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0B6B6F',
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+  },
+
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+
+  modalItemNew: {
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+
+  itemText: {
+    fontSize: 14,
+    color: '#222',
+    fontWeight: '500',
   },
 });

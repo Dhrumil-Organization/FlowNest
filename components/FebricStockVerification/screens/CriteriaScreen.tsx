@@ -149,105 +149,105 @@ export default function CriteriaScreen({ navigation, token }) {
 
 
     // Navigate and pass the entire formState as a param
-    // const handleLoadStock = async () => {
-    //     try {
-
-    //         const payload = {
-    //             prptype: 'S',
-    //             prpcodes: [formState.PrpCode],
-    //             yearno: formState.YearNo,
-    //             strcode: formState.StrCode,
-
-    //             updateStock: formState.updateStock,
-    //             autoFound: formState.autoFound,
-    //             manual: formState.manual,
-    //             stockNotFound: formState.stockNotFound,
-    //             autoNotFound: formState.autoNotFound,
-    //             autoForRepacking: formState.autoForRepacking,
-    //             duplicate: formState.duplicate,
-    //             txntype: 'yarnStockVerification',
-    //             stktype: formState.StkType || 'I',
-    //         };
-
-    //         const headers = {
-    //             Authorization: `Bearer ${getToken()}`,
-    //             'Content-Type': 'application/json',
-    //             'X-Requested-with': 'XMLHttpRequest',
-    //         };
-
-    //         console.log('payload =>', payload);
-
-    //         const response = await axios.post(
-    //             `${API}/api/get_verify_manual_stock`,
-    //             payload,
-    //             { headers }
-    //         );
-
-    //         console.log('response =>', response.data);
-
-    //         if (
-    //             response?.data?.success === true &&
-    //             response?.data?.response?.data?.length > 0
-    //         ) {
-    //             navigation.navigate('StockList', {
-    //                 criteriaForm: formState,
-    //                 stockData: response.data.response.data,
-    //             });
-    //         } else {
-    //             Alert.alert('No Data Found');
-    //         }
-
-    //     } catch (error) {
-    //         console.log(error);
-    //         Alert.alert('Server Error');
-    //     }
-    // };
-
-
     const handleLoadStock = async () => {
+        try {
 
-        const staticData = [
-            {
-                UId: "100001",
-                CartNo: "CTN0001",
-                ItmName: "40s Cotton Yarn",
-                MerName: "Cotton",
-                GrdName: "A Grade",
-                ShdName: "White",
-                Chees: 24,
-                Denier: 150,
-                StkType: "Manual",
-                UsrCode: "ADMIN",
-                TranDate: "20250616",
-                Wt: 48.75,
-                IsAuto: "No",
-                TranName: "Manual Verification",
-                Status: "1"
-            },
-            {
-                UId: "100002",
-                CartNo: "CTN0002",
-                ItmName: "60s Cotton Yarn",
-                MerName: "Polyester",
-                GrdName: "B Grade",
-                ShdName: "Black",
-                Chees: 30,
-                Denier: 200,
-                StkType: "Auto Found",
-                UsrCode: "USER01",
-                TranDate: "20250615",
-                Wt: 52.25,
-                IsAuto: "Yes",
-                TranName: "Auto Verification",
-                Status: "2"
+            const payload = {
+                prptype: 'S',
+                prpcodes: [formState.PrpCode],
+                yearno: formState.YearNo,
+                strcode: formState.StrCode,
+
+                updateStock: formState.updateStock,
+                autoFound: formState.autoFound,
+                manual: formState.manual,
+                stockNotFound: formState.stockNotFound,
+                autoNotFound: formState.autoNotFound,
+                autoForRepacking: formState.autoForRepacking,
+                duplicate: formState.duplicate,
+                txntype: 'yarnStockVerification',
+                stktype: formState.StkType || 'I',
+            };
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            console.log('payload =>', payload);
+
+            const response = await axios.post(
+                `${API}/api/get_verify_manual_stock`,
+                payload,
+                { headers }
+            );
+
+            console.log('response =>', response.data);
+
+            if (
+                response?.data?.success === true &&
+                response?.data?.response?.data?.length > 0
+            ) {
+                navigation.navigate('StockList', {
+                    criteriaForm: formState,
+                    stockData: response.data.response.data,
+                });
+            } else {
+                Alert.alert('No Data Found');
             }
-        ];
 
-        navigation.navigate('StockList', {
-            criteriaForm: formState,
-            stockData: staticData,
-        });
+        } catch (error) {
+            console.log(error);
+            Alert.alert('Server Error');
+        }
     };
+
+
+    // const handleLoadStock = async () => {
+
+    //     const staticData = [
+    //         {
+    //             UId: "100001",
+    //             CartNo: "CTN0001",
+    //             ItmName: "40s Cotton Yarn",
+    //             MerName: "Cotton",
+    //             GrdName: "A Grade",
+    //             ShdName: "White",
+    //             Chees: 24,
+    //             Denier: 150,
+    //             StkType: "Manual",
+    //             UsrCode: "ADMIN",
+    //             TranDate: "20250616",
+    //             Wt: 48.75,
+    //             IsAuto: "No",
+    //             TranName: "Manual Verification",
+    //             Status: "1"
+    //         },
+    //         {
+    //             UId: "100002",
+    //             CartNo: "CTN0002",
+    //             ItmName: "60s Cotton Yarn",
+    //             MerName: "Polyester",
+    //             GrdName: "B Grade",
+    //             ShdName: "Black",
+    //             Chees: 30,
+    //             Denier: 200,
+    //             StkType: "Auto Found",
+    //             UsrCode: "USER01",
+    //             TranDate: "20250615",
+    //             Wt: 52.25,
+    //             IsAuto: "Yes",
+    //             TranName: "Auto Verification",
+    //             Status: "2"
+    //         }
+    //     ];
+
+    //     navigation.navigate('StockList', {
+    //         criteriaForm: formState,
+    //         stockData: staticData,
+    //     });
+    // };
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -392,7 +392,7 @@ export default function CriteriaScreen({ navigation, token }) {
                             style={{
                                 fontSize: 18,
                                 fontWeight: '700',
-                                color: '#000',
+                                color: '#fff',
                             }}
                         >
                             Select Property
@@ -404,7 +404,7 @@ export default function CriteriaScreen({ navigation, token }) {
                             <Icon
                                 name="close"
                                 size={26}
-                                color="#000"
+                                color="#fff"
                             />
                         </TouchableOpacity>
                     </View>
@@ -439,9 +439,9 @@ export default function CriteriaScreen({ navigation, token }) {
                             >
                                 <Text
                                     style={{
-                                        fontSize: 16,
+                                        fontSize: 14,
                                         fontWeight: '600',
-                                        color: '#222',
+                                        color: '#000',
                                     }}
                                 >
                                     {item.PrpName}
@@ -450,8 +450,8 @@ export default function CriteriaScreen({ navigation, token }) {
                                 <Text
                                     style={{
                                         marginTop: 4,
-                                        fontSize: 13,
-                                        color: '#777',
+                                        fontSize: 12,
+                                        color: '#000',
                                     }}
                                 >
                                     {item.PrpCode}
@@ -520,9 +520,9 @@ export default function CriteriaScreen({ navigation, token }) {
                             >
                                 <Text
                                     style={{
-                                        fontSize: 16,
+                                        fontSize: 14,
                                         fontWeight: '600',
-                                        color: '#222',
+                                        color: '#000',
                                     }}
                                 >
                                     {item.YearName}
@@ -532,14 +532,53 @@ export default function CriteriaScreen({ navigation, token }) {
                     />
                 </View>
             </Modal>
-            <Modal visible={storeVisible} animationType="slide">
+            <Modal
+                visible={storeVisible}
+                animationType="slide"
+                onRequestClose={() => setStoreVisible(false)}
+            >
                 <View style={{ flex: 1, backgroundColor: '#fff' }}>
+
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingHorizontal: 15,
+                            paddingVertical: 15,
+                            backgroundColor: '#0B6B6F',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                fontSize: 18,
+                                fontWeight: '700',
+                                color: '#fff',
+                            }}
+                        >
+                            Select Store
+                        </Text>
+
+                        <TouchableOpacity onPress={() => setStoreVisible(false)}>
+                            <Icon name="close" size={26} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+
                     <FlatList
                         data={getAllStoreData}
                         keyExtractor={(item) => item.StrCode}
                         renderItem={({ item }) => (
                             <TouchableOpacity
-                                style={styles.modalItem}
+                                style={{
+                                    paddingVertical: 18,
+                                    paddingHorizontal: 15,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: '#eee',
+                                    backgroundColor:
+                                        formState.StrCode === item.StrCode
+                                            ? '#E8F5F5'
+                                            : '#fff',
+                                }}
                                 onPress={() => {
                                     setFormState(prev => ({
                                         ...prev,
@@ -548,20 +587,62 @@ export default function CriteriaScreen({ navigation, token }) {
                                     setStoreVisible(false);
                                 }}
                             >
-                                <Text>{item.StrName}</Text>
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: '#000',
+                                    }}
+                                >
+                                    {item.StrName}
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        marginTop: 4,
+                                        fontSize: 12,
+                                        color: '#000',
+                                    }}
+                                >
+                                    {item.StrCode}
+                                </Text>
                             </TouchableOpacity>
                         )}
                     />
                 </View>
             </Modal>
-            <Modal visible={stockTypeVisible} animationType="slide">
-                <View style={{ flex: 1, backgroundColor: '#fff' }}>
-                    <FlatList
-                        data={getStockTypesFilterForm}
-                        keyExtractor={(item) => item.value}
-                        renderItem={({ item }) => (
+            <Modal
+                visible={stockTypeVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setStockTypeVisible(false)}
+            >
+                <TouchableOpacity
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.3)',
+                        justifyContent: 'center',
+                        paddingHorizontal: 20,
+                    }}
+                    activeOpacity={1}
+                    onPress={() => setStockTypeVisible(false)}
+                >
+                    <View
+                        style={{
+                            backgroundColor: '#fff',
+                            borderRadius: 12,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {getStockTypesFilterForm.map(item => (
                             <TouchableOpacity
-                                style={styles.modalItem}
+                                key={item.value}
+                                style={{
+                                    paddingVertical: 15,
+                                    paddingHorizontal: 16,
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: '#eee',
+                                }}
                                 onPress={() => {
                                     setFormState(prev => ({
                                         ...prev,
@@ -570,11 +651,22 @@ export default function CriteriaScreen({ navigation, token }) {
                                     setStockTypeVisible(false);
                                 }}
                             >
-                                <Text>{item.label}</Text>
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        color: '#000',
+                                        fontWeight:
+                                            formState.StkType === item.value
+                                                ? '700'
+                                                : '500',
+                                    }}
+                                >
+                                    {item.label}
+                                </Text>
                             </TouchableOpacity>
-                        )}
-                    />
-                </View>
+                        ))}
+                    </View>
+                </TouchableOpacity>
             </Modal>
         </SafeAreaView>
 

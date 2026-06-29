@@ -103,7 +103,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             status: 'P',
             LngName: '',
             YearName: '',
-            StkType: ''
+            StkType: '',
+            MacCode: ''
         }
     })
     const [getAllYearData, setAllYearData] = useState([]);
@@ -119,6 +120,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const screenWidth = Dimensions.get('window').width;
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const [showList, setShowList] = useState(false);
+    const [getMachineData, setMachineData] = useState([]);
+    const [selectedmachine, setselectedmachine] = useState([]);
     const normalizeCriteria = (criteria: any) => {
         return {
             PrpCode: criteria?.PrpCode || '',
@@ -130,7 +133,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         };
     };
 
-    console.log("getchees", getchees);
+    console.log("getMachineData", getMachineData);
 
     const styles = StyleSheet.create({
         field: {
@@ -377,7 +380,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         cartonNo: {
             fontSize: 13,
-            fontWeight:'700',
+            fontWeight: '700',
             color: '#007EA7'
         },
 
@@ -1282,7 +1285,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 prptype: userPtype,
                 strcode: '002',
                 txntype: 'creel_yarn_issue',
-                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                // yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 // yearno: '26',
                 fromdate: FormState.values.fromdate || '',
                 todate: FormState.values.todate || '',
@@ -1303,7 +1307,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     PreferenceJson: {
                         criteria: {
                             PrpCode: FormState.values.PrpCode,
-                            YearNo: FormState.values.YearNo,
+                            YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
                             fromdate: FormState.values.fromdate,
                             todate: FormState.values.todate,
                             status: FormState.values.status,
@@ -1375,7 +1379,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 uid: item.UId,
                 prpcode: FormState.values.PrpCode,
                 strcode: '002',
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
             };
             console.log("show Payload:", payload);
@@ -1437,7 +1441,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             Denier: d1Item.Denier || '',
                             d1SrNo: String(d1Item.SrNo || ''),
                             UId: d1Item.UId || '',
-                            yearNo: FormState.values.YearNo || ''
+                            yearNo: FormState.values.YearNo || getCurrentFinancialYear() || ''
                         };
                     });
 
@@ -1570,7 +1574,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             const yno = await AsyncStorage.getItem('yno');
             const payload = {
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 strcode: '002',
                 searchcarton: searchText.trim()
             };
@@ -1736,7 +1740,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 // referrer: 'dashboard',
                 fetch: 'shift',
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo
+                yearno: FormState.values.YearNo || getCurrentFinancialYear()
 
             };
             console.log("historyPayload", historyPayload);
@@ -1760,66 +1764,104 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
     }
 
-    // const fetchitmgrdshdname = async (parsedData) => {
+    const getMachine = async () => {
 
-    //     if (cancelToken?.cancel) cancelToken.cancel();
-    //     cancelToken = axios.CancelToken.source();
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
 
-    //     try {
-    //         let yno = await AsyncStorage.getItem('yno');
+        try {
+            let yno = await AsyncStorage.getItem('yno');
 
-    //         const payload = {
-    //             // text: parcode,
-    //             // txntype: 'creel_yarn_issue',
-    //             prpcode: FormState.values.PrpCode,
-    //             yearno: FormState.values.YearNo,
-    //             strcode: '002',
-    //             itmcode: parsedData?.ItmCode,
-    //             mercode: parsedData?.MerCode,
-    //             grdcode: parsedData?.GrdCode,
-    //             shdcode: parsedData?.ShdCode,
-    //         };
-    //        // console.log("get_item_detail_from_carton historyPayload", historyPayload);
-    //         // const response = await axios.get(
-    //         //     `${API}/api/get_criterion`, getRequestConfig(
-    //         //         {
-    //         //             params: { ...historyPayload }
-    //         //         }
-    //         //     )
-    //         // );
-    //         const headers = {
-    //             Authorization: `Bearer ${getToken()}`,
-    //             'Content-Type': 'application/json',
-    //             'X-Requested-with': 'XMLHttpRequest',
-    //         };
-    //         const response = await axios.post(`${API}/api/get_item_detail_from_carton`,
-    //             payload, { headers });
+            const historyPayload = {
+                txntype: 'creel_yarn_issue',
+                prptype: '',
+                fetch: 'machine',
+                prpcode: FormState.values.PrpCode,
+                yearno: getCurrentFinancialYear(),
+                strcode: '002',
+                macgrp: "WRP"
+            };
+            console.log("historyPayload", historyPayload);
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+            console.log("machine response", response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                setMachineData(response.data.response.data);
+            } else {
+                setMachineData([]);
+            }
+        } catch (error) {
+            // console.log("API getshifts error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
-    //         console.log("response", response);
+    const getcreelid = async (macCode) => {
 
-    //         if (response.data.success && response.data.response.data.length > 0) {
-    //             // setShiftData(response.data.response.data);
-    //         } else {
-    //             // setShiftData([]);
-    //         }
-    //     } catch (error) {
-    //         // console.log("API getshifts error:", error);
-    //     } finally {
-    //         setIsLoading(false);
-    //     }
-    // }
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const userPtype = await AsyncStorage.getItem('user_prptype');
+
+            const Payload = {
+                txntype: 'creel_yarn_issue',
+                prpcode: FormState.values.PrpCode,
+                yearno: getCurrentFinancialYear(),
+                strcode: '002',
+                maccode: macCode,
+                fetch: "get_creelid",
+                prptype: userPtype
+            };
+
+            console.log("creel id payload", Payload);
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...Payload }
+                    }
+                )
+            );
+
+            console.log("creelid response", response);
+
+            if (response.data.success) {
+
+                const data = response.data.response.data;
+
+                setCreelId(data?.batch_no || "");
+
+            } else {
+
+                setCreelId("");
+
+            }
+        } catch (error) {
+            // console.log("API getshifts error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     const fetchitmgrdshdname = async (parsedData) => {
         setIsLoading(true); // ✅ start loader
         try {
             const payload = {
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 strcode: '002',
                 itmcode: parsedData?.ItmCode,
                 mercode: parsedData?.MerCode,
                 grdcode: parsedData?.GrdCode,
                 shdcode: parsedData?.ShdCode,
-
             };
 
             console.log("payload", payload);
@@ -1857,13 +1899,15 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         const { PrpCode, YearNo } = FormState.values;
         if (PrpCode && YearNo) {
             getShifts();
+            // getMachine();
         }
-    }, [FormState.values.PrpCode, FormState.values.YearNo]);
+    }, [FormState.values.PrpCode, FormState.values.YearNo || getCurrentFinancialYear()]);
 
 
     useEffect(() => {
         if (isCreelModalVisible) {
             getShifts();
+            getMachine();
             // getdesign();
         }
     }, [isCreelModalVisible]);
@@ -1935,7 +1979,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
                 PrpCode: FormState.values.PrpCode,
-                YearNo: FormState.values.YearNo,
+                YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
                 CreelId: creelId,
                 BeamNo: 0,
@@ -2038,7 +2082,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
                 PrpCode: FormState.values.PrpCode,
-                YearNo: FormState.values.YearNo,
+                YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
                 CreelId: creelId,
                 BeamNo: 0,
@@ -2051,6 +2095,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 uid: mainUId || '',
                 RecipeUId: '1',
                 DsnCode: 0,
+                IssTo: FormState.values.MacCode,
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId || '',
                     PrpCode: item.PrpCode || '',
@@ -2143,7 +2188,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 // txntype: 'creel_yarn_issue',
                 uid: item.UId,
             };
@@ -2199,7 +2244,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 subsrno: item.SubSrNo,
                 uid: item.UId,
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
             };
             console.log("delete payload", payloadObj);
@@ -2275,6 +2320,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         setRemark('');
         setShowPicker(false);
         // setSetupDate(null);
+        setselectedmachine(null);
 
         setFormState(prev => ({
             ...prev,
@@ -2566,10 +2612,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                             />
                                         </View>
 
-                                        <View style={styles.inputGroup}>
+                                        {/* <View style={styles.inputGroup}>
                                             <Text style={styles.label}>Year No <Text style={{ color: 'red' }}> *</Text></Text>
                                             <SearchableDropdown
-                                                key={FormState.values.YearNo}
+                                                key={FormState.values.YearNo || getCurrentFinancialYear()}
                                                 data={getAllYearData || []}
                                                 labelKey="YearName"
                                                 valueKey="YearNo"
@@ -2589,6 +2635,32 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 multiple={false}
                                                 emptyMessage="No years data available"
                                             />
+                                        </View> */}
+
+                                        <View style={styles.field}>
+                                            <Text style={styles.label}>Machine <Text style={{ color: 'red' }}> *</Text></Text>
+                                            <PartyDropdown
+                                                data={getMachineData}
+                                                placeholder="Select Machine"
+                                                labelKey={["MacCode", "MacName"]}
+                                                valueKey="MacCode"
+                                                pageSize={12}
+                                                initialValue={selectedmachine ?? null}
+                                                selected={selectedmachine ?? null}
+                                                type="machine"
+                                                onSelect={(item) => {
+                                                    setselectedmachine(item);
+                                                    setFormState(prev => ({
+                                                        ...prev,
+                                                        values: {
+                                                            ...prev.values,
+                                                            MacCode: item?.MacCode
+                                                        }
+                                                    }));
+
+                                                    getcreelid(item?.MacCode);
+                                                }}
+                                            />
                                         </View>
 
                                         {/* Creel ID */}
@@ -2600,6 +2672,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 onChangeText={setCreelId}
                                                 placeholder="Enter Creel ID"
                                                 placeholderTextColor="#888"
+                                                readOnly
                                             />
                                         </View>
 
@@ -2645,8 +2718,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                                                         onSelect={(item) => {
                                                             setShift(item.ShfCode);
-
-                                                            // agar FormState me bhi store karna ho
                                                             setFormState(prev => ({
                                                                 ...prev,
                                                                 values: {
@@ -2689,7 +2760,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         </View>
 
                                         <View style={styles.field}>
-                                            <Text style={styles.label}>Stcok Type *</Text>
+                                            <Text style={styles.label}>Stock Type <Text style={{ color: 'red' }}> *</Text></Text>
                                             <PartyDropdown
                                                 data={getStockTypes}
                                                 placeholder="Select Stock Type"
@@ -2731,6 +2802,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         <TouchableOpacity
                                             style={styles.saveBtn}
                                             onPress={() => {
+                                                if (!selectedmachine) {
+                                                    Alert.alert("Validation", "Select Machine");
+                                                    return;
+                                                }
                                                 if (!creelId?.trim()) {
                                                     Alert.alert("Validation", "Enter Creel ID");
                                                     return;
@@ -2747,7 +2822,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     Alert.alert("Validation", "Select Stock Type");
                                                     return;
                                                 }
-                                                const yearNo = FormState.values.YearNo;
+                                                const yearNo = FormState.values.YearNo || getCurrentFinancialYear();
                                                 const startYear = "20" + (parseInt(yearNo) - 1);
                                                 const endYear = "20" + yearNo;
                                                 const selectedDate = setupDate.toISOString().split('T')[0];
@@ -3283,8 +3358,13 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
             <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
                 onPress={() => {
-                    setIsCreelModalVisible(true);
                     resetAllFields();
+
+                    setShowList(false);          
+                    setCartonSummary([]);        
+                    setIsScanModalVisible(false);
+
+                    setIsCreelModalVisible(true);
                 }}
             >
                 <Icon name="add" size={20} color="#fff" />

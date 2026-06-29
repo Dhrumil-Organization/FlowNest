@@ -274,7 +274,7 @@ const APP_SECTIONS = [
     {
         title: 'I',
         data: [
-            { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'precision-manufacturing', iconColor: '#4169E1' },
+            { id: '32', name: 'Weft Issue', screen: 'Weft Issue', icon: 'outbox', iconColor: '#1976D2' },
         ],
     },
     {
@@ -366,6 +366,24 @@ const APP_SECTIONS = [
         title: 'Y',
         data: [
             { id: '41', name: 'Febric Stock Verification', screen: 'Febric Stock Verification', icon: 'receipt-long', iconColor: '#740cea' },
+        ],
+    },
+    {
+        title: 'Y',
+        data: [
+            { id: '42', name: 'Purchase Import Auth', screen: 'Purchase Import Auth', icon: 'task-alt', iconColor: '#991070' },
+        ],
+    },
+    {
+        title: 'W',
+        data: [
+            { id: '43', name: 'Weft Issue Return', screen: 'Weft Issue Return', icon: 'assignment-return', iconColor: '#F57C00', },
+        ],
+    },
+    {
+        title: 'D',
+        data: [
+            { id: '44', name: 'Design Creation', screen: 'Design Creation', icon: 'precision-manufacturing', iconColor: '#4169E1' },
         ],
     },
 ];
@@ -677,9 +695,38 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Sudamo Sales Order Entry",
                 //                         "href": "/"
                 //                     },
-
-
-
+                //                     {
+                //                         "title": "Poy Rate Entry",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Price List",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order Price List Auth",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Sales Order Price List Auth",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Purchase Import Auth",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Weft Issue Return",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Creel Issue Return",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Design Creation",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

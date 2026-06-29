@@ -211,6 +211,46 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
     );
   };
 
+  const handleAutoEntry = async (item: Inquiry) => {
+    try {
+      setLoading(true);
+      const payload = { 
+        uid: item.id,
+        prpcode: item.party_prp_code,
+        strcode: '',
+        // prptype: getUserPrptype,
+        yearno: getCurrentFinancialYear(),
+        txntype: 'mob_inquiry',
+        fetch: 'autoso_from_inquiries',
+      };
+
+      console.log("Auto Entry Payload:", payload, item);
+      Alert.alert(
+        "Auto Entry Success",
+        `Auto Entry completed for ${item.inquiry_no}`
+      );
+
+      const response = await inquiryApi.autoEntry(payload as any);
+      console.log("Auto Entry Response:", response);
+
+      // Show the response in the card (e.g., as a toast or inline message)
+      Alert.alert(
+        "Auto Entry Success",
+        `Auto Entry completed for ${item.inquiry_no}. Response: ${JSON.stringify(response)}`
+      );
+
+      // Optionally: Update the card to show the response
+      // You can add a new state to track the response for each card
+    } catch (e: any) {
+      Alert.alert(
+        "Error",
+        e?.response?.data?.message || "Failed to perform Auto Entry"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // const renderItem = ({ item }: { item: Inquiry }) => (
   //   <TouchableOpacity
   //     activeOpacity={0.7}
@@ -331,6 +371,17 @@ const DashboardScreen: React.FC<Props> = ({ navigation, username, getUserId }) =
               </Text>
             </TouchableOpacity>
           ) : null}
+
+          {/* New Auto Entry Button */}
+          {/* <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              handleAutoEntry(item);
+            }}>
+            <Text style={styles.actionIcon}>⚡</Text>
+            <Text style={styles.actionText}>Auto Entry</Text>
+          </TouchableOpacity> */}
         </View>
       </TouchableOpacity>
     );

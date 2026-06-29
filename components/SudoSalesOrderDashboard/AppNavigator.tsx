@@ -7,8 +7,8 @@ import {
 } from 'react-native';
 
 // import HomeScreen from './screen/HomeScreen';
-// import DesignsScreen from './screen//DesignsScreen';
-// import CostingScreen from './screen//CostingScreen';
+import DesignsScreen from './screen//DesignsScreen';
+import CostingScreen from './screen//CostingScreen';
 // import OrdersScreen from './screen//OrdersScreen';
 import StockScreen from './screen//StockScreen';
 import ExpenseScreen from './screen//ExpenseScreen';

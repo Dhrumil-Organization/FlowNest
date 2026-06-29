@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const IS_LOCAL = false; //true = local apis url , false = live api url
 
 export let API: string = IS_LOCAL 
-        ? "http://192.168.13.100:4016" 
+        ? "http://192.168.13.100:4017" 
         : "https://apig.tms-webapp.com";
 
 export let PRINTSTICKER = IS_LOCAL 
@@ -20,7 +20,7 @@ export const initAPI = async (): Promise<string> => {
     const selected_property = await AsyncStorage.getItem("selected_property");    
     
     if (IS_LOCAL) {
-        API = "http://192.168.13.100:4016";
+        API = "http://192.168.13.100:4017";
     } else {
 
         API = selected_property === "rayons"
@@ -34,7 +34,7 @@ export const initAPI = async (): Promise<string> => {
 
 export const initAPIForSticker = async (): Promise<string> => {    
     PRINTSTICKER = IS_LOCAL 
-    ? "http://192.168.13.100:4016/api/print-grey-in-stock"
+    ? "http://192.168.13.100:4017/api/print-grey-in-stock"
     : "https://apig.tms-webapp.com/api/print-grey-in-stock"; 
     
     return PRINTSTICKER;
@@ -42,7 +42,7 @@ export const initAPIForSticker = async (): Promise<string> => {
 
 export const initAPIForPrinterList = async (): Promise<string> => {    
     PRINTERSLISTAPI = IS_LOCAL
-    ? "http://192.168.13.130:4016/printers"
+    ? "http://192.168.13.130:4017/printers"
     : "http://192.168.0.6:4000/printers"
     
     return PRINTERSLISTAPI;

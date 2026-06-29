@@ -31,13 +31,26 @@ const POYRateEntry = ({ token, navigation }: any) => {
         type: 'warning',
     });
 
+    // const completedCount = useMemo(() => {
+    //     return listData.filter(item => Number(getItemRate(item) || 0) > 0).length;
+    // }, [listData]);
+
+    // const pendingCount = Math.max((listData.length || 15) - (completedCount || 1), 0);
+    // const totalCount = listData.length || 15;
+    // const progressPercent = `${Math.min(((completedCount || 1) / totalCount) * 100, 100)}%`;
+
     const completedCount = useMemo(() => {
         return listData.filter(item => Number(getItemRate(item) || 0) > 0).length;
     }, [listData]);
 
-    const pendingCount = Math.max((listData.length || 15) - (completedCount || 1), 0);
-    const totalCount = listData.length || 15;
-    const progressPercent = `${Math.min(((completedCount || 1) / totalCount) * 100, 100)}%`;
+    const totalCount = listData.length;
+
+    const pendingCount = totalCount - completedCount;
+
+    const progressPercent =
+        totalCount > 0
+            ? `${(completedCount / totalCount) * 100}%`
+            : '0%';
 
     useEffect(() => {
         if (!failedSrNo) {
@@ -74,6 +87,8 @@ const POYRateEntry = ({ token, navigation }: any) => {
         if (index < 0) return;
 
         setTimeout(() => {
+            console.log("listRef.current?.scrollToIndex =>", listRef.current)
+            console.log("typeof scrollToIndex =", typeof listRef.current?.scrollToIndex);
             listRef.current?.scrollToIndex({
                 index,
                 animated: true,
@@ -180,7 +195,16 @@ const POYRateEntry = ({ token, navigation }: any) => {
                     result.find((x: any) => x?.ItmCode === selectItmCode) || result[0];
 
                 setSelected(itemToSelect);
-                setAmount(getItemRate(itemToSelect)?.toString() || '');
+                // setAmount(getItemRate(itemToSelect)?.toString() || '');
+                const rate = getItemRate(itemToSelect);
+
+                if (Number(rate || 0) === 0) {
+                    setAmount('');
+                } else {
+                    setAmount(rate.toString());
+                }
+
+                console.log('RATE=>', getItemRate(itemToSelect));
                 setShowKeypad(true);
 
                 if (selectItmCode) {
@@ -306,7 +330,14 @@ const POYRateEntry = ({ token, navigation }: any) => {
 
     const selectItem = (item: any) => {
         setSelected(item);
-        setAmount(getItemRate(item)?.toString() || '');
+        // setAmount(getItemRate(item)?.toString() || '');
+        const rate = getItemRate(item);
+
+        if (Number(rate || 0) === 0) {
+            setAmount('');
+        } else {
+            setAmount(rate.toString());
+        }
         setShowKeypad(true);
     };
 
@@ -321,8 +352,15 @@ const POYRateEntry = ({ token, navigation }: any) => {
             return;
         }
 
+        // if (key === '.') {
+        //     if (amount.includes('.')) return;
+        //     setAmount(prev => (prev ? `${prev}.` : '0.'));
+        //     return;
+        // }
+
         if (key === '.') {
             if (amount.includes('.')) return;
+
             setAmount(prev => (prev ? `${prev}.` : '0.'));
             return;
         }
@@ -331,9 +369,20 @@ const POYRateEntry = ({ token, navigation }: any) => {
             return;
         }
 
+        // setAmount(prev => {
+        //     if (prev.length >= 8) return prev;
+        //     if (prev === '0') return key;
+        //     return `${prev}${key}`;
+        // });
         setAmount(prev => {
             if (prev.length >= 8) return prev;
-            if (prev === '0') return key;
+
+            // agar screen par sirf 0 dikh raha hai aur user digit press kare
+            // to 0 replace ho jaye
+            if (prev === '' || prev === '0') {
+                return key;
+            }
+
             return `${prev}${key}`;
         });
     };
@@ -463,7 +512,7 @@ const POYRateEntry = ({ token, navigation }: any) => {
                             </View>
                             <View>
                                 <Text style={styles.summaryLabel}>Done</Text>
-                                <Text style={styles.summaryDone}>{completedCount || 1}</Text>
+                                <Text style={styles.summaryDone}>{completedCount}</Text>
                             </View>
                         </View>
 
@@ -497,7 +546,7 @@ const POYRateEntry = ({ token, navigation }: any) => {
                             <View style={[styles.progressFill, { width: progressPercent }]} />
                         </View>
                         <Text style={styles.progressText}>
-                            {completedCount || 1} of {totalCount} completed
+                            {completedCount} of {totalCount} completed
                         </Text>
                     </View>
                 </View>

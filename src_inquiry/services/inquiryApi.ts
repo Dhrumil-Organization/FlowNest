@@ -167,4 +167,22 @@ export const inquiryApi = {
     console.log("Inquiry delete", params, res)
     return res.data.data;
   },
+
+  autoEntry: async (payload: {
+    uid: number;
+    prpcode: string;
+    strcode: string;
+    // prptype: string;
+    yearno: string;
+    txntype: string;
+    fetch: string;
+    // Add other required fields
+  }) => {
+    const res = await client.post<ApiResponse<any>>(
+      `/api/auto_entry`,
+      payload
+    );
+    console.log("Auto Entry API Response:", res);
+    return res.data.data;
+  },
 };

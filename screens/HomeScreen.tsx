@@ -374,6 +374,12 @@ const APP_SECTIONS = [
             { id: '42', name: 'Purchase Import Auth', screen: 'Purchase Import Auth', icon: 'task-alt', iconColor: '#991070' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '42', name: 'Event', screen: 'Event', icon: 'event', iconColor: '#923070' },
+        ],
+    },
 
 ];
 
@@ -400,6 +406,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
     const sectionListRef = useRef<SectionList>(null);
     const debouncedQuery = useDebounce(searchQuery, 300);
     const flatListRef = useRef<FlatList>(null);
+    const [eventAllowed, setEventAllowed] = useState(false);
 
     // CONSOLE
 
@@ -672,10 +679,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Employ Dashboard",
                 //                         "href": "/"
                 //                     },
-                // {
-                //     "title": "Purchase Import Auth",
-                //     "href": "/"
-                // },
+                //                     {
+                //                         "title": "Purchase Import Auth",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Event",
+                //                         "href": "/"
+                //                     },
 
                 //                 ]
                 //             }
@@ -702,6 +713,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                             // Normalize the title: if it's "Yarn Purchase Order", treat it as "Purchase Order"
                             return child.title.replace('Yarn ', '');
                         });
+
+                        const hasEventAccess = mobileAppPage.children.some(
+                            (child: any) => child.title === 'Event'
+                        );
+
+                        setEventAllowed(hasEventAccess);
 
                         // Filter APP_SECTIONS to only include apps whose name is in allowedTitles
                         // const newSections = APP_SECTIONS.map(section => {
@@ -813,7 +830,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
 
     // RENDER: professional tile — no "Tap to open" subtitle, name allowed to wrap but minimize lines.
     const renderAppItem = ({ item, index }: { item: any; index: number }) => {
-        const disabled = !isConnected;
+        // const disabled = !isConnected;
+        const disabled =
+            !isConnected &&
+            !(item.name === 'Event' && eventAllowed);
         const bg = hexToRgba(item.iconColor || theme.BRAND_PRIMARY, 0.12);
         const circleBg = item.iconColor || theme.BRAND_PRIMARY;
 

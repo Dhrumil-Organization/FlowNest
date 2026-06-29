@@ -31,13 +31,26 @@ const POYRateEntry = ({ token, navigation }: any) => {
         type: 'warning',
     });
 
+    // const completedCount = useMemo(() => {
+    //     return listData.filter(item => Number(getItemRate(item) || 0) > 0).length;
+    // }, [listData]);
+
+    // const pendingCount = Math.max((listData.length || 15) - (completedCount || 1), 0);
+    // const totalCount = listData.length || 15;
+    // const progressPercent = `${Math.min(((completedCount || 1) / totalCount) * 100, 100)}%`;
+
     const completedCount = useMemo(() => {
         return listData.filter(item => Number(getItemRate(item) || 0) > 0).length;
     }, [listData]);
 
-    const pendingCount = Math.max((listData.length || 15) - (completedCount || 1), 0);
-    const totalCount = listData.length || 15;
-    const progressPercent = `${Math.min(((completedCount || 1) / totalCount) * 100, 100)}%`;
+    const totalCount = listData.length;
+
+    const pendingCount = totalCount - completedCount;
+
+    const progressPercent =
+        totalCount > 0
+            ? `${(completedCount / totalCount) * 100}%`
+            : '0%';
 
     useEffect(() => {
         if (!failedSrNo) {
@@ -74,6 +87,8 @@ const POYRateEntry = ({ token, navigation }: any) => {
         if (index < 0) return;
 
         setTimeout(() => {
+            console.log("listRef.current?.scrollToIndex =>", listRef.current)
+            console.log("typeof scrollToIndex =", typeof listRef.current?.scrollToIndex);
             listRef.current?.scrollToIndex({
                 index,
                 animated: true,
@@ -497,7 +512,7 @@ const POYRateEntry = ({ token, navigation }: any) => {
                             </View>
                             <View>
                                 <Text style={styles.summaryLabel}>Done</Text>
-                                <Text style={styles.summaryDone}>{completedCount || 1}</Text>
+                                <Text style={styles.summaryDone}>{completedCount}</Text>
                             </View>
                         </View>
 
@@ -531,7 +546,7 @@ const POYRateEntry = ({ token, navigation }: any) => {
                             <View style={[styles.progressFill, { width: progressPercent }]} />
                         </View>
                         <Text style={styles.progressText}>
-                            {completedCount || 1} of {totalCount} completed
+                            {completedCount} of {totalCount} completed
                         </Text>
                     </View>
                 </View>

@@ -7,10 +7,10 @@ import {
 } from 'react-native';
 
 // import HomeScreen from './screen/HomeScreen';
-// import DesignsScreen from './screen//DesignsScreen';
-// import CostingScreen from './screen//CostingScreen';
+import DesignsScreen from './screen//DesignsScreen';
+import CostingScreen from './screen//CostingScreen';
 // import OrdersScreen from './screen//OrdersScreen';
-// import StockScreen from './screen//StockScreen';
+import StockScreen from './screen//StockScreen';
 import ExpenseScreen from './screen//ExpenseScreen';
 // import ProdScreen from './screen//ProdScreen';
 
@@ -19,7 +19,7 @@ const TABS = [
   // { id: 'designs', label: 'Designs', Screen: DesignsScreen },
   // { id: 'costing', label: 'Costing', Screen: CostingScreen },
   // { id: 'orders', label: 'Orders', Screen: OrdersScreen },
-  // { id: 'stock', label: 'Stock', Screen: StockScreen },
+  { id: 'stock', label: 'Stock', Screen: StockScreen },
   { id: 'expense', label: 'Expense', Screen: ExpenseScreen },
   // { id: 'prod', label: 'Prod', Screen: ProdScreen },
 ];

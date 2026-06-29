@@ -7,6 +7,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
@@ -116,7 +117,9 @@ const PriceList = ({ token, navigation }: any) => {
     };
 
     const handleAddNewRateDate = () => {
-        navigation.navigate('Poy Rate Entry');
+        navigation.navigate("Poy Rate Entry", {
+            refreshPriceList: true,
+        });
     };
 
     const YarnRateListData = async (month: string) => {
@@ -166,6 +169,15 @@ const PriceList = ({ token, navigation }: any) => {
         YarnRateListData(currentMonthNo);
 
     }, []);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            const currentMonthNo = String(selectedMonth + 1).padStart(2, '0');
+
+            YarnRateListData(currentMonthNo);
+
+        }, [selectedMonth])
+    );
 
     const filtered = useMemo(() => {
 
@@ -217,65 +229,43 @@ const PriceList = ({ token, navigation }: any) => {
         return map;
     }, [YarnlistData]);
 
-    const getRateStyle = (
-        itemCode: string,
-        currentDate: string
-    ) => {
-
-        const currentIndex = dateColumns.findIndex(
-            x => x.rawDate === currentDate
-        );
+    const getRateStyle = (itemCode: string, currentDate: string) => {
 
         const currentRate = Number(
-            rateMap[
-                `${itemCode}_${currentDate}`
-            ]?.PLRate || 0
+            rateMap[`${itemCode}_${currentDate}`]?.PLRate || 0
         );
 
         if (currentRate === 0) {
             return styles.missing;
         }
 
-        if (dateColumns.length < 2) {
+        const rates = dateColumns
+            .map(col => Number(rateMap[`${itemCode}_${col.rawDate}`]?.PLRate || 0))
+            .filter(rate => rate > 0);
+
+        if (rates.length <= 1) {
+            return styles.normal;
+        }
+
+        // Duplicate count
+        const duplicateCount = rates.filter(r => r === currentRate).length;
+
+        if (duplicateCount > 1) {
             return styles.same;
         }
 
-        const firstDate = dateColumns[0]?.rawDate;
-        const secondDate = dateColumns[1]?.rawDate;
+        const minRate = Math.min(...rates);
+        const maxRate = Math.max(...rates);
 
-        const firstRate = Number(
-            rateMap[
-                `${itemCode}_${firstDate}`
-            ]?.PLRate || 0
-        );
-
-        const secondRate = Number(
-            rateMap[
-                `${itemCode}_${secondDate}`
-            ]?.PLRate || 0
-        );
-
-        if (firstRate === 0 || secondRate === 0) {
-            return styles.missing;
+        if (currentRate === minRate) {
+            return styles.lower;
         }
 
-        if (firstRate === secondRate) {
-            return styles.same;
+        if (currentRate === maxRate) {
+            return styles.higher;
         }
 
-        if (currentIndex === 0) {
-            return firstRate > secondRate
-                ? styles.higher
-                : styles.lower;
-        }
-
-        if (currentIndex === 1) {
-            return secondRate > firstRate
-                ? styles.higher
-                : styles.lower;
-        }
-
-        return styles.same;
+        return styles.normal;
     };
 
     const handleInlineSave = async (itemCode: string, date: string, value: string) => {
@@ -1148,5 +1138,11 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontWeight: '700',
         fontSize: 16,
+    },
+
+    normal: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
     },
 });

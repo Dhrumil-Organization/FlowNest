@@ -16,8 +16,8 @@ import ExpenseScreen from './screen//ExpenseScreen';
 
 const TABS = [
   // { id: 'home', label: 'Home', Screen: HomeScreen },
-  { id: 'designs', label: 'Designs', Screen: DesignsScreen },
-  { id: 'costing', label: 'Costing', Screen: CostingScreen },
+  // { id: 'designs', label: 'Designs', Screen: DesignsScreen },
+  // { id: 'costing', label: 'Costing', Screen: CostingScreen },
   // { id: 'orders', label: 'Orders', Screen: OrdersScreen },
   { id: 'stock', label: 'Stock', Screen: StockScreen },
   { id: 'expense', label: 'Expense', Screen: ExpenseScreen },

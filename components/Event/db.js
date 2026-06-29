@@ -297,4 +297,37 @@ export async function markSyncing(localId) {
   );
 }
 
+// db.js
+
+export const updateEnquiryLocally = async (localId, updatedData) => {
+  const db = await getDb();
+  const fields = [
+    'party_name',
+    'address',
+    'gst_no',
+    'design_requirement',
+    'qty_required',
+    'price',
+    'colour_requirement',
+    'contact_name',
+    'designation',
+    'mobile',
+    'email',
+    'front_img',
+    'back_img',
+    'card_front_uri',
+    'scanned_from_card',
+    'event_code',
+    'design_dsn_name',
+    'design_dsn_code',
+  ];
+
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => updatedData[f] ?? null);
+  values.push(localId); // for WHERE clause
+
+  const query = `UPDATE enquiries SET ${setClause}, sync_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE local_id = ?`;
+  await db.executeSql(query, values);
+};
+
 export default getDb;

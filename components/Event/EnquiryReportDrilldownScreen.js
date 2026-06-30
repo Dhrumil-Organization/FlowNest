@@ -285,8 +285,13 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { getCurrentFinancialYear } from '../../common/commonfunction';
 import { deleteEnquiries } from './syncService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 
-export default function EnquiryReportDrilldownScreen({ route, navigation }) {
+export default function EnquiryReportDrilldownScreen({
+  route,
+  navigation,
+  username,
+}) {
   const { userId, userName, userRole, eventCode } = route.params;
   const [loading, setLoading] = useState(true);
   const [enquiries, setEnquiries] = useState([]);
@@ -438,74 +443,84 @@ export default function EnquiryReportDrilldownScreen({ route, navigation }) {
   }
 
   return (
-    <View style={styles.screen}>
-      <FlatList
-        data={enquiries}
-        keyExtractor={item => String(item.id)}
-        renderItem={renderRow}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No enquiries from this user yet.</Text>
-        }
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+    <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'Event Report Details'}
+        subHeader={'Manage your event report details'}
       />
+      <View style={styles.screen}>
+        <FlatList
+          data={enquiries}
+          keyExtractor={item => String(item.id)}
+          renderItem={renderRow}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No enquiries from this user yet.</Text>
+          }
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
 
-      {/* Detail Modal */}
-      <Modal
-        visible={!!selected}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setSelected(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <TouchableOpacity
-              style={styles.modalClose}
-              onPress={() => setSelected(null)}
-            >
-              <Icon name="close" color="#6b7280" size={24} />
-            </TouchableOpacity>
-            {selected && (
-              <ScrollView>
-                <Text style={styles.modalTitle}>{selected.party_name}</Text>
-                <Text style={styles.modalSub}>
-                  Enquiry #{selected.id} · {formatDate(selected.created_at)}
-                </Text>
+        {/* Detail Modal */}
+        <Modal
+          visible={!!selected}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setSelected(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <TouchableOpacity
+                style={styles.modalClose}
+                onPress={() => setSelected(null)}
+              >
+                <Icon name="close" color="#6b7280" size={24} />
+              </TouchableOpacity>
+              {selected && (
+                <ScrollView>
+                  <Text style={styles.modalTitle}>{selected.party_name}</Text>
+                  <Text style={styles.modalSub}>
+                    Enquiry #{selected.id} · {formatDate(selected.created_at)}
+                  </Text>
 
-                <DetailRow label="Contact name" value={selected.contact_name} />
-                <DetailRow label="Mobile" value={selected.mobile} />
-                <DetailRow label="Email" value={selected.email} />
-                <DetailRow label="Address" value={selected.address} />
-                <DetailRow label="GST No." value={selected.gst_no} />
-                <DetailRow
-                  label="Design requirement"
-                  value={selected.design_requirement}
-                />
-                <DetailRow
-                  label="Colour requirement"
-                  value={selected.colour_requirement}
-                />
-                <DetailRow
-                  label="Qty required"
-                  value={
-                    selected.qty_required
-                      ? `${Number(selected.qty_required).toLocaleString()} m`
-                      : null
-                  }
-                />
-                <DetailRow
-                  label="Price"
-                  value={selected.price ? `₹${selected.price}/m` : null}
-                />
-              </ScrollView>
-            )}
+                  <DetailRow
+                    label="Contact name"
+                    value={selected.contact_name}
+                  />
+                  <DetailRow label="Mobile" value={selected.mobile} />
+                  <DetailRow label="Email" value={selected.email} />
+                  <DetailRow label="Address" value={selected.address} />
+                  <DetailRow label="GST No." value={selected.gst_no} />
+                  <DetailRow
+                    label="Design requirement"
+                    value={selected.design_requirement}
+                  />
+                  <DetailRow
+                    label="Colour requirement"
+                    value={selected.colour_requirement}
+                  />
+                  <DetailRow
+                    label="Qty required"
+                    value={
+                      selected.qty_required
+                        ? `${Number(selected.qty_required).toLocaleString()} m`
+                        : null
+                    }
+                  />
+                  <DetailRow
+                    label="Price"
+                    value={selected.price ? `₹${selected.price}/m` : null}
+                  />
+                </ScrollView>
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </>
   );
 }
 

@@ -32,28 +32,76 @@ export const clearCachedEvents = async () => {
 //
 
 const DESIGNS_CACHE_KEY = 'cached_designs';
-
-export const getCachedDesign = async () => {
-  try {
-    const data = await AsyncStorage.getItem(DESIGNS_CACHE_KEY);
-    return data ? JSON.parse(data) : null;
-  } catch (e) {
-    return null;
-  }
-};
+const DESIGNS_CHUNK_PREFIX = 'cached_designs_chunk_';
+const DESIGNS_META_KEY = 'cached_designs_meta';
+const CHUNK_SIZE = 500; // Adjust based on your typical payload size
 
 export const setCachedDesing = async designs => {
   try {
-    await AsyncStorage.setItem(DESIGNS_CACHE_KEY, JSON.stringify(designs));
+    // Split the designs array into chunks
+    const chunks = [];
+    for (let i = 0; i < designs.length; i += CHUNK_SIZE) {
+      chunks.push(designs.slice(i, i + CHUNK_SIZE));
+    }
+
+    // Store each chunk under a separate key
+    for (let i = 0; i < chunks.length; i++) {
+      await AsyncStorage.setItem(
+        `${DESIGNS_CHUNK_PREFIX}${i}`,
+        JSON.stringify(chunks[i]),
+      );
+    }
+
+    // Save metadata: total number of chunks
+    await AsyncStorage.setItem(
+      DESIGNS_META_KEY,
+      JSON.stringify({ totalChunks: chunks.length }),
+    );
+
+    // Remove the old monolithic key (if any)
+    await AsyncStorage.removeItem('cached_designs');
   } catch (e) {
-    console.log('Failed to cache events', e);
+    console.log('Failed to cache designs (chunked)', e);
+  }
+};
+
+export const getCachedDesign = async () => {
+  try {
+    console.log('get cached design');
+    const metaStr = await AsyncStorage.getItem(DESIGNS_META_KEY);
+    if (!metaStr) return null;
+
+    const meta = JSON.parse(metaStr);
+    const allDesigns = [];
+
+    for (let i = 0; i < meta.totalChunks; i++) {
+      const chunkStr = await AsyncStorage.getItem(
+        `${DESIGNS_CHUNK_PREFIX}${i}`,
+      );
+      if (chunkStr) {
+        const chunk = JSON.parse(chunkStr);
+        allDesigns.push(...chunk);
+      }
+    }
+
+    return allDesigns;
+  } catch (e) {
+    console.log('Failed to get cached designs (chunked)', e);
+    return null;
   }
 };
 
 export const clearCachedDesing = async () => {
   try {
-    await AsyncStorage.removeItem(DESIGNS_CACHE_KEY);
-  } catch (e) {}
+    const keys = await AsyncStorage.getAllKeys();
+    const chunkKeys = keys.filter(
+      k => k.startsWith(DESIGNS_CHUNK_PREFIX) || k === DESIGNS_META_KEY,
+    );
+    await AsyncStorage.multiRemove(chunkKeys);
+    await AsyncStorage.removeItem('cached_designs'); // legacy key
+  } catch (e) {
+    console.log('Failed to clear cached designs', e);
+  }
 };
 
 SQLite.enablePromise(true);
@@ -175,7 +223,7 @@ export async function initDb(token, prptype) {
       const allDesigns = response.data.data;
       if (allDesigns && allDesigns.length) {
         await setCachedDesing(allDesigns);
-        console.log('Designs cached during initDb');
+        console.log('Designs cached during initDb', allDesigns.length);
       }
     } catch (error) {
       console.log('Failed to fetch Designs during initDb', error.message);
@@ -296,5 +344,38 @@ export async function markSyncing(localId) {
     [localId],
   );
 }
+
+// db.js
+
+export const updateEnquiryLocally = async (localId, updatedData) => {
+  const db = await getDb();
+  const fields = [
+    'party_name',
+    'address',
+    'gst_no',
+    'design_requirement',
+    'qty_required',
+    'price',
+    'colour_requirement',
+    'contact_name',
+    'designation',
+    'mobile',
+    'email',
+    'front_img',
+    'back_img',
+    'card_front_uri',
+    'scanned_from_card',
+    'event_code',
+    'design_dsn_name',
+    'design_dsn_code',
+  ];
+
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => updatedData[f] ?? null);
+  values.push(localId); // for WHERE clause
+
+  const query = `UPDATE enquiries SET ${setClause}, sync_status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE local_id = ?`;
+  await db.executeSql(query, values);
+};
 
 export default getDb;

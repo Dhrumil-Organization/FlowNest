@@ -522,6 +522,7 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
     );
 
     return (
+
         <View style={{ flex: 1, backgroundColor: "#F5F7FB" }}>
 
             {/* HEADER */}
@@ -677,7 +678,8 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                             onPress={() => {
                                 fetchCreelReturnData();
                                 setFilterVisible(false);
-                            }}>
+                            }}
+                        >
                             <Text style={styles.applyText}>Apply Filters</Text>
                         </TouchableOpacity>
 
@@ -890,36 +892,24 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                         });
                                     }}
                                 >
-
-                                    {/* TOP SECTION */}
                                     <View style={styles.rowBetween}>
-
-                                        {/* LEFT DATE */}
                                         <Text style={styles.dateText}>
                                             {item.IssRDate}
                                         </Text>
-
-                                        {/* RIGHT SIDE */}
                                         <View style={{ alignItems: "flex-end" }}>
-
-                                            {/* ISSR NO */}
                                             <View style={styles.refBadge}>
                                                 <Text style={styles.refText}>
                                                     {item.IssRNo}
                                                 </Text>
                                             </View>
-
                                         </View>
-
                                     </View>
 
-                                    {/* TITLE */}
                                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                                         <Text style={styles.labelText}>Stock Type:</Text>
                                         <Text style={styles.valueText}>{item.StkType}</Text>
                                     </View>
 
-                                    {/* BOTTOM */}
                                     <View style={styles.rowBetween}>
                                         <View style={{ flexDirection: "row", gap: 20 }}>
                                             <View>
@@ -928,7 +918,6 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                                     {item.TotQty || 0}
                                                 </Text>
                                             </View>
-
                                             <View>
                                                 <Text style={styles.smallLabel}>Pcs</Text>
                                                 <Text style={[styles.amount, { color: "#13879A" }]}>
@@ -938,8 +927,6 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                         </View>
                                     </View>
 
-                                    {/* DELETE ICON */}
-                                    {/* DELETE ICON */}
                                     <TouchableOpacity
                                         onPress={() => {
                                             setSelectedDeleteItem(item);
@@ -949,29 +936,42 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                     >
                                         <Icon name="delete" size={18} color="#fff" />
                                     </TouchableOpacity>
-
                                 </TouchableOpacity>
-
-
                             );
                         }}
                     />
                 )}
-            {/* 🔥 FLOATING ADD BUTTON */}
+
             <TouchableOpacity
                 style={styles.fab}
-                onPress={() =>
-                    navigation.navigate("WeftIssueReturnEntry", {
-                        creelData: null,
-                        token: token,
-                        selectedProperty: selectedProperty,
-                        selectedYear: selectedYear,
-                        fromDate: fromDate,
-                        toDate: toDate,
-                        refresh: false
-                    })
-                }
+                // onPress={() =>
+                //     navigation.navigate("WeftIssueReturnEntry", {
+                //         creelData: null,
+                //         token: token,
+                //         selectedProperty: selectedProperty,
+                //         selectedYear: selectedYear,
+                //         fromDate: fromDate,
+                //         toDate: toDate,
+                //         refresh: false
+                //     })
+                // }
 
+                onPress={() => {
+                    if (!selectedProperty) {
+                        showWarning("Please select Property.");
+                        return;
+                    } else {
+                        navigation.navigate("WeftIssueReturnEntry", {
+                            creelData: null,
+                            token: token,
+                            selectedProperty: selectedProperty,
+                            selectedYear: selectedYear,
+                            fromDate: fromDate,
+                            toDate: toDate,
+                            refresh: false
+                        });
+                    }
+                }}
             >
                 <Icon name="add" size={26} color="#fff" />
             </TouchableOpacity>
@@ -996,8 +996,6 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                         </Text>
 
                         <View style={styles.confirmRow}>
-
-                            {/* NO BUTTON */}
                             <TouchableOpacity
                                 style={[
                                     styles.confirmBtn,
@@ -1013,7 +1011,6 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                 </Text>
                             </TouchableOpacity>
 
-                            {/* YES BUTTON */}
                             <TouchableOpacity
                                 style={[
                                     styles.confirmBtn,
@@ -1031,9 +1028,7 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                     Yes
                                 </Text>
                             </TouchableOpacity>
-
                         </View>
-
                     </View>
                 </View>
             </Modal>
@@ -1041,7 +1036,6 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
             <Modal transparent visible={alertData.visible} animationType="fade">
                 <View style={styles.alertOverlay}>
                     <View style={styles.alertBox}>
-
                         <Icon
                             name={
                                 alertData.type === "success"
@@ -1059,7 +1053,6 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                         : "#FFA000"
                             }
                         />
-
                         <Text style={styles.alertTitle}>
                             {
                                 alertData.type === "success"
@@ -1069,11 +1062,9 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                         : "Warning"
                             }
                         </Text>
-
                         <Text style={styles.alertMessage}>
                             {alertData.message}
                         </Text>
-
                         <TouchableOpacity
                             onPress={() =>
                                 setAlertData({
@@ -1088,22 +1079,15 @@ const WeftIssueReturn = ({ token, navigation, route }) => {
                                 OK
                             </Text>
                         </TouchableOpacity>
-
                     </View>
                 </View>
             </Modal>
-
         </View >
     );
 };
-
 export default WeftIssueReturn;
 
-const styles = StyleSheet.create({
-
-    // header: { flexDirection: "row", justifyContent: "space-between", padding: 16, paddingTop: 40 },
-    // headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-
+const styles = StyleSheet.create({  
     header: {
         height: 64,
         // backgroundColor: COLORS.primary,
@@ -1162,15 +1146,12 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         alignItems: "center"
     },
-
-    title: { fontSize: 16, fontWeight: "600" },
+    title: { fontSize: 16, fontWeight: "600" },    
     resetText: { color: "red" },
-
     label: {
         marginTop: 10,
         color: '#000'
     },
-
     bigInput: {
         backgroundColor: "#F3F4F6",
         padding: 14,
@@ -1180,12 +1161,10 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         color: '#000'
     },
-
     inputText: {
         flex: 1,
         color: '#000'
     },
-
     dateBox: {
         flex: 1,
         flexDirection: "row",
@@ -1195,7 +1174,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         marginTop: 6
     },
-
     applyBtnNew: {
         backgroundColor: "#13879A",
         padding: 16,
@@ -1203,9 +1181,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         alignItems: "center"
     },
-
     applyText: { color: "#fff" },
-
     pickerHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -1214,13 +1190,11 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderColor: "#eee"
     },
-
     pickerTitle: {
         fontSize: 16,
         fontWeight: "600",
         color: '#000'
     },
-
     pickerSearch: {
         flexDirection: "row",
         alignItems: "center",
@@ -1229,7 +1203,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         borderRadius: 10
     },
-
     pickerItem: {
         padding: 15,
         borderBottomWidth: 1,
@@ -1241,7 +1214,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         marginTop: 10,
     },
-
     chip: {
         flexDirection: "row",
         alignItems: "center",
@@ -1253,7 +1225,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         maxWidth: "90%",
     },
-
     chipText: {
         marginHorizontal: 6,
         fontSize: 13,
@@ -1265,19 +1236,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         marginTop: 10,
     },
-
     filterLabel: {
         fontSize: 14,
         fontWeight: "600",
         marginBottom: 6,
         color: "#1010108e"
     },
-
     tabContainer: {
         flexDirection: "row",
         gap: 10
     },
-
     tabBtn: {
         paddingVertical: 10,
         paddingHorizontal: 18,
@@ -1286,17 +1254,14 @@ const styles = StyleSheet.create({
         borderColor: "#ddd",
         backgroundColor: "#fff"
     },
-
     activeTab: {
         backgroundColor: "#13879A",
         borderColor: "#13879A"
     },
-
     tabText: {
         fontSize: 14,
         color: "#555"
     },
-
     activeText: {
         color: "#fff",
         fontWeight: "600"
@@ -1308,35 +1273,30 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         elevation: 3,
     },
-
     rowBetween: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-start",
     },
-
     title: {
         fontSize: 16,
         fontWeight: "700",
         color: "#0F2027",
     },
-
     subText: {
         fontSize: 12,
         color: "#777",
         marginTop: 4,
     },
-
     labelSmall: {
         fontSize: 12,
         color: "#555",
     },
-
     statusBadge: {
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
-    },
+    },    
     fab: {
         position: "absolute",
         bottom: 20,
@@ -1361,25 +1321,21 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 3 },
         elevation: 3
     },
-
     dateText: {
         fontSize: 13,
         color: "#000"
     },
-
     refBadge: {
         backgroundColor: "#F1F3F5",
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 8
     },
-
     refText: {
         fontSize: 12,
         color: "#000",
         fontWeight: "500"
     },
-
     ledgerTitle: {
         fontSize: 15,
         fontWeight: "600",
@@ -1387,17 +1343,14 @@ const styles = StyleSheet.create({
         marginTop: 6,
         marginBottom: 10
     },
-
     smallLabel: {
         fontSize: 11,
         color: "#000"
     },
-
     amount: {
         fontSize: 14,
         fontWeight: "600"
     },
-
     balanceText: {
         fontSize: 15,
         fontWeight: "700",
@@ -1408,7 +1361,6 @@ const styles = StyleSheet.create({
         color: "#000",
         marginRight: 6
     },
-
     valueText: {
         fontSize: 12,
         // fontWeight: "600",
@@ -1430,7 +1382,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "rgba(0,0,0,0.4)",
     },
-
     alertBox: {
         width: "85%",
         backgroundColor: "#fff",
@@ -1438,21 +1389,18 @@ const styles = StyleSheet.create({
         padding: 22,
         alignItems: "center",
     },
-
     alertTitle: {
         fontSize: 18,
         fontWeight: "700",
         marginTop: 10,
         color: "#000",
     },
-
     alertMessage: {
         textAlign: "center",
         marginTop: 10,
         color: "#444",
         fontSize: 14,
     },
-
     alertBtn: {
         marginTop: 18,
         backgroundColor: "#13879A",
@@ -1465,13 +1413,11 @@ const styles = StyleSheet.create({
         marginTop: 18,
         gap: 12,
     },
-
     confirmBtn: {
         paddingVertical: 10,
         paddingHorizontal: 28,
         borderRadius: 10,
     },
-
     confirmBtnText: {
         color: "#fff",
         fontWeight: "700",
@@ -1483,24 +1429,20 @@ const styles = StyleSheet.create({
         marginBottom: 14,
         elevation: 3,
     },
-
     skeletonRow: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
     },
-
     skeletonBottom: {
         flexDirection: "row",
         justifyContent: "space-between",
         marginTop: 20,
     },
-
     skeleton: {
         backgroundColor: "#E5E7EB",
         borderRadius: 6,
     },
-
     skeletonDelete: {
         position: "absolute",
         right: 16,

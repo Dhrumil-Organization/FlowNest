@@ -386,6 +386,12 @@ const APP_SECTIONS = [
             { id: '45', name: 'Febric Stock Verification', screen: 'Febric Stock Verification', icon: 'receipt-long', iconColor: '#740cea' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '43', name: 'Weft Issue Return', screen: 'Weft Issue Return', icon: 'swap-horiz', iconColor: '#5E35B1' },
+        ],
+    },
 
 ];
 
@@ -718,10 +724,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Purchase Import Auth",
                 //                         "href": "/"
                 //                     },
-                //                     {
-                //                         "title": "Weft Issue Return",
-                //                         "href": "/"
-                //                     },
+                //                     // {
+                //                     //     "title": "Weft Issue Return",
+                //                     //     "href": "/"
+                //                     // },
                 //                     {
                 //                         "title": "Creel Issue Return",
                 //                         "href": "/"
@@ -731,12 +737,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "href": "/"
                 //                     },
 
-                // {
-                //     "title": "Purchase Import Auth",
-                //     "href": "/"
-                // },
-
-
+                //                     {
+                //                         "title": "Weft Issue Return",
+                //                         "href": "/"
+                //                     },
                 //                 ]
                 //             }
                 //         ]

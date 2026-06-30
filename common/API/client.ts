@@ -58,7 +58,7 @@ export interface YarnMaster {
 
 export interface CostInputs {
     price_map: Record<string, number>;
-    dye_map:   Record<string, number>;
+    dye_map: Record<string, number>;
     weaving_rate: number; rpm: number; eff: number;
     greige_brok: number; dyeing_proc: number;
     finished_brok: number; cut_pack: number;
@@ -97,10 +97,20 @@ export interface CostingRecord {
 // ── Design API ───────────────────────────────────────────────
 export const DesignAPI = {
 
-    list: (params?: { category?: string; search?: string }) =>
-        client.get<{ success: boolean; data: Design[] }>('/designs', {
+    list: (params?: { category?: string; search?: string; page?: number; limit?: number }) =>
+        client.get<{
+            success: boolean;
+            data: {
+                data: Design[];
+                total: number;
+                page: number;
+                limit: number;
+                total_pages: number;
+            }
+        }>('/designs', {
             params: {
                 yearno: '27',
+                limit: 50,
                 ...params,
             },
         }),

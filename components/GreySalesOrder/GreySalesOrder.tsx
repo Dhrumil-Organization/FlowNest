@@ -899,6 +899,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     return requestconfig;
                 };
                 const response = await axios.get(`${API}/api/authso`, getRequestConfig({ params: payload }));
+
+                console.log("response", response);
+
                 if (response.data.success) {
                     setresponsemessageYPO(response.data.message || 'Success');
                     setTimeout(() => {

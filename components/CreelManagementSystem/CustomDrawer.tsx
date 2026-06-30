@@ -323,7 +323,7 @@ const CustomDrawer = (props) => {
 
                         </View>
 
-                        <Text style={styles.label}>Year</Text>
+                        {/* <Text style={styles.label}>Year</Text>
                         <View style={styles.inputBox}>
                             <SearchableDropdown
                                 key={FormState.values.YearNo}
@@ -345,9 +345,7 @@ const CustomDrawer = (props) => {
                                 }}
                                 multiple={false}
                                 emptyMessage="No years data available" />
-
-                            {/* <Text>{FormState.values.YearNo || "Select Year"}</Text> */}
-                        </View>
+                        </View> */}
 
                         <Text style={styles.label}>From Date</Text>
                         <View style={styles.inputBox}>

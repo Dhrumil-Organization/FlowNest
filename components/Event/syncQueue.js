@@ -269,6 +269,7 @@ async function processSingleEnquiry(enquiry, token, yearno, prptype) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const formData = new FormData();
+      console.log('Saves formData :', formData, enquiry);
 
       if (enquiry.back_img && enquiry.back_img.trim()) {
         const fileName = enquiry.back_img.split('/').pop() || 'card.jpg';
@@ -280,6 +281,22 @@ async function processSingleEnquiry(enquiry, token, yearno, prptype) {
           name: fileName,
           type: 'image/jpeg',
         });
+      }
+
+      if (enquiry.front_img && enquiry.front_img.trim()) {
+        const uri = enquiry.front_img;
+        // Check if it's a file URI
+        if (uri.startsWith('file://') || uri.startsWith('content://')) {
+          const fileName = uri.split('/').pop() || 'card_front.jpg';
+          formData.append('front_img', {
+            uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+            name: fileName,
+            type: 'image/jpeg',
+          });
+        } else {
+          // It's a server path/URL – send as a string
+          formData.append('front_img', uri);
+        }
       }
 
       API_FIELDS.forEach(key => {
@@ -307,6 +324,7 @@ async function processSingleEnquiry(enquiry, token, yearno, prptype) {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,
         },
+        timeout: 60000,
       });
 
       console.log('Saves formData :', formData, res);

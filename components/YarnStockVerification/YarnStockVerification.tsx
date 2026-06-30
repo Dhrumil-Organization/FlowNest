@@ -14,6 +14,7 @@ import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../..
 import Snackbar from 'react-native-snackbar';
 import FullScreenLoader from '../Loader/Loader';
 
+
 //const YarnStockVerification: React.FC<Props> = ({ token, navigation, isConnected, username, getUserPrptype }) => {
 const YarnStockVerification = (props) => {
     const { token, navigation, isConnected, username, getUserPrptype } = props;
@@ -67,6 +68,47 @@ const YarnStockVerification = (props) => {
     const [printer, setPrinter] = useState('')
 
     const rowsPerPage = 20;
+
+    const staticjson = [
+        {
+            UId: "100001",
+            CartNo: "CTN0001",
+            ItmName: "40s Cotton Yarn",
+            MerName: "Cotton",
+            GrdName: "A Grade",
+            ShdName: "White",
+            Chees: 24,
+            Denier: 150,
+            StkType: "Manual",
+            UsrCode: "ADMIN",
+            TranDate: "20250616",
+            Wt: 48.75,
+            IsAuto: "No",
+            TranName: "Manual Verification",
+            Status: "1"
+        },
+        {
+            UId: "100002",
+            CartNo: "CTN0002",
+            ItmName: "60s Cotton Yarn",
+            MerName: "Polyester",
+            GrdName: "B Grade",
+            ShdName: "Black",
+            Chees: 30,
+            Denier: 200,
+            StkType: "Auto Found",
+            UsrCode: "USER01",
+            TranDate: "20250615",
+            Wt: 52.25,
+            IsAuto: "Yes",
+            TranName: "Auto Verification",
+            Status: "2"
+        }
+    ];
+
+    useEffect(() => {
+        setAllStockData();
+    }, []);
 
     useEffect(() => {
         const loadProperty = async () => {
@@ -303,7 +345,7 @@ const YarnStockVerification = (props) => {
             };
             console.log("params :", params)
             console.log("url :", `${PRINTSTICKER}`)
-            
+
             axios.post(`${PRINTSTICKER}`, params, { headers })
                 .then(response => {
                     console.log("response :", response)

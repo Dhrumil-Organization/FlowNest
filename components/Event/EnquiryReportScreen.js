@@ -20,6 +20,8 @@ import { Picker } from '@react-native-picker/picker';
 import api from './api';
 import { API } from '../../common/API/dynamicAPI';
 import { isOnline } from './CardScanService';
+import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
+import theme from '../../android/app/src/theme';
 
 // Configure your actual events here, or fetch from an /events endpoint
 // if you run many shows per year.
@@ -29,7 +31,7 @@ import { isOnline } from './CardScanService';
 //   { code: 'heimtextil2026', label: 'Heimtextil India 2026' },
 // ];
 
-export default function EnquiryReportScreen({ navigation }) {
+export default function EnquiryReportScreen({ navigation, username }) {
   const [eventCode, setEventCode] = useState('');
   // const [selectedEvent, setSelectedEvent] = useState(EVENTS[0].code);
   // const [EVENTS, setEVENTS] = useState(EVENTS[0].code);
@@ -165,48 +167,59 @@ export default function EnquiryReportScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Enquiry Report</Text>
+    <>
+      <HeaderBarwithBack
+        userName={username}
+        header={'Event Report'}
+        subHeader={'Manage your event report'}
+      />
+      <View style={styles.screen}>
+        {/* <Text style={styles.title}>Enquiry Report</Text> */}
 
-      <View style={styles.pickerWrap}>
-        <Picker selectedValue={eventCode} onValueChange={setEventCode}>
-          {EVENTS &&
-            EVENTS.map(e => (
-              <Picker.Item
-                key={e.EventId}
-                label={e.EventName}
-                value={e.EventId}
-              />
-            ))}
-        </Picker>
+        <View style={styles.pickerWrap}>
+          <Picker selectedValue={eventCode} onValueChange={setEventCode}>
+            {EVENTS &&
+              EVENTS.map(e => (
+                <Picker.Item
+                  key={e.EventId}
+                  label={e.EventName}
+                  value={e.EventId}
+                  style={styles.pickerItem}
+                />
+              ))}
+          </Picker>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color="#c2622f" />
+        ) : (
+          <>
+            <Text style={styles.totalsLine}>
+              {summary?.totals?.users} users · {summary?.totals?.enquiries}{' '}
+              enquiries · {summary?.totals?.qty.toLocaleString()} m total
+            </Text>
+
+            <FlatList
+              data={summary?.users}
+              keyExtractor={item => String(item?.user_id)}
+              renderItem={renderUserCard}
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                paddingBottom: 24,
+              }}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+              ListEmptyComponent={
+                <Text style={styles.empty}>
+                  No enquiries recorded for this event yet.
+                </Text>
+              }
+            />
+          </>
+        )}
       </View>
-
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color="#c2622f" />
-      ) : (
-        <>
-          <Text style={styles.totalsLine}>
-            {summary?.totals?.users} users · {summary?.totals?.enquiries}{' '}
-            enquiries · {summary?.totals?.qty.toLocaleString()} m total
-          </Text>
-
-          <FlatList
-            data={summary?.users}
-            keyExtractor={item => String(item?.user_id)}
-            renderItem={renderUserCard}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              <Text style={styles.empty}>
-                No enquiries recorded for this event yet.
-              </Text>
-            }
-          />
-        </>
-      )}
-    </View>
+    </>
   );
 }
 
@@ -227,6 +240,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
     marginBottom: 8,
+    marginTop: 8,
+    color: theme.BRAND_GRADIENT_END
+  },
+  pickerItem: {
+    color: theme.BRAND_GRADIENT_END
   },
   totalsLine: {
     fontSize: 12,

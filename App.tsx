@@ -301,6 +301,14 @@ export default function App() {
     initializeApp();
   }, []);
 
+  useEffect(() => {
+    if(!isConnected) {
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+  }, [isConnected]);
+
   console.log('getUserPrptype In App', getUserPrptype);
 
 
@@ -464,46 +472,48 @@ export default function App() {
   //   }
   // }, [getMasterSyncData]);
 
-  const handleAuth = useCallback(async () => {
-    console.log('✅ Checkdevice Calling...');
-    const payload = { deviceid: getDeviceId };
-    // const payload = { deviceid: "bbbbbbb" };
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-    };
-    try {
-      setIsLoading(true);
+  const handleAuth = useCallback(async (isConnected) => {
+    if (isConnected) {
       console.log('✅ Checkdevice Calling...');
-      // const response = await axios.post('https://apig.tms-webapp.com/api/checkdevice', payload, { headers });
-      const response = await axios.post(
-        `https://apig.tms-webapp.com/api/checkdevice`,
-        payload,
-        { headers },
-      );
-      console.log('✅ Checkdevice API Response:', response);
-      if (Number(response.data) === 1) {
-        console.log('✅ Checkdevice API Response:', response, payload);
-        setIsLoading(false);
-        setAuth(true);
-      } else {
+      const payload = { deviceid: getDeviceId };
+      // const payload = { deviceid: "bbbbbbb" };
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      };
+      try {
+        setIsLoading(true);
+        console.log('✅ Checkdevice Calling...');
+        // const response = await axios.post('https://apig.tms-webapp.com/api/checkdevice', payload, { headers });
+        const response = await axios.post(
+          `https://apig.tms-webapp.com/api/checkdevice`,
+          payload,
+          { headers },
+        );
+        console.log('✅ Checkdevice API Response:', response);
+        if (Number(response.data) === 1) {
+          console.log('✅ Checkdevice API Response:', response, payload);
+          setIsLoading(false);
+          setAuth(true);
+        } else {
+          setIsLoading(false);
+          setAuth(false);
+        }
+      } catch (error) {
         setIsLoading(false);
         setAuth(false);
+        Alert.alert('Error', 'Server error');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      setIsLoading(false);
-      setAuth(false);
-      Alert.alert('Error', 'Server error');
-    } finally {
-      setIsLoading(false);
     }
   }, [getDeviceId]);
 
   useEffect(() => {
     if (getDeviceId) {
-      handleAuth();
+      handleAuth(isConnected);
     }
-  }, [getDeviceId]);
+  }, [getDeviceId, isConnected]);
 
   console.log('🔵 Device ID:', getDeviceId);
 
@@ -1673,7 +1683,7 @@ export default function App() {
                           <PurchaseImportAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                         </>
                       }</Stack.Screen>
-                       <Stack.Screen name="Weft Issue Return">{(props) =>
+                      <Stack.Screen name="Weft Issue Return">{(props) =>
                         <>
                           <WeftIssueReturn {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
 

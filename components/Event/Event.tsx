@@ -775,11 +775,11 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
       return;
     }
 
-    const mobileRegex = /^[0-9]{10}$/;
-    if (!mobileRegex.test(mobile)) {
-      Alert.alert('Invalid Mobile Number', 'Please enter a valid 10-digit mobile number.');
-      return;
-    }
+    // const mobileRegex = /^[0-9]{10}$/;
+    // if (!mobileRegex.test(mobile)) {
+    //   Alert.alert('Invalid Mobile Number', 'Please enter a valid 10-digit mobile number.');
+    //   return;
+    // }
 
     setSaving(true);
     try {
@@ -1109,6 +1109,7 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
                   key={e.EventId}
                   label={e.EventName}
                   value={e.EventId}
+                  style={styles.pickerItem}
                 />
               ))}
           </Picker>
@@ -1877,6 +1878,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
     marginBottom: 8,
+    color: theme.BRAND_GRADIENT_END
+  },
+  pickerItem: {
+    color: theme.BRAND_GRADIENT_END
   },
   syncBanner: {
     padding: 12,

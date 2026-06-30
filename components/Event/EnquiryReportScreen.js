@@ -21,6 +21,7 @@ import api from './api';
 import { API } from '../../common/API/dynamicAPI';
 import { isOnline } from './CardScanService';
 import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
+import theme from '../../android/app/src/theme';
 
 // Configure your actual events here, or fetch from an /events endpoint
 // if you run many shows per year.
@@ -183,6 +184,7 @@ export default function EnquiryReportScreen({ navigation, username }) {
                   key={e.EventId}
                   label={e.EventName}
                   value={e.EventId}
+                  style={styles.pickerItem}
                 />
               ))}
           </Picker>
@@ -238,7 +240,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
     marginBottom: 8,
-    marginTop: 8
+    marginTop: 8,
+    color: theme.BRAND_GRADIENT_END
+  },
+  pickerItem: {
+    color: theme.BRAND_GRADIENT_END
   },
   totalsLine: {
     fontSize: 12,

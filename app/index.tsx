@@ -1,3 +1,4 @@
+import { isOnline } from '@/components/Event/CardScanService';
 import HomeScreen from '@/components/HomeScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
@@ -7,6 +8,7 @@ export default function TabsIndex() {
   // const [prp, setPrp] = useState();
   //  const [token, setToken] = useState('');
   const [username, setUsername] = useState('');
+  const [online, setOnline] = useState(false);
 
   // useEffect(() => {
   //     const load = async () => {
@@ -18,7 +20,11 @@ export default function TabsIndex() {
   //     load();
   // }, []);
 
-
+  async function checkConnectivity() {
+    const result = await isOnline();
+    console.log("home screen device online parent :", result);
+    setOnline(result);
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -28,13 +34,14 @@ export default function TabsIndex() {
       setUsername(u || 'User');
     };
     load();
+     checkConnectivity();
   }, []);
 
   return (
     <>
       {/* <AuthProvider> */}
-        <HomeScreen username={username} />
-        
+      <HomeScreen username={username} online={online} />
+
       {/* </AuthProvider> */}
     </>
   );

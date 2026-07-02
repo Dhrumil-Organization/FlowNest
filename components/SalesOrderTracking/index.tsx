@@ -1600,7 +1600,7 @@ const SalesOrderTracking: React.FC<{
                     <View style={styles.detailContainer}>
                         <View style={styles.modalContainer}>
                             <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Main Item Summary</Text>
+                                <Text style={styles.modalTitle}>Main Design Summary</Text>
                                 <TouchableOpacity onPress={closeDesignModal}>
                                     <Icon name="close" size={24} color="#333" />
                                 </TouchableOpacity>
@@ -1738,7 +1738,7 @@ const SalesOrderTracking: React.FC<{
                                     alignItems: 'center',
                                 }}
                             >
-                                <Text style={styles.sectionTitle}>Main Item Details</Text>
+                                <Text style={styles.sectionTitle}>Main Design Details</Text>
                                 <TouchableOpacity
                                     onPress={toggleSortOrder1}
                                     style={{ flexDirection: 'row', alignItems: 'center' }}
@@ -1842,7 +1842,7 @@ const SalesOrderTracking: React.FC<{
                             {!isAll ? (
                                 <>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Sub Item Summary</Text>
+                                        <Text style={styles.modalTitle}>Sub Design Summary</Text>
                                         <TouchableOpacity
                                             onPress={() => setIsPartyDetailsModalVisible(false)}
                                         >
@@ -1925,7 +1925,7 @@ const SalesOrderTracking: React.FC<{
                             ) : (
                                 <View>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Sub Item Summary</Text>
+                                        <Text style={styles.modalTitle}>Sub Design Summary</Text>
                                         <TouchableOpacity
                                             onPress={() => setIsPartyDetailsModalVisible(false)}
                                         >
@@ -1990,7 +1990,7 @@ const SalesOrderTracking: React.FC<{
                                     alignItems: 'center',
                                 }}
                             >
-                                <Text style={styles.sectionTitle}>Sub Item Details</Text>
+                                <Text style={styles.sectionTitle}>Sub Design Details</Text>
                                 <TouchableOpacity
                                     onPress={toggleSortOrder2}
                                     style={{ flexDirection: 'row', alignItems: 'center' }}

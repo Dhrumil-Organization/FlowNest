@@ -642,11 +642,11 @@ export default function LandingPage() {
                                 {item.desc}
                             </Text>
 
-                            <View style={styles.tapHint}>
+                            {/* <View style={styles.tapHint}>
                                 <Text style={styles.tapText}>
                                     Tap to explore →
                                 </Text>
-                            </View>
+                            </View> */}
                         </TouchableOpacity>
                     ))}
                 </Animated.ScrollView>

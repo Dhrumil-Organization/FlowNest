@@ -1,73 +1,7 @@
 const APP_SECTIONS = [
   
-    {
-        title: 'Y',
-        data: [
-            { id: '5', name: 'Purchase Order', screen: 'Yarn Purchase Order', icon: 'attach-money', iconColor: '#1F7006' },
-        ],
-    },
-    {
-        title: 'G',
-        data: [
-            { id: '6', name: 'Grey Purchase Order', screen: 'Grey Purchase Order', icon: 'payments', iconColor: '#3BAD18' },
-            { id: '7', name: 'Sales Order', screen: 'Sales Order', icon: 'point-of-sale', iconColor: '#20BEC1' },
-        ],
-    },
-    // Only For Sudamo
-    {
-        title: 'P',
-        data: [
-            { id: '8', name: 'Production Order Tracking', screen: 'Production Order Tracking', icon: 'track-changes', iconColor: '#CE9F78' },
-        ],
-    },
-    {
-        title: 'N',
-        data: [
-            { id: '9', name: 'New Account Request', screen: 'New Account Request', icon: 'account-balance', iconColor: '#E982F6' },
-        ],
-    },
-    {
-        title: 'M',
-        data: [
-            { id: '10', name: 'Monthly Expense Report', screen: 'Monthly Expense Report', icon: 'table-chart', iconColor: '#D35400' },
-        ],
-    },
-    {
-        title: 'S',
-        data: [
-            { id: '11', name: 'Snap View', screen: 'Snap View', icon: 'table-view', iconColor: '#ABC00B' },
-        ],
-    },
-    {
-        title: 'R',
-        data: [
-            { id: '12', name: 'Receivables', screen: 'Receivables', icon: 'receipt-long', iconColor: '#773F3F' },
-        ],
-    },
-    {
-        title: 'P',
-        data: [
-            { id: '13', name: 'Packing Automation', screen: 'Packing Automation', icon: 'table-view', iconColor: 'rgb(194, 213, 52)' },
-        ],
-    },
-    {
-        title: 'I',
-        data: [
-            { id: '14', name: 'Inquiry', screen: 'Inquiry', icon: 'table-view', iconColor: 'rgb(194, 213, 52)' },
-        ],
-    },
-    {
-        title: 'R',
-        data: [
-            { id: '15', name: 'Payable', screen: 'Payable', icon: 'payment', iconColor: '#521313' },
-        ],
-    },
-    {
-        title: 'D',
-        data: [
-            { id: '16', name: 'Daily Collection Report', screen: 'Daily Collection Report', icon: 'collections-bookmark', iconColor: '#5B2CFF' },
-        ],
-    },
+  
+  
     // Only For Sudamo
     {
         title: 'T',
@@ -75,12 +9,7 @@ const APP_SECTIONS = [
             { id: '17', name: 'Taka Checking Entry', screen: 'Taka Checking Entry', icon: 'dynamic-form', iconColor: '#5B2CFF' },
         ],
     },
-    {
-        title: 'S',
-        data: [
-            { id: '18', name: 'Sales Order Tracking', screen: 'Sales Order Tracking', icon: 'track-changes', iconColor: '#DB945A' },
-        ],
-    },
+   
     {
         title: 'Y',
         data: [

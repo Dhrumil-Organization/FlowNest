@@ -13,6 +13,9 @@ import FullScreenLoader from '../components/FullScreenLoader';
 import Snackbar, { SnackbarType } from '@/components/Snackbar';
 import { registerSnackbar } from '@/common/utils/snackbar';
 import { View, StyleSheet } from 'react-native';
+import { SalesOrderProvider } from '@/components/YarnSalesOrder/SalesOrderContext';
+import { initDb } from '@/components/Event/db';
+import { isOnline } from '@/components/Event/CardScanService';
 
 
 export default function RootLayout() {
@@ -27,6 +30,23 @@ export default function RootLayout() {
     action: undefined as { text: string; onPress: () => void } | undefined,
     duration: 4000,
   });
+  const [token, setToken] = useState('');
+  const [username, setUsername] = useState('');
+  const [getUsertype, setUsertype] = useState('');
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const t = await AsyncStorage.getItem('access_token');
+      const u = await AsyncStorage.getItem('user_details');
+      const p = await AsyncStorage.getItem('user_prptype');
+
+      setToken(t || '');
+      setUsername(u || 'User');
+      setUsertype(p || '')
+    };
+    load();
+  }, []);
 
   useEffect(() => {
     registerSnackbar((message, type = 'info', action, duration) => {
@@ -44,6 +64,8 @@ export default function RootLayout() {
   initAPIForPrinterList();
   initAPIForSticker();
 
+
+
   const initializeDatabases = async () => {
     try {
       await initDB(); // Initialize chat.db
@@ -60,6 +82,27 @@ export default function RootLayout() {
   useEffect(() => {
     initializeDatabases();
   }, []);
+
+  const initializeDatabasesEvent = async () => {
+    try {
+      if (token && getUsertype) {
+        await initDb(token, getUsertype); // Initialize chat.db
+
+        console.log('✅ All event databases initialized successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing databases:', error);
+      // Retry or show user-friendly error
+    }
+  };
+
+  // Call this function when your app starts
+  useEffect(() => {
+    if (!token) return;
+    if (!getUsertype) return;
+    initializeDatabasesEvent(token, getUsertype);
+  }, [token, getUsertype]);
+
 
   useEffect(() => {
     if (!isReady) return;
@@ -180,9 +223,10 @@ export default function RootLayout() {
     // </Stack>
     // </AuthProvider>
     <>
-      <View style={styles.rootContainer}>
-        <Stack screenOptions={{ headerShown: false }}>
-          {/* {isAllowed && isLoggedIn === true ? (
+      <SalesOrderProvider>
+        <View style={styles.rootContainer}>
+          <Stack screenOptions={{ headerShown: false }}>
+            {/* {isAllowed && isLoggedIn === true ? (
         <>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="index" />
@@ -190,29 +234,30 @@ export default function RootLayout() {
       ) : (
         <Stack.Screen name="(auth)/login" />
       )} */}
-          {isAllowed && isLoggedIn === true ? (
-            <>
-              <Stack.Screen name="" />
-            </>
-          ) : (
-            <>
-              <Stack.Screen name="(all)" />
-              <Stack.Screen name="(auth)/login" />
-            </>
-          )}
-          {/* <Stack.Screen name="(all)" /> */}
-        </Stack>
-        <View style={styles.snackbarHost} pointerEvents="box-none">
-          <Snackbar
-            visible={snackbar.visible}
-            message={snackbar.message}
-            type={snackbar.type}
-            action={snackbar.action}
-            duration={snackbar.duration}
-            onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
-          />
+            {isAllowed && isLoggedIn === true ? (
+              <>
+                <Stack.Screen name="" />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="(all)" />
+                <Stack.Screen name="(auth)/login" />
+              </>
+            )}
+            {/* <Stack.Screen name="(all)" /> */}
+          </Stack>
+          <View style={styles.snackbarHost} pointerEvents="box-none">
+            <Snackbar
+              visible={snackbar.visible}
+              message={snackbar.message}
+              type={snackbar.type}
+              action={snackbar.action}
+              duration={snackbar.duration}
+              onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
+            />
+          </View>
         </View>
-      </View>
+      </SalesOrderProvider>
     </>
   );
 }

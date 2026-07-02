@@ -232,6 +232,14 @@ export const logoutSession = async (): Promise<void> => {
     }
 };
 
+export const deleteAcoountSession = async (): Promise<void> => {
+    try {
+        await AsyncStorage.clear();
+    } catch (error) {
+        console.error('Error logging out:', error);
+    }
+};
+
 // Clear entire profile
 export const clearUserProfile = async (): Promise<void> => {
     try {

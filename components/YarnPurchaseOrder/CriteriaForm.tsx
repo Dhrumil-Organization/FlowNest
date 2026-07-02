@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient';
-import theme from '@/components/theme';
-import SearchableDropdown from '@/Shared/SearchableDropdown';
-// import Snackbar from 'react-native-snackbar';
-// import FullScreenLoader from '../Loader/Loader';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import LinearGradient from 'react-native-linear-gradient';
+import theme from '../../android/app/src/theme';
+import SearchableDropdown from '../Shared/SearchableDropdown';
+import Snackbar from 'react-native-snackbar';
+import FullScreenLoader from '../Loader/Loader';
 
 const { height } = Dimensions.get('window');
 

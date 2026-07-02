@@ -53,7 +53,6 @@ const ChartScreen = ({ token }) => {
   // const { item, d1Item, token } = route.params;
   const item = params?.item ? JSON.parse(params.item) : null;
   const d1Item = params?.d1Item ? JSON.parse(params.d1Item) : null;
-  // const token = params?.token;
 
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -113,10 +112,10 @@ const ChartScreen = ({ token }) => {
 
   useEffect(() => {
     if (!token) return;
-    fetchData(token);
+    fetchData();
   }, [token]);
 
-  const fetchData = async (token) => {
+  const fetchData = async () => {
     const type = await AsyncStorage.getItem('user_prptype');
     setLoading(true);
 
@@ -139,8 +138,7 @@ const ChartScreen = ({ token }) => {
       });
 
       const result = await res.json();
-      console.log('Chart API raw payload:', type, item.yearno, item.PrpCode, item.UId, item.StrCode, d1Item.ItmCode, item.ParCode);
-      console.log('Chart API response:', result);
+
       // ✅ SAFE SET (NO CRASH)
       if (result?.success) {
         setChartData({
@@ -272,8 +270,8 @@ const ChartScreen = ({ token }) => {
     <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
 
       {/* HEADER */}
-      <LinearGradient colors={['#0F6C7B', '#13879A']} style={{ padding: 15 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 50, alignItems: 'center' }}>
+      <LinearGradient colors={['#0F6C7B', '#13879A']} style={{ padding: 15, marginTop: 55 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>

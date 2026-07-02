@@ -30,7 +30,7 @@ import HeaderBar from '@/components/Header';
 // import { encodeData } from './encodingUtils';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '@/components/theme';
-import { API } from '../../common/API/dynamicAPI';
+import { API } from '@/common/API/dynamicAPI';
 // import CriteriaForm from './CriteriaForm';
 import { fetchAllStoredata } from '../../common/API/Functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -46,7 +46,7 @@ interface CardData {
 
 interface Props {
     token: string;
-    // navigation: any;
+    navigation: any;
     isConnected: boolean | null;
     username: string;
 }
@@ -132,7 +132,7 @@ interface D1datakeys {
     LastShade: string;
 }
 
-const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, username, ...rest }) => {
+const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, username, ...rest }) => {
     const router = useRouter();
     const [searchQueryYPO, setSearchQueryYPO] = useState('');
     const [searchhistoryQueryYPO, setSearchhistoryQueryYPO] = useState('');
@@ -373,7 +373,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
         },
 
         label: {
-            color: '#888',
+            color: '#000',
             fontSize: 12
         },
 
@@ -515,6 +515,62 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             fontWeight: '500',
             color: '#333'
         },
+        stampContainer: {
+            position: 'absolute',
+            right: 35,      // right side se distance
+            top: 115,
+            // top: '80%',
+            left: '80%',
+            marginLeft: -50,
+            marginTop: 20,
+            zIndex: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+        stampContainerPOS: {
+            position: 'absolute',
+            right: 20,
+            top: 120,
+            zIndex: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+
+        stampContainerYOS: {
+            position: 'absolute',
+            right: 20,
+            top: 120,
+            zIndex: 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+        },
+
+        stamp: {
+            width: 100,
+            height: 60,
+            borderRadius: 10,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            transform: [{ rotate: '0deg' }],
+        },
+
+        stampAccepted: {
+            backgroundColor: 'rgba(76, 175, 80, 0.7)',
+            borderColor: 'rgba(46, 125, 50, 0.9)',
+        },
+
+        stampRejected: {
+            backgroundColor: 'rgba(244, 67, 54, 0.7)',
+            borderColor: 'rgba(198, 40, 40, 0.9)',
+        },
+
+        stampText: {
+            color: '#fff',
+            fontWeight: 'bold',
+            fontSize: 12,
+            textAlign: 'center',
+        },
     });
 
     useEffect(() => {
@@ -524,20 +580,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
         };
         getType();
     }, []);
-
-    useEffect(() => {
-        if (!token) return;
-        if (activeTab1YPO === 'history') {
-            fetchAllHistoryData();
-        } else if (activeTab1YPO === 'requests') {
-            fetchData();
-        } else if (activeTab1YPO === 'verify') {
-            fetchAllVerifyData();
-        }
-    }, [activeTab1YPO, token]);
-
-    const handleCriteriaFormOpen = () => setCriteriaFormOpen(true)
-    const handleCriteriaFormClose = () => setCriteriaFormOpen(false)
 
     useEffect(() => {
         if (!token) return;
@@ -618,10 +660,10 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
     };
     */
 
-    console.log("TESTING 1234123123123")
+    // console.log("TESTING 1234123123123")
 
     const fetchData = useCallback(async () => {
-        console.log("TESTING")
+        // console.log("TESTING")
         // if (typeof FormState.values.StrCode == 'undefined' || FormState.values.StrCode == null || FormState.values.StrCode == '') return;
 
         if (cancelTokenRef.current) {
@@ -970,23 +1012,18 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
     }, [FormState.values.StrCode, token]);
 
-    // useEffect(() => {
-    //     // if (!didInitialFetch.current) {
-    //     //     didInitialFetch.current = true;
-    //     //     return;
-    //     // }
-    //     if(!token) return;
+    useEffect(() => {
+        if (!token) return;
+        if (activeTab1YPO === 'history') {
+            fetchAllHistoryData();
+        } else if (activeTab1YPO === 'requests') {
+            fetchData();
+        } else if (activeTab1YPO === 'verify') {
+            fetchAllVerifyData();
+        }
 
-    //     if (activeTab1YPO === 'history') {
-    //         fetchAllHistoryData();
-    //     } else if (activeTab1YPO === 'requests') {
-    //         fetchData();
-    //     } else if (activeTab1YPO === 'verify') {
-    //         fetchAllVerifyData();
-    //     }
-
-    //     //}, [activeTab1YPO, fetchData, fetchAllHistoryData, fetchAllVerifyData]);
-    // }, [activeTab1YPO, token]);
+        //}, [activeTab1YPO, fetchData, fetchAllHistoryData, fetchAllVerifyData]);
+    }, [activeTab1YPO, token]);
 
     const handleListIconClick = async (prpcode: string, prptype: string, yearno: string, parcode: string) => {
         setActiveTabYPO('party');
@@ -1302,9 +1339,16 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                         },
                         params
                     };
+
+                    console.log('params', params);
+
                     return requestconfig;
                 };
+
                 const response = await axios.get(`${API}/api/authpo`, getRequestConfig({ params: payload }));
+
+                console.log("response", response);
+
                 if (response.data.success) {
                     setresponsemessageYPO(response.data.message || 'Success');
                     setTimeout(() => {
@@ -1450,15 +1494,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
         }
     };
 
-    const shareLocalFile = async (localFileUri: string) => {
-        try {
-            const urlToShare = localFileUri.startsWith('file://') ? localFileUri : `file://${localFileUri}`;
-            await Share.share({ url: urlToShare } as any);
-        } catch (err) {
-            console.warn('shareLocalFile error', err);
-            Alert.alert('Share failed', err?.message || String(err));
-        }
-    };
+
 
     // PdfViewerModal inside component (updated handleDownload)
     // const PdfViewerModal = ({ visible, pdfUrl, pdfPublicUrl, onClose }: {
@@ -1470,41 +1506,41 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
     //     const [webViewKey, setWebViewKey] = useState(0);
     //     const [saving, setSaving] = useState(false);
 
-    //     // const handleDownload = async () => {
-    //     //     try {
-    //     //         if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
-    //     //         if (Platform.OS === 'ios') {
-    //     //             await shareLocalFile(pdfUrl);
-    //     //             return;
-    //     //         }
-    //     //         const localPath = pdfUrl.startsWith('file://') ? pdfUrl.replace('file://', '') : pdfUrl;
-    //     //         const fileName = localPath.split('/').pop() || `document_${Date.now()}.pdf`;
-    //     //         const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-    //     //         console.log("localPath", localPath);
-    //     //         try {
-    //     //             await RNFS.copyFile(localPath, destPath);
-    //     //             if (ToastAndroid) {
-    //     //                 ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
-    //     //             } else {
-    //     //                 Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
-    //     //             }
-    //     //         } catch (copyErr: any) {
-    //     //             console.error('copyFile failed', copyErr);
-    //     //             Alert.alert(
-    //     //                 'Save failed',
-    //     //                 'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
-    //     //                 [
-    //     //                     { text: 'Cancel', style: 'cancel' },
-    //     //                     { text: 'Open Settings', onPress: () => openManageAllFilesPermission() },
-    //     //                     { text: 'Share', onPress: () => shareLocalFile(pdfUrl) }
-    //     //                 ]
-    //     //             );
-    //     //         }
-    //     //     } catch (err) {
-    //     //         console.error('handleDownload error', err);
-    //     //         Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
-    //     //     }
-    //     // };
+    //     const handleDownload = async () => {
+    //         try {
+    //             if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //             if (Platform.OS === 'ios') {
+    //                 await shareLocalFile(pdfUrl);
+    //                 return;
+    //             }
+    //             const localPath = pdfUrl.startsWith('file://') ? pdfUrl.replace('file://', '') : pdfUrl;
+    //             const fileName = localPath.split('/').pop() || `document_${Date.now()}.pdf`;
+    //             const destPath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+    //             console.log("localPath", localPath);
+    //             try {
+    //                 await RNFS.copyFile(localPath, destPath);
+    //                 if (ToastAndroid) {
+    //                     ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
+    //                 } else {
+    //                     Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //                 }
+    //             } catch (copyErr: any) {
+    //                 console.error('copyFile failed', copyErr);
+    //                 Alert.alert(
+    //                     'Save failed',
+    //                     'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
+    //                     [
+    //                         { text: 'Cancel', style: 'cancel' },
+    //                         { text: 'Open Settings', onPress: () => openManageAllFilesPermission() },
+    //                         { text: 'Share', onPress: () => shareLocalFile(pdfUrl) }
+    //                     ]
+    //                 );
+    //             }
+    //         } catch (err) {
+    //             console.error('handleDownload error', err);
+    //             Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //         }
+    //     };
 
     //     const handleClose = () => {
     //         setWebViewKey(prev => prev + 1);
@@ -1555,291 +1591,18 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
     // const userPtype = await AsyncStorage.getItem('user_prptype');
 
-    const buildChartPayload = (item: any, d1Item: any) => ({
-        prptype: prptype,
-        yearno: item.yearno,
-        prpcode: item.PrpCode,
-        uid: item.UId,
-        strcode: item.StrCode,
-        itemcode: d1Item.ItmCode,
-        parcode: item.ParCode,
-    });
+    // const buildChartPayload = (item: any, d1Item: any) => ({
+    //     prptype: prptype,
+    //     yearno: item.yearno,
+    //     prpcode: item.PrpCode,
+    //     uid: item.UId,
+    //     strcode: item.StrCode,
+    //     itemcode: d1Item.ItmCode,
+    //     parcode: item.ParCode,
+    // });
 
-    console.log("PRPTYPE 1 ::- ", FormState.values.PrpType)
-    console.log("PRPTYPE 2 ::- ", prptype)
-
-    const fetchPurchaseOrderChart = async (payload: any) => {
-        try {
-            const response = await fetch(`${API}/api/purchase_order_chart`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json',
-                    'X-Requested-with': 'XMLHttpRequest',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            console.log("payload :- ", payload)
-
-            const result = await response.json();
-
-            console.log("result :- ", result)
-
-            if (!response.ok) {
-                throw new Error(result?.message || 'API Error');
-            }
-
-            return result;
-
-        } catch (error) {
-            console.log('Chart API Error:', error);
-            throw error;
-        }
-    };
-
-    const handleChartClick = async (item, d1Item) => {
-        const payload = {
-            prptype: prptype,
-            yearno: item.yearno,
-            prpcode: item.PrpCode,
-            uid: item.UId,
-            strcode: item.StrCode,
-            itmcode: d1Item.ItmCode,
-            parcode: item.ParCode,
-        };
-
-        console.log("📤 Chart Payload:", payload);
-
-        setChartLoading(true);
-        setChartVisible(true);
-
-        try {
-            const response = await fetch(`${API}/api/purchase_order_chart`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            const result = await response.json();
-
-            console.log("📊 Chart Response:", result);
-
-            if (result?.success && result?.response) {
-
-                const itemData = Array.isArray(result.response.itemwisedata)
-                    ? result.response.itemwisedata
-                    : [];
-
-                setChartData({
-                    labels: itemData.map(i => i?.label || ''),
-                    values: itemData.map(i => i?.value || 0),
-                    itemName: result.response?.itemdetail || '',
-                    partyName: result.response?.party_detail || ''
-                });
-
-            } else {
-                setChartData({
-                    labels: [],
-                    values: []
-                });
-            }
-            // setChartData(result);
-        } catch (error) {
-            console.log("❌ Chart Error:", error);
-        } finally {
-            setChartLoading(false);
-        }
-    };
-
-    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => (
-
-        <View style={[
-            crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-            item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
-            {
-                item.isProcessed &&
-                (
-                    <View style={[crlimtreq_styles.stampContainerYOS,]}>
-                        <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
-                            <Text style={crlimtreq_styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                            </Text>
-                        </View>
-                    </View>
-                )
-            }
-            <View style={crlimtreq_styles.dateContainer}><Text style={crlimtreq_styles.dateText}>{item.PODate}</Text></View>
-            <View style={crlimtreq_styles.cardHeaderContainer}>
-                <View style={crlimtreq_styles.cardHeader}><Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text></View>
-            </View>
-            <View style={crlimtreq_styles.cardSubHeader}>
-                <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
-            </View>
-            <View style={crlimtreq_styles.cardContent}>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Broker:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.BAccName || ''}</Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Net Amt.:</Text>
-                        <Text style={crlimtreq_styles.value}> {item.NetAmt || ''}: </Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesYPO[item.UId]?.ARemark || ''}
-                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
-                        />
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Status:</Text>
-                        <Text style={crlimtreq_styles.value}>{item.AuthStatus || ''}</Text>
-                    </View>
-                </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>StoreName:</Text>
-                        <Text style={crlimtreq_styles.value}>
-                            {item.StoreName || 'N/A'}
-                        </Text>
-                    </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
-
-                    </View>
-                </View>
-
-
-
-                <View style={crlimtreq_styles.expandRow}>
-                    <TouchableOpacity
-                        style={crlimtreq_styles.expandButton}
-                        onPress={() => toggleExpandRequest(item.UId, item)}
-                    >
-                        <Text style={crlimtreq_styles.expandText}>
-                            Items: {item.d1?.length || 0}
-                        </Text>
-
-                        <Icon
-                            name={expandedRequestCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                            size={24}
-                            color="#333"
-                        />
-                    </TouchableOpacity>
-                </View>
-                {
-                    expandedRequestCards[item.UId] && item.d1.map((d1Item, index) => (
-                        <View key={index} style={crlimtreq_styles.subCard}>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <Text style={crlimtreq_styles.subcardtitle}>{item.ParName}</Text>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Item:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ItmName}</Text>
-                                </View>
-
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Grade:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.GrdName}</Text>
-                                </View>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Shade:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.ShdName}</Text>
-                                </View>
-
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Qty:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Qty}</Text>
-                                </View>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Rate:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.UnitRate}</Text>
-                                </View>
-
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Amount:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.Amount}</Text>
-                                </View>
-                            </View>
-                            <View style={crlimtreq_styles.subRow1}>
-                                <View style={crlimtreq_styles.subCol}>
-                                    <Text style={crlimtreq_styles.subcardtext1}>Disc. %:</Text>
-                                    <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.DisPer}</Text>
-                                </View>
-                            </View>
-                            {
-                                activeTab1YPO === 'requests' &&
-                                (
-                                    <>
-                                        <View style={crlimtreq_styles.subRow1}>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Current Stock:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.CurrentStock}</Text>
-                                            </View>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Last Party:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastParty}</Text>
-                                            </View>
-                                        </View>
-                                        <View style={crlimtreq_styles.subRow1}>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Last Rate:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastRate}</Text>
-                                            </View>
-                                            <View style={crlimtreq_styles.subCol}>
-                                                <Text style={crlimtreq_styles.subcardtext1}>Last Shade:</Text>
-                                                <Text style={crlimtreq_styles.subcardtextval1}>{d1Item.LastShade}</Text>
-                                            </View>
-                                        </View>
-                                    </>
-                                )
-                            }
-                        </View>
-                    ))
-                }
-            </View>
-            <View style={crlimtreq_styles.cardActions}>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'accept')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
-                    <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                </TouchableOpacity>
-                {/* <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
-                    <View style={crlimtreq_styles.infoIconContainer}>
-                        <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
-                        {item.d1 && <Text style={crlimtreq_styles.infoCount}>{item.d1.length}</Text>}
-                    </View>
-                </TouchableOpacity> */}
-                <TouchableOpacity
-                    onPress={() => { if (isConnected && !item.isProcessed) handleCallURL(item); }}
-                    disabled={!isConnected || item.isProcessed || getLocationLoading}>
-                    {
-                        getLocationLoading ?
-                            (
-                                <ActivityIndicator size={40} color="#2196F3" />
-                            )
-                            :
-                            (
-                                <Icon name="file-present" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#2196F3"} />
-                            )
-                    }
-                </TouchableOpacity>
-            </View>
-        </View >
-    );
+    // console.log("PRPTYPE 1 ::- ", FormState.values.PrpType)
+    // console.log("PRPTYPE 2 ::- ", prptype)
 
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => {
 
@@ -2310,10 +2073,37 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
         return (
             <View style={[
-                styles.card,
-                isApproved ? styles.acceptedCard :
-                    isRejected ? styles.rejectedCard : null
-            ]}>
+                crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
+                item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
+                {/* {
+                    item.isProcessed &&
+                    (
+                        <View style={[crlimtreq_styles.stampContainerYOS,]}>
+                            <View style={[crlimtreq_styles.stamp, item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected]}>
+                                <Text style={crlimtreq_styles.stampText}>
+                                    {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                                </Text>
+                            </View>
+                        </View>
+                    )
+                } */}
+
+                {item.isProcessed && (
+                    <View style={styles.stampContainerYOS}>
+                        <View
+                            style={[
+                                styles.stamp,
+                                item.actionType === 'accept'
+                                    ? styles.stampAccepted
+                                    : styles.stampRejected,
+                            ]}
+                        >
+                            <Text style={styles.stampText}>
+                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                            </Text>
+                        </View>
+                    </View>
+                )}
 
                 {/* HEADER */}
                 <View style={styles.headerRow}>
@@ -2361,17 +2151,35 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                     <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
                 </View>
 
+                <View style={styles.row}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={styles.label}>Auth Remark:</Text>
+                        <RNTextInput
+                            style={crlimtreq_styles.editableValueBlack}
+                            value={editableValuesYPO[item.UId]?.ARemark || ''}
+                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                        />
+                    </View>
+                </View>
+
                 {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
                 {
                     type === 'verify' && (
                         <View style={styles.actionRow}>
-                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#4CAF50' }]}>
-                                <Icon name="check" size={20} color="#fff" />
+                            <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="check-circle" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#F44336' }]}>
-                                <Icon name="close" size={20} color="#fff" />
+                            <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                             </TouchableOpacity>
+
+                            {/* <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="check-circle" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                                <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                            </TouchableOpacity> */}
                         </View>
                     )
                 }
@@ -2383,24 +2191,26 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                             {/* ✅ ACCEPT */}
                             <TouchableOpacity
                                 onPress={() => handleIconPress(item, 'accept')}
-                                disabled={!isConnected || item.IsAuth !== '0'}
+                                // disabled={!isConnected || item.IsAuth !== '0'}
+                                disabled={!isConnected || item.isProcessed}
                             >
                                 <Icon
                                     name="check-circle"
                                     size={35}
-                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#4CAF50"}
+                                    color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"}
                                 />
                             </TouchableOpacity>
 
                             {/* ❌ REJECT */}
                             <TouchableOpacity
                                 onPress={() => handleIconPress(item, 'reject')}
-                                disabled={!isConnected || item.IsAuth !== '0'}
+                                // disabled={!isConnected || item.IsAuth !== '0'}
+                                disabled={!isConnected || item.isProcessed}
                             >
                                 <Icon
                                     name="cancel"
                                     size={35}
-                                    color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#F44336"}
+                                    color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"}
                                 />
                             </TouchableOpacity>
 
@@ -2462,25 +2272,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                                         {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
                                         <TouchableOpacity
                                             style={styles.chartBtn}
-                                            // onPress={() => 
-                                            //     navigation.navigate('ChartScreen', {
+                                            // onPress={() => navigation.navigate('ChartScreen', {
                                             //     item,
                                             //     d1Item,
                                             //     token
-                                            // }
-                                            // onPress={() =>
-                                            //     // console.log('Chart clicked', d1Item);
-                                            //     // handleChartClick(item, d1Item);
-                                            //     router.push({
-                                            //         pathname: '/ChartScreen',
-                                            //         params: {
-                                            //             item: item,
-                                            //             d1Item: d1Item,
-                                            //             token: token
-
-                                            //         }
-                                            //     })
-                                            // }
+                                            // })}
                                             onPress={() =>
                                                 // console.log('Chart clicked', d1Item);
                                                 // handleChartClick(item, d1Item);
@@ -2494,8 +2290,6 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                                                     }
                                                 })
                                             }
-
-
                                         >
                                             <Icon name="bar-chart" size={18} color="#fff" />
                                         </TouchableOpacity>

@@ -17,12 +17,15 @@ import {
     RefreshControl,
     ActionSheetIOS,
     Platform,
+    ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
 import theme from '@/components/theme';
+import { API } from '@/common/API/dynamicAPI';
+import axios from 'axios';
 import {
     getUserProfile,
     updateUserProfile,
@@ -31,6 +34,7 @@ import {
     pickProfileImage,
     logoutSession,
     UserProfile,
+    deleteAcoountSession,
 } from '@/common/utils/profileStorage';
 
 const { width, height } = Dimensions.get('window');
@@ -38,16 +42,18 @@ const { width, height } = Dimensions.get('window');
 // Background image (replace later)
 const HEADER_IMAGE = 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=1200';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ token }) {
     const router = useRouter();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [delloading, setdelloading] = useState(false);
 
     // Edit form state
     const [editField, setEditField] = useState<keyof UserProfile | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [gettoken, settoken] = useState('')
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -58,6 +64,13 @@ export default function ProfileScreen() {
         loadProfile();
         animateEntrance();
     }, []);
+
+    useEffect(() => {
+        if (!token) return;
+        if (token) {
+            settoken(token)
+        }
+    }, [token])
 
     const animateEntrance = () => {
         Animated.parallel([
@@ -196,6 +209,93 @@ export default function ProfileScreen() {
                     onPress: async () => {
                         await logoutSession();
                         router.replace('/(auth)/login');
+                    },
+                },
+            ]
+        );
+    };
+
+    const getToken = () => {
+        return token;
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            'Delete Account',
+            'This will permanently delete your FlowNest account and remove your personal data associated with this account. This action cannot be undone.',
+            [
+                {
+                    text: 'Keep Account',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete Account',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            Alert.alert(
+                                'Final Confirmation',
+                                'Are you absolutely sure you want to permanently delete your account? Once deleted, you will lose access to your account, profile information, and app data.',
+                                [
+                                    {
+                                        text: 'Cancel',
+                                        style: 'cancel',
+                                    },
+                                    {
+                                        text: 'Delete Permanently',
+                                        style: 'destructive',
+                                        onPress: async () => {
+                                            try {
+                                                setdelloading(true);
+
+                                                const headers = {
+                                                    Authorization: `Bearer ${gettoken}`,
+                                                    'Content-Type': 'application/json',
+                                                    'X-Requested-With': 'XMLHttpRequest',
+                                                };
+
+                                                const response = await axios.post(
+                                                    `${API}/api/delete_account`,
+                                                    {}, // body
+                                                    { headers } // config
+                                                );
+                                                if (response.data.success === true) {
+                                                    setdelloading(false);
+
+                                                    // Alert.alert('No Data Found');
+                                                    console.log('🔵 Delete acoount Response:', response);
+                                                    // const maindata = response.data.data.data;
+
+
+
+                                                    console.log('DELETE ACCOUNT API RESPONSE =>', response);
+
+                                                    Alert.alert(
+                                                        'Account Deleted',
+                                                        'Your account has been permanently deleted.'
+                                                    );
+
+                                                    await deleteAcoountSession();
+                                                    router.replace('/(auth)/login');
+
+                                                }
+                                            } catch (error) {
+                                                setdelloading(false);
+                                                console.log('DELETE ACCOUNT ERROR =>', error);
+
+                                                Alert.alert(
+                                                    'Deletion Failed',
+                                                    'Unable to delete your account at this time. Please try again later.'
+                                                );
+                                            }
+
+                                        },
+                                    },
+                                ]
+                            );
+                        } catch (error) {
+                            console.log(error);
+                        }
                     },
                 },
             ]
@@ -383,9 +483,21 @@ export default function ProfileScreen() {
                         <ActionButton icon="rate-review" label="Send Feedback" onPress={() => router.push('/feedback')} />
                         {/* <ActionButton icon="help" label="Help Center" onPress={() => router.push('/help')} /> */}
                         {/* <ActionButton icon="lock" label="Privacy" onPress={() => router.push('/privacy')} /> */}
-                        <ActionButton icon="share" label="Share App" onPress={() => Alert.alert('Share', 'Share functionality coming soon!')} />
+                        {/* <ActionButton icon="share" label="Share App" onPress={() => Alert.alert('Share', 'Share functionality coming soon!')} /> */}
+                        <DeleteActionButton icon="delete" label="Delete Account" onPress={handleDeleteAccount} />
                     </View>
                 </View>
+
+                {/* ============== LOGOUT BUTTON ============== */}
+                {/* <TouchableOpacity style={styles.logoutBtn} disabled={delloading} onPress={handleDeleteAccount}>
+                    {delloading ? (
+                        <ActivityIndicator size={20} color="#EF4444" />
+                    ) : (
+                        <Icon name="delete" size={20} color="#EF4444" />
+                    )}
+
+                    <Text style={styles.logoutText}>Delete Account</Text>
+                </TouchableOpacity> */}
 
                 {/* ============== LOGOUT BUTTON ============== */}
                 <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -524,6 +636,14 @@ const ActionButton = ({ icon, label, onPress }: any) => (
             <Icon name={icon} size={22} color={theme.BRAND_GRADIENT_END} />
         </View>
         <Text style={styles.actionLabel}>{label}</Text>
+    </TouchableOpacity>
+);
+const DeleteActionButton = ({ icon, label, onPress }: any) => (
+    <TouchableOpacity style={styles.delactionBtn} onPress={onPress} activeOpacity={0.7}>
+        <View style={styles.delactionIcon}>
+            <Icon name={icon} size={22} color={'#EF4444'} />
+        </View>
+        <Text style={styles.delactionLabel}>{label}</Text>
     </TouchableOpacity>
 );
 
@@ -771,6 +891,35 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     actionLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    // 
+    delactionBtn: {
+        width: (width - 52) / 2,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: 14,
+        padding: 16,
+        alignItems: 'center',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+    },
+    delactionIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: `${theme.BRAND_GRADIENT_END}15`,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    delactionLabel: {
         fontSize: 12,
         fontWeight: '600',
         color: '#374151',

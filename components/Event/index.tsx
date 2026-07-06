@@ -4004,6 +4004,10 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         setGstNo(fields.gst_no);
         setCardFields(prev => ({ ...prev, gst_no: true }));
       }
+      if (fields.designation && !designation) {
+        setDesignation(fields.designation);
+        setCardFields(prev => ({ ...prev, designation: true }));
+      }
       if (fields.contact_name && !contactName) {
         setContactName(fields.contact_name);
         setCardFields(prev => ({ ...prev, contact_name: true }));
@@ -5365,6 +5369,15 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
           </Field>
 
           <Field label="Designation">
+            <TextInput
+              style={[styles.input, cardFields.designation && styles.cardFilledInput]}
+              placeholder="Designation"
+              value={designation}
+              onChangeText={setDesignation}
+            />
+          </Field>
+
+          <Field label="Designation">
             <TextInput style={styles.input} placeholder="Designation" value={designation} onChangeText={setDesignation} />
           </Field>
 
@@ -5962,7 +5975,8 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 14,
     fontSize: 14.5,
-    color: C.ink,
+    // color: C.ink,
+    color: '#000',
     backgroundColor: C.surface,
   },
   textarea: { minHeight: 74, textAlignVertical: 'top', paddingTop: 12 },

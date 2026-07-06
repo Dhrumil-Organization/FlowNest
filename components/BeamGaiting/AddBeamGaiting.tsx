@@ -161,7 +161,7 @@ const CartonAddDrawer = (props) => {
             if (response?.data?.success && data.length > 0) {
                 setBeamdata(data);
                 await Promise.all([
-                    fetchshift(machine).catch(e => console.log('shift error', e)),
+                    // fetchshift(machine).catch(e => console.log('shift error', e)),
                     fetchoperator(machine).catch(e => console.log('operator error', e)),
                     fetchsupervisior(machine).catch(e => console.log('supervisor error', e)),
                     fetchemployee(machine).catch(e => console.log('employee error', e)),
@@ -283,7 +283,7 @@ const CartonAddDrawer = (props) => {
                 fetch: 'shift',
                 prpcode: machine?.PrpCode || FormState.values.prpcode
             };
-            console.log("Payload:", historyPayload);
+            console.log("Shift Payload:", historyPayload);
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -1110,6 +1110,11 @@ const CartonAddDrawer = (props) => {
                                             ...prev,
                                             values: updatedValues
                                         }));
+
+                                        await fetchshift({
+                                            PrpCode: item?.PrpCode || ""
+                                        });
+
                                         const uidFromShow = await Soshow(updatedValues);
                                         setUID(uidFromShow);
                                         await checkvoucher({

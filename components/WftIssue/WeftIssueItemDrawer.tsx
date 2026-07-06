@@ -1148,7 +1148,7 @@ const WeftIssueItemDrawer = ({
                 setShowSuccess(true);
 
                 // ✅ RESET + CLOSE
-                resetAllFields();
+                resetAllData();
                 setIsScanModalVisible(false);
 
             }
@@ -1475,7 +1475,7 @@ const WeftIssueItemDrawer = ({
                                     // }}
                                     onPress={() => {
                                         setShowSuccess(false);
-                                        resetAllFields();
+                                        resetAllData();
 
                                         closeAllDrawers();
                                         fetchbrowse();  // 🔥 sab band
@@ -1516,7 +1516,7 @@ const WeftIssueItemDrawer = ({
                                     // }}
                                     onPress={() => {
                                         setdeleteShowSuccess(false);
-                                        resetAllFields();
+                                        resetAllData();
 
                                         // closeAllDrawers();
                                         // fetchbrowse();  // 🔥 sab band

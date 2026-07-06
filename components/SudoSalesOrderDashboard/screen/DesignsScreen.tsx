@@ -1,5 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
 // FILE: screens/designs/DesignsScreen.tsx
+// ✅ FIXED — adds the 3 MISSING pieces from the web artifact:
+//    1. GREIGE WIDTH field (auto = reed × (1 − warp shrink), or the
+//       entry field when width basis = "Greige width")
+//    2. "Sizing" toggle chip on each warp yarn row
+//    3. LIVE SPEC panel — reed/total-ends card, LOOM→GREIGE→FINISHED
+//       construction table, GSM/GLM grid, fibre blend bar, formula
+//       basis, Rapier-loom warning
+//    + corrected fabric math to match CostingEngine / web artifact:
+//       EPI greige  = total ends ÷ greige width   (ends conserved)
+//       EPI finished= total ends ÷ finished width
+//       PPI greige  = PPI(loom) + 2               (table pick)
+//       PPI finished= PPI greige ÷ (1 − finish shrink)
 // ═══════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -9,7 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { T } from '../../../common/utils/theme';
-import { DesignAPI, type Design, type SubDesign, type YarnMaster } from '../../../common/API/client';
+import { DesignAPI, type Design, type SubDesign, type YarnMaster, ItemAPI, type GetItem } from '../../../common/API/client';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -18,6 +30,106 @@ const f1 = (n: number) => n > 0 ? n.toFixed(1) : '—';
 
 const TABS = ['Catalog', 'Design', 'Colourway', 'Yarns', 'Dyeing'] as const;
 type Tab = typeof TABS[number];
+
+const DEFAULT_PRPCODE = 'SIP';
+const DEFAULT_STRCODE = '002';
+const DEFAULT_YEARNO = '27';
+
+// ═══════════════════════════════════════════════════════════════
+// SHARED FABRIC MATH — mirrors app/Services/CostingEngine.php
+// ═══════════════════════════════════════════════════════════════
+
+// grams of yarn per metre of yarn — matches YarnMaster::gpm()
+const GPM = (sys: string, cnt: number): number => {
+    if (!cnt || cnt <= 0) return 0;
+    switch (sys) {
+        case 'Lea': return 1.6535 / cnt;        // Linen
+        case 'Ne': return 0.5905 / cnt;         // Cotton / blends
+        case 'Den': return cnt / 9000;          // Filament
+        case 'Dtx': return (cnt * 0.9) / 9000;  // Dtex
+        default: return 0;
+    }
+};
+
+export type FabricSpec = ReturnType<typeof calcSpec>;
+
+function calcSpec(d: any) {
+    const s = (Number(d.warp_shrink) || 0) / 100;   // warp take-up
+    const gf = (Number(d.gf_shrink) || 0) / 100;    // greige→finish shrink
+    const basis: 'reed' | 'greige' = d.width_basis === 'greige' ? 'greige' : 'reed';
+
+    // reed ↔ greige width are interchangeable
+    let reed = Number(d.reed_space) || 0;
+    let widthGreige = Number(d.greige_width) || 0;
+    if (basis === 'greige' && widthGreige > 0 && s < 1) {
+        reed = widthGreige / (1 - s);
+    } else {
+        widthGreige = reed * (1 - s);
+    }
+
+    const warpYarns: any[] = d.warp_yarns ?? [];
+    const weftYarns: any[] = d.weft_yarns ?? [];
+    const epiLoom = warpYarns.reduce((t, y) => t + (Number(y.epi) || 0), 0);
+    const ppiLoom = weftYarns.reduce((t, y) => t + (Number(y.ppi) || 0), 0);
+
+    const totalEnds = epiLoom * reed;
+    const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;          // "+2 picks on table"
+    const wf = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+
+    // ends are conserved loom → greige → finished
+    const epiGreige = widthGreige > 0 ? totalEnds / widthGreige : 0;
+    const finWidthIn = (Number(d.fin_width) || 0) > 0
+        ? Number(d.fin_width)
+        : (gf < 1 ? widthGreige * (1 - gf) : widthGreige);
+    const epiFinished = finWidthIn > 0 ? totalEnds / finWidthIn : 0;
+    // picks pack closer as length shrinks in finishing
+    const ppiFinished = gf < 1 ? ppiTable / (1 - gf) : ppiTable;
+
+    // ── GLM (per-yarn, same formulas as CostingEngine::compute) ──
+    let warpGLM = 0;
+    warpYarns.forEach((y) => {
+        warpGLM += (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+    });
+    let weftGLM = 0;
+    weftYarns.forEach((y) => {
+        weftGLM += (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
+    });
+    const greigGLM = warpGLM + weftGLM;
+    const widthGreigeM = widthGreige * 0.0254;
+    const greigGSM = widthGreigeM > 0 ? greigGLM / widthGreigeM : 0;
+    const finGLM = gf < 1 ? greigGLM / (1 - gf) : greigGLM;   // mass conserved
+    const finWidthM = finWidthIn * 0.0254;
+    const finGSM = finWidthM > 0 ? finGLM / finWidthM : 0;
+
+    // ── fibre blend, weighted by grams contributed ─────────────
+    const fibreOf = (sys: string) =>
+        sys === 'Lea' ? 'Linen' : sys === 'Ne' ? 'Cotton'
+            : (sys === 'Den' || sys === 'Dtx') ? 'Polyester' : 'Other';
+    const blendTotals: Record<string, number> = {};
+    warpYarns.forEach((y) => {
+        const g = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+    });
+    weftYarns.forEach((y) => {
+        const g = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
+        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+    });
+    const blendGrand = Object.values(blendTotals).reduce((a, b) => a + b, 0);
+    const hasNaturalFibre = warpYarns.concat(weftYarns).some(y => y.sys === 'Lea');
+
+    return {
+        basis, reed, widthGreige, finWidthIn,
+        epiLoom, ppiLoom, ppiTable, totalEnds,
+        epiGreige, epiFinished, ppiFinished,
+        warpGLM, weftGLM, greigGLM, greigGSM, finGLM, finGSM,
+        blendTotals, blendGrand, hasNaturalFibre,
+        finWidthEntered: (Number(d.fin_width) || 0) > 0,
+    };
+}
+
+const BLEND_COLORS: Record<string, string> = {
+    Linen: '#C8A96E', Cotton: '#A8C8A0', Polyester: '#A0B8C8', Other: '#C8A8B0',
+};
 
 // ── TabBar ────────────────────────────────────────────────────
 function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
@@ -75,104 +187,277 @@ function enrich(d: Design): Design & { epi_total: number; ppi_total: number } {
     return { ...d, epi_total: epi, ppi_total: ppi };
 }
 
-// ── calcFabric ────────────────────────────────────────────────
-function calcFabric(d: Design & { epi_total: number; ppi_total: number }) {
-    const epiLoom = d.epi_total ?? 0;
-    const ppiLoom = d.ppi_total ?? 0;
-    const warpShk = d.warp_shrink ?? 0;
-    const gfShk = d.gf_shrink ?? 0;
-    const reedSpace = d.reed_space ?? 0;
-    const finWidth = d.fin_width ?? 0;
-    const epiGreige = epiLoom * (1 + warpShk / 100);
-    const epiFinished = epiGreige * (1 + gfShk / 100);
-    const ppiGreige = ppiLoom * (1 + warpShk / 100);
-    const ppiFinished = ppiGreige * (1 + gfShk / 100);
-    const widthGreige = reedSpace * (1 - warpShk / 100);
-    const widthFin = finWidth > 0 ? finWidth : widthGreige * (1 - gfShk / 100);
-    const totalEnds = epiLoom * reedSpace;
-    const gpmLea = (cnt: number) => 453.592 / (cnt * 300 * 0.9144);
-    const gpmNe = (cnt: number) => 453.592 / (cnt * 840 * 0.9144);
-    const gpmDen = (cnt: number) => cnt / 9000;
-    const widthGreigeM = widthGreige * 0.0254;
-    let warpGLM = 0;
-    (d.warp_yarns ?? []).forEach((y: any) => {
-        const cnt = Number(y.cnt); const epi = Number(y.epi);
-        if (!cnt || cnt <= 0 || !epi) return;
-        const ends = epi * reedSpace;
-        if (y.sys === 'Lea') warpGLM += ends * gpmLea(cnt);
-        else if (y.sys === 'Ne') warpGLM += ends * gpmNe(cnt);
-        else if (y.sys === 'Den') warpGLM += ends * gpmDen(cnt);
-    });
-    let weftGLM = 0;
-    (d.weft_yarns ?? []).forEach((y: any) => {
-        const cnt = Number(y.cnt); const ppi = Number(y.ppi);
-        if (!cnt || cnt <= 0 || !ppi) return;
-        const picksPerM = ppi / 0.0254;
-        if (y.sys === 'Lea') weftGLM += picksPerM * widthGreigeM * gpmLea(cnt);
-        else if (y.sys === 'Ne') weftGLM += picksPerM * widthGreigeM * gpmNe(cnt);
-        else if (y.sys === 'Den') weftGLM += picksPerM * widthGreigeM * gpmDen(cnt);
-    });
-    const greigGLM = warpGLM + weftGLM;
-    const greigGSM = widthGreigeM > 0 ? greigGLM / widthGreigeM : 0;
-    const finGLM = gfShk > 0 ? greigGLM / (1 - gfShk / 100) : greigGLM;
-    const finWidthM = (finWidth > 0 ? finWidth : widthGreige) * 0.0254;
-    const finGSM = finWidthM > 0 ? finGLM / finWidthM : 0;
-    return { epiGreige, epiFinished, ppiGreige, ppiFinished, widthGreige, widthFin, totalEnds, greigGLM, greigGSM, finGLM, finGSM };
-}
+// ═══════════════════════════════════════════════════════════════
+// ✅ NEW — LIVE SPEC PANEL (the whole MISSING right-hand panel)
+// ═══════════════════════════════════════════════════════════════
+function LiveSpecPanel({ design }: { design: any }) {
+    const [showFormula, setShowFormula] = useState(false);
+    const spec = useMemo(() => calcSpec(design), [design]);
 
-// ── fibreBlend ────────────────────────────────────────────────
-function fibreBlend(d: Design) {
-    const all = [...(d.warp_yarns ?? []), ...(d.weft_yarns ?? [])];
-    if (!all.length) return null;
-    const totals: Record<string, number> = {};
-    let grand = 0;
-    all.forEach((y: any) => {
-        const key = y.sys === 'Lea' ? 'Linen' : y.sys === 'Ne' ? 'Cotton' : y.sys === 'Den' ? 'Polyester' : 'Other';
-        totals[key] = (totals[key] ?? 0) + 1; grand++;
-    });
-    const colors: Record<string, string> = { Linen: '#C8A96E', Cotton: '#A8C8A0', Polyester: '#A0B8C8', Other: '#C8A8B0' };
-    return { totals, grand, colors };
+    const hasConstruction = spec.epiLoom > 0 && spec.reed > 0;
+    const hasWeight = spec.greigGLM > 0;
+    if (!hasConstruction && !hasWeight) return null;
+
+    return (
+        <View style={ls.wrap}>
+            <Text style={ls.title}>LIVE SPEC</Text>
+
+            {/* ── dark reed / total ends card ── */}
+            <View style={ls.darkCard}>
+                <View style={{ flex: 1 }}>
+                    <Text style={ls.darkLabel}>
+                        {spec.basis === 'greige' ? 'GREIGE WIDTH · BASIS' : 'REED SPACE · BASIS'}
+                    </Text>
+                    <Text style={ls.darkVal}>
+                        {spec.basis === 'greige' ? `${f1(spec.widthGreige)}"` : `${spec.reed}"`}
+                    </Text>
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={ls.darkLabel}>TOTAL ENDS</Text>
+                    <Text style={ls.darkVal}>
+                        {spec.totalEnds > 0 ? Math.round(spec.totalEnds).toLocaleString('en-IN') : '—'}
+                    </Text>
+                </View>
+            </View>
+
+            <Text style={ls.loomLine}>
+                ↑EPI {f1(spec.epiLoom)} × ↑PPI {f1(spec.ppiLoom)}  (on loom)
+            </Text>
+
+            {/* ── construction table LOOM / GREIGE / FINISHED ── */}
+            <View style={ls.table}>
+                <View style={[ls.tr, ls.trHead]}>
+                    {['CONSTRUCTION', 'LOOM', 'GREIGE', 'FINISHED'].map((h, i) => (
+                        <Text key={i} style={[ls.td, ls.tdHead, i === 0 && ls.tdLabel]}>{h}</Text>
+                    ))}
+                </View>
+                <View style={ls.tr}>
+                    <Text style={[ls.td, ls.tdLabel]}>EPI</Text>
+                    <Text style={ls.td}>{f1(spec.epiLoom)}</Text>
+                    <Text style={[ls.td, ls.tdGreige]}>{f1(spec.epiGreige)}</Text>
+                    <Text style={[ls.td, ls.tdFin]}>{f1(spec.epiFinished)}</Text>
+                </View>
+                <View style={ls.tr}>
+                    <Text style={[ls.td, ls.tdLabel]}>PPI</Text>
+                    <Text style={ls.td}>{f1(spec.ppiLoom)}</Text>
+                    <Text style={[ls.td, ls.tdGreige]}>{f1(spec.ppiTable)}</Text>
+                    <Text style={[ls.td, ls.tdFin]}>{f1(spec.ppiFinished)}</Text>
+                </View>
+                <View style={ls.tr}>
+                    <Text style={[ls.td, ls.tdLabel]}>Width"</Text>
+                    <Text style={ls.td}>{f1(spec.reed)}</Text>
+                    <Text style={[ls.td, ls.tdGreige]}>{f1(spec.widthGreige)}</Text>
+                    <Text style={[ls.td, ls.tdFin]}>{f1(spec.finWidthIn)}</Text>
+                </View>
+            </View>
+
+            {/* ── GSM / GLM grid ── */}
+            {hasWeight && (
+                <View style={ls.gsmGrid}>
+                    <View style={ls.gsmBox}>
+                        <Text style={ls.gsmLabel}>Greige GSM</Text>
+                        <Text style={ls.gsmVal}>{Math.round(spec.greigGSM)}</Text>
+                    </View>
+                    <View style={ls.gsmBox}>
+                        <Text style={ls.gsmLabel}>Greige GLM</Text>
+                        <Text style={ls.gsmVal}>{spec.greigGLM.toFixed(1)} g/m</Text>
+                    </View>
+                    <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
+                        <Text style={ls.gsmLabel}>Finished GSM</Text>
+                        <Text style={ls.gsmVal}>{Math.round(spec.finGSM)}</Text>
+                        {spec.finWidthEntered && <Text style={ls.gsmNote}>{spec.finWidthIn}" fin</Text>}
+                    </View>
+                    <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
+                        <Text style={ls.gsmLabel}>Finished GLM</Text>
+                        <Text style={ls.gsmVal}>{spec.finGLM.toFixed(1)} g/m</Text>
+                    </View>
+                </View>
+            )}
+
+            {/* ── fibre blend bar ── */}
+            {spec.blendGrand > 0 && (
+                <View style={{ marginTop: 14 }}>
+                    <Text style={ls.sec}>FIBRE BLEND</Text>
+                    <View style={ls.blendBar}>
+                        {Object.entries(spec.blendTotals).map(([k, v]) => (
+                            <View key={k} style={{ flex: v / spec.blendGrand, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                        ))}
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                        {Object.entries(spec.blendTotals).map(([k, v]) => (
+                            <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                                <Text style={{ fontSize: 10, color: T.muted }}>
+                                    {k} {Math.round(v / spec.blendGrand * 100)}%
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* ── formula basis (expandable) ── */}
+            <TouchableOpacity style={{ marginTop: 12 }} onPress={() => setShowFormula(v => !v)}>
+                <Text style={{ fontSize: 12, color: T.copper, fontWeight: '600' }}>
+                    {showFormula ? '▾' : '▸'} Formula basis
+                </Text>
+            </TouchableOpacity>
+            {showFormula && (
+                <View style={ls.formulaBox}>
+                    <Text style={ls.formulaTxt}>
+                        Reed and greige width are interchangeable: greige width = reed × (1 − warp shrink).
+                        Total ends = ΣEPI(loom) × reed. EPI greige = ΣEPI ÷ (1 − warp shrink),
+                        PPI greige = ΣPPI + 2. Greige GSM = greige GLM ÷ width(m).
+                        Finished GLM = greige GLM ÷ (1 − finish shrink); mass conserved.
+                        Finished EPI = total ends ÷ finished width (ends conserved).
+                        Finished PPI = PPI greige ÷ (1 − finish shrink) — picks pack closer as length shrinks.
+                    </Text>
+                </View>
+            )}
+
+            {/* ── natural fibre / Rapier warning ── */}
+            {spec.hasNaturalFibre && (
+                <View style={ls.warnBox}>
+                    <Text style={ls.warnTxt}>
+                        ⚠️ Contains natural fibre — this design is restricted to{' '}
+                        <Text style={{ fontWeight: '800', color: T.copper }}>Rapier</Text> looms;
+                        water-jet gating is blocked automatically.
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
 }
+const ls = StyleSheet.create({
+    wrap: { marginTop: 24, backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14 },
+    title: { fontSize: 10, fontWeight: '800', color: T.ink, letterSpacing: 0.8, marginBottom: 10 },
+    darkCard: { flexDirection: 'row', backgroundColor: T.nav, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8 },
+    darkLabel: { fontSize: 9, color: '#ffffffAA', fontWeight: '600', letterSpacing: 0.4 },
+    darkVal: { fontSize: 20, fontWeight: '800', color: '#fff', marginTop: 2 },
+    loomLine: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.3, marginBottom: 6 },
+    table: { borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: T.border },
+    tr: { flexDirection: 'row', backgroundColor: T.surface },
+    trHead: { backgroundColor: T.sub },
+    td: { flex: 1, fontSize: 11, color: T.ink, paddingVertical: 6, paddingHorizontal: 8, textAlign: 'right' },
+    tdHead: { fontSize: 9, fontWeight: '700', color: T.muted },
+    tdLabel: { textAlign: 'left', fontWeight: '600', flex: 1.2 },
+    tdGreige: { fontWeight: '700', color: T.ink },
+    tdFin: { fontWeight: '700', color: T.copper },
+    gsmGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, borderWidth: 1, borderColor: T.border, borderRadius: 8, overflow: 'hidden' },
+    gsmBox: { width: '50%', backgroundColor: T.sub, padding: 10 },
+    gsmBoxBorder: { borderTopWidth: 1, borderTopColor: T.border },
+    gsmLabel: { fontSize: 9, color: T.muted, fontWeight: '600', letterSpacing: 0.3 },
+    gsmVal: { fontSize: 16, fontWeight: '800', color: T.ink, marginTop: 2 },
+    gsmNote: { fontSize: 9, color: T.muted },
+    sec: { fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginBottom: 6 },
+    blendBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
+    formulaBox: { backgroundColor: T.sub, borderRadius: 8, padding: 10, marginTop: 6 },
+    formulaTxt: { fontSize: 10, color: T.muted, lineHeight: 15 },
+    warnBox: { backgroundColor: '#FBF3E3', borderRadius: 8, padding: 10, marginTop: 10, borderWidth: 1, borderColor: '#EAD9B0' },
+    warnTxt: { fontSize: 11, color: '#7A5C1E', lineHeight: 16 },
+});
 
 // ═══════════════════════════════════════════════════════════════
-// SHARED: Yarn Picker Modal
+// SHARED: Server Search Yarn Picker Modal
+// Used by Warp / Weft / Selvedge. It does NOT depend on first 300 yarns.
+// Every search calls: GET /api/yarns?search=<text>&limit=50&yearno=27
 // ═══════════════════════════════════════════════════════════════
-function YarnPickerModal({ visible, yarns, title = 'Select yarn', onSelect, onClose }: {
-    visible: boolean; yarns: YarnMaster[];
+function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: {
+    visible: boolean;
     title?: string;
-    onSelect: (y: YarnMaster) => void; onClose: () => void;
+    onSelect: (y: YarnMaster) => void;
+    onClose: () => void;
 }) {
     const [search, setSearch] = useState('');
-    const filtered = useMemo(() => {
-        const q = search.toLowerCase();
-        if (!q) return yarns;
-        return yarns.filter(y => y.name.toLowerCase().includes(q) || y.sys.toLowerCase().includes(q) || String(y.cnt).includes(q));
-    }, [yarns, search]);
+    const [yarns, setYarns] = useState<YarnMaster[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const loadYarns = useCallback(async (q = '') => {
+        if (!visible) return;
+        setLoading(true);
+        try {
+            const res = await (DesignAPI.yarns as any)({
+                yearno: DEFAULT_YEARNO,
+                prpcode: DEFAULT_PRPCODE,
+                strcode: DEFAULT_STRCODE,
+                limit: 50,
+                search: q.trim() || undefined,
+            });
+            setYarns(res?.data?.data || []);
+            console.log('YARN SEARCH OK', {
+                search: q,
+                count: res?.data?.data?.length || 0,
+                url: res?.config?.url,
+                baseURL: res?.config?.baseURL,
+                params: res?.config?.params,
+            });
+        } catch (e: any) {
+            console.log('YARN SEARCH ERROR', {
+                message: e?.message,
+                code: e?.code,
+                status: e?.response?.status,
+                data: e?.response?.data,
+                baseURL: e?.config?.baseURL,
+                url: e?.config?.url,
+                params: e?.config?.params,
+            });
+            setYarns([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [visible]);
+
+    useEffect(() => {
+        if (!visible) return;
+        const t = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
+        return () => clearTimeout(t);
+    }, [visible, search, loadYarns]);
+
+    const closePicker = () => {
+        onClose();
+        setSearch('');
+        setYarns([]);
+    };
+
     return (
-        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={closePicker}>
             <View style={yp.overlay}>
                 <View style={yp.sheet}>
                     <View style={yp.handle} />
                     <View style={yp.header}>
                         <Text style={yp.title}>{title}</Text>
-                        <TouchableOpacity onPress={() => { onClose(); setSearch(''); }} style={yp.closeBtn}>
+                        <TouchableOpacity onPress={closePicker} style={yp.closeBtn}>
                             <Text style={yp.closeTxt}>✕</Text>
                         </TouchableOpacity>
                     </View>
                     <View style={yp.searchWrap}>
-                        <TextInput value={search} onChangeText={setSearch} placeholder="Search..."
-                            placeholderTextColor={T.muted} style={yp.search} autoFocus />
+                        <TextInput
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Search yarn name / code / count..."
+                            placeholderTextColor={T.muted}
+                            style={yp.search}
+                            autoFocus
+                        />
                     </View>
-                    <FlatList data={filtered} keyExtractor={y => y.mi_id} keyboardShouldPersistTaps="handled"
+                    {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 10 }} />}
+                    <FlatList
+                        data={yarns}
+                        keyExtractor={(y, idx) => `${y.mi_id}-${idx}`}
+                        keyboardShouldPersistTaps="handled"
                         renderItem={({ item: y }) => (
                             <TouchableOpacity style={yp.row} activeOpacity={0.7}
-                                onPress={() => { onSelect(y); onClose(); setSearch(''); }}>
+                                onPress={() => { onSelect(y); closePicker(); }}>
                                 <Text style={yp.yarnName}>{y.name}</Text>
-                                <Text style={yp.yarnSub}>{y.cnt}/1 {y.sys}{y.price > 0 ? ` · ₹${y.price}/kg` : ''}</Text>
+                                <Text style={yp.yarnSub}>
+                                    Code {y.mi_id} · {y.cnt}/1 {y.sys}{y.price > 0 ? ` · ₹${y.price}/kg` : ''}
+                                </Text>
                             </TouchableOpacity>
                         )}
                         ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />}
-                        ListEmptyComponent={<Text style={{ padding: 16, color: T.muted, textAlign: 'center' }}>No yarns found</Text>}
+                        ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: T.muted, textAlign: 'center' }}>
+                            {search.trim() ? 'No yarns found' : 'Type to search yarns, or choose from the first 50 results'}
+                        </Text> : null}
                         contentContainerStyle={{ paddingBottom: 40 }}
                     />
                 </View>
@@ -180,6 +465,184 @@ function YarnPickerModal({ visible, yarns, title = 'Select yarn', onSelect, onCl
         </Modal>
     );
 }
+
+function CategoryPickerModal({ visible, onSelect, onClose, }: {
+    visible: boolean;
+    onSelect: (value: GetItem) => void;
+    onClose: () => void;
+}) {
+    const [search, setSearch] = useState('');
+    const [categories, setCategories] = useState<GetItem[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const loadCategories = useCallback(async (q = '') => {
+        if (!visible) return;
+
+        setLoading(true);
+
+        try {
+            const res = await ItemAPI.getItem({
+                yearno: DEFAULT_YEARNO,
+                prpcode: DEFAULT_PRPCODE,
+                strcode: DEFAULT_STRCODE,
+                txntype: 'design_master',
+                isall: 1,
+                billdate: '',
+                itmcode: '',
+                ttype: [8, 3, 30, 2, 34, 83, 42],
+                fetch: q.trim(),
+            });
+
+            console.log("ITEM RESPONSE =>", res.data);
+
+            const list = res.data.response?.data || [];
+
+            setCategories(list);
+
+            console.log("CATEGORY SEARCH OK", {
+                search: q,
+                count: list.length,
+                url: res.config?.url,
+                baseURL: res.config?.baseURL,
+                params: res.config?.params,
+            });
+
+        } catch (e: any) {
+
+            console.log("CATEGORY SEARCH ERROR", {
+                message: e?.message,
+                code: e?.code,
+                status: e?.response?.status,
+                data: e?.response?.data,
+                baseURL: e?.config?.baseURL,
+                url: e?.config?.url,
+                params: e?.config?.params,
+            });
+
+            setCategories([]);
+
+        } finally {
+
+            setLoading(false);
+
+        }
+
+    }, [visible]);
+
+    useEffect(() => {
+
+        if (!visible) return;
+
+        const t = setTimeout(
+            () => loadCategories(search),
+            search.trim() ? 350 : 0
+        );
+
+        return () => clearTimeout(t);
+
+    }, [visible, search, loadCategories]);
+
+    const closePicker = () => {
+        onClose();
+        setSearch('');
+        setCategories([]);
+    };
+
+    return (
+        <Modal
+            visible={visible}
+            animationType="slide"
+            transparent
+            onRequestClose={closePicker}
+        >
+            <View style={yp.overlay}>
+                <View style={yp.sheet}>
+
+                    <View style={yp.handle} />
+
+                    <View style={yp.header}>
+                        <Text style={yp.title}>
+                            Select Category
+                        </Text>
+
+                        <TouchableOpacity
+                            onPress={closePicker}
+                            style={yp.closeBtn}
+                        >
+                            <Text style={yp.closeTxt}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={yp.searchWrap}>
+                        <TextInput
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Search Category..."
+                            placeholderTextColor={T.muted}
+                            style={yp.search}
+                            autoFocus
+                        />
+                    </View>
+
+                    {loading && (
+                        <ActivityIndicator
+                            color={T.copper}
+                            style={{ paddingVertical: 10 }}
+                        />
+                    )}
+
+                    <FlatList
+                        data={categories}
+                        keyExtractor={(item) => item.ItmCode}
+                        keyboardShouldPersistTaps="handled"
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={yp.row}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                    onSelect(item);
+                                    closePicker();
+                                }}
+                            >
+                                <Text style={yp.yarnName}>
+                                    {item.ItmName}
+                                </Text>
+
+                                <Text style={yp.yarnSub}>
+                                    {item.ItmCode}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        ItemSeparatorComponent={() => (
+                            <View
+                                style={{
+                                    height: 1,
+                                    backgroundColor: T.border,
+                                    marginLeft: 16,
+                                }}
+                            />
+                        )}
+                        ListEmptyComponent={
+                            !loading ? (
+                                <Text
+                                    style={{
+                                        padding: 16,
+                                        color: T.muted,
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    No Category Found
+                                </Text>
+                            ) : null
+                        }
+                    />
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+
 const yp = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
     sheet: { backgroundColor: T.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%' },
@@ -195,19 +658,27 @@ const yp = StyleSheet.create({
     yarnSub: { fontSize: 12, color: T.muted, marginTop: 2 },
 });
 
-// ── Yarn line row ─────────────────────────────────────────────
+// ── Yarn line row (✅ NEW: Sizing chip + selvedge/ENDS mode) ──
 function YarnLineRow({ yarn, type, onChange, onRemove }: {
-    yarn: any; type: 'warp' | 'weft';
+    yarn: any; type: 'warp' | 'weft' | 'selvedge';
     onChange: (k: string, v: any) => void; onRemove: () => void;
 }) {
-    const key = type === 'warp' ? 'epi' : 'ppi';
-    const lbl = type === 'warp' ? 'EPI' : 'PPI';
+    const key = type === 'warp' ? 'epi' : type === 'weft' ? 'ppi' : 'ends';
+    const lbl = type === 'warp' ? 'EPI' : type === 'weft' ? 'PPI' : 'ENDS';
     return (
         <View style={yl.row}>
             <View style={{ flex: 1 }}>
                 <Text style={yl.name}>{yarn.name}</Text>
-                <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}</Text>
+                <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}{yarn.blend_ratio ? ` · ${yarn.blend_ratio}` : ''}</Text>
             </View>
+            {/* ✅ MISSING #2 — Sizing toggle (warp yarns only) */}
+            {type === 'warp' && (
+                <TouchableOpacity
+                    style={[yl.sizingChip, yarn.sizing && yl.sizingChipOn]}
+                    onPress={() => onChange('sizing', !yarn.sizing)}>
+                    <Text style={[yl.sizingTxt, yarn.sizing && yl.sizingTxtOn]}>Sizing</Text>
+                </TouchableOpacity>
+            )}
             <View style={yl.epiWrap}>
                 <TextInput value={String(yarn[key] ?? '')} onChangeText={v => onChange(key, parseFloat(v) || 0)}
                     keyboardType="numeric" style={yl.epiInput} />
@@ -223,6 +694,10 @@ const yl = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 6, gap: 8 },
     name: { fontSize: 13, fontWeight: '600', color: T.ink },
     sub: { fontSize: 11, color: T.muted, marginTop: 2 },
+    sizingChip: { borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: T.sub },
+    sizingChipOn: { backgroundColor: T.copper + '22', borderColor: T.copper },
+    sizingTxt: { fontSize: 10, fontWeight: '700', color: T.muted },
+    sizingTxtOn: { color: T.copper },
     epiWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     epiInput: { backgroundColor: T.sub, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, color: T.ink, width: 56, textAlign: 'center' },
     epiLabel: { fontSize: 11, color: T.muted, fontWeight: '600' },
@@ -246,17 +721,56 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
 
     const load = useCallback(async (page = 1) => {
         try {
-            const res = await DesignAPI.list({ category: filter !== 'All' ? filter : undefined, search: search || undefined, page, limit: 50 });
-            const envelope = (res.data as any).data;
-            const rows: Design[] = Array.isArray(envelope) ? envelope : (envelope?.data ?? []);
-            console.log("response",res)
+            const res = await DesignAPI.list({
+                yearno: DEFAULT_YEARNO,
+                page,
+                per_page: 50,
+                limit: 50,
+                category: filter !== 'All' ? filter : undefined,
+                search: search || undefined,
+            } as any);
+
+            console.log('DESIGN LIST OK', {
+                url: res.config?.url,
+                baseURL: res.config?.baseURL,
+                params: res.config?.params,
+                status: res.status,
+            });
+
+            const body: any = res.data;
+            const rows: Design[] = Array.isArray(body?.data)
+                ? body.data
+                : Array.isArray(body?.data?.data)
+                    ? body.data.data
+                    : [];
+
+            const meta = body?.meta ?? body?.data?.meta ?? {};
+            const hasMore = Boolean(meta.has_more);
+
             setDesigns(prev => page === 1 ? rows : [...prev, ...rows]);
-            setTotalPages(envelope?.total_pages ?? 1);
-            setTotal(envelope?.total ?? rows.length);
+            setTotalPages(hasMore ? page + 1 : page);
+            setTotal((page === 1 ? 0 : designs.length) + rows.length + (hasMore ? 1 : 0));
             setCurrentPage(page);
-        } catch (e: any) { Alert.alert('Error', e.message); }
+        } catch (e: any) {
+            const msg = e?.response?.data?.message
+                || e?.response?.data?.error
+                || e?.message
+                || 'Unable to load designs';
+
+            console.log('DESIGN LIST ERROR', {
+                message: e?.message,
+                code: e?.code,
+                status: e?.response?.status,
+                data: e?.response?.data,
+                url: e?.config?.url,
+                baseURL: e?.config?.baseURL,
+                params: e?.config?.params,
+            });
+
+            Alert.alert('Design list error', String(msg));
+        }
         finally { setLoading(false); setRefreshing(false); }
-    }, [filter, search]);
+    }, [filter, search, designs.length]);
 
     useEffect(() => { load(1); }, [filter]);
     useEffect(() => { const t = setTimeout(() => load(1), 400); return () => clearTimeout(t); }, [search]);
@@ -307,7 +821,6 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                                         <Text style={ct.rowCode}>{d.code}</Text>
                                         <TypeBadge type={d.type} />
                                     </View>
-                                    {/* <Text style={ct.rowSub}>{SHORT(d.category)} · {d.epi_total}×{d.ppi_total} · {d.cw_count} cw</Text> */}
                                     <Text style={ct.rowSub}>
                                         {SHORT(d.category)} ·
                                         {Number(d.epi_total).toFixed(2)}×{Number(d.ppi_total).toFixed(2)} ·
@@ -325,9 +838,9 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                                     {detailLoading ? (
                                         <ActivityIndicator color={T.copper} style={{ paddingVertical: 20 }} />
                                     ) : det ? (() => {
-                                        const fab = calcFabric(det);
-                                        const blend = fibreBlend(det);
-                                        const hasC = det.epi_total > 0 && det.reed_space > 0;
+                                        // ✅ uses the same corrected math as the Live Spec panel
+                                        const fab = calcSpec(det);
+                                        const hasC = det.epi_total > 0 && (det.reed_space ?? 0) > 0;
                                         const hasG = fab.greigGLM > 0;
                                         return (
                                             <>
@@ -338,7 +851,7 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                                                         {det.warp_yarns?.map((y: any, i: number) => (
                                                             <View key={`w${i}`} style={ct.yarnRow}>
                                                                 <View style={ct.yarnBadgeWarp}><Text style={ct.yarnBadgeTxt}>WARP</Text></View>
-                                                                <Text style={ct.yarnName}>{y.cnt ? `${y.cnt} ` : ''}{y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}</Text>
+                                                                <Text style={ct.yarnName}>{y.cnt ? `${y.cnt} ` : ''}{y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}{y.sizing ? ' · sized' : ''}</Text>
                                                                 <Text style={ct.yarnEpi}>{Number(y.epi).toFixed(2)} EPI</Text>
                                                             </View>
                                                         ))}
@@ -381,14 +894,14 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                                                             <View style={ct.tableRow}>
                                                                 <Text style={[ct.tableCell, ct.tableCellLabel]}>PPI</Text>
                                                                 <Text style={ct.tableCell}>{f1(det.ppi_total)}</Text>
-                                                                <Text style={[ct.tableCell, ct.tdGreige]}>{f1(fab.ppiGreige)}</Text>
+                                                                <Text style={[ct.tableCell, ct.tdGreige]}>{f1(fab.ppiTable)}</Text>
                                                                 <Text style={[ct.tableCell, ct.tdFinished]}>{f1(fab.ppiFinished)}</Text>
                                                             </View>
                                                             <View style={ct.tableRow}>
                                                                 <Text style={[ct.tableCell, ct.tableCellLabel]}>Width"</Text>
                                                                 <Text style={ct.tableCell}>{det.reed_space}</Text>
                                                                 <Text style={[ct.tableCell, ct.tdGreige]}>{f1(fab.widthGreige)}</Text>
-                                                                <Text style={[ct.tableCell, ct.tdFinished]}>{det.fin_width > 0 ? det.fin_width : '—'}</Text>
+                                                                <Text style={[ct.tableCell, ct.tdFinished]}>{det.fin_width > 0 ? det.fin_width : f1(fab.finWidthIn)}</Text>
                                                             </View>
                                                         </View>
                                                     </>
@@ -414,27 +927,24 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                                                         </View>
                                                     </View>
                                                 )}
-                                                {blend && (
+                                                {fab.blendGrand > 0 && (
                                                     <View style={{ marginTop: 14 }}>
                                                         <Text style={ct.expandSec}>FIBRE BLEND</Text>
                                                         <View style={{ flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
-                                                            {Object.entries(blend.totals).map(([k, v]) => (
-                                                                <View key={k} style={{ flex: v / blend.grand, backgroundColor: blend.colors[k] ?? '#888' }} />
+                                                            {Object.entries(fab.blendTotals).map(([k, v]) => (
+                                                                <View key={k} style={{ flex: v / fab.blendGrand, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
                                                             ))}
                                                         </View>
                                                         <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                                                            {Object.entries(blend.totals).map(([k, v]) => (
+                                                            {Object.entries(fab.blendTotals).map(([k, v]) => (
                                                                 <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                                                    <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: blend.colors[k] ?? '#888' }} />
-                                                                    <Text style={{ fontSize: 10, color: T.muted }}>{k} {Math.round(v / blend.grand * 100)}%</Text>
+                                                                    <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
+                                                                    <Text style={{ fontSize: 10, color: T.muted }}>{k} {Math.round(v / fab.blendGrand * 100)}%</Text>
                                                                 </View>
                                                             ))}
                                                         </View>
                                                     </View>
                                                 )}
-                                                <TouchableOpacity style={{ marginTop: 12 }}>
-                                                    <Text style={{ fontSize: 12, color: T.copper, fontWeight: '600' }}>▸ Formula basis</Text>
-                                                </TouchableOpacity>
                                                 {!!det.latest_cost && (
                                                     <View style={ct.latestCostRow}>
                                                         <Text style={ct.latestCostTxt}>Latest cost</Text>
@@ -518,28 +1028,52 @@ const ct = StyleSheet.create({
     cwAddTxt: { fontSize: 12, fontWeight: '700', color: T.copper },
 });
 
+// ═══════════════════════════════════════════════════════════════
+// TAB 2 — DESIGN  (✅ greige width + sizing + Live Spec panel)
+// ═══════════════════════════════════════════════════════════════
+const EMPTY_FORM = {
+    code: '', category: '', type: 'YD',
+    weave: '', reed_space: 64, greige_width: 0, warp_shrink: 6, gf_shrink: 5,
+    fin_width: 0, warp_wastage: 0, weft_wastage: 6,
+    warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
+};
 
-function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: () => void }) {
-    const [allYarns, setAllYarns] = useState<YarnMaster[]>([]);
+function DesignTab({ design, onRefresh, onCancelEdit }: {
+    design: Design | null; onRefresh: () => void; onCancelEdit: () => void;
+}) {
     const [saving, setSaving] = useState(false);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
-    const [form, setForm] = useState<any>({
-        code: '', category: 'Linen Shirting', type: 'YD',
-        weave: '', reed_space: 64, warp_shrink: 6, gf_shrink: 5,
-        fin_width: 0, warp_wastage: 0, weft_wastage: 6,
-        warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
-    });
+    const [form, setForm] = useState<any>({ ...EMPTY_FORM });
+    const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
-    useEffect(() => { DesignAPI.yarns().then(r => setAllYarns(r.data.data)).catch(() => { }); }, []);
     useEffect(() => {
-        if (design) setForm({ ...design, width_basis: 'reed', selvedge_yarns: (design as any).selvedge_yarns ?? [], warp_wastage: (design as any).warp_wastage ?? 0, weft_wastage: (design as any).weft_wastage ?? 6 });
-        else setForm({ code: '', category: 'Linen Shirting', type: 'YD', weave: '', reed_space: 64, warp_shrink: 6, gf_shrink: 5, fin_width: 0, warp_wastage: 0, weft_wastage: 6, warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed' });
+        if (design) setForm({
+            ...EMPTY_FORM, ...design,
+            width_basis: (design as any).width_basis ?? 'reed',
+            greige_width: (design as any).greige_width ?? 0,
+            selvedge_yarns: (design as any).selvedge_yarns ?? [],
+            warp_wastage: (design as any).warp_wastage ?? 0,
+            weft_wastage: (design as any).weft_wastage ?? 6,
+        });
+        else setForm({ ...EMPTY_FORM });
     }, [design?.id]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
+
+    // ✅ MISSING #1 — greige width ⇄ reed space, kept in sync live
+    const shrinkFrac = (Number(form.warp_shrink) || 0) / 100;
+    const autoGreige = (Number(form.reed_space) || 0) * (1 - shrinkFrac);
+    const autoReed = shrinkFrac < 1 && (Number(form.greige_width) || 0) > 0
+        ? (Number(form.greige_width) || 0) / (1 - shrinkFrac) : 0;
+    const isReedBasis = form.width_basis !== 'greige';
+
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
-        set(key, [...(form[key] ?? []), { mi_id: y.mi_id, name: y.name, sys: y.sys, cnt: y.cnt, base_price: y.price, blend_ratio: null, ...(type === 'warp' ? { epi: 60 } : type === 'weft' ? { ppi: 52 } : { epi: 0 }) }]);
+        set(key, [...(form[key] ?? []), {
+            mi_id: y.mi_id, itm_code: y.itm_code, m_itm_code: y.m_itm_code, prp_code: y.prp_code, str_code: y.str_code, name: y.name, sys: y.sys, cnt: y.cnt, base_price: y.price,
+            blend_ratio: null,
+            ...(type === 'warp' ? { epi: 60, sizing: false } : type === 'weft' ? { ppi: 52 } : { ends: 0 }),
+        }]);
     };
     const updateYarn = (type: string, idx: number, k: string, v: any) => {
         const key = `${type}_yarns`; const list = [...(form[key] ?? [])];
@@ -547,51 +1081,120 @@ function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: ()
     };
     const removeYarn = (type: string, idx: number) =>
         set(`${type}_yarns`, (form[`${type}_yarns`] ?? []).filter((_: any, i: number) => i !== idx));
+
     const save = async () => {
         setSaving(true);
         try {
-            if (design?.id) await DesignAPI.update(design.id, form);
-            else await DesignAPI.create(form);
+            // send both widths — backend resolves from width_basis
+            const payload = {
+                ...form,
+                reed_space: isReedBasis ? form.reed_space : autoReed,
+                greige_width: isReedBasis ? autoGreige : form.greige_width,
+            };
+            if (design?.id) await DesignAPI.update(design.id, payload);
+            else await DesignAPI.create(payload);
             Alert.alert('Saved', 'Design saved successfully'); onRefresh();
         } catch (e: any) { Alert.alert('Error', e.message); }
         finally { setSaving(false); }
     };
+
     const Chip = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
         <TouchableOpacity onPress={onPress} style={[fm.chip, active && fm.chipActive]}>
             <Text style={[fm.chipTxt, active && fm.chipTxtActive]}>{label}</Text>
         </TouchableOpacity>
     );
+
     return (
         <>
             <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+                {/* ── editing banner (owner mode) ── */}
+                {design?.id && (
+                    <View style={fm.editBanner}>
+                        <Text style={fm.editTxt}>
+                            <Text style={{ fontWeight: '800' }}>Editing {design.code}</Text> — owner mode.
+                            Changes update the existing design; saved costings keep their snapshots,
+                            and the next costing version picks up the new recipe automatically.
+                        </Text>
+                        <TouchableOpacity onPress={onCancelEdit}>
+                            <Text style={fm.editCancel}>Cancel editing</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <Text style={fm.label}>DESIGN CODE</Text>
                 <TextInput value={form.code ?? ''} onChangeText={v => set('code', v)} placeholder="e.g. Cambridge" placeholderTextColor={T.muted} style={fm.input} />
+
                 <Text style={fm.label}>CATEGORY</Text>
-                <View style={fm.chipRow}>
+                {/* <View style={fm.chipRow}>
                     {[['Shirting', 'Linen Shirting'], ['Sportswear', 'Sportswear'], ['Suiting', 'Linen Suiting']].map(([label, val]) => (
                         <Chip key={val} label={label} active={form.category === val} onPress={() => set('category', val)} />
                     ))}
-                </View>
+                </View> */}
+
+                {form.category ? (
+                    <View style={yl.row}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={yl.name}>{form.category}</Text>
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => set('category', '')}
+                            style={{ paddingLeft: 8 }}
+                        >
+                            <Text style={{ color: T.pd, fontSize: 18 }}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
+
+                <TouchableOpacity
+                    style={fm.addBtn}
+                    onPress={() => setCategoryPickerVisible(true)}
+                >
+                    <Text style={fm.addBtnTxt}>
+                        {'+ Select Category'}
+                    </Text>
+                </TouchableOpacity>
+
+
                 <Text style={fm.label}>DYE TYPE</Text>
                 <View style={fm.chipRow}>
                     <Chip label="Yarn Dyed" active={form.type === 'YD'} onPress={() => set('type', 'YD')} />
                     <Chip label="Piece Dyed" active={form.type === 'PD'} onPress={() => set('type', 'PD')} />
                 </View>
+
                 <Text style={fm.label}>WEAVE / STRUCTURE</Text>
                 <TextInput value={form.weave ?? ''} onChangeText={v => set('weave', v)} placeholder="e.g. Dobby — fine dobby" placeholderTextColor={T.muted} style={fm.input} />
+
                 <Text style={fm.label}>WIDTH BASIS</Text>
                 <Text style={fm.hint}>how you enter the warp width</Text>
                 <View style={fm.chipRow}>
-                    <Chip label="Reed space" active={form.width_basis === 'reed'} onPress={() => set('width_basis', 'reed')} />
-                    <Chip label="Greige width" active={form.width_basis === 'greige'} onPress={() => set('width_basis', 'greige')} />
+                    <Chip label="Reed space" active={isReedBasis} onPress={() => set('width_basis', 'reed')} />
+                    <Chip label="Greige width" active={!isReedBasis} onPress={() => {
+                        // seed greige from current reed so the value doesn't jump
+                        setForm((f: any) => ({
+                            ...f, width_basis: 'greige',
+                            greige_width: f.greige_width > 0 ? f.greige_width
+                                : +((Number(f.reed_space) || 0) * (1 - (Number(f.warp_shrink) || 0) / 100)).toFixed(2),
+                        }));
+                    }} />
                 </View>
+
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>REED SPACE</Text>
-                        <View style={fm.inputRow}>
-                            <TextInput value={String(form.reed_space ?? '')} onChangeText={v => set('reed_space', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} />
-                            <Text style={fm.unit}>"</Text>
-                        </View>
+                        {isReedBasis ? (
+                            <View style={fm.inputRow}>
+                                <TextInput value={String(form.reed_space ?? '')} onChangeText={v => set('reed_space', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} />
+                                <Text style={fm.unit}>"</Text>
+                            </View>
+                        ) : (
+                            <View style={fm.inputRow}>
+                                <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
+                                    <Text style={fm.roTxt}>{autoReed > 0 ? autoReed.toFixed(1) : '—'}</Text>
+                                </View>
+                                <Text style={fm.unit}>"</Text>
+                            </View>
+                        )}
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>WARP SHRINK</Text>
@@ -601,6 +1204,32 @@ function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: ()
                         </View>
                     </View>
                 </View>
+
+                {/* ✅ MISSING #1 — GREIGE WIDTH field */}
+                <Text style={fm.label}>GREIGE WIDTH</Text>
+                <Text style={fm.hint}>
+                    {isReedBasis
+                        ? `auto = reed × (1 − ${form.warp_shrink || 0}% warp take-up)`
+                        : `reed space is derived: greige ÷ (1 − ${form.warp_shrink || 0}%)`}
+                </Text>
+                {isReedBasis ? (
+                    <View style={fm.inputRow}>
+                        <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
+                            <Text style={fm.roTxt}>{autoGreige > 0 ? autoGreige.toFixed(1) : '—'}</Text>
+                        </View>
+                        <Text style={fm.unit}>"</Text>
+                    </View>
+                ) : (
+                    <View style={fm.inputRow}>
+                        <TextInput
+                            value={form.greige_width ? String(form.greige_width) : ''}
+                            onChangeText={v => set('greige_width', parseFloat(v) || 0)}
+                            keyboardType="numeric" style={[fm.input, { flex: 1 }]}
+                            placeholder="57.7" placeholderTextColor={T.muted} />
+                        <Text style={fm.unit}>"</Text>
+                    </View>
+                )}
+
                 <Text style={fm.label}>WARP YARNS</Text>
                 {(form.warp_yarns ?? []).map((y: any, i: number) => (
                     <YarnLineRow key={i} yarn={y} type="warp" onChange={(k, v) => updateYarn('warp', i, k, v)} onRemove={() => removeYarn('warp', i)} />
@@ -608,6 +1237,7 @@ function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: ()
                 <TouchableOpacity style={fm.addBtn} onPress={() => setPickerFor('warp')}>
                     <Text style={fm.addBtnTxt}>+ Add warp yarn</Text>
                 </TouchableOpacity>
+
                 <Text style={fm.label}>WEFT YARNS</Text>
                 {(form.weft_yarns ?? []).map((y: any, i: number) => (
                     <YarnLineRow key={i} yarn={y} type="weft" onChange={(k, v) => updateYarn('weft', i, k, v)} onRemove={() => removeYarn('weft', i)} />
@@ -615,14 +1245,16 @@ function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: ()
                 <TouchableOpacity style={fm.addBtn} onPress={() => setPickerFor('weft')}>
                     <Text style={fm.addBtnTxt}>+ Add weft yarn</Text>
                 </TouchableOpacity>
+
                 <Text style={fm.label}>SELVEDGE</Text>
                 <Text style={fm.hint}>optional · cost only, excluded from GSM</Text>
                 {(form.selvedge_yarns ?? []).map((y: any, i: number) => (
-                    <YarnLineRow key={i} yarn={y} type="warp" onChange={(k, v) => updateYarn('selvedge', i, k, v)} onRemove={() => removeYarn('selvedge', i)} />
+                    <YarnLineRow key={i} yarn={y} type="selvedge" onChange={(k, v) => updateYarn('selvedge', i, k, v)} onRemove={() => removeYarn('selvedge', i)} />
                 ))}
                 <TouchableOpacity style={fm.addBtn} onPress={() => setPickerFor('selvedge')}>
                     <Text style={fm.addBtnTxt}>+ Select selvedge yarn</Text>
                 </TouchableOpacity>
+
                 <Text style={fm.label}>WASTAGE</Text>
                 <Text style={fm.hint}>adds to yarn cost only — does not change GSM / fabric weight</Text>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -641,6 +1273,7 @@ function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: ()
                         </View>
                     </View>
                 </View>
+
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>FINISHED WIDTH</Text>
@@ -658,20 +1291,52 @@ function DesignTab({ design, onRefresh }: { design: Design | null; onRefresh: ()
                         </View>
                     </View>
                 </View>
+
+                {/* ✅ MISSING #3 — LIVE SPEC panel (updates as you type) */}
+                <LiveSpecPanel design={{
+                    ...form,
+                    reed_space: isReedBasis ? form.reed_space : autoReed,
+                    greige_width: isReedBasis ? autoGreige : form.greige_width,
+                }} />
+
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
-                    <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Save design' : 'Create design'}</Text>
+                    <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
             </ScrollView>
-            <YarnPickerModal visible={pickerFor !== null} yarns={allYarns}
+            <YarnPickerModal
+                visible={pickerFor !== null}
+                title={pickerFor === 'warp' ? 'Select warp yarn' : pickerFor === 'weft' ? 'Select weft yarn' : 'Select selvedge yarn'}
                 onSelect={y => pickerFor && addYarn(y, pickerFor)}
-                onClose={() => setPickerFor(null)} />
+                onClose={() => setPickerFor(null)}
+            />
+            {/* <CategoryPickerModal
+                visible={categoryPickerVisible}
+                onSelect={(category) => {
+                    set('category', category);
+                }}
+                onClose={() => setCategoryPickerVisible(false)}
+            /> */}
+            <CategoryPickerModal
+                visible={categoryPickerVisible}
+                onSelect={(item) => {
+                    set('category', item.ItmName);
+                    // setCategoryPickerVisible(false);
+                }}
+                onClose={() => setCategoryPickerVisible(false)}
+            />
+
         </>
     );
 }
 const fm = StyleSheet.create({
+    editBanner: { backgroundColor: T.copper + '15', borderWidth: 1, borderColor: T.copper + '55', borderRadius: 10, padding: 12, marginBottom: 4 },
+    editTxt: { fontSize: 12, color: T.ink, lineHeight: 17 },
+    editCancel: { fontSize: 12, fontWeight: '700', color: T.copper, marginTop: 6 },
     label: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginTop: 16, marginBottom: 6 },
     hint: { fontSize: 11, color: T.muted, marginTop: -4, marginBottom: 6 },
     input: { backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: T.ink },
+    inputRO: { backgroundColor: T.sub, justifyContent: 'center' },
+    roTxt: { fontSize: 14, color: T.ink, fontWeight: '600' },
     inputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     unit: { fontSize: 14, color: T.muted, fontWeight: '600' },
     chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
@@ -681,7 +1346,7 @@ const fm = StyleSheet.create({
     chipTxtActive: { color: '#fff' },
     addBtn: { borderWidth: 1.5, borderColor: T.copper, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginBottom: 4 },
     addBtnTxt: { fontSize: 14, fontWeight: '700', color: T.copper },
-    saveBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
+    saveBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
     saveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
 
@@ -702,13 +1367,13 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
     useEffect(() => {
         if (!visible) return;
         setLoading(true);
-        DesignAPI.list({ limit: 200 } as any)
+        DesignAPI.list({ page: 1, per_page: 200, limit: 200, yearno: '27' } as any)
             .then(r => {
                 const envelope = (r.data as any).data;
                 const rows = Array.isArray(envelope) ? envelope : (envelope?.data ?? []);
                 setDesigns(rows);
             })
-            .catch(() => { })
+            .catch((e: any) => console.log('DESIGN PICKER ERROR', { message: e?.message, status: e?.response?.status, data: e?.response?.data, baseURL: e?.config?.baseURL, url: e?.config?.url }))
             .finally(() => setLoading(false));
     }, [visible]);
 
@@ -806,13 +1471,11 @@ function ShadePickerModal({ visible, onSelect, onClose }: {
                     <ScrollView keyboardShouldPersistTaps="handled" style={{ paddingBottom: 40 }}>
                         {filtered.map((shade, si) => (
                             <View key={si}>
-                                {/* Color group header */}
                                 <View style={sd.groupHdr}>
                                     <View style={[sd.colorDot, { backgroundColor: shade.hex, borderWidth: shade.hex === '#FFFFFF' ? 1 : 0, borderColor: T.border }]} />
                                     <Text style={sd.colorName}>{shade.color_name}</Text>
                                     <Text style={sd.supplierCount}>{shade.suppliers.length} supplier{shade.suppliers.length > 1 ? 's' : ''}</Text>
                                 </View>
-                                {/* Supplier rows */}
                                 {shade.suppliers.map((sp, spi) => (
                                     <TouchableOpacity key={spi} style={sd.supplierRow} activeOpacity={0.7}
                                         onPress={() => { onSelect({ color_name: shade.color_name, hex: shade.hex, shade_no: sp.shade_no }); onClose(); setSearch(''); }}>
@@ -854,7 +1517,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
     useEffect(() => {
         if (design) {
             setBaseDesign(design);
-            // auto-generate sub-design code
             const base = design.code?.replace(/\s+/g, '-') ?? 'Design';
             setSubCode(`${base}-01`);
         }
@@ -887,8 +1549,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
     return (
         <>
             <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-
-                {/* BASE DESIGN picker */}
                 <Text style={cw2.label}>BASE DESIGN</Text>
                 <TouchableOpacity style={cw2.picker} onPress={() => setShowDesignPicker(true)}>
                     <Text style={[cw2.pickerTxt, !baseDesign && { color: T.muted }]}>
@@ -899,7 +1559,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
 
                 {baseDesign && (
                     <>
-                        {/* SUB-DESIGN CODE */}
                         <Text style={cw2.label}>SUB-DESIGN CODE</Text>
                         <Text style={cw2.hint}>auto-generated from the main design — non-editable, no duplicates</Text>
                         <View style={cw2.codeRow}>
@@ -910,7 +1569,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                             <Text style={cw2.codeAuto}>AUTO</Text>
                         </View>
 
-                        {/* WARP YARNS — assign shade */}
                         {warpYarns.length > 0 && (
                             <>
                                 <Text style={cw2.label}>WARP YARNS</Text>
@@ -945,7 +1603,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                             </>
                         )}
 
-                        {/* WEFT YARNS — assign shade */}
                         {weftYarns.length > 0 && (
                             <>
                                 <Text style={cw2.label}>WEFT YARNS</Text>
@@ -979,7 +1636,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                             </>
                         )}
 
-                        {/* PREVIEW box */}
                         <View style={cw2.previewBox}>
                             <View style={cw2.previewSwatch} />
                             <View style={{ flex: 1 }}>
@@ -990,7 +1646,6 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                             </View>
                         </View>
 
-                        {/* Save */}
                         <TouchableOpacity style={[cw2.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
                             <Text style={cw2.saveTxt}>{saving ? 'Saving…' : 'Save colourway'}</Text>
                         </TouchableOpacity>
@@ -1007,14 +1662,12 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                 )}
             </ScrollView>
 
-            {/* Design picker modal */}
             <DesignPickerModal
                 visible={showDesignPicker}
                 onSelect={d => { setBaseDesign(d); const base = d.code?.replace(/\s+/g, '-') ?? 'Design'; setSubCode(`${base}-01`); }}
                 onClose={() => setShowDesignPicker(false)}
             />
 
-            {/* Shade picker modal */}
             <ShadePickerModal
                 visible={shadePickerFor !== null}
                 onSelect={shade => {
@@ -1061,12 +1714,31 @@ function YarnsTab() {
     const [yarns, setYarns] = useState<YarnMaster[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'Lea' | 'Ne' | 'Den'>('all');
-    useEffect(() => { DesignAPI.yarns().then(r => setYarns(r.data.data)).catch(() => { }).finally(() => setLoading(false)); }, []);
+    const [search, setSearch] = useState('');
+
+    const loadYarns = useCallback(async (q = '') => {
+        setLoading(true);
+        try {
+            const res = await (DesignAPI.yarns as any)({ limit: 100, yearno: DEFAULT_YEARNO, prpcode: DEFAULT_PRPCODE, strcode: DEFAULT_STRCODE, search: q.trim() || undefined });
+            setYarns(res?.data?.data || []);
+        } catch (e: any) {
+            console.log('YARNS TAB ERROR', { message: e?.message, status: e?.response?.status, data: e?.response?.data, baseURL: e?.config?.baseURL, url: e?.config?.url, params: e?.config?.params });
+            setYarns([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        const t = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
+        return () => clearTimeout(t);
+    }, [search, loadYarns]);
+
     const filtered = useMemo(() => filter === 'all' ? yarns : yarns.filter(y => y.sys === filter), [yarns, filter]);
-    if (loading) return <View style={s.center}><ActivityIndicator color={T.copper} /></View>;
     return (
         <View style={{ flex: 1 }}>
             <View style={{ backgroundColor: T.surface, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.border }}>
+                <TextInput value={search} onChangeText={setSearch} placeholder="Search yarn name / code / count..." placeholderTextColor={T.muted} style={[ct.search, { marginBottom: 8 }]} />
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                     {(['all', 'Lea', 'Ne', 'Den'] as const).map(f => (
                         <TouchableOpacity key={f} onPress={() => setFilter(f)} style={[ct.chip, filter === f && ct.chipActive]}>
@@ -1077,7 +1749,8 @@ function YarnsTab() {
                     ))}
                 </ScrollView>
             </View>
-            <FlatList data={filtered} keyExtractor={y => y.mi_id} contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
+            {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 12 }} />}
+            <FlatList data={filtered} keyExtractor={(y, idx) => `${y.mi_id}-${idx}`} contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
                 renderItem={({ item: y }) => (
                     <View style={yn.row}>
                         <View style={[yn.badge, { backgroundColor: y.sys === 'Lea' ? '#E8F4E8' : y.sys === 'Ne' ? '#E8EEF4' : '#F4EEE8' }]}>
@@ -1091,6 +1764,7 @@ function YarnsTab() {
                     </View>
                 )}
                 ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border }} />}
+                ListEmptyComponent={!loading ? <Text style={s.empty}>No yarns found</Text> : null}
             />
         </View>
     );
@@ -1168,9 +1842,15 @@ export function DesignsScreen() {
 
     const handleSelectDesign = async (d: Design) => {
         setSelected(d); setDetail(d);
-        try { const res = await DesignAPI.get(d.id); setDetail({ ...d, ...res.data.data }); } catch { }
+        try {
+            const res = await DesignAPI.get(d.id); setDetail({ ...d, ...res.data.data });
+            console.log("design res", res);
+        } catch { }
+
         setTab('Design');
     };
+
+    const handleCancelEdit = () => { setSelected(null); setDetail(null); };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
@@ -1182,7 +1862,13 @@ export function DesignsScreen() {
             <TabBar active={tab} onChange={setTab} />
             <View style={{ flex: 1 }}>
                 {tab === 'Catalog' && <CatalogTab onSelectDesign={handleSelectDesign} />}
-                {tab === 'Design' && <DesignTab design={detailDesign} onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)} />}
+                {tab === 'Design' && (
+                    <DesignTab
+                        design={detailDesign}
+                        onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
+                        onCancelEdit={handleCancelEdit}
+                    />
+                )}
                 {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
                 {tab === 'Yarns' && <YarnsTab />}
                 {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}

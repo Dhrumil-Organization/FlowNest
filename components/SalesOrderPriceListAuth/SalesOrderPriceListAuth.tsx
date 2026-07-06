@@ -621,7 +621,8 @@ const SalesOrderPriceListAuth = ({ navigation, token }) => {
                                                                                 }
                                                                             ]}
                                                                         >
-                                                                            {detail.PLRate}
+                                                                            {/* {detail.PLRate} */}
+                                                                            {detail.PLRate != null ? Number(detail.PLRate).toFixed(2) : '0.00'}
                                                                         </Text>
                                                                     </View>
                                                                 </View>

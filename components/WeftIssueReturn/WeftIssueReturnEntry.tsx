@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, FlatList, Alert, ActivityIndicator } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import axios from "axios";
-import { API } from "../../common/API/dynamicAPI";
+import { API, PRINTSTICKER, PRINTERSLISTAPI } from "../../common/API/dynamicAPI";
 import CustomSearchableDropdown from '../Shared/CustomSearchableDropdown';
+import Snackbar from 'react-native-snackbar';
 
 interface FormState {
     CartNo: string;
@@ -102,9 +103,14 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
         message: "",
         type: "warning"
     });      // Save
-    const [beamLoading, setBeamLoading] = useState(false); // Beam List
+    const [beamLoading, setBeamLoading] = useState(false);
+    const [getPrinters, setPrinters] = useState([])
+    const [printer, setPrinter] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [getSavedData, setGetSavedData] = useState({});
+    const [getDataSaved, setDataSaved] = useState(false)
 
-    console.log("selectedBatchNo", selectedBatchNo);
+    console.log("getSavedData", getSavedData);
 
     const showWarning = (msg) => {
         setAlertData({
@@ -484,48 +490,59 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
 
             const resData = res?.data;
 
-            // if (resData?.message === false) {
-            //     showWarning(resData?.response?.message);
-            // } else if (resData?.response?.error === true) {
-            //     showWarning(resData?.response?.message);
-            // } else if (resData?.success === true) {
-            //     showSuccess(resData?.response?.message);
-            // } else {
-            //     showError(resData?.message);
-            // }
-
             if (resData?.message === false) {
                 showWarning(resData?.response?.message);
-
+                setGetSavedData(payload);
+                setDataSaved(false);
+                getAllPrinters();
             } else if (resData?.response?.error === true) {
                 showWarning(resData?.response?.message);
-
-            }
-            else if (resData?.success === true) {
-                Alert.alert(
-                    "Success",
-                    resData?.response?.message,
-                    [
-                        {
-                            text: "OK",
-                            onPress: () => {
-                                navigation.replace("Weft Issue Return", {
-                                    token,
-                                    refresh: true,
-                                    selectedProperty,
-                                    selectedYear,
-                                    fromDate,
-                                    toDate,
-                                });
-                            },
-                        },
-                    ],
-                    { cancelable: false }
-                );
-            }
-            else {
+                getAllPrinters();
+                setGetSavedData(payload);
+                setDataSaved(false);
+            } else if (resData?.success === true) {
+                showSuccess(resData?.response?.message);
+                getAllPrinters();
+                setGetSavedData(payload);
+                setDataSaved(true);
+            } else {
                 showError(resData?.message);
             }
+
+            // if (resData?.message === false) {
+            //     showWarning(resData?.response?.message);
+
+            // } else if (resData?.response?.error === true) {
+            //     showWarning(resData?.response?.message);
+
+            // }
+            // else if (resData?.success === true) {
+            //     setGetSavedData(payload);
+
+            //     Alert.alert(
+            //         "Success",
+            //         resData?.response?.message,
+            //         [
+            //             {
+            //                 text: "OK",
+            //                 onPress: () => {
+            //                     navigation.replace("Weft Issue Return", {
+            //                         token,
+            //                         refresh: true,
+            //                         selectedProperty,
+            //                         selectedYear,
+            //                         fromDate,
+            //                         toDate,
+            //                     });
+            //                 },
+            //             },
+            //         ],
+            //         { cancelable: false }
+            //     );
+            // }
+            // else {
+            //     showError(resData?.message);
+            // }
         } catch (error) {
             console.log("❌ SAVE ERROR:", error?.response?.data || error.message);
             let errorMessage = "An unexpected error occurred while saving.";
@@ -637,6 +654,115 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
         </View>
     );
 
+    const printSticker = () => {
+        // if (typeof printer == 'undefined' || printer == null || printer == '') {
+        //     Alert.alert('Please select printer first.');
+        //     return false;
+        // } 
+        // else 
+        {
+            setIsLoading(true);
+            console.log('printsticker function :', getSavedData);
+            let temppayloadObj = new Object();
+
+            if (Object.keys(getSavedData).length > 0) {
+                temppayloadObj = {
+                    uid: getSavedData.IssUId ?? "0",
+                    inwno: "",
+                    inwdate: "",
+                    srno: getSavedData.IssSrNo ?? "0",
+                    itmcode: getSavedData.ItmCode ?? "0",
+                    itmname: getSavedData.ItmName ?? "",
+                    dsncode: "0",
+                    dsnname: "",
+                    rcno: "",
+                    amount: "",
+                    subsr: getSavedData.IssSubSr ?? "0",
+                    takano: getSavedData.CartNo ?? "",
+                    qty: getSavedData.TotQty ?? "0",
+                    trantype: getSavedData.trantype ?? "",
+                    ttype: "",
+                    dptname: "",
+                    shdcode: getSavedData.ShdCode ?? "0",
+                    shdname: getSavedData.ShdName ?? "",
+                    whr: "",
+                    yarncostr: "",
+                    yard: "",
+                    sexecname: "",
+                    strcode: "",
+                    unqsrno: "",
+                    grdcode: getSavedData.GrdCode ?? "0",
+                    grdname: getSavedData.GrdName ?? "",
+                    mercode: getSavedData.MerCode ?? "0",
+                    mername: getSavedData.MerName ?? "",
+                    denier: getSavedData.Denier ?? "0",
+                    prpcode: getSavedData.PrpCode ?? ""
+                }
+                console.log("getSavedData", getSavedData, temppayloadObj);
+                const params = {
+                    data: [getSavedData],
+                    IskgQty: 0,
+                    printype: "Print",
+                    PrintFormat: 5,
+                    printerName: printer ? printer : '',
+                    txntype: "beam_weft_issue_return"
+                };
+
+                // return;
+                axios.post(`${PRINTSTICKER}`, params)
+                    .then(response => {
+                        setIsLoading(false);
+                        const res = response.data;
+
+                        if (res.success) {
+                            Snackbar.show({
+                                text: '✅ ${res.printed} label(s) sent to printer.',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'green',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                        } else {
+                            Snackbar.show({
+                                text: res.message || 'Operation failed',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'red',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
+                        }
+                    }).catch(error => {
+                        setIsLoading(false);
+                        Snackbar.show({
+                            text: error?.response?.data?.error || error.message || 'Print failed',
+                            duration: Snackbar.LENGTH_LONG,
+                            backgroundColor: 'red',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
+                    });
+            } else {
+                setIsLoading(false);
+                Snackbar.show({
+                    text: 'printing sticker data is empty',
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: 'red',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: '#fff' },
+                });
+            }
+        }
+    }
+
+    const getAllPrinters = async () => {
+        try {
+            const res = await axios.get(PRINTERSLISTAPI);
+            const printerList = res.data?.printers || res.data || [];
+            setPrinters(printerList);
+        } catch (err) {
+            console.log("Printer API error:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     return (
         <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
             <View style={styles.header}>
@@ -699,6 +825,8 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
                             onPress={() => {
                                 fetchCreelData();
                                 setLinkModal(true);
+                                setPrinter('');
+                                setPrinters([]);
                             }}
                         >
                             <Icon name="link" size={16} color="#0F6C7B" />
@@ -936,6 +1064,24 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
                         </Text>
                     )}
                 </TouchableOpacity>
+                {getDataSaved && status === "Close" && (
+                    <TouchableOpacity
+                        style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                        onPress={printSticker}
+                    // disabled={loading}
+                    >
+                        <Text style={{ color: "#fff", fontWeight: "600" }}>
+                            Print
+                        </Text>
+                    </TouchableOpacity>
+                )}
+                {/* {getDataSaved && status === "Close" && (
+                    <View style={{ flexDirection: 'row', marginTop: 10 }}>
+                        <TouchableOpacity style={[styles.saveBtn, loading && { opacity: 0.7 }]} onPress={printSticker}>
+                            <Text style={{ color: "#fff", fontWeight: "600" }}>Print</Text>
+                        </TouchableOpacity>
+                    </View>
+                )} */}
             </ScrollView>
 
             <Modal transparent visible={linkModal} animationType="slide">

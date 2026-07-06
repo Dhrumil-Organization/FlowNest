@@ -370,6 +370,7 @@ const styles = StyleSheet.create({
     borderBottomColor: C.border,
     gap: 10,
     ...shadowSoft,
+    marginTop: 25
   },
   fullModalBackBtn: { padding: 6 },
   fullModalHeaderTitle: { fontSize: 16, fontWeight: '800', color: C.ink },

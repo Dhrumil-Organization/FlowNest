@@ -108,7 +108,7 @@ const HeaderBar: React.FC<HeaderProps> = ({ userName, onSearch, placeholder = 'S
                 />
                 <View style={{ marginLeft: 10 }}>
                   <Text style={styles.brandTitle}>FlowNest</Text>
-                  <Text style={styles.brandSub}>{'Portal ( v7.5.3 )'}</Text>
+                  <Text style={styles.brandSub}>{'Portal ( v7.5.4 )'}</Text>
                 </View>
               </View>
             </TouchableOpacity>

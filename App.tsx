@@ -155,6 +155,7 @@ import InquiryReport from './components/InquiryReport/InquiryReport';
 import Event from './components/Event/index';
 import EnquiryReportScreen from './components/Event/EnquiryReportScreen';
 import EnquiryReportDrilldown from './components/Event/EnquiryReportDrilldownScreen';
+import EnquiryDetailScreen from './components/Event/EnquiryDetailScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -491,7 +492,7 @@ export default function App() {
           { headers },
         );
         console.log('✅ Checkdevice API Response:', response);
-        if (Number(response.data) === 0) {
+        if (Number(response.data) === 1) {
           console.log('✅ Checkdevice API Response:', response, payload);
           setIsLoading(false);
           setAuth(true);
@@ -1696,6 +1697,11 @@ export default function App() {
                           <Stack.Screen name="Event">{(props) =>
                             <>
                               <Event {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                            </>
+                          }</Stack.Screen>
+                          <Stack.Screen name="EnquiryDetail">{(props) =>
+                            <>
+                              <EnquiryDetailScreen {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
                             </>
                           }</Stack.Screen>
                           <Stack.Screen name="EnquiryReportScreen">{(props) =>

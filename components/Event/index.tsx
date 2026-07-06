@@ -3673,7 +3673,7 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
     if (!getUserPrptypeFromCache) return;
     loadEvent();
     loadPrp(getUserPrptypeFromCache);
-  }, [token]);
+  }, [token, getUserPrptypeFromCache]);
 
   async function checkConnectivity() {
     const result = await isOnline();

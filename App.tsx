@@ -157,8 +157,8 @@ import EnquiryReportScreen from './components/Event/EnquiryReportScreen';
 import EnquiryReportDrilldown from './components/Event/EnquiryReportDrilldownScreen';
 import QuarterSummaryScreen from './components/QuarterWiseDispatch/QuarterSummaryScreen';
 import EnquiryDetailScreen from './components/Event/EnquiryDetailScreen';
-
-
+import ManufacturingControlTower from './components/SudoSalesOrderDashboard/screen/ManufacturingControlTower';
+import PurchaseTransportAuth from './components/PurchaseTransportAuth/PurchaseTransportAuth'
 
 const Stack = createNativeStackNavigator();
 
@@ -1460,6 +1460,18 @@ export default function App() {
                               />
                             )}
                           </Stack.Screen>
+                          <Stack.Screen name="Manufacturing Control Tower">
+                            {props => (
+                              <ManufacturingControlTower
+                                {...props}
+                                token={gettoken || ''}
+                                isConnected={isConnected}
+                                username={getUserDetails}
+                                getUserId={getUserId}
+                                getUserPrptype={getUserPrptype}
+                              />
+                            )}
+                          </Stack.Screen>
                           <Stack.Screen name="SendQuotation" options={{ title: 'Send Quotation' }}>
                             {props => (
                               <SendQuotationScreen
@@ -1727,6 +1739,12 @@ export default function App() {
                               />
                             )}
                           </Stack.Screen>
+
+                          <Stack.Screen name="Purchase Transport Auth">{(props) =>
+                            <>
+                              <PurchaseTransportAuth {...props} token={gettoken || ''} isConnected={isConnected} username={getUserDetails} />
+                            </>
+                          }</Stack.Screen>
 
                         </Stack.Navigator>
                         {/* </Stack.Navigator> */}

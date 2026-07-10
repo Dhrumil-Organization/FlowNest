@@ -337,4 +337,44 @@ export const ItemAPI = {
         client.get<GetItemResponse>('/getitem', { params }),
 };
 
+export const RealCostingChainAPI = {
+  dashboard: (params: {
+    prpcode?: string;
+    yearno?: string;
+    strcode?: string;
+    from_date?: string;
+    to_date?: string;
+    dsncode?: string;
+    order_uid?: string;
+  }) =>
+    client.get('/real-costing-chain/dashboard', {
+      params: {
+        prpcode: params.prpcode || 'SIP',
+        yearno: params.yearno || '27',
+        strcode: params.strcode || '',
+        from_date: params.from_date,
+        to_date: params.to_date,
+        dsncode: params.dsncode || '',
+        order_uid: params.order_uid || '',
+      },
+    }),
+
+  designDrilldown: (params: {
+    prpcode?: string;
+    yearno?: string;
+    dsncode: string | number;
+    from_date?: string;
+    to_date?: string;
+  }) =>
+    client.get('/real-costing-chain/design-drilldown', {
+      params: {
+        prpcode: params.prpcode || 'SIP',
+        yearno: params.yearno || '27',
+        dsncode: params.dsncode,
+        from_date: params.from_date,
+        to_date: params.to_date,
+      },
+    }),
+};
+
 export default client;

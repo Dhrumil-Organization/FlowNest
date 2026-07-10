@@ -398,6 +398,18 @@ const APP_SECTIONS = [
             { id: '44', name: 'Weft Issue Return', screen: 'Weft Issue Return', icon: 'swap-horiz', iconColor: '#991070' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '45', name: 'Purchase Transport Auth', screen: 'Purchase Transport Auth', icon: 'route', iconColor: '#7a2a49' },
+        ],
+    },
+    // {
+    //     title: 'Y',
+    //     data: [
+    //         { id: '45', name: 'Manufacturing Control Tower', screen: 'Real VS Actual Costing', icon: 'swap-horiz', iconColor: '#991070' },
+    //     ],
+    // },
 ];
 
 interface Props {
@@ -749,6 +761,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Quarter Summary",
                 //                         "href": "/"
                 //                     },
+                //                     {
+                //                         "title": "Event",
+                //                         "href": "/"
+                //                     },
+                //                     {
+                //                         "title": "Purchase Transport Auth",
+                //                         "href": "/"
+                //                     },                                   
                 //                 ]
                 //             }
                 //         ]

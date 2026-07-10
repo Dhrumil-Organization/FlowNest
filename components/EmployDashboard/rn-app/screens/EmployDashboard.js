@@ -15,7 +15,7 @@ import SalesExecDashboardScreen from './SalesExecDashboardScreen';
 import LinearGradient from 'react-native-linear-gradient';
 import HeaderBarwithBack from '../../../HeaderBarwithBack/HeaderBarwithBack';
 import theme from '../../../../android/app/src/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 /**
  * MainDashboardScreen

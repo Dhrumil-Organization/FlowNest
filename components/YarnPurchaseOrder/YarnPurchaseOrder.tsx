@@ -570,6 +570,26 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             fontSize: 12,
             textAlign: 'center',
         },
+
+        prpCodeContainer: {
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 10,
+            backgroundColor: '#F5F7FA',
+            paddingVertical: 8,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: '#E0E0E0',
+        },
+
+        prpCodeText: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: '#000',
+            textAlign: 'center',
+            letterSpacing: 1,
+        },
     });
 
     useEffect(() => {
@@ -1731,6 +1751,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             <View style={crlimtreq_styles.cardHeaderContainer}>
                 <View style={crlimtreq_styles.cardHeader}><Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text></View>
             </View>
+            <View style={crlimtreq_styles.cardSubHeader1}>
+                <Text style={crlimtreq_styles.cardSubHeaderText1}>{item.PrpCode}</Text>
+            </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
             </View>
@@ -1908,6 +1931,15 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     isRejected ? styles.rejectedCard : null
             ]}>
 
+
+                <View style={styles.headerRow}>
+                    <View style={styles.prpCodeContainer}>
+                        <Text style={styles.prpCodeText}>
+                            {item.PrpCode}
+                        </Text>
+                    </View>
+                </View>
+
                 {/* HEADER */}
                 <View style={styles.headerRow}>
                     <View>
@@ -1932,6 +1964,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
                 {/* PARTY */}
                 <Text style={styles.party}>{item.ParName}</Text>
+
 
                 {/* DETAILS */}
                 <View style={styles.row}>
@@ -2157,6 +2190,9 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 <View style={crlimtreq_styles.cardHeader}>
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
+            </View>
+            <View style={crlimtreq_styles.cardSubHeader1}>
+                <Text style={crlimtreq_styles.cardSubHeaderText1}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
@@ -2388,6 +2424,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     </View>
                 )}
 
+                <View style={styles.headerRow}>
+                    <View style={styles.prpCodeContainer}>
+                        <Text style={styles.prpCodeText}>
+                            {item.PrpCode}
+                        </Text>
+                    </View>
+                </View>
                 {/* HEADER */}
                 <View style={styles.headerRow}>
                     <View>
@@ -2409,6 +2452,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         </View>
                     )}
                 </View>
+
+
 
                 {/* PARTY */}
                 <Text style={styles.party}>{item.ParName}</Text>

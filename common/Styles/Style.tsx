@@ -459,6 +459,26 @@ export const crlimtreq_styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+    cardSubHeader1: {
+        // backgroundColor: '#E3F2FD', // Light blue (optional: change to light purple)
+        borderColor: '#B3E5FC',
+        borderWidth: 1,
+        padding: 10,
+        borderRadius: 5,
+        marginBottom: 10,
+        alignSelf: 'flex-start',
+        width: '100%',
+        maxWidth: '100%',
+    },
+    cardSubHeaderText1: {
+        // backgroundColor: '#E3F2FD',
+        color: theme.BRAND_GRADIENT_END,
+        fontSize: 14,
+        fontWeight: '600',
+        textAlign: 'center',
+        width: '100%',      // ✅ Important
+        alignSelf: 'center',
+    },
     cardSubHeaderhistory: {
         // borderColor: theme.BRAND_GRADIENT_END,
         // borderWidth: 2,

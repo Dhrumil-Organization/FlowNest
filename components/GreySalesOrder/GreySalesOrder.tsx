@@ -1022,6 +1022,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
+            <View style={crlimtreq_styles.cardSubHeader1}>
+                <Text style={crlimtreq_styles.cardSubHeaderText1}>{item.PrpCode}</Text>
+            </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
             </View>
@@ -1122,6 +1125,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 <View style={crlimtreq_styles.cardHeader}>
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
+            </View>
+            <View style={crlimtreq_styles.cardSubHeader1}>
+                <Text style={crlimtreq_styles.cardSubHeaderText1}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
@@ -1266,6 +1272,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, navigation, isConnected, usern
                 <View style={crlimtreq_styles.cardHeader}>
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
+            </View>
+            <View style={crlimtreq_styles.cardSubHeader1}>
+                <Text style={crlimtreq_styles.cardSubHeaderText1}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>

@@ -12,12 +12,16 @@ import CostingScreen from './screen//CostingScreen';
 // import OrdersScreen from './screen//OrdersScreen';
 import StockScreen from './screen//StockScreen';
 import ExpenseScreen from './screen//ExpenseScreen';
+import ManufacturingControlTower from './screen/ManufacturingControlTower';
+import RealCostingReferenceDashboard from './screen/RealCostingReferenceDashboard';
 // import ProdScreen from './screen//ProdScreen';
 
 const TABS = [
   // { id: 'home', label: 'Home', Screen: HomeScreen },
   { id: 'designs', label: 'Designs', Screen: DesignsScreen },
-  // { id: 'costing', label: 'Costing', Screen: CostingScreen },
+  // { id: 'ManufacturingControlTower', label: 'Costing Dashboard', Screen: ManufacturingControlTower },
+  // { id: 'RealCostingReferenceDashboard', label: 'Costing Dashboard', Screen: RealCostingReferenceDashboard },
+  { id: 'costing', label: 'Costing', Screen: CostingScreen },
   // { id: 'orders', label: 'Orders', Screen: OrdersScreen },
   { id: 'stock', label: 'Stock', Screen: StockScreen },
   { id: 'expense', label: 'Expense', Screen: ExpenseScreen },

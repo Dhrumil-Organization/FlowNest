@@ -5,6 +5,7 @@ import axios from "axios";
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from "../../common/API/dynamicAPI";
 import CustomSearchableDropdown from '../Shared/CustomSearchableDropdown';
 import Snackbar from 'react-native-snackbar';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const CreelIssueReturnEntry = ({ navigation, route }) => {
 
@@ -54,8 +55,13 @@ const CreelIssueReturnEntry = ({ navigation, route }) => {
         type: "warning"
     });
 
-    const [getPrinters, setPrinters] = useState([])
-    const [printer, setPrinter] = useState('');
+    const [getPrinters, setPrinters] = useState([]);
+    const [printer, setPrinter] = useState("");
+    const [printerLoading, setPrinterLoading] = useState(false);
+    const [printerError, setPrinterError] = useState("");
+    const [printerModalVisible, setPrinterModalVisible] = useState(false);
+    const [selectedPrinterStatus, setSelectedPrinterStatus] = useState("");
+    const [printerSearch, setPrinterSearch] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [getSavedData, setGetSavedData] = useState({});
     const [getDataSaved, setDataSaved] = useState(false)
@@ -541,12 +547,11 @@ const CreelIssueReturnEntry = ({ navigation, route }) => {
     };
 
     const printSticker = () => {
-        // if (typeof printer == 'undefined' || printer == null || printer == '') {
-        //     Alert.alert('Please select printer first.');
-        //     return false;
-        // } 
-        // else 
-        {
+        if (typeof printer == 'undefined' || printer == null || printer == '') {
+            Alert.alert('Please select printer first.');
+            return false;
+        }
+        else {
             setIsLoading(true);
             console.log('printsticker function :', getSavedData);
             let temppayloadObj = new Object();
@@ -595,7 +600,14 @@ const CreelIssueReturnEntry = ({ navigation, route }) => {
                 };
 
                 // return;
-                axios.post(`${PRINTSTICKER}`, params)
+                // axios.post(`${PRINTSTICKER}`, params)
+                axios.post(
+                    PRINTSTICKER,
+                    params,
+                    {
+                        headers: getPrinterHeaders()
+                    }
+                )
                     .then(response => {
                         setIsLoading(false);
                         const res = response.data;
@@ -637,17 +649,101 @@ const CreelIssueReturnEntry = ({ navigation, route }) => {
         }
     }
 
+    // const getAllPrinters = async () => {
+    //     try {
+    //         const res = await axios.get(PRINTERSLISTAPI);
+    //         const printerList = res.data?.printers || res.data || [];
+    //         setPrinters(printerList);
+    //     } catch (err) {
+    //         console.log("Printer API error:", err);
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // }
+
+
+    const getPrinterHeaders = () => ({
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "x-api-key": "PRINT_SECRET_123",
+    });
+
+    const getPrintersUrl = () =>
+        `${String(API).replace(/\/$/, "")}/api/printers`;
+
+    const normalizePrinterList = (raw) => {
+        const list = raw?.printers || raw?.data?.printers || raw?.data || raw || [];
+
+        if (!Array.isArray(list)) return [];
+
+        return list.map(item => ({
+            ...item,
+            Name: item.Name || item.name,
+            StatusText: item.StatusText || item.status || "Idle",
+        }));
+    };
+
+    const selectPrinter = async (item) => {
+        setPrinter(item.Name);
+        setSelectedPrinterStatus(item.StatusText);
+
+        await AsyncStorage.setItem(
+            "lastSelectedPrinter",
+            item.Name
+        );
+
+        setPrinterModalVisible(false);
+    };
+
+    const getPrinterStatusColor = (status) => {
+        if (status === "Offline") return "#DC2626";
+        return "#16A34A";
+    };
+
     const getAllPrinters = async () => {
+
+        setPrinterLoading(true);
+
         try {
-            const res = await axios.get(PRINTERSLISTAPI);
-            const printerList = res.data?.printers || res.data || [];
-            setPrinters(printerList);
-        } catch (err) {
-            console.log("Printer API error:", err);
+
+            const res = await axios.get(
+                getPrintersUrl(),
+                {
+                    headers: getPrinterHeaders()
+                }
+            );
+
+            const list = normalizePrinterList(res.data);
+
+            setPrinters(list);
+
+            const last = await AsyncStorage.getItem(
+                "lastSelectedPrinter"
+            );
+
+            if (last) {
+                const p = list.find(x => x.Name === last);
+
+                if (p) {
+                    setPrinter(p.Name);
+                    setSelectedPrinterStatus(
+                        p.StatusText
+                    );
+                }
+            }
+
+        } catch (e) {
+
+            setPrinterError("Unable to load printers");
+
         } finally {
-            setIsLoading(false);
+
+            setPrinterLoading(false);
+
         }
-    }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
@@ -953,15 +1049,154 @@ const CreelIssueReturnEntry = ({ navigation, route }) => {
                     )}
                 </TouchableOpacity>
                 {getDataSaved && status === "Close" && (
-                    <TouchableOpacity
-                        style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                        onPress={printSticker}
-                    // disabled={loading}
+                    // <TouchableOpacity
+                    //     style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                    //     onPress={printSticker}
+                    // // disabled={loading}
+                    // >
+                    //     <Text style={{ color: "#fff", fontWeight: "600" }}>
+                    //         Print
+                    //     </Text>
+                    // </TouchableOpacity>
+
+                    <View
+                        style={{
+                            backgroundColor: "#fff",
+                            borderRadius: 18,
+                            padding: 18,
+                            marginTop: 14,
+                            marginBottom: 12,
+                            elevation: 3,
+                            shadowColor: "#000",
+                            shadowOpacity: 0.08,
+                            shadowRadius: 8,
+                        }}
                     >
-                        <Text style={{ color: "#fff", fontWeight: "600" }}>
-                            Print
-                        </Text>
-                    </TouchableOpacity>
+
+                        <View style={{ flexDirection: "row" }}>
+
+                            <View
+                                style={{
+                                    width: 56,
+                                    height: 56,
+                                    borderRadius: 14,
+                                    backgroundColor: "#EAF7FF",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    marginRight: 14
+                                }}>
+
+                                <Icon
+                                    name="print"
+                                    size={30}
+                                    color="#0E83C8"
+                                />
+
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+
+                                <Text
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: "700",
+                                        color: "#111827"
+                                    }}>
+                                    Sticker Printing
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color: "#6B7280",
+                                        marginTop: 2,
+                                        fontSize: 12
+                                    }}>
+                                    Select printer and print saved sticker
+                                </Text>
+
+                            </View>
+
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                if (getPrinters.length === 0) {
+                                    getAllPrinters();
+                                }
+                                setPrinterModalVisible(true);
+                            }}
+                            style={{
+                                marginTop: 18,
+                                borderWidth: 1.5,
+                                borderColor: "#8CCBFF",
+                                borderRadius: 16,
+                                padding: 15,
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                            }}>
+
+                            <View>
+
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: "700",
+                                        color: "#111827"
+                                    }}>
+                                    {printer || "Select Printer"}
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color: "#0F6C7B",
+                                        marginTop: 2,
+                                        fontWeight: "700"
+                                    }}>
+                                    {selectedPrinterStatus || "Idle"}
+                                </Text>
+
+                            </View>
+
+                            <Icon
+                                name="keyboard-arrow-down"
+                                size={28}
+                                color="#374151"
+                            />
+
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={printSticker}
+                            style={{
+                                backgroundColor: "#0F6C7B",
+                                borderRadius: 14,
+                                height: 56,
+                                marginTop: 16,
+                                justifyContent: "center",
+                                alignItems: "center",
+                                flexDirection: "row"
+                            }}>
+
+                            <Icon
+                                name="print"
+                                size={22}
+                                color="#fff"
+                            />
+
+                            <Text
+                                style={{
+                                    color: "#fff",
+                                    fontSize: 18,
+                                    fontWeight: "700",
+                                    marginLeft: 10
+                                }}>
+                                Print Sticker
+                            </Text>
+
+                        </TouchableOpacity>
+
+                    </View>
                 )}
             </ScrollView>
 
@@ -1142,6 +1377,147 @@ const CreelIssueReturnEntry = ({ navigation, route }) => {
                         </TouchableOpacity>
                     </View>
                 </View>
+            </Modal>
+
+            <Modal
+                visible={printerModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setPrinterModalVisible(false);
+                    // setPendingPrintItem(null);
+                    setPrinterSearch("");
+                }}>
+
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: "rgba(0,0,0,.45)",
+                        justifyContent: "flex-end"
+                    }}>
+
+                    <View
+                        style={{
+                            backgroundColor: "#fff",
+                            borderTopLeftRadius: 25,
+                            borderTopRightRadius: 25,
+                            padding: 20,
+                            maxHeight: "80%"
+                        }}>
+
+                        <View
+                            style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: 15,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    fontSize: 20,
+                                    fontWeight: "700",
+                                    color: "#000",
+                                }}
+                            >
+                                Select Printer
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setPrinterModalVisible(false);
+                                    // setPendingPrintItem(null);
+                                    setPrinterSearch("");
+                                }}
+                                style={{
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 22,
+                                    backgroundColor: "#F1F5F9",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                }}
+                            >
+                                <Icon name="close" size={20} color="#111827" />
+                            </TouchableOpacity>
+                        </View>
+
+
+                        <TextInput
+                            placeholder="Search printer..."
+                            value={printerSearch}
+                            onChangeText={setPrinterSearch}
+                            style={{
+                                height: 50,
+                                borderWidth: 1,
+                                borderColor: "#ddd",
+                                borderRadius: 12,
+                                paddingHorizontal: 15,
+                                marginBottom: 15
+                            }}
+                        />
+
+                        <FlatList
+                            data={getPrinters.filter(p =>
+                                p.Name.toLowerCase().includes(
+                                    printerSearch.toLowerCase()
+                                )
+                            )}
+                            keyExtractor={(i) => i.Name}
+                            renderItem={({ item }) => (
+
+                                <TouchableOpacity
+
+                                    onPress={() => selectPrinter(item)}
+
+                                    style={{
+                                        padding: 15,
+                                        borderBottomWidth: 1,
+                                        borderColor: "#eee",
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center"
+                                    }}>
+
+                                    <View>
+
+                                        <Text
+                                            style={{
+                                                fontWeight: "700",
+                                                fontSize: 15,
+                                                color: "#000"
+                                            }}>
+                                            {item.Name}
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: getPrinterStatusColor(
+                                                    item.StatusText
+                                                )
+                                            }}>
+                                            {item.StatusText}
+                                        </Text>
+
+                                    </View>
+
+                                    {printer === item.Name &&
+                                        <Icon
+                                            name="check-circle"
+                                            size={24}
+                                            color="#16A34A"
+                                        />
+                                    }
+
+                                </TouchableOpacity>
+
+                            )}
+                        />
+
+                    </View>
+
+                </View>
+
             </Modal>
         </View>
     );

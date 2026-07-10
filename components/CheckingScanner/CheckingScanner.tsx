@@ -1353,12 +1353,12 @@ const CheckingScanner: React.FC<Props> = ({
             const payload = {
                 prptype: userPtype,
                 yearno: getCurrentFinancialYear(),
-                txntype: "chekingScanner",
+                txntype: "cheking_scanner_list",
                 ShfCode: "",
                 ChkDate: "",
                 PrpCode: "",
                 BeamNo: "",
-                ImgTag: txntype === "manual_checking" ? 2 : 1,
+                // ImgTag: txntype === "manual_checking" ? 2 : 1,
             };
 
             console.log("scanner list Payload:", payload);
@@ -1477,6 +1477,7 @@ const CheckingScanner: React.FC<Props> = ({
             console.log("DELETE RESPONSE =>", response.data);
 
             if (response.data.success) {
+                setIsDeleteLoading(false);
                 const updatedData = scannerCardData.filter(
                     (data) => data.UId !== selectedDeleteItem.UId,
                 );

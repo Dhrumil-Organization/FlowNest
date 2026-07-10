@@ -13,7 +13,7 @@
 //       PPI greige  = PPI(loom) + 2               (table pick)
 //       PPI finished= PPI greige ÷ (1 − finish shrink)
 // ═══════════════════════════════════════════════════════════════
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
     View, Text, ScrollView, FlatList, TextInput,
     TouchableOpacity, StyleSheet, Alert, RefreshControl,
@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { T } from '../../../common/utils/theme';
-import { DesignAPI, type Design, type SubDesign, type YarnMaster, ItemAPI, type GetItem } from '../../../common/API/client';
+import client, { DesignAPI, type Design, type SubDesign, type YarnMaster, ItemAPI, type GetItem } from '../../../common/API/client';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -31,9 +31,35 @@ const f1 = (n: number) => n > 0 ? n.toFixed(1) : '—';
 const TABS = ['Catalog', 'Design', 'Colourway', 'Yarns', 'Dyeing'] as const;
 type Tab = typeof TABS[number];
 
+const getCurrentFinancialYear = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1;
+
+    const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+    return financialYear.toString().substring(2);
+};
+
 const DEFAULT_PRPCODE = 'SIP';
 const DEFAULT_STRCODE = '002';
-const DEFAULT_YEARNO = '27';
+const DEFAULT_YEARNO = getCurrentFinancialYear();
+
+type ERPContextValue = { prpcode: string; strcode: string; yearno: string };
+
+const DEFAULT_ERP_CONTEXT: ERPContextValue = {
+    prpcode: DEFAULT_PRPCODE,
+    strcode: DEFAULT_STRCODE,
+    yearno: DEFAULT_YEARNO,
+};
+
+const ERPContext = createContext<ERPContextValue>(DEFAULT_ERP_CONTEXT);
+
+function useERP(): ERPContextValue {
+    return useContext(ERPContext);
+}
+
+type DesignOptionShade = { color_name: string; hex: string; shade_no?: string };
+type DesignOptions = { shades: DesignOptionShade[]; blend_options: string[] };
 
 // ═══════════════════════════════════════════════════════════════
 // SHARED FABRIC MATH — mirrors app/Services/CostingEngine.php
@@ -360,7 +386,7 @@ const ls = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 // SHARED: Server Search Yarn Picker Modal
 // Used by Warp / Weft / Selvedge. It does NOT depend on first 300 yarns.
-// Every search calls: GET /api/yarns?search=<text>&limit=50&yearno=27
+// Every search uses DEFAULT_PRPCODE, DEFAULT_STRCODE and the current financial year
 // ═══════════════════════════════════════════════════════════════
 function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: {
     visible: boolean;
@@ -368,6 +394,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
     onSelect: (y: YarnMaster) => void;
     onClose: () => void;
 }) {
+    const { prpcode, strcode, yearno } = useERP();
     const [search, setSearch] = useState('');
     const [yarns, setYarns] = useState<YarnMaster[]>([]);
     const [loading, setLoading] = useState(false);
@@ -377,9 +404,9 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
         setLoading(true);
         try {
             const res = await (DesignAPI.yarns as any)({
-                yearno: DEFAULT_YEARNO,
-                prpcode: DEFAULT_PRPCODE,
-                strcode: DEFAULT_STRCODE,
+                yearno: yearno,
+                prpcode: prpcode,
+                strcode: strcode,
                 limit: 50,
                 search: q.trim() || undefined,
             });
@@ -471,6 +498,7 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
     onSelect: (value: GetItem) => void;
     onClose: () => void;
 }) {
+    const { prpcode, strcode, yearno } = useERP();
     const [search, setSearch] = useState('');
     const [categories, setCategories] = useState<GetItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -482,42 +510,49 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
 
         try {
             const res = await ItemAPI.getItem({
-                yearno: DEFAULT_YEARNO,
-                prpcode: DEFAULT_PRPCODE,
-                strcode: DEFAULT_STRCODE,
+                yearno: yearno,
+                prpcode: prpcode,
+                strcode: strcode,
                 txntype: 'design_master',
                 isall: 1,
                 billdate: '',
                 itmcode: '',
                 ttype: [8, 3, 30, 2, 34, 83, 42],
-                fetch: q.trim(),
+                fetch: '',
             });
 
             console.log("ITEM RESPONSE =>", res.data);
 
             const list = res.data.response?.data || [];
+            // const filtered = q.trim()
+            //     ? list.filter((item: any) =>
+            //         item.ItmName?.toLowerCase().includes(q.toLowerCase()) ||
+            //         item.ItmCode?.toLowerCase().includes(q.toLowerCase())
+            //     )
+            //     : list;
 
+            // setCategories(list);
             setCategories(list);
 
-            console.log("CATEGORY SEARCH OK", {
-                search: q,
-                count: list.length,
-                url: res.config?.url,
-                baseURL: res.config?.baseURL,
-                params: res.config?.params,
-            });
+            // console.log("CATEGORY SEARCH OK", {
+            //     search: q,
+            //     count: list.length,
+            //     url: res.config?.url,
+            //     baseURL: res.config?.baseURL,
+            //     params: res.config?.params,
+            // });
 
         } catch (e: any) {
 
-            console.log("CATEGORY SEARCH ERROR", {
-                message: e?.message,
-                code: e?.code,
-                status: e?.response?.status,
-                data: e?.response?.data,
-                baseURL: e?.config?.baseURL,
-                url: e?.config?.url,
-                params: e?.config?.params,
-            });
+            // console.log("CATEGORY SEARCH ERROR", {
+            //     message: e?.message,
+            //     code: e?.code,
+            //     status: e?.response?.status,
+            //     data: e?.response?.data,
+            //     baseURL: e?.config?.baseURL,
+            //     url: e?.config?.url,
+            //     params: e?.config?.params,
+            // });
 
             setCategories([]);
 
@@ -529,24 +564,41 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
 
     }, [visible]);
 
-    useEffect(() => {
+    // useEffect(() => {
 
+    //     if (!visible) return;
+
+    //     const t = setTimeout(
+    //         () => loadCategories(search),
+    //         search.trim() ? 350 : 0
+    //     );
+
+    //     return () => clearTimeout(t);
+
+    // }, [visible, search, loadCategories]);
+
+    useEffect(() => {
         if (!visible) return;
 
-        const t = setTimeout(
-            () => loadCategories(search),
-            search.trim() ? 350 : 0
-        );
-
-        return () => clearTimeout(t);
-
-    }, [visible, search, loadCategories]);
+        loadCategories();
+    }, [visible]);
 
     const closePicker = () => {
         onClose();
         setSearch('');
         setCategories([]);
     };
+
+    const filteredCategories = useMemo(() => {
+        const q = search.trim().toLowerCase();
+
+        if (!q) return categories;
+
+        return categories.filter(item =>
+            item.ItmName?.toLowerCase().includes(q) ||
+            item.ItmCode?.toLowerCase().includes(q)
+        );
+    }, [categories, search]);
 
     return (
         <Modal
@@ -577,6 +629,10 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
                         <TextInput
                             value={search}
                             onChangeText={setSearch}
+                            // onChangeText={(text) => {
+                            //     setSearch(text);
+                            //     loadCategories(text);
+                            // }}
                             placeholder="Search Category..."
                             placeholderTextColor={T.muted}
                             style={yp.search}
@@ -592,8 +648,12 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
                     )}
 
                     <FlatList
-                        data={categories}
-                        keyExtractor={(item) => item.ItmCode}
+                        // data={categories}
+                        data={filteredCategories}
+                        // keyExtractor={(item) => item.ItmCode}
+                        keyExtractor={(item, index) =>
+                            `${item.ItmCode}_${item.ItmName}_${index}`
+                        }
                         keyboardShouldPersistTaps="handled"
                         renderItem={({ item }) => (
                             <TouchableOpacity
@@ -666,33 +726,37 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
     const key = type === 'warp' ? 'epi' : type === 'weft' ? 'ppi' : 'ends';
     const lbl = type === 'warp' ? 'EPI' : type === 'weft' ? 'PPI' : 'ENDS';
     return (
-        <View style={yl.row}>
-            <View style={{ flex: 1 }}>
-                <Text style={yl.name}>{yarn.name}</Text>
-                <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}{yarn.blend_ratio ? ` · ${yarn.blend_ratio}` : ''}</Text>
+        <View style={yl.card}>
+            <View style={yl.row}>
+                <View style={{ flex: 1 }}>
+                    <Text style={yl.name}>{yarn.name}</Text>
+                    <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}</Text>
+                </View>
+                {type === 'warp' && (
+                    <TouchableOpacity style={[yl.sizingChip, yarn.sizing && yl.sizingChipOn]}
+                        onPress={() => onChange('sizing', !yarn.sizing)}>
+                        <Text style={[yl.sizingTxt, yarn.sizing && yl.sizingTxtOn]}>Sizing</Text>
+                    </TouchableOpacity>
+                )}
+                <View style={yl.epiWrap}>
+                    <TextInput value={String(yarn[key] ?? '')}
+                        onChangeText={v => onChange(key, parseFloat(v) || 0)} keyboardType="numeric" style={yl.epiInput} />
+                    <Text style={yl.epiLabel}>{lbl}</Text>
+                </View>
+                <TouchableOpacity onPress={onRemove} style={{ paddingLeft: 8 }}><Text style={{ color: T.pd, fontSize: 18 }}>✕</Text></TouchableOpacity>
             </View>
-            {/* ✅ MISSING #2 — Sizing toggle (warp yarns only) */}
-            {type === 'warp' && (
-                <TouchableOpacity
-                    style={[yl.sizingChip, yarn.sizing && yl.sizingChipOn]}
-                    onPress={() => onChange('sizing', !yarn.sizing)}>
-                    <Text style={[yl.sizingTxt, yarn.sizing && yl.sizingTxtOn]}>Sizing</Text>
-                </TouchableOpacity>
-            )}
-            <View style={yl.epiWrap}>
-                <TextInput value={String(yarn[key] ?? '')} onChangeText={v => onChange(key, parseFloat(v) || 0)}
-                    keyboardType="numeric" style={yl.epiInput} />
-                <Text style={yl.epiLabel}>{lbl}</Text>
-            </View>
-            <TouchableOpacity onPress={onRemove} style={{ paddingLeft: 8 }}>
-                <Text style={{ color: T.pd, fontSize: 18 }}>✕</Text>
-            </TouchableOpacity>
+            <Text style={yl.blendLabel}>BLEND / SUB ITEM</Text>
+            <TextInput value={yarn.blend_ratio ?? ''}
+                onChangeText={v => onChange('blend_ratio', v.trim() || null)}
+                placeholder="Pure or ratio/sub-item, e.g. 65/35"
+                placeholderTextColor={T.muted} style={yl.blendInput} />
         </View>
     );
 }
 const yl = StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 6, gap: 8 },
-    name: { fontSize: 13, fontWeight: '600', color: T.ink },
+    card: { backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    name: { fontSize: 13, fontWeight: '700', color: T.ink },
     sub: { fontSize: 11, color: T.muted, marginTop: 2 },
     sizingChip: { borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: T.sub },
     sizingChipOn: { backgroundColor: T.copper + '22', borderColor: T.copper },
@@ -701,12 +765,15 @@ const yl = StyleSheet.create({
     epiWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     epiInput: { backgroundColor: T.sub, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13, color: T.ink, width: 56, textAlign: 'center' },
     epiLabel: { fontSize: 11, color: T.muted, fontWeight: '600' },
+    blendLabel: { fontSize: 9, color: T.muted, fontWeight: '700', letterSpacing: 0.5, marginTop: 10, marginBottom: 6 },
+    blendInput: { backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, color: T.ink, fontSize: 12 },
 });
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 1 — CATALOG
 // ═══════════════════════════════════════════════════════════════
-function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void }) {
+function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Design) => void; onEditDesign: (d: Design) => void; }) {
+    const { yearno } = useERP();
     const [designs, setDesigns] = useState<Design[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -722,7 +789,7 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
     const load = useCallback(async (page = 1) => {
         try {
             const res = await DesignAPI.list({
-                yearno: DEFAULT_YEARNO,
+                yearno: yearno,
                 page,
                 per_page: 50,
                 limit: 50,
@@ -736,6 +803,8 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                 params: res.config?.params,
                 status: res.status,
             });
+
+            console.log("Design res", res)
 
             const body: any = res.data;
             const rows: Design[] = Array.isArray(body?.data)
@@ -792,7 +861,7 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
             <View style={{ backgroundColor: T.surface }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ gap: 6, paddingHorizontal: 14, paddingVertical: 8 }}>
-                    {['All', 'Shirting', 'Sportswear', 'Suiting'].map(c => (
+                    {['All', ...Array.from(new Set(designs.map(d => d.category).filter(Boolean)))].map(c => (
                         <TouchableOpacity key={c} onPress={() => setFilter(c)}
                             style={[ct.chip, filter === c && ct.chipActive]}>
                             <Text style={[ct.chipTxt, filter === c && ct.chipTxtActive]}>{c}</Text>
@@ -954,7 +1023,16 @@ function CatalogTab({ onSelectDesign }: { onSelectDesign: (d: Design) => void })
                                                 <View style={ct.cwRow}>
                                                     <Text style={ct.cwTitle}>COLOURWAYS ({det.cw_count ?? 0})</Text>
                                                     <TouchableOpacity style={ct.cwAddBtn} onPress={() => onSelectDesign(det)}>
-                                                        <Text style={ct.cwAddTxt}>+ Add colourway</Text>
+                                                        <Text style={ct.cwAddTxt}>+ Add Sub Design</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        style={[ct.cwAddBtn]}
+                                                        onPress={() => onEditDesign(det)}
+                                                    >
+                                                        <Text style={ct.cwAddTxt}>
+                                                            Update Design
+                                                        </Text>
                                                     </TouchableOpacity>
                                                 </View>
                                             </>
@@ -1029,12 +1107,12 @@ const ct = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 2 — DESIGN  (✅ greige width + sizing + Live Spec panel)
+// TAB 2 — DESIGN  (Reed Space input + calculated Greige Width + Live Spec)
 // ═══════════════════════════════════════════════════════════════
 const EMPTY_FORM = {
     code: '', category: '', type: 'YD',
-    weave: '', reed_space: 64, greige_width: 0, warp_shrink: 6, gf_shrink: 5,
-    fin_width: 0, warp_wastage: 0, weft_wastage: 6,
+    weave: '', reed_space: 0, greige_width: 0, warp_shrink: 0, gf_shrink: 0,
+    fin_width: 0, warp_wastage: 0, weft_wastage: 0,
     warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
 };
 
@@ -1063,9 +1141,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     // ✅ MISSING #1 — greige width ⇄ reed space, kept in sync live
     const shrinkFrac = (Number(form.warp_shrink) || 0) / 100;
     const autoGreige = (Number(form.reed_space) || 0) * (1 - shrinkFrac);
-    const autoReed = shrinkFrac < 1 && (Number(form.greige_width) || 0) > 0
-        ? (Number(form.greige_width) || 0) / (1 - shrinkFrac) : 0;
-    const isReedBasis = form.width_basis !== 'greige';
 
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
@@ -1088,13 +1163,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             // send both widths — backend resolves from width_basis
             const payload = {
                 ...form,
-                reed_space: isReedBasis ? form.reed_space : autoReed,
-                greige_width: isReedBasis ? autoGreige : form.greige_width,
+                width_basis: 'reed',
+                reed_space: form.reed_space,
+                greige_width: autoGreige,
             };
             if (design?.id) await DesignAPI.update(design.id, payload);
             else await DesignAPI.create(payload);
             Alert.alert('Saved', 'Design saved successfully'); onRefresh();
-        } catch (e: any) { Alert.alert('Error', e.message); }
+        } catch (e: any) { Alert.alert('Error', e?.response?.data?.message || e?.message || 'Unable to save design'); }
         finally { setSaving(false); }
     };
 
@@ -1166,35 +1242,23 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 <TextInput value={form.weave ?? ''} onChangeText={v => set('weave', v)} placeholder="e.g. Dobby — fine dobby" placeholderTextColor={T.muted} style={fm.input} />
 
                 <Text style={fm.label}>WIDTH BASIS</Text>
-                <Text style={fm.hint}>how you enter the warp width</Text>
+                <Text style={fm.hint}>Reed Space is the construction anchor. Greige Width is calculated automatically.</Text>
                 <View style={fm.chipRow}>
-                    <Chip label="Reed space" active={isReedBasis} onPress={() => set('width_basis', 'reed')} />
-                    <Chip label="Greige width" active={!isReedBasis} onPress={() => {
-                        // seed greige from current reed so the value doesn't jump
-                        setForm((f: any) => ({
-                            ...f, width_basis: 'greige',
-                            greige_width: f.greige_width > 0 ? f.greige_width
-                                : +((Number(f.reed_space) || 0) * (1 - (Number(f.warp_shrink) || 0) / 100)).toFixed(2),
-                        }));
-                    }} />
+                    <View style={[fm.chip, fm.chipActive]}>
+                        <Text style={[fm.chipTxt, fm.chipTxtActive]}>Reed space</Text>
+                    </View>
+                    <View style={[fm.chip, fm.chipDisabled]}>
+                        <Text style={[fm.chipTxt, fm.chipDisabledTxt]}>Greige width · auto</Text>
+                    </View>
                 </View>
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={fm.label}>REED SPACE</Text>
-                        {isReedBasis ? (
-                            <View style={fm.inputRow}>
-                                <TextInput value={String(form.reed_space ?? '')} onChangeText={v => set('reed_space', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} />
-                                <Text style={fm.unit}>"</Text>
-                            </View>
-                        ) : (
-                            <View style={fm.inputRow}>
-                                <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
-                                    <Text style={fm.roTxt}>{autoReed > 0 ? autoReed.toFixed(1) : '—'}</Text>
-                                </View>
-                                <Text style={fm.unit}>"</Text>
-                            </View>
-                        )}
+                        <Text style={fm.label}>REED SPACE · INPUT</Text>
+                        <View style={fm.inputRow}>
+                            <TextInput value={String(form.reed_space ?? '')} onChangeText={v => set('reed_space', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} />
+                            <Text style={fm.unit}>"</Text>
+                        </View>
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>WARP SHRINK</Text>
@@ -1205,30 +1269,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     </View>
                 </View>
 
-                {/* ✅ MISSING #1 — GREIGE WIDTH field */}
-                <Text style={fm.label}>GREIGE WIDTH</Text>
-                <Text style={fm.hint}>
-                    {isReedBasis
-                        ? `auto = reed × (1 − ${form.warp_shrink || 0}% warp take-up)`
-                        : `reed space is derived: greige ÷ (1 − ${form.warp_shrink || 0}%)`}
-                </Text>
-                {isReedBasis ? (
-                    <View style={fm.inputRow}>
-                        <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
-                            <Text style={fm.roTxt}>{autoGreige > 0 ? autoGreige.toFixed(1) : '—'}</Text>
-                        </View>
-                        <Text style={fm.unit}>"</Text>
+                <Text style={fm.label}>GREIGE WIDTH · CALCULATED</Text>
+                <Text style={fm.hint}>Greige Width = Reed Space × (1 − Warp Shrink)</Text>
+                <View style={fm.inputRow}>
+                    <View style={[fm.input, fm.inputRO, { flex: 1 }]}>
+                        <Text style={fm.roTxt}>{autoGreige > 0 ? autoGreige.toFixed(1) : '—'}</Text>
                     </View>
-                ) : (
-                    <View style={fm.inputRow}>
-                        <TextInput
-                            value={form.greige_width ? String(form.greige_width) : ''}
-                            onChangeText={v => set('greige_width', parseFloat(v) || 0)}
-                            keyboardType="numeric" style={[fm.input, { flex: 1 }]}
-                            placeholder="57.7" placeholderTextColor={T.muted} />
-                        <Text style={fm.unit}>"</Text>
-                    </View>
-                )}
+                    <Text style={fm.unit}>"</Text>
+                </View>
 
                 <Text style={fm.label}>WARP YARNS</Text>
                 {(form.warp_yarns ?? []).map((y: any, i: number) => (
@@ -1279,14 +1327,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         <Text style={fm.label}>FINISHED WIDTH</Text>
                         <Text style={fm.hint}>optional</Text>
                         <View style={fm.inputRow}>
-                            <TextInput value={form.fin_width ? String(form.fin_width) : ''} onChangeText={v => set('fin_width', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="58" placeholderTextColor={T.muted} />
+                            <TextInput editable={!form.finish_locked} value={form.fin_width ? String(form.fin_width) : ''} onChangeText={v => set('fin_width', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="58" placeholderTextColor={T.muted} />
                             <Text style={fm.unit}>"</Text>
                         </View>
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={fm.label}>FINISH SHRINK</Text>
                         <View style={fm.inputRow}>
-                            <TextInput value={String(form.gf_shrink ?? '5')} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="5" placeholderTextColor={T.muted} />
+                            <TextInput editable={!form.finish_locked} value={String(form.gf_shrink ?? '5')} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="5" placeholderTextColor={T.muted} />
                             <Text style={fm.unit}>%</Text>
                         </View>
                     </View>
@@ -1295,8 +1343,9 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 {/* ✅ MISSING #3 — LIVE SPEC panel (updates as you type) */}
                 <LiveSpecPanel design={{
                     ...form,
-                    reed_space: isReedBasis ? form.reed_space : autoReed,
-                    greige_width: isReedBasis ? autoGreige : form.greige_width,
+                    width_basis: 'reed',
+                    reed_space: form.reed_space,
+                    greige_width: autoGreige,
                 }} />
 
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
@@ -1329,6 +1378,9 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     );
 }
 const fm = StyleSheet.create({
+    fixedBasis: { backgroundColor: T.sub, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12 },
+    fixedBasisTitle: { fontSize: 12, fontWeight: '800', color: T.ink },
+    fixedBasisText: { fontSize: 11, lineHeight: 16, color: T.muted, marginTop: 4 },
     editBanner: { backgroundColor: T.copper + '15', borderWidth: 1, borderColor: T.copper + '55', borderRadius: 10, padding: 12, marginBottom: 4 },
     editTxt: { fontSize: 12, color: T.ink, lineHeight: 17 },
     editCancel: { fontSize: 12, fontWeight: '700', color: T.copper, marginTop: 6 },
@@ -1342,8 +1394,10 @@ const fm = StyleSheet.create({
     chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
     chip: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: T.sub },
     chipActive: { backgroundColor: T.ink },
+    chipDisabled: { backgroundColor: T.sub, borderWidth: 1, borderColor: T.border },
     chipTxt: { fontSize: 13, fontWeight: '600', color: T.muted },
     chipTxtActive: { color: '#fff' },
+    chipDisabledTxt: { color: T.muted },
     addBtn: { borderWidth: 1.5, borderColor: T.copper, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginBottom: 4 },
     addBtnTxt: { fontSize: 14, fontWeight: '700', color: T.copper },
     saveBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
@@ -1351,15 +1405,16 @@ const fm = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 3 — COLOURWAY
+// TAB 3 — SUB DESIGN / COLOURWAY
+// Each yarn has its own independent shade-band builder.
+// Same/different shades and multiple shades per yarn are supported.
 // ═══════════════════════════════════════════════════════════════
-
-// Design picker for Colourway tab base design selection
 function DesignPickerModal({ visible, onSelect, onClose }: {
     visible: boolean;
     onSelect: (d: Design) => void;
     onClose: () => void;
 }) {
+    const { yearno } = useERP();
     const [designs, setDesigns] = useState<Design[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
@@ -1367,20 +1422,20 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
     useEffect(() => {
         if (!visible) return;
         setLoading(true);
-        DesignAPI.list({ page: 1, per_page: 200, limit: 200, yearno: '27' } as any)
+        DesignAPI.list({ page: 1, per_page: 200, limit: 200, yearno: yearno } as any)
             .then(r => {
-                const envelope = (r.data as any).data;
-                const rows = Array.isArray(envelope) ? envelope : (envelope?.data ?? []);
-                setDesigns(rows);
+                const envelope: any = r.data.data;
+                setDesigns(Array.isArray(envelope) ? envelope : (envelope?.data ?? []));
             })
-            .catch((e: any) => console.log('DESIGN PICKER ERROR', { message: e?.message, status: e?.response?.status, data: e?.response?.data, baseURL: e?.config?.baseURL, url: e?.config?.url }))
+            .catch(() => setDesigns([]))
             .finally(() => setLoading(false));
     }, [visible]);
 
     const filtered = useMemo(() => {
-        const q = search.toLowerCase();
-        if (!q) return designs;
-        return designs.filter(d => d.code.toLowerCase().includes(q) || d.category.toLowerCase().includes(q));
+        const q = search.trim().toLowerCase();
+        return !q ? designs : designs.filter(d =>
+            d.code.toLowerCase().includes(q) || String(d.category || '').toLowerCase().includes(q)
+        );
     }, [designs, search]);
 
     return (
@@ -1389,30 +1444,22 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
                 <View style={yp.sheet}>
                     <View style={yp.handle} />
                     <View style={yp.header}>
-                        <Text style={yp.title}>Base design</Text>
-                        <TouchableOpacity onPress={() => { onClose(); setSearch(''); }} style={yp.closeBtn}>
-                            <Text style={yp.closeTxt}>✕</Text>
-                        </TouchableOpacity>
+                        <Text style={yp.title}>Select Main Design</Text>
+                        <TouchableOpacity onPress={onClose} style={yp.closeBtn}><Text style={yp.closeTxt}>✕</Text></TouchableOpacity>
                     </View>
                     <View style={yp.searchWrap}>
-                        <TextInput value={search} onChangeText={setSearch} placeholder="Search..."
-                            placeholderTextColor={T.muted} style={yp.search} autoFocus />
+                        <TextInput value={search} onChangeText={setSearch} placeholder="Search design..." placeholderTextColor={T.muted} style={yp.search} />
                     </View>
                     {loading ? <ActivityIndicator color={T.copper} style={{ padding: 24 }} /> : (
-                        <FlatList data={filtered} keyExtractor={d => d.id} keyboardShouldPersistTaps="handled"
-                            renderItem={({ item: d }) => (
-                                <TouchableOpacity style={[yp.row, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-                                    activeOpacity={0.7}
-                                    onPress={() => { onSelect(d); onClose(); setSearch(''); }}>
-                                    <View>
-                                        <Text style={yp.yarnName}>{d.code}</Text>
-                                        <Text style={yp.yarnSub}>{SHORT(d.category)}</Text>
-                                    </View>
-                                    <TypeBadge type={d.type} />
+                        <FlatList
+                            data={filtered}
+                            keyExtractor={d => d.id}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity style={yp.row} onPress={() => { onSelect(item); onClose(); }}>
+                                    <Text style={yp.yarnName}>{item.code}</Text>
+                                    <Text style={yp.yarnSub}>{item.category} · {item.type}</Text>
                                 </TouchableOpacity>
                             )}
-                            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />}
-                            contentContainerStyle={{ paddingBottom: 40 }}
                         />
                     )}
                 </View>
@@ -1421,296 +1468,340 @@ function DesignPickerModal({ visible, onSelect, onClose }: {
     );
 }
 
-// Shade picker modal
+type Shade = { color_name: string; hex: string; shade_no?: string };
+type ShadeBand = Shade & { mi_id: string; blend_ratio?: string | null; thread_count: number };
+
 function ShadePickerModal({ visible, onSelect, onClose }: {
     visible: boolean;
-    onSelect: (shade: { color_name: string; hex: string; shade_no?: string }) => void;
+    onSelect: (shade: Shade) => void;
     onClose: () => void;
 }) {
+    const { prpcode, strcode, yearno } = useERP();
     const [search, setSearch] = useState('');
+    const [rows, setRows] = useState<Shade[]>([]);
+    const [name, setName] = useState('');
+    const [shadeNo, setShadeNo] = useState('');
+    const [hex, setHex] = useState('#808080');
 
-    // Mock shade data — replace with API call when shade endpoint available
-    const shades = [
-        { color_name: 'Navy', hex: '#1B2A6B', suppliers: [{ name: 'Rainbow Dyechem', shade_no: 'RB-Navy-2231', code: 'SH-1001' }, { name: 'Colortex', shade_no: '12-NAVY', code: 'SH-1002' }] },
-        { color_name: 'White', hex: '#FFFFFF', suppliers: [{ name: 'Spectrum Dyes', shade_no: 'OBA-Bright', code: 'SH-1003' }] },
-        { color_name: 'Sky Blue', hex: '#87CEEB', suppliers: [{ name: 'Rainbow Dyechem', shade_no: 'RB-Sky-1180', code: 'SH-1004' }] },
-        { color_name: 'Royal Blue', hex: '#4169E1', suppliers: [{ name: 'Colortex', shade_no: '22-ROYAL', code: 'SH-1005' }] },
-        { color_name: 'Black', hex: '#000000', suppliers: [{ name: 'Spectrum Dyes', shade_no: 'SP-Jet-990', code: 'SH-1006' }] },
-        { color_name: 'Charcoal', hex: '#36454F', suppliers: [{ name: 'Spectrum Dyes', shade_no: 'SP-Char-400', code: 'SH-1007' }] },
-        { color_name: 'Indigo Navy', hex: '#003153', suppliers: [{ name: 'Rainbow Dyechem', shade_no: 'RB-Indigo-500', code: 'SH-1008' }, { name: 'Colortex', shade_no: 'IND-NAVY', code: 'SH-1009' }] },
-        { color_name: 'Olive', hex: '#808000', suppliers: [{ name: 'Spectrum Dyes', shade_no: 'SP-Olive-22', code: 'SH-1010' }] },
-        { color_name: 'Beige', hex: '#F5F5DC', suppliers: [{ name: 'Rainbow Dyechem', shade_no: 'RB-Beige-100', code: 'SH-1011' }] },
-        { color_name: 'Red', hex: '#CC0000', suppliers: [{ name: 'Colortex', shade_no: 'RED-202', code: 'SH-1012' }] },
-    ];
+    useEffect(() => {
+        if (!visible) return;
+        client.get('/design-options', { params: { prpcode, strcode, yearno } })
+            .then(r => setRows(r.data?.data?.shades || []))
+            .catch(() => setRows([]));
+    }, [visible, prpcode, strcode, yearno]);
 
     const filtered = useMemo(() => {
-        const q = search.toLowerCase();
-        if (!q) return shades;
-        return shades.filter(s =>
-            s.color_name.toLowerCase().includes(q) ||
-            s.suppliers.some(sp => sp.name.toLowerCase().includes(q) || sp.shade_no.toLowerCase().includes(q))
-        );
-    }, [search]);
+        const q = search.trim().toLowerCase();
+        return !q ? rows : rows.filter(x => `${x.color_name} ${x.shade_no || ''}`.toLowerCase().includes(q));
+    }, [rows, search]);
+
+    const addManual = () => {
+        if (!name.trim()) { Alert.alert('Shade name required'); return; }
+        onSelect({ color_name: name.trim(), shade_no: shadeNo.trim() || name.trim(), hex: /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : '#808080' });
+        onClose();
+    };
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-            <View style={yp.overlay}>
-                <View style={yp.sheet}>
-                    <View style={yp.handle} />
-                    <View style={yp.header}>
-                        <Text style={yp.title}>Select dyed shade</Text>
-                        <TouchableOpacity onPress={() => { onClose(); setSearch(''); }} style={yp.closeBtn}>
-                            <Text style={yp.closeTxt}>✕</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={yp.searchWrap}>
-                        <TextInput value={search} onChangeText={setSearch}
-                            placeholder="Search colour, code or company..."
-                            placeholderTextColor={T.muted} style={yp.search} autoFocus />
-                    </View>
-                    <ScrollView keyboardShouldPersistTaps="handled" style={{ paddingBottom: 40 }}>
-                        {filtered.map((shade, si) => (
-                            <View key={si}>
-                                <View style={sd.groupHdr}>
-                                    <View style={[sd.colorDot, { backgroundColor: shade.hex, borderWidth: shade.hex === '#FFFFFF' ? 1 : 0, borderColor: T.border }]} />
-                                    <Text style={sd.colorName}>{shade.color_name}</Text>
-                                    <Text style={sd.supplierCount}>{shade.suppliers.length} supplier{shade.suppliers.length > 1 ? 's' : ''}</Text>
-                                </View>
-                                {shade.suppliers.map((sp, spi) => (
-                                    <TouchableOpacity key={spi} style={sd.supplierRow} activeOpacity={0.7}
-                                        onPress={() => { onSelect({ color_name: shade.color_name, hex: shade.hex, shade_no: sp.shade_no }); onClose(); setSearch(''); }}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={sd.supplierName}>{sp.name}</Text>
-                                            <Text style={sd.shadeNo}>Shade no. {sp.shade_no}</Text>
-                                        </View>
-                                        <Text style={sd.shadeCode}>{sp.code}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        ))}
-                        <View style={{ height: 40 }} />
-                    </ScrollView>
+            <View style={yp.overlay}><View style={yp.sheet}>
+                <View style={yp.handle} />
+                <View style={yp.header}><Text style={yp.title}>Select or Add Shade</Text><TouchableOpacity onPress={onClose}><Text style={yp.closeTxt}>✕</Text></TouchableOpacity></View>
+                <View style={yp.searchWrap}><TextInput value={search} onChangeText={setSearch} placeholder="Search saved shades..." placeholderTextColor={T.muted} style={yp.search} /></View>
+                <View style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: T.border }}>
+                    <TextInput value={name} onChangeText={setName} placeholder="Shade name" placeholderTextColor={T.muted} style={yp.search} />
+                    <TextInput value={shadeNo} onChangeText={setShadeNo} placeholder="Shade number/code (optional)" placeholderTextColor={T.muted} style={[yp.search, { marginTop: 8 }]} />
+                    <TextInput value={hex} onChangeText={setHex} placeholder="#RRGGBB" autoCapitalize="none" style={[yp.search, { marginTop: 8 }]} />
+                    <TouchableOpacity onPress={addManual} style={{ backgroundColor: T.copper, borderRadius: 8, padding: 10, alignItems: 'center', marginTop: 8 }}><Text style={{ color: '#fff', fontWeight: '800' }}>Use This Shade</Text></TouchableOpacity>
                 </View>
-            </View>
+                <FlatList data={filtered} keyExtractor={(x, i) => `${x.color_name}-${x.shade_no || ''}-${i}`}
+                    renderItem={({ item }) => <TouchableOpacity style={yp.row} onPress={() => { onSelect(item); onClose(); }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: item.hex || '#808080', borderWidth: 1, borderColor: T.border }} /><View><Text style={yp.yarnName}>{item.color_name}</Text><Text style={yp.yarnSub}>{item.shade_no || ''}</Text></View></View></TouchableOpacity>} />
+            </View></View>
         </Modal>
     );
 }
-const sd = StyleSheet.create({
-    groupHdr: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: T.bg },
-    colorDot: { width: 20, height: 20, borderRadius: 10 },
-    colorName: { fontSize: 14, fontWeight: '700', color: T.ink, flex: 1 },
-    supplierCount: { fontSize: 11, color: T.muted },
-    supplierRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, paddingLeft: 44, backgroundColor: T.surface, borderTopWidth: 1, borderTopColor: T.border },
-    supplierName: { fontSize: 13, fontWeight: '600', color: T.copper },
-    shadeNo: { fontSize: 11, color: T.muted, marginTop: 2 },
-    shadeCode: { fontSize: 12, fontWeight: '700', color: T.copper },
-});
+
+function YarnShadeBlock({ yarn, direction, bands, onChange }: {
+    yarn: any;
+    direction: 'warp' | 'weft';
+    bands: ShadeBand[];
+    onChange: (rows: ShadeBand[]) => void;
+}) {
+    const [picker, setPicker] = useState(false);
+    const [pendingShade, setPendingShade] = useState<Shade | null>(null);
+    const [count, setCount] = useState('1');
+    const unit = direction === 'warp' ? `${Number(yarn.epi || 0)} EPI` : `${Number(yarn.ppi || 0)} PPI`;
+
+    const add = () => {
+        if (!pendingShade) { Alert.alert('Shade required', 'Select a shade first.'); return; }
+        const n = Math.max(1, Math.round(Number(count) || 1));
+        onChange([...bands, {
+            ...pendingShade,
+            mi_id: yarn.mi_id,
+            blend_ratio: yarn.blend_ratio ?? null,
+            thread_count: n,
+        }]);
+        setPendingShade(null);
+        setCount('1');
+    };
+
+    return (
+        <View style={cw3.yarnBlock}>
+            <View style={cw3.yarnHeader}>
+                <View style={[cw3.dirBadge, direction === 'weft' && { backgroundColor: T.pd + '20' }]}>
+                    <Text style={[cw3.dirText, direction === 'weft' && { color: T.pd }]}>{direction.toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={cw3.yarnName}>{yarn.name}</Text>
+                    <Text style={cw3.yarnMeta}>{unit}{yarn.blend_ratio ? ` · ${yarn.blend_ratio}` : ''}</Text>
+                </View>
+            </View>
+
+            {bands.length > 0 && (
+                <View style={{ marginTop: 10 }}>
+                    {bands.map((b, i) => (
+                        <View key={`${b.color_name}-${i}`} style={cw3.bandRow}>
+                            <View style={[cw3.bandDot, { backgroundColor: b.hex }]} />
+                            <Text style={cw3.bandName}>{b.color_name}</Text>
+                            <Text style={cw3.bandCount}>{b.thread_count}</Text>
+                            <TouchableOpacity onPress={() => onChange(bands.filter((_, x) => x !== i))}>
+                                <Text style={cw3.remove}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            <View style={cw3.addRow}>
+                <TouchableOpacity style={cw3.shadeSelect} onPress={() => setPicker(true)}>
+                    {pendingShade ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                            <View style={[cw3.bandDot, { backgroundColor: pendingShade.hex }]} />
+                            <Text style={cw3.shadeSelectText}>{pendingShade.color_name}</Text>
+                        </View>
+                    ) : <Text style={cw3.shadeSelectText}>Select shade ▾</Text>}
+                </TouchableOpacity>
+                <TextInput value={count} onChangeText={setCount} keyboardType="numeric" style={cw3.countInput} />
+                <TouchableOpacity style={cw3.addBandBtn} onPress={add}><Text style={cw3.addBandText}>Add</Text></TouchableOpacity>
+            </View>
+
+            <ShadePickerModal visible={picker} onSelect={setPendingShade} onClose={() => setPicker(false)} />
+        </View>
+    );
+}
 
 function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; onNavigateToCatalog: () => void }) {
     const [baseDesign, setBaseDesign] = useState<Design | null>(design);
     const [showDesignPicker, setShowDesignPicker] = useState(false);
-    const [shadePickerFor, setShadePickerFor] = useState<{ yarnIdx: number; yarnType: 'warp' | 'weft' } | null>(null);
     const [saving, setSaving] = useState(false);
     const [subCode, setSubCode] = useState('');
-    const [selectedShades, setSelectedShades] = useState<Record<string, any>>({});
+    const [commercialName, setCommercialName] = useState('');
+    const [warpBands, setWarpBands] = useState<Record<string, ShadeBand[]>>({});
+    const [weftBands, setWeftBands] = useState<Record<string, ShadeBand[]>>({});
+
+    const loadFull = useCallback(async (d: Design) => {
+        try {
+            const res = await DesignAPI.get(d.id);
+            setBaseDesign({ ...d, ...res.data.data });
+        } catch {
+            setBaseDesign(d);
+        }
+    }, []);
 
     useEffect(() => {
-        if (design) {
-            setBaseDesign(design);
-            const base = design.code?.replace(/\s+/g, '-') ?? 'Design';
-            setSubCode(`${base}-01`);
-        }
-    }, [design?.id]);
+        if (!design) return;
+        loadFull(design);
+        setSubCode(`${design.code.replace(/\s+/g, '-')}-01`);
+        setWarpBands({}); setWeftBands({}); setCommercialName('');
+    }, [design?.id, loadFull]);
 
     const warpYarns = baseDesign?.warp_yarns ?? [];
     const weftYarns = baseDesign?.weft_yarns ?? [];
+    const allWarp = Object.values(warpBands).flat();
+    const allWeft = Object.values(weftBands).flat();
 
     const save = async () => {
-        if (!baseDesign) { Alert.alert('Error', 'Select a base design first'); return; }
+        if (!baseDesign) { Alert.alert('Main Design required'); return; }
+        if (!subCode.trim()) { Alert.alert('Sub Design code required'); return; }
+        if (baseDesign.type === 'YD' && allWarp.length === 0 && allWeft.length === 0) {
+            Alert.alert('Shade pattern required', 'Add at least one warp or weft shade band.'); return;
+        }
+        if (baseDesign.type === 'PD' && !commercialName.trim()) {
+            Alert.alert('Commercial shade required', 'Enter the final piece-dyed shade name.'); return;
+        }
+
         setSaving(true);
         try {
-            const warpColors = warpYarns.map((y: any, i: number) => ({
-                mi_id: y.mi_id, ...(selectedShades[`warp_${i}`] ?? {})
+            const toColors = (rows: ShadeBand[]) => rows.map(r => ({
+                mi_id: r.mi_id, blend_ratio: r.blend_ratio ?? null,
+                shade: r.shade_no ?? r.color_name, color_name: r.color_name, hex: r.hex,
             }));
-            const weftColors = weftYarns.map((y: any, i: number) => ({
-                mi_id: y.mi_id, ...(selectedShades[`weft_${i}`] ?? {})
+            const toPatterns = (rows: ShadeBand[]) => rows.map(r => ({
+                mi_id: r.mi_id, blend_ratio: r.blend_ratio ?? null,
+                shade: r.shade_no ?? r.color_name, color_name: r.color_name, hex: r.hex,
+                thread_count: r.thread_count,
             }));
+
             await DesignAPI.addColourway(baseDesign.id, {
-                code: subCode,
-                warp_colors: warpColors,
-                weft_colors: weftColors,
+                code: subCode.trim(),
+                commercial_name: commercialName.trim() || undefined,
+                warp_colors: toColors(allWarp),
+                weft_colors: toColors(allWeft),
+                warp_patterns: toPatterns(allWarp),
+                weft_patterns: toPatterns(allWeft),
             } as any);
-            Alert.alert('Saved', 'Colourway saved successfully');
-            setSelectedShades({});
-        } catch (e: any) { Alert.alert('Error', e.message); }
-        finally { setSaving(false); }
+
+            Alert.alert('Saved', 'Sub Design saved successfully.');
+            setWarpBands({}); setWeftBands({});
+            setSubCode(`${baseDesign.code.replace(/\s+/g, '-')}-01`);
+        } catch (e: any) {
+            Alert.alert('Save failed', e?.response?.data?.message || e?.message || 'Unable to save Sub Design');
+        } finally { setSaving(false); }
     };
 
     return (
         <>
-            <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-                <Text style={cw2.label}>BASE DESIGN</Text>
-                <TouchableOpacity style={cw2.picker} onPress={() => setShowDesignPicker(true)}>
-                    <Text style={[cw2.pickerTxt, !baseDesign && { color: T.muted }]}>
-                        {baseDesign ? `${baseDesign.code} (${baseDesign.type})` : 'Select main design'}
-                    </Text>
-                    <Text style={{ color: T.muted }}>▾</Text>
+            <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
+                <View style={cw3.intro}>
+                    <Text style={cw3.introTitle}>NEW SUB DESIGN</Text>
+                    <Text style={cw3.introText}>Construction stays in Main Design. This screen stores yarn-wise shades and repeat counts only.</Text>
+                </View>
+
+                <Text style={cw3.label}>MAIN DESIGN</Text>
+                <TouchableOpacity style={cw3.picker} onPress={() => setShowDesignPicker(true)}>
+                    <Text style={cw3.pickerText}>{baseDesign ? `${baseDesign.code} · ${baseDesign.type}` : 'Select Main Design'}</Text>
+                    <Text>▾</Text>
                 </TouchableOpacity>
 
                 {baseDesign && (
                     <>
-                        <Text style={cw2.label}>SUB-DESIGN CODE</Text>
-                        <Text style={cw2.hint}>auto-generated from the main design — non-editable, no duplicates</Text>
-                        <View style={cw2.codeRow}>
-                            <View style={cw2.codeBadge}>
-                                <Text style={cw2.codeBadgeTxt}>{baseDesign.code}</Text>
-                            </View>
-                            <Text style={cw2.codeVal}>{subCode}</Text>
-                            <Text style={cw2.codeAuto}>AUTO</Text>
-                        </View>
+                        <Text style={cw3.label}>SUB DESIGN CODE</Text>
+                        <TextInput value={subCode} onChangeText={setSubCode} style={cw3.input} placeholder="e.g. RIB-145-NAVY" placeholderTextColor={T.muted} />
 
-                        {warpYarns.length > 0 && (
+                        {baseDesign.type === 'YD' ? (
                             <>
-                                <Text style={cw2.label}>WARP YARNS</Text>
-                                <Text style={cw2.hint}>assign a dyed shade to each yarn</Text>
+                                <Text style={cw3.label}>COMMERCIAL NAME</Text>
+                                <TextInput
+                                    value={commercialName}
+                                    onChangeText={setCommercialName}
+                                    style={cw3.input}
+                                    placeholder="optional market name"
+                                    placeholderTextColor={T.muted}
+                                />
+                                <Text style={cw3.section}>WOVEN CHECK</Text>
+                                <View style={cw3.preview}>
+                                    <View style={cw3.previewLine}>
+                                        {[...allWarp, ...allWeft].slice(0, 80).map((b, i) => (
+                                            <View key={i} style={{ width: Math.max(3, Math.min(20, b.thread_count * 2)), height: 42, backgroundColor: b.hex }} />
+                                        ))}
+                                    </View>
+                                    <Text style={cw3.previewText}>{allWarp.length} warp bands · {allWeft.length} weft bands</Text>
+                                </View>
+
+                                <Text style={cw3.section}>WARP SHADES</Text>
                                 {warpYarns.map((y: any, i: number) => {
-                                    const shade = selectedShades[`warp_${i}`];
-                                    return (
-                                        <View key={i} style={cw2.yarnShadeRow}>
-                                            <View style={cw2.yarnBadge}>
-                                                <Text style={cw2.yarnBadgeTxt}>WARP</Text>
-                                            </View>
-                                            <Text style={cw2.yarnNm} numberOfLines={1}>{y.name}</Text>
-                                            {y.blend_ratio ? (
-                                                <View style={cw2.blendBadge}>
-                                                    <Text style={cw2.blendTxt}>{y.blend_ratio}</Text>
-                                                </View>
-                                            ) : null}
-                                            <TouchableOpacity style={[cw2.shadeBtn, shade && { backgroundColor: shade.hex + '30', borderColor: shade.hex }]}
-                                                onPress={() => setShadePickerFor({ yarnIdx: i, yarnType: 'warp' })}>
-                                                {shade ? (
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: shade.hex }} />
-                                                        <Text style={[cw2.shadeBtnTxt, { color: T.ink }]}>{shade.color_name}</Text>
-                                                    </View>
-                                                ) : (
-                                                    <Text style={cw2.shadeBtnTxt}>Select shade ▾</Text>
-                                                )}
-                                            </TouchableOpacity>
-                                        </View>
-                                    );
+                                    const key = `${y.mi_id}|${y.blend_ratio ?? ''}|${i}`;
+                                    return <YarnShadeBlock key={key} yarn={y} direction="warp" bands={warpBands[key] ?? []} onChange={rows => setWarpBands(p => ({ ...p, [key]: rows }))} />;
                                 })}
-                            </>
-                        )}
 
-                        {weftYarns.length > 0 && (
-                            <>
-                                <Text style={cw2.label}>WEFT YARNS</Text>
+                                <Text style={cw3.section}>WEFT SHADES</Text>
                                 {weftYarns.map((y: any, i: number) => {
-                                    const shade = selectedShades[`weft_${i}`];
-                                    return (
-                                        <View key={i} style={cw2.yarnShadeRow}>
-                                            <View style={[cw2.yarnBadge, { backgroundColor: T.pd + '20' }]}>
-                                                <Text style={[cw2.yarnBadgeTxt, { color: T.pd }]}>WEFT</Text>
-                                            </View>
-                                            <Text style={cw2.yarnNm} numberOfLines={1}>{y.name}</Text>
-                                            {y.blend_ratio ? (
-                                                <View style={cw2.blendBadge}>
-                                                    <Text style={cw2.blendTxt}>{y.blend_ratio}</Text>
-                                                </View>
-                                            ) : null}
-                                            <TouchableOpacity style={[cw2.shadeBtn, shade && { backgroundColor: shade.hex + '30', borderColor: shade.hex }]}
-                                                onPress={() => setShadePickerFor({ yarnIdx: i, yarnType: 'weft' })}>
-                                                {shade ? (
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: shade.hex }} />
-                                                        <Text style={[cw2.shadeBtnTxt, { color: T.ink }]}>{shade.color_name}</Text>
-                                                    </View>
-                                                ) : (
-                                                    <Text style={cw2.shadeBtnTxt}>Select shade ▾</Text>
-                                                )}
-                                            </TouchableOpacity>
-                                        </View>
-                                    );
+                                    const key = `${y.mi_id}|${y.blend_ratio ?? ''}|${i}`;
+                                    return <YarnShadeBlock key={key} yarn={y} direction="weft" bands={weftBands[key] ?? []} onChange={rows => setWeftBands(p => ({ ...p, [key]: rows }))} />;
                                 })}
+                            </>
+                        ) : (
+                            <>
+                                <View style={cw3.pdBox}>
+                                    <Text style={cw3.pdTitle}>PIECE-DYED SUB DESIGN</Text>
+                                    <Text style={cw3.pdText}>The complete greige fabric is dyed after weaving. Yarn-wise shade selection is not required.</Text>
+                                </View>
+
+                                <Text style={cw3.label}>COMMERCIAL SHADE</Text>
+                                <TextInput
+                                    value={commercialName}
+                                    onChangeText={setCommercialName}
+                                    style={cw3.input}
+                                    placeholder="e.g. Indigo, Olive, Charcoal"
+                                    placeholderTextColor={T.muted}
+                                />
+
+                                <View style={cw3.preview}>
+                                    <View style={[cw3.previewLine, cw3.pdPreview]}>
+                                        <Text style={cw3.pdPreviewText}>
+                                            {commercialName.trim() || 'GREIGE / SHADE PREVIEW'}
+                                        </Text>
+                                    </View>
+                                    <Text style={cw3.previewText}>Piece-dyed commercial shade</Text>
+                                </View>
                             </>
                         )}
 
-                        <View style={cw2.previewBox}>
-                            <View style={cw2.previewSwatch} />
-                            <View style={{ flex: 1 }}>
-                                <Text style={cw2.previewLabel}>PREVIEW</Text>
-                                <Text style={cw2.previewSub}>
-                                    Warp — {Object.entries(selectedShades).filter(([k]) => k.startsWith('warp')).map(([, v]: any) => v.color_name).join(' / ') || '—'} / Weft — {Object.entries(selectedShades).filter(([k]) => k.startsWith('weft')).map(([, v]: any) => v.color_name).join(' / ') || '—'}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <TouchableOpacity style={[cw2.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
-                            <Text style={cw2.saveTxt}>{saving ? 'Saving…' : 'Save colourway'}</Text>
+                        <TouchableOpacity style={[cw3.save, saving && { opacity: 0.5 }]} disabled={saving} onPress={save}>
+                            <Text style={cw3.saveText}>{saving ? 'Saving…' : 'Save Sub Design'}</Text>
                         </TouchableOpacity>
                     </>
                 )}
 
-                {!baseDesign && (
-                    <View style={s.center}>
-                        <Text style={s.empty}>Select a base design to add a colourway</Text>
-                        <TouchableOpacity onPress={onNavigateToCatalog} style={{ marginTop: 12 }}>
-                            <Text style={{ color: T.copper, fontWeight: '700', fontSize: 14 }}>Browse Catalog →</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                {!baseDesign && <TouchableOpacity onPress={onNavigateToCatalog}><Text style={s.empty}>Select a Main Design or return to Catalog.</Text></TouchableOpacity>}
             </ScrollView>
 
             <DesignPickerModal
                 visible={showDesignPicker}
-                onSelect={d => { setBaseDesign(d); const base = d.code?.replace(/\s+/g, '-') ?? 'Design'; setSubCode(`${base}-01`); }}
+                onSelect={d => { loadFull(d); setSubCode(`${d.code.replace(/\s+/g, '-')}-01`); setWarpBands({}); setWeftBands({}); }}
                 onClose={() => setShowDesignPicker(false)}
-            />
-
-            <ShadePickerModal
-                visible={shadePickerFor !== null}
-                onSelect={shade => {
-                    if (!shadePickerFor) return;
-                    const key = `${shadePickerFor.yarnType}_${shadePickerFor.yarnIdx}`;
-                    setSelectedShades(prev => ({ ...prev, [key]: shade }));
-                    setShadePickerFor(null);
-                }}
-                onClose={() => setShadePickerFor(null)}
             />
         </>
     );
 }
-const cw2 = StyleSheet.create({
-    label: { fontSize: 10, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginTop: 16, marginBottom: 6 },
-    hint: { fontSize: 11, color: T.muted, marginTop: -4, marginBottom: 6 },
-    picker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 14 },
-    pickerTxt: { fontSize: 14, fontWeight: '600', color: T.ink },
-    codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 14, paddingVertical: 12 },
-    codeBadge: { backgroundColor: T.sub, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-    codeBadgeTxt: { fontSize: 11, fontWeight: '700', color: T.muted },
-    codeVal: { flex: 1, fontSize: 15, fontWeight: '800', color: T.ink },
-    codeAuto: { fontSize: 10, color: T.muted, fontWeight: '600' },
-    yarnShadeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6 },
-    yarnBadge: { backgroundColor: T.yd + '20', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-    yarnBadgeTxt: { fontSize: 9, fontWeight: '800', color: T.yd },
-    yarnNm: { flex: 1, fontSize: 12, fontWeight: '600', color: T.ink },
-    blendBadge: { backgroundColor: T.green + '30', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-    blendTxt: { fontSize: 9, fontWeight: '700', color: T.green },
-    shadeBtn: { borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-    shadeBtnTxt: { fontSize: 12, color: T.copper, fontWeight: '600' },
-    previewBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: T.surface, borderRadius: 10, borderWidth: 1, borderColor: T.border, padding: 12, marginTop: 16 },
-    previewSwatch: { width: 60, height: 60, borderRadius: 8, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border },
-    previewLabel: { fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.5 },
-    previewSub: { fontSize: 12, color: T.muted, marginTop: 4 },
-    saveBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-    saveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+const cw3 = StyleSheet.create({
+    intro: { backgroundColor: T.copper + '16', borderWidth: 1, borderColor: T.copper + '55', borderRadius: 10, padding: 12 },
+    introTitle: { fontSize: 11, fontWeight: '900', color: T.copper, letterSpacing: 0.7 },
+    introText: { fontSize: 11, lineHeight: 16, color: T.ink, marginTop: 4 },
+    label: { fontSize: 10, fontWeight: '800', color: T.muted, letterSpacing: 0.5, marginTop: 16, marginBottom: 6 },
+    section: { fontSize: 11, fontWeight: '900', color: T.ink, letterSpacing: 0.8, marginTop: 20, marginBottom: 8 },
+    picker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 10, padding: 14 },
+    pickerText: { fontSize: 14, color: T.ink, fontWeight: '700' },
+    input: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: T.ink, fontSize: 14 },
+    yarnBlock: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 12, marginBottom: 10 },
+    yarnHeader: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    dirBadge: { backgroundColor: T.yd + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
+    dirText: { color: T.yd, fontSize: 9, fontWeight: '900' },
+    yarnName: { fontSize: 13, fontWeight: '800', color: T.ink },
+    yarnMeta: { fontSize: 10, color: T.muted, marginTop: 2 },
+    bandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderTopWidth: 1, borderTopColor: T.sub },
+    bandDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: T.border },
+    bandName: { flex: 1, fontSize: 12, color: T.ink, fontWeight: '700' },
+    bandCount: { fontSize: 12, color: T.copper, fontWeight: '900' },
+    remove: { color: T.pd, fontSize: 16, paddingLeft: 8 },
+    addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+    shadeSelect: { flex: 1, minHeight: 40, justifyContent: 'center', borderWidth: 1, borderColor: T.border, borderRadius: 8, paddingHorizontal: 10 },
+    shadeSelectText: { fontSize: 12, color: T.copper, fontWeight: '700' },
+    countInput: { width: 58, backgroundColor: T.sub, borderRadius: 8, paddingVertical: 9, textAlign: 'center', color: T.ink },
+    addBandBtn: { backgroundColor: T.copper, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
+    addBandText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    swatches: { gap: 7, paddingTop: 10, paddingRight: 10 },
+    quickDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: T.border },
+    paletteItem: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 9, padding: 10 },
+    paletteDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: T.border },
+    paletteText: { fontSize: 12, color: T.ink, fontWeight: '700' },
+    preview: { backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 10, padding: 10 },
+    previewLine: { flexDirection: 'row', minHeight: 42, borderRadius: 7, overflow: 'hidden', backgroundColor: T.sub },
+    previewText: { color: T.muted, fontSize: 10, marginTop: 6 },
+    pdBox: { backgroundColor: T.sub, borderRadius: 10, padding: 14, marginTop: 16 },
+    pdTitle: { fontSize: 11, fontWeight: '900', color: T.ink },
+    pdText: { fontSize: 11, lineHeight: 16, color: T.muted, marginTop: 4 },
+    pdPreview: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+    pdPreviewText: { color: T.muted, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+    save: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+    saveText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 4 — YARNS
 // ═══════════════════════════════════════════════════════════════
 function YarnsTab() {
+    const { prpcode, strcode, yearno } = useERP();
     const [yarns, setYarns] = useState<YarnMaster[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'Lea' | 'Ne' | 'Den'>('all');
@@ -1719,7 +1810,7 @@ function YarnsTab() {
     const loadYarns = useCallback(async (q = '') => {
         setLoading(true);
         try {
-            const res = await (DesignAPI.yarns as any)({ limit: 100, yearno: DEFAULT_YEARNO, prpcode: DEFAULT_PRPCODE, strcode: DEFAULT_STRCODE, search: q.trim() || undefined });
+            const res = await (DesignAPI.yarns as any)({ limit: 100, yearno: yearno, prpcode: prpcode, strcode: strcode, search: q.trim() || undefined });
             setYarns(res?.data?.data || []);
         } catch (e: any) {
             console.log('YARNS TAB ERROR', { message: e?.message, status: e?.response?.status, data: e?.response?.data, baseURL: e?.config?.baseURL, url: e?.config?.url, params: e?.config?.params });
@@ -1836,6 +1927,7 @@ const dy = StyleSheet.create({
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════════
 export function DesignsScreen() {
+    const context = DEFAULT_ERP_CONTEXT;
     const [tab, setTab] = useState<Tab>('Catalog');
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
@@ -1850,30 +1942,47 @@ export function DesignsScreen() {
         setTab('Design');
     };
 
+    const handleAddSubDesign = async (d: Design) => {
+        setSelected(d);
+        try {
+            const res = await DesignAPI.get(d.id);
+            setDetail({ ...d, ...res.data.data });
+        } catch {
+            setDetail(d);
+        }
+        setTab('Colourway');
+    };
+
     const handleCancelEdit = () => { setSelected(null); setDetail(null); };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-            <View style={hdr.wrap}>
-                <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                <Text style={hdr.title}>Designs</Text>
-                {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
-            </View>
-            <TabBar active={tab} onChange={setTab} />
-            <View style={{ flex: 1 }}>
-                {tab === 'Catalog' && <CatalogTab onSelectDesign={handleSelectDesign} />}
-                {tab === 'Design' && (
-                    <DesignTab
-                        design={detailDesign}
-                        onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
-                        onCancelEdit={handleCancelEdit}
+        <ERPContext.Provider value={context}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+                <View style={hdr.wrap}>
+                    <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
+                    <Text style={hdr.title}>Designs</Text>
+                    {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
+                </View>
+                <TabBar active={tab} onChange={setTab} />
+                <View style={{ flex: 1 }}>
+                    {tab === 'Catalog' && <CatalogTab onSelectDesign={handleAddSubDesign} onEditDesign={(design) => {
+                        handleSelectDesign(design);
+                    }}
                     />
-                )}
-                {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
-                {tab === 'Yarns' && <YarnsTab />}
-                {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
-            </View>
-        </SafeAreaView>
+                    }
+                    {tab === 'Design' && (
+                        <DesignTab
+                            design={detailDesign}
+                            onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
+                            onCancelEdit={handleCancelEdit}
+                        />
+                    )}
+                    {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
+                    {tab === 'Yarns' && <YarnsTab />}
+                    {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
+                </View>
+            </SafeAreaView>
+        </ERPContext.Provider>
     );
 }
 

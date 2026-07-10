@@ -1,10 +1,11 @@
 /////// [3] /////////
 import { HOME_TOUR } from '@/common/TourJson';
 import TourOverlay from '@/common/TourOverlay';
-import * as Device from 'expo-device';
 import Header from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -16,7 +17,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import axios from 'axios';
 import { isOnline } from '../Event/CardScanService';
 
 const { width } = Dimensions.get('window');
@@ -128,10 +128,10 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
             //     );
             const deviceId = Device.osInternalBuildId || "test-device";
             const res = await axios.post(
-                'https://apig.tms-webapp.com/api/checkdevice',
+                'https://apig.tms-webapp.com/api/checkdeviceios',
                 {
                     deviceid: deviceId,
-                    // deviceid: '25D2121',
+                    // deviceid: 'xnaldanodnndow',
 
                 }
             );
@@ -280,6 +280,7 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
         // { name: 'Price List', route: 'price-list', icon: 'assessment', color: '#1E3A5F', category: 'Production' },
         { name: 'Event', route: 'event', icon: 'event', color: '#923070', category: 'Production' },
         { name: 'Sales Order', route: 'sales-order', icon: 'point-of-sale', color: '#20BEC1', category: 'Production'  },
+        { name: 'Employ Dashboard', route: 'employ-dashboard', icon: 'fact-check', color: '#5f338f', category: 'Production' },
     ];
 
     useEffect(() => {

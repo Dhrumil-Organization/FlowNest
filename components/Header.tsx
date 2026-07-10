@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
+    Animated,
     Image,
     Modal,
     Platform,
@@ -14,8 +15,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
-    Animated
+    View
 } from 'react-native';
 import logo from '../assets/images/logo.png';
 import theme from './theme';
@@ -33,6 +33,7 @@ export default function Header({
 }: any) {
     const [search, setSearch] = useState('');
     const [menuVisible, setMenuVisible] = useState(false);
+    const [appVersion, setAppVersion] = useState('');
     const router = useRouter();
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -99,6 +100,19 @@ export default function Header({
         else router.replace('/');
     };
 
+    useEffect(() => {
+        const fetchAppVersion = async () => {
+            try {
+                const appJson = await import('../app.json');
+                setAppVersion(appJson.expo.version);
+            } catch (error) {
+                console.error('Error fetching app version:', error);
+            }
+        };
+
+        fetchAppVersion();
+    }, []);
+
     return (
         <LinearGradient
             colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
@@ -129,7 +143,7 @@ export default function Header({
                                         paddingVertical: 2,
                                         borderRadius: 8,
                                     }}>
-                                        {subHeaderText ? subHeaderText : `Welcome back, ${userName || 'User'}`}
+                                        {subHeaderText ? subHeaderText : `Welcome back, ${userName || 'User'} (V${appVersion})`}
 
                                     </Text>
                                 </Animated.View>
@@ -140,7 +154,7 @@ export default function Header({
                                     {breadcrumb || breadcrumbWithNoHome || 'FlowNest'}
                                 </Text>
                                 <Text style={{ color: headerConnectColor, fontSize: 12 }}>
-                                    {subHeaderText ? subHeaderText : `Welcome back, ${userName || 'User'}`}
+                                    {subHeaderText ? subHeaderText : `Welcome back, ${userName || 'User'} (V${appVersion})`}
 
                                 </Text>
                             </View>

@@ -472,8 +472,18 @@ const EVENTS_CACHE_KEY = 'cached_events';
 const PRP_CACHE_KEY = 'cached_prp';
 const DESIGNS_CHUNK_PREFIX = 'cached_designs_chunk_';
 const DESIGNS_META_KEY = 'cached_designs_meta';
+// FOR S
 const ITEM_CHUNK_PREFIX = 'cached_item_chunk_';
 const ITEM_META_KEY = 'cached_item_meta';
+// FOR K
+const ITEM_CHUNK_PREFIX_K = 'cached_item_chunk_K';
+const ITEM_META_KEY_K = 'cached_item_meta_K';
+// FOR V
+const ITEM_CHUNK_PREFIX_V = 'cached_item_chunk_V';
+const ITEM_META_KEY_V = 'cached_item_meta_V';
+// FOR R
+const ITEM_CHUNK_PREFIX_R = 'cached_item_chunk_R';
+const ITEM_META_KEY_R = 'cached_item_meta_R';
 const CHUNK_SIZE = 500;
 
 // ════════════════════════ CACHING LOGIC (AsyncStorage) ═════════════════════
@@ -587,6 +597,7 @@ export const clearCachedDesing = async () => {
 };
 
 // Chunked caching for items
+// FOR S
 export const setCachedItem = async items => {
   try {
     const chunks = [];
@@ -645,6 +656,192 @@ export const clearCachedItem = async () => {
     await AsyncStorage.removeItem('cached_items');
   } catch (e) {
     console.log('Failed to clear cached items', e);
+  }
+};
+
+// FOR K
+export const setCachedItemK = async items => {
+  try {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      chunks.push(items.slice(i, i + CHUNK_SIZE));
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      await AsyncStorage.setItem(
+        `${ITEM_CHUNK_PREFIX_K}${i}`,
+        JSON.stringify(chunks[i]),
+      );
+    }
+
+    await AsyncStorage.setItem(
+      ITEM_META_KEY_K,
+      JSON.stringify({ totalChunks: chunks.length }),
+    );
+
+    await AsyncStorage.removeItem('cached_items');
+  } catch (e) {
+    console.log('Failed to cache items (chunked)', e);
+  }
+};
+
+export const getCachedItemK = async () => {
+  try {
+    const metaStr = await AsyncStorage.getItem(ITEM_META_KEY_K);
+    if (!metaStr) return null;
+
+    const meta = JSON.parse(metaStr);
+    const allItems = [];
+
+    for (let i = 0; i < meta.totalChunks; i++) {
+      const chunkStr = await AsyncStorage.getItem(`${ITEM_CHUNK_PREFIX_K}${i}`);
+      if (chunkStr) {
+        const chunk = JSON.parse(chunkStr);
+        allItems.push(...chunk);
+      }
+    }
+
+    return allItems;
+  } catch (e) {
+    console.log('Failed to get cached items (chunked)', e);
+    return null;
+  }
+};
+
+export const clearCachedItemK = async () => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const chunkKeys = keys.filter(
+      k => k.startsWith(ITEM_CHUNK_PREFIX_K) || k === ITEM_META_KEY_K,
+    );
+    await AsyncStorage.multiRemove(chunkKeys);
+    await AsyncStorage.removeItem('cached_items');
+  } catch (e) {
+    console.log('Failed to clear cached items', e);
+  }
+};
+
+// FOR V
+export const setCachedItemV = async items => {
+  try {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      chunks.push(items.slice(i, i + CHUNK_SIZE));
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      await AsyncStorage.setItem(
+        `${ITEM_CHUNK_PREFIX_V}${i}`,
+        JSON.stringify(chunks[i]),
+      );
+    }
+
+    await AsyncStorage.setItem(
+      ITEM_META_KEY_V,
+      JSON.stringify({ totalChunks: chunks.length }),
+    );
+
+    await AsyncStorage.removeItem('cached_items');
+  } catch (e) {
+    console.log('Failed to cache items (chunked)', e);
+  }
+};
+
+export const getCachedItemV = async () => {
+  try {
+    const metaStr = await AsyncStorage.getItem(ITEM_META_KEY_V);
+    if (!metaStr) return null;
+
+    const meta = JSON.parse(metaStr);
+    const allItems = [];
+
+    for (let i = 0; i < meta.totalChunks; i++) {
+      const chunkStr = await AsyncStorage.getItem(`${ITEM_CHUNK_PREFIX_V}${i}`);
+      if (chunkStr) {
+        const chunk = JSON.parse(chunkStr);
+        allItems.push(...chunk);
+      }
+    }
+
+    return allItems;
+  } catch (e) {
+    console.log('Failed to get cached items (chunked)', e);
+    return null;
+  }
+};
+
+export const clearCachedItemV= async () => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const chunkKeys = keys.filter(
+      k => k.startsWith(ITEM_CHUNK_PREFIX_V) || k === ITEM_META_KEY_V,
+    );
+    await AsyncStorage.multiRemove(chunkKeys);
+    await AsyncStorage.removeItem('cached_items');
+  } catch (e) {
+    console.log('Failed to clear cached items', e);
+  }
+};
+
+// FOR R
+export const setCachedItemR = async items => {
+  try {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      chunks.push(items.slice(i, i + CHUNK_SIZE));
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      await AsyncStorage.setItem(
+        `${ITEM_CHUNK_PREFIX_R}${i}`,
+        JSON.stringify(chunks[i]),
+      );
+    }
+
+    await AsyncStorage.setItem(
+      ITEM_META_KEY_R,
+      JSON.stringify({ totalChunks: chunks.length }),
+    );
+
+    await AsyncStorage.removeItem('cached_items');
+  } catch (e) {
+    console.log('Failed to cache items R (chunked)', e);
+  }
+};
+
+export const getCachedItemR = async () => {
+  try {
+    const metaStr = await AsyncStorage.getItem(ITEM_META_KEY_R);
+    if (!metaStr) return null;
+
+    const meta = JSON.parse(metaStr);
+    const allItems = [];
+
+    for (let i = 0; i < meta.totalChunks; i++) {
+      const chunkStr = await AsyncStorage.getItem(`${ITEM_CHUNK_PREFIX_R}${i}`);
+      if (chunkStr) {
+        const chunk = JSON.parse(chunkStr);
+        allItems.push(...chunk);
+      }
+    }
+
+    return allItems;
+  } catch (e) {
+    console.log('Failed to get cached R items (chunked)', e);
+    return null;
+  }
+};
+
+export const clearCachedItemR = async () => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const chunkKeys = keys.filter(
+      k => k.startsWith(ITEM_CHUNK_PREFIX_R) || k === ITEM_META_KEY_R,
+    );
+    await AsyncStorage.multiRemove(chunkKeys);
+    await AsyncStorage.removeItem('cached_items');
+  } catch (e) {
+    console.log('Failed to clear cached R items', e);
   }
 };
 
@@ -763,18 +960,75 @@ export async function initDb(token, prptype) {
   }
 
   // Fetch and cache Items
+  // FOR S
   if (token && prptype) {
     try {
       const yearno = getCurrentFinancialYear();
       const q = '';
       const response = await api.get(`${API}/api/geteventitem`, {
-        params: { prptype, yearno },
+        params: { prptype: 'S', yearno },
         headers: { Authorization: `Bearer ${token}` },
       });
       const allItems = response.data.data;
       if (allItems && allItems.length) {
         await setCachedItem(allItems);
-        console.log('Items cached during initDb', allItems.length);
+        console.log('Items S cached during initDb', allItems.length);
+      }
+    } catch (error) {
+      console.log('Failed to fetch Items during initDb', error.message);
+    }
+  }
+  // FOR K
+  if (token && prptype) {
+    try {
+      const yearno = getCurrentFinancialYear();
+      const q = '';
+      const response = await api.get(`${API}/api/geteventitem`, {
+        params: { prptype: 'K', yearno },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allItems = response.data.data;
+      if (allItems && allItems.length) {
+        await setCachedItemK(allItems);
+        console.log('Items K cached during initDb', allItems.length);
+      }
+    } catch (error) {
+      console.log('Failed to fetch Items during initDb', error.message);
+    }
+  }
+  // FOR V
+  if (token && prptype) {
+    try {
+      const yearno = getCurrentFinancialYear();
+      const q = '';
+      const response = await api.get(`${API}/api/geteventitem`, {
+        params: { prptype: 'V', yearno },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allItems = response.data.data;
+      if (allItems && allItems.length) {
+        await setCachedItemV(allItems);
+        console.log('Items V cached during initDb', allItems.length);
+      }
+    } catch (error) {
+      console.log('Failed to fetch Items during initDb', error.message);
+    }
+  }
+  // FOR R
+  if (token && prptype) {
+    console.log('Fetching Items R during initDb');
+    try {
+      const yearno = getCurrentFinancialYear();
+      const q = '';
+      const response = await api.get(`${API}/api/geteventitem`, {
+        params: { prptype: 'R', yearno },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log('Items R response:', response.data);
+      const allItems = response.data.data;
+      if (allItems && allItems.length) {
+        await setCachedItemR(allItems);
+        console.log('Items R cached during initDb', allItems.length);
       }
     } catch (error) {
       console.log('Failed to fetch Items during initDb', error.message);

@@ -3115,9 +3115,28 @@ import {
   isOnline,
   scanVisitingCard,
 } from './CardScanService';
-import { deleteAllEnquiriesFromDB, getAllEnquiries, getCachedDesign, getCachedEvents, getCachedItem, getCachedItemK, getCachedItemR, getCachedItemV, getCachedPrp, insertEnquiry } from './db';
+import {
+  deleteAllEnquiriesFromDB,
+  getAllEnquiries,
+  getCachedDesign,
+  getCachedEvents,
+  getCachedItem,
+  getCachedItemK,
+  getCachedItemR,
+  getCachedItemV,
+  getCachedPrp,
+  insertEnquiry,
+  setCachedDesing,
+  setCachedEvents,
+  setCachedItem,
+  setCachedItemK,
+  setCachedItemR,
+  setCachedItemV,
+  setCachedPrp,
+} from './db';
 import { abortSync, startSyncQueue } from './syncQueue';
 import { syncShowEnquiries, updateEnquiries } from './syncService';
+import api from './api';
 
 const DESIGNATIONS = [
   'Owner', 'Partner', 'Director', 'Purchase Manager',
@@ -3411,9 +3430,35 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
   }, [getUserPrptype]);
 
   // Load events and prp
+  // Online  -> fetch fresh from Laravel API (and refresh the cache for later offline use)
+  // Offline -> fall back to the local cache exactly as before
   const loadEvent = useCallback(async () => {
     setLoading(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token && getUserPrptypeFromCache) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/getevent`, {
+            params: { prptype: getUserPrptypeFromCache, yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const events = response.data?.data;
+          if (events && events.length > 0) {
+            setEVENTS(events);
+            setEventCode(events[0].EventId);
+            setCachedEvents(events); // keep cache fresh for the next offline session
+            console.log('Loaded events from API (online)', events);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online events fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const eventsString = await AsyncStorage.getItem('cached_events');
       if (eventsString) {
         const events = JSON.parse(eventsString);
@@ -3424,15 +3469,39 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         }
       }
     } catch (err) {
-      console.log('Failed to load cached events', err);
+      console.log('Failed to load events', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token, getUserPrptypeFromCache]);
 
   const loadPrp = useCallback(async (getUserPrptypeFromCache) => {
     setLoading(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/geteventprptype`, {
+            params: { prptype: getUserPrptypeFromCache, yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const prp = response.data?.data;
+          if (prp && prp.length > 0) {
+            setPRPS(prp);
+            setPrpCode(getUserPrptypeFromCache || prp[0].code);
+            setCachedPrp(prp); // keep cache fresh for the next offline session
+            console.log('Loaded prps from API (online)', prp);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online prp fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const prpString = await AsyncStorage.getItem('cached_prp');
       if (prpString) {
         const prp = JSON.parse(prpString);
@@ -3443,18 +3512,49 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         }
       }
     } catch (err) {
-      console.log('Failed to load cached prps', err);
+      console.log('Failed to load prps', err);
     } finally {
       setLoading(false);
     }
-  }, [getUserPrptypeFromCache]);
+  }, [token]);
 
-  // Load designs and items (cached)
+  // Load designs and items
+  // Online  -> fetch fresh from Laravel API (and refresh the cache for later offline use)
+  // Offline -> fall back to the local cache exactly as before
   const loadDesing = useCallback(async () => {
     if (isFetchingDesignsRef.current) return;
     isFetchingDesignsRef.current = true;
     setLoadingDesigns(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token && getUserPrptypeFromCache) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/designs/search`, {
+            params: { q: '', prptype: getUserPrptypeFromCache, yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const fresh = response.data?.data;
+          if (fresh) {
+            if (fresh.length === 0) {
+              setAllDesigns([]);
+              setDisplayedDesigns([]);
+              setHasMore(false);
+            } else {
+              setAllDesigns(fresh);
+            }
+            setCachedDesing(fresh); // keep cache fresh for the next offline session
+            console.log('Loaded designs from API (online)', fresh.length);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online designs fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const cached = await getCachedDesign();
       if (!cached || cached.length === 0) {
         setAllDesigns([]);
@@ -3464,18 +3564,47 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         setAllDesigns(cached);
       }
     } catch (err) {
-      console.log('Failed to load cached designs', err);
+      console.log('Failed to load designs', err);
     } finally {
       setLoadingDesigns(false);
       isFetchingDesignsRef.current = false;
     }
-  }, []);
+  }, [token, getUserPrptypeFromCache]);
 
   const loadItems = useCallback(async () => {
     if (isFetchingItemsRef.current) return;
     isFetchingItemsRef.current = true;
     setLoadingItems(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/geteventitem`, {
+            params: { prptype: 'S', yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const fresh = response.data?.data;
+          if (fresh) {
+            if (fresh.length === 0) {
+              setAllItems([]);
+              setDisplayedItems([]);
+              setHasMoreItem(false);
+            } else {
+              setAllItems(fresh);
+            }
+            setCachedItem(fresh); // keep cache fresh for the next offline session
+            console.log('Loaded items(S) from API (online)', fresh.length);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online items(S) fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const cached = await getCachedItem();
       if (!cached || cached.length === 0) {
         setAllItems([]);
@@ -3485,18 +3614,47 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         setAllItems(cached);
       }
     } catch (err) {
-      console.log('Failed to load cached items', err);
+      console.log('Failed to load items(S)', err);
     } finally {
       setLoadingItems(false);
       isFetchingItemsRef.current = false;
     }
-  }, []);
+  }, [token]);
 
   const loadItems_K = useCallback(async () => {
     if (isFetchingItemsRef.current) return;
     isFetchingItemsRef.current = true;
     setLoadingItems(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/geteventitem`, {
+            params: { prptype: 'K', yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const fresh = response.data?.data;
+          if (fresh) {
+            if (fresh.length === 0) {
+              setAllItems([]);
+              setDisplayedItems([]);
+              setHasMoreItem(false);
+            } else {
+              setAllItems(fresh);
+            }
+            setCachedItemK(fresh); // keep cache fresh for the next offline session
+            console.log('Loaded items(K) from API (online)', fresh.length);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online items(K) fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const cached = await getCachedItemK();
       if (!cached || cached.length === 0) {
         setAllItems([]);
@@ -3506,18 +3664,47 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         setAllItems(cached);
       }
     } catch (err) {
-      console.log('Failed to load cached items', err);
+      console.log('Failed to load items(K)', err);
     } finally {
       setLoadingItems(false);
       isFetchingItemsRef.current = false;
     }
-  }, []);
+  }, [token]);
 
   const loadItems_V = useCallback(async () => {
     if (isFetchingItemsRef.current) return;
     isFetchingItemsRef.current = true;
     setLoadingItems(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/geteventitem`, {
+            params: { prptype: 'V', yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const fresh = response.data?.data;
+          if (fresh) {
+            if (fresh.length === 0) {
+              setAllItems([]);
+              setDisplayedItems([]);
+              setHasMoreItem(false);
+            } else {
+              setAllItems(fresh);
+            }
+            setCachedItemV(fresh); // keep cache fresh for the next offline session
+            console.log('Loaded items(V) from API (online)', fresh.length);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online items(V) fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const cached = await getCachedItemV();
       if (!cached || cached.length === 0) {
         setAllItems([]);
@@ -3527,18 +3714,47 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         setAllItems(cached);
       }
     } catch (err) {
-      console.log('Failed to load cached items', err);
+      console.log('Failed to load items(V)', err);
     } finally {
       setLoadingItems(false);
       isFetchingItemsRef.current = false;
     }
-  }, []);
+  }, [token]);
 
   const loadItems_R = useCallback(async () => {
     if (isFetchingItemsRef.current) return;
     isFetchingItemsRef.current = true;
     setLoadingItems(true);
     try {
+      const currentlyOnline = await isOnline();
+      setOnline(currentlyOnline);
+
+      if (currentlyOnline && token) {
+        try {
+          const yearno = getCurrentFinancialYear();
+          const response = await api.get(`${API}/api/geteventitem`, {
+            params: { prptype: 'R', yearno },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const fresh = response.data?.data;
+          if (fresh) {
+            if (fresh.length === 0) {
+              setAllItems([]);
+              setDisplayedItems([]);
+              setHasMoreItem(false);
+            } else {
+              setAllItems(fresh);
+            }
+            setCachedItemR(fresh); // keep cache fresh for the next offline session
+            console.log('Loaded items(R) from API (online)', fresh.length);
+            return;
+          }
+        } catch (apiErr) {
+          console.log('Online items(R) fetch failed, falling back to cache', apiErr?.message);
+        }
+      }
+
+      // OFFLINE (or online fetch had nothing / failed) — same as before
       const cached = await getCachedItemR();
       if (!cached || cached.length === 0) {
         setAllItems([]);
@@ -3548,12 +3764,12 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
         setAllItems(cached);
       }
     } catch (err) {
-      console.log('Failed to load cached items', err);
+      console.log('Failed to load items(R)', err);
     } finally {
       setLoadingItems(false);
       isFetchingItemsRef.current = false;
     }
-  }, []);
+  }, [token]);
 
   console.log('Item data Items:', allItems, 'Design data Designs:', allDesigns);
 
@@ -5377,10 +5593,6 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
             />
           </Field>
 
-          <Field label="Designation">
-            <TextInput style={styles.input} placeholder="Designation" value={designation} onChangeText={setDesignation} />
-          </Field>
-
           <Field label="Mobile">
             <TextInput
               style={[styles.input, cardFields.mobile && styles.cardFilledInput]}
@@ -6088,8 +6300,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     fontSize: 13,
     backgroundColor: C.surface,
+    color: '#000',
   },
-  remarkInput: { minHeight: 34 },
+  remarkInput: { minHeight: 34, color: '#000' },
   noDesignsText: { fontSize: 12, color: C.muted, textAlign: 'center', paddingVertical: 10 },
   noItemsText: { fontSize: 13, color: C.muted, textAlign: 'center', paddingVertical: 20 },
 

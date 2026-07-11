@@ -143,7 +143,7 @@ export default function Header({
                                         paddingVertical: 2,
                                         borderRadius: 8,
                                     }}>
-                                        {subHeaderText ? subHeaderText : `Welcome back, ${userName || 'User'} (V${appVersion})`}
+                                        {subHeaderText ? subHeaderText : `Welcome back , ${userName || 'User'} (V${appVersion})`}
 
                                     </Text>
                                 </Animated.View>
@@ -154,7 +154,7 @@ export default function Header({
                                     {breadcrumb || breadcrumbWithNoHome || 'FlowNest'}
                                 </Text>
                                 <Text style={{ color: headerConnectColor, fontSize: 12 }}>
-                                    {subHeaderText ? subHeaderText : `Welcome back, ${userName || 'User'} (V${appVersion})`}
+                                    {subHeaderText ? subHeaderText : `Welcome back , ${userName || 'User'} (V${appVersion})`}
 
                                 </Text>
                             </View>

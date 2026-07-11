@@ -281,6 +281,7 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
         { name: 'Event', route: 'event', icon: 'event', color: '#923070', category: 'Production' },
         { name: 'Sales Order', route: 'sales-order', icon: 'point-of-sale', color: '#20BEC1', category: 'Production'  },
         { name: 'Employ Dashboard', route: 'employ-dashboard', icon: 'fact-check', color: '#5f338f', category: 'Production' },
+        { name: 'Price List', route: 'price-list', icon: 'assessment', color: '#1E3A5F', category: 'Production' },
     ];
 
     useEffect(() => {

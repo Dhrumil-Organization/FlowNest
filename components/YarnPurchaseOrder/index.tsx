@@ -1,39 +1,35 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Modal,
-    ActivityIndicator,
-    Linking,
-    LayoutAnimation,
-    ScrollView,
-    ToastAndroid,
-    Share,
-    StyleSheet
-} from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    LayoutAnimation,
+    Modal,
+    TextInput as RNTextInput,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 // import RNFS from 'react-native-fs';
 // import { Buffer } from 'buffer';
 // import Pdf from 'react-native-pdf';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { crlimtreq_styles } from '@/common/Style';
-import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
+import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 // import { encode as btoa } from  'base-64';
 // import { urlSafeEncode } from './urlSafeEncode';
 // import { encodeData } from './encodingUtils';
-import { LinearGradient } from 'expo-linear-gradient';
-import theme from '@/components/theme';
 import { API } from '@/common/API/dynamicAPI';
+import theme from '@/components/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 // import CriteriaForm from './CriteriaForm';
-import { fetchAllStoredata } from '../../common/API/Functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchAllStoredata } from '../../common/API/Functions';
 // import { useNavigation } from '@react-navigation/native';
 // import { navigate } from '../../android/app/src/navigation/NavigationService';
 import { useRouter } from 'expo-router';
@@ -570,6 +566,25 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             fontWeight: 'bold',
             fontSize: 12,
             textAlign: 'center',
+        },
+        prpCodeContainer: {
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 10,
+            backgroundColor: '#F5F7FA',
+            paddingVertical: 8,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: '#E0E0E0',
+        },
+
+        prpCodeText: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: '#000',
+            textAlign: 'center',
+            letterSpacing: 1,
         },
     });
 
@@ -1615,6 +1630,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 isApproved ? styles.acceptedCard :
                     isRejected ? styles.rejectedCard : null
             ]}>
+                <View style={styles.headerRow}>
+                    <View style={styles.prpCodeContainer}>
+                        <Text style={styles.prpCodeText}>
+                            {item.PrpCode}
+                        </Text>
+                    </View>
+                </View>
 
                 {/* HEADER */}
                 <View style={styles.headerRow}>
@@ -2104,7 +2126,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         </View>
                     </View>
                 )}
-
+                <View style={styles.headerRow}>
+                    <View style={styles.prpCodeContainer}>
+                        <Text style={styles.prpCodeText}>
+                            {item.PrpCode}
+                        </Text>
+                    </View>
+                </View>
                 {/* HEADER */}
                 <View style={styles.headerRow}>
                     <View>

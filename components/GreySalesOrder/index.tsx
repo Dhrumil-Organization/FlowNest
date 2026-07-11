@@ -1,33 +1,29 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Modal,
-    ActivityIndicator,
-    Linking,
-    LayoutAnimation,
-    ScrollView,
-    UIManager, Platform,
-    useWindowDimensions,
-    StyleSheet,
-    Dimensions
-} from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import axios from 'axios';
-import FullScreenLoader from '@/components/FullScreenLoader';
+import { API } from '@/common/API/dynamicAPI';
+import { fetchAllStoredata } from '@/common/API/Functions';
 import { crlimtreq_styles } from '@/common/Style';
-import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
-import { API } from '@/common/API/dynamicAPI';
-import CriteriaForm from './CriteriaForm';
-import { fetchAllStoredata } from '@/common/API/Functions';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    LayoutAnimation,
+    Modal,
+    Platform,
+    TextInput as RNTextInput,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    useWindowDimensions,
+    View
+} from 'react-native';
+import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 
 interface CardData {
     [key: string]: string;
@@ -1018,6 +1014,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
+              <View style={crlimtreq_styles.cardSubHeader}>
+                <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
+            </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
             </View>
@@ -1118,6 +1117,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 <View style={crlimtreq_styles.cardHeader}>
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
+            </View>
+             <View style={crlimtreq_styles.cardSubHeader}>
+                <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>
@@ -1262,6 +1264,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 <View style={crlimtreq_styles.cardHeader}>
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
+            </View>
+             <View style={crlimtreq_styles.cardSubHeader}>
+                <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText}>{item.ParName}</Text>

@@ -463,6 +463,12 @@ export const crlimtreq_styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
+     cardSubHeaderText12: {
+        color: theme.BRAND_GRADIENT_END, // Purple theme
+        fontSize: 14,
+        fontWeight: '600',
+        alignSelf: 'center',
+    },
     cardSubHeaderhistory: {
         // borderColor: theme.BRAND_GRADIENT_END,
         // borderWidth: 2,

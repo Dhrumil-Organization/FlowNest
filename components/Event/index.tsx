@@ -3512,14 +3512,11 @@ export default function NewEnquiryScreen({ token, username }) {
         }
       }
       // Offline, or API call failed/returned nothing usable -> use cache
-      const eventsString = await AsyncStorage.getItem('cached_events');
-      if (eventsString) {
-        const events = JSON.parse(eventsString);
-        if (events && events.length > 0) {
-          setEVENTS(events);
-          setEventCode(events[0].EventId);
-          console.log('Loaded events from cache', events);
-        }
+      const events = await getCachedEvents();
+      if (events && events.length > 0) {
+        setEVENTS(events);
+        setEventCode(events[0].EventId);
+        console.log('Loaded events from cache', events);
       }
     } catch (err) {
       console.log('Failed to load events', err);
@@ -3554,14 +3551,11 @@ export default function NewEnquiryScreen({ token, username }) {
         }
       }
       // Offline, or API call failed/returned nothing usable -> use cache
-      const prpString = await AsyncStorage.getItem('cached_prp');
-      if (prpString) {
-        const prp = JSON.parse(prpString);
-        if (prp && prp.length > 0) {
-          setPRPS(prp);
-          setPrpCode(prptypeForApi || prp[0].code);
-          console.log('Loaded prps from cache', prp);
-        }
+      const prp = await getCachedPrp();
+      if (prp && prp.length > 0) {
+        setPRPS(prp);
+        setPrpCode(prptypeForApi || prp[0].code);
+        console.log('Loaded prps from cache', prp);
       }
     } catch (err) {
       console.log('Failed to load cached prps', err);

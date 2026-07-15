@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { warehouseApi } from "../../services/warehouseApi";
+import { warehouseApi } from "./services/warehouseApi";
 import CartonCard from "./components/CartonCard";
 import { styles, COLORS } from "./components/WarehouseStyles";
 

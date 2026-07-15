@@ -99,6 +99,45 @@ const CustomDrawer = (props) => {
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
 
+    useEffect(() => {
+        const test = async () => {
+            const currentYearNo = await AsyncStorage.getItem("selected_yearno");
+            console.log("selected_yearno =", currentYearNo);
+
+            console.log("Year List =", getAllYearData);
+        };
+
+        test();
+    }, [getAllYearData]);
+
+    useEffect(() => {
+        if (getAllYearData.length === 0) return;
+
+        const setCurrentYear = async () => {
+            const currentYearNo = await AsyncStorage.getItem("yno");
+
+            const currentYear = getAllYearData.find(
+                item => String(item.YearNo) === String(currentYearNo)
+            );
+
+            if (currentYear) {
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        YearNo: currentYear.YearNo,
+                        YearName: currentYear.YearName,
+                    },
+                }));
+            }
+        };
+
+        setCurrentYear();
+
+    }, [getAllYearData]);
+
+    console.log("Year List", getAllYearData);
+
     return (
         <>
             {/* <Modal visible={isVisible} transparent animationType="none"
@@ -307,14 +346,29 @@ const CustomDrawer = (props) => {
                                 placeholder="Choose property..."
                                 pageSize={10}
                                 initialValue={selectedProperty}
-                                onSelect={(item) => {
-                                    setFormState(FormState => ({
-                                        ...FormState,
-                                        values: {
-                                            ...FormState.values,
-                                            PrpCode: item?.PrpCode || '',
-                                            LngName: item?.LngName || ''
+                                // onSelect={(item) => {
+                                //     setFormState(FormState => ({
+                                //         ...FormState,
+                                //         values: {
+                                //             ...FormState.values,
+                                //             PrpCode: item?.PrpCode || '',
+                                //             LngName: item?.LngName || ''
 
+                                //         }
+                                //     }));
+                                // }}
+
+                                onSelect={(item) => {
+                                    setFormState(prev => ({
+                                        ...prev,
+                                        values: {
+                                            ...prev.values,
+                                            PrpCode: item?.PrpCode || "",
+                                            LngName: item?.LngName || "",
+
+                                            // Purana year clear kar do
+                                            YearNo: "",
+                                            YearName: "",
                                         }
                                     }));
                                 }}

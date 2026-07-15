@@ -147,9 +147,9 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
 
           setEnquiries(result);
           // if (result) {
-            
-          // }
 
+          // }
+          console.log('result', result);
           if (result.party_name) setPartyName(result.party_name);
           if (result.address) setAddress(result.address);
           if (result.gst_no) setGstNo(result.gst_no);
@@ -770,7 +770,7 @@ export default function NewEnquiryScreen({ route, token, navigation, username })
       return;
     }
 
-    if(!mobile) {
+    if (!mobile) {
       Alert.alert('Mobile number required', 'Please enter the mobile number.');
       return;
     }

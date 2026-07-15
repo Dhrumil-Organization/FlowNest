@@ -20,6 +20,7 @@ import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithB
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import theme from '../../android/app/src/theme';
 import TourOverlay, { COSTING_TOUR } from '../components/TourOverlay';
+import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Costing'>;
 
@@ -62,7 +63,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
     try {
       const data = await inquiryApi.show(id, {
         prptype: getUserPrptype,
-        yearno: "27"
+        yearno: getCurrentFinancialYear(),
       });
       setInquiry(data);
       setRows(
@@ -105,7 +106,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
           gst_percent: parseFloat(r.gst_percent) || 5,
         })),
         prptype: getUserPrptype,
-        yearno: "27"
+        yearno: getCurrentFinancialYear()
       });
       Alert.alert('Success', 'Costing saved', [
         { text: 'OK', onPress: () => navigation.goBack() },

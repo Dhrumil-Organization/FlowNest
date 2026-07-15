@@ -212,7 +212,7 @@ export default function EnquiryReportScreen({ navigation, username }) {
             <Text style={styles.statNum}>
               {item.total_qty.toLocaleString()}
             </Text>
-            <Text style={styles.statLbl}>Total qty (m)</Text>
+            <Text style={styles.statLbl}>Total qty</Text>
           </View>
         </View>
       </TouchableOpacity>

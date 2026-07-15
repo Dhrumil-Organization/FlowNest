@@ -149,13 +149,25 @@ export default function EnquiryReportDrilldownScreen({
             </Text>
           </View>
         )}
+        <View style={styles.itemsBadge}>
+          <Icon name="email" color="#B3552C" size={12} />
+          <Text style={styles.itemsBadgeText}>
+            Mail: {item.is_mail === '0'
+              ? 'Not Send'
+              : item.is_mail === '1'
+              ? 'Send'
+              : item.is_mail === '2'
+              ? 'Failed'
+              : 'No Mail'}
+          </Text>
+        </View>
       </View>
       <View style={styles.rowRight}>
         <Text style={styles.qty}>
           <Text style={styles.qtyNum}>
             {Number(item.qty_required || 0).toLocaleString()}
           </Text>{' '}
-          m
+          Qty
         </Text>
         <View style={styles.buttonContainer}>
           <TouchableOpacity

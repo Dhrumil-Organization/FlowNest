@@ -769,6 +769,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, isConnected, username, getMen
                 //                         "title": "Purchase Transport Auth",
                 //                         "href": "/"
                 //                     },                                   
+                //                     {
+                //                         "title": "Event",
+                //                         "href": "/"
+                //                     },                                   
                 //                 ]
                 //             }
                 //         ]

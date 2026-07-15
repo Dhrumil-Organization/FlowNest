@@ -1,5 +1,5 @@
 // SettingsScreen.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
     Text,
@@ -21,22 +21,26 @@ import LinearGradient from 'react-native-linear-gradient';
 import { fetchMasterSyncPartyDataPerPrptypeCache } from '../../common/API/Functions';
 import { initDatabase } from '../../common/API/DatabaseManager';
 import theme from '../../android/app/src/theme'; // ✅ your theme.ts path (same as your other screens)
+import axios from 'axios';
 
 interface Props {
     token: string;
     isConnected: boolean | null;
     username: string;
     navigation: any;
+    userid: number | string;
 }
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
 
-const SettingsScreen: React.FC<Props> = ({ token, isConnected, navigation }) => {
+const SettingsScreen: React.FC<Props> = ({ token, isConnected, userid, navigation }) => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
     const [liveLogsUnlocked, setLiveLogsUnlocked] = useState(false);
     const [getNoti_Token, setNoti_Token] = useState(null);
+
+    console.log("userid: ", userid);
 
 
     // ✅ THEME MODE
@@ -194,6 +198,41 @@ const SettingsScreen: React.FC<Props> = ({ token, isConnected, navigation }) => 
             setIsSyncing(false);
         }
     };
+
+    const handleAuthAll = useCallback(async () => {
+
+        const payload = {
+
+        };
+        const headers = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        };
+        console.log('🔵 Sending login payload:', payload);
+        try {
+            //   setIsLoading(true)
+            const response = await axios.post(
+                'https://apig.tms-webapp.com/api/updatedevice',
+                { headers }
+            );
+            console.log('✅ yoyo API Response:', response);
+            //   if (Number(response.data) === 1) {
+            //     setIsLoading(false);
+            //     setAuth(true);
+            //   } else {
+            //     setIsLoading(false);
+            //     setAuth(false);
+            //   }
+        } catch (error) {
+            //   setIsLoading(false);
+            //   setAuth(false);
+            console.error('Server error:', error);
+            Alert.alert('Error', 'Server error');
+        } finally {
+            //   setIsLoading(false);
+        }
+    }, []);
 
     // -----------------------------------
     // ✅ Row Component (Reusable professional row)
@@ -420,10 +459,28 @@ const SettingsScreen: React.FC<Props> = ({ token, isConnected, navigation }) => 
                         )
                     }
                 />
+                {userid === '1' && (
+                    <SettingsRow
+                        icon="sync"
+                        title="Auth All Devices"
+                        // subtitle={isConnected ? 'Sync master data with server' : 'Offline - connect internet'}
+                        onPress={handleAuthAll}
+                        right={
+                            isSyncing ? (
+                                <ActivityIndicator color={theme.BRAND_GRADIENT_END} />
+                            ) : (
+                                <View style={[styles.badge, { backgroundColor: 'rgba(0,126,167,0.12)' }]}>
+                                    <Text style={[styles.badgeText, { color: theme.BRAND_GRADIENT_END }]}>Auth</Text>
+                                </View>
+                            )
+                        }
+                    />
+                )}
+
                 <SettingsRow
                     icon="app-settings-alt"
                     title="Application Version"
-                    subtitle={'v7.5.5'}
+                    subtitle={'v7.5.6'}
                 // onPress={''}
 
                 />

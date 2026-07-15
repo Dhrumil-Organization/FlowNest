@@ -10,6 +10,7 @@ import {
     Modal,
     ActivityIndicator,
     FlatList,
+    RefreshControl
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import axios from "axios";
@@ -88,13 +89,25 @@ const CheckingScanner: React.FC<Props> = ({
     const [selectedGrade, setSelectedGrade] = useState(null);
     const [selectedChecker, setSelectedChecker] = useState(null);
 
-    const [showManualPopup, setShowManualPopup] = useState(false);
     const [machinedata, setMachineData] = useState([]);
     const [FormState, setFormState] = useState({
         values: {},
     });
-    const [activeTab, setActiveTab] = useState("manual");
-    const [showManual, setShowManual] = useState(true);
+
+    const [manualGradeData, setManualGradeData] = useState([]);
+    const [manualCheckerData, setManualCheckerData] = useState([]);
+
+    const [manualGrade, setManualGrade] = useState("");
+    const [manualChecker, setManualChecker] = useState("");
+
+    const [selectedManualGrade, setSelectedManualGrade] = useState(null);
+    const [selectedManualChecker, setSelectedManualChecker] = useState(null);
+
+    const [manualShiftData, setManualShiftData] = useState([]);
+    const [manualShift, setManualShift] = useState("");
+
+    const [activeTab, setActiveTab] = useState("scanner");
+    const [showManual, setShowManual] = useState(false);
     const [scannerModal, setScannerModal] = useState(false);
     const [scannerCardData, setScannerCardData] = useState([]);
     const [scannerLoading, setScannerLoading] = useState(false);
@@ -107,6 +120,12 @@ const CheckingScanner: React.FC<Props> = ({
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null); // true = manual, false = scanner
     // const [isScanning, setIsScanning] = useState(false);
     // console.log("scannerCardData", scannerCardData);
+
+    const [manualBeamData, setManualBeamData] = useState([]);
+    const [selectedBeam, setSelectedBeam] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const MANUAL_CHECKER_KEY = "manual_checker";
+    const QR_CHECKER_KEY = "qr_checker";
 
     const resetScanFields = () => {
         setDesign("");
@@ -219,14 +238,6 @@ const CheckingScanner: React.FC<Props> = ({
         },
     });
 
-    if (!device || !hasPermission) {
-        return (
-            <View>
-                <Text>No camera permission or device not available</Text>
-            </View>
-        );
-    }
-
     const getToken = () => {
         return token;
     };
@@ -289,40 +300,74 @@ const CheckingScanner: React.FC<Props> = ({
             console.log("checker response", response);
 
             // if (response.data.success && response.data.response.data.length > 0) {
-            //     setCheckerData(response.data.response.data);
-            //     let tempChecker = '';
-            //     tempChecker = await AsyncStorage.getItem('csChecker');
+            //     const checkerList = response.data.response.data;
 
-            //     if (typeof tempChecker != 'undefined' && tempChecker != null && tempChecker != '') {
-            //         response.data.response.data && response.data.response.data.filter((el, ind) => {
-            //             if (el.EmpCode == tempChecker) {
-            //                 setChecker(tempChecker);
-            //             }
-            //         })
+            //     const userId = response.data.response.user_id; // <-- response se
+
+            //     if (userId && userId !== "" && userId !== "0") {
+            //         const matchedData = checkerList.filter(
+            //             (item) => String(item.EmpCode) === String(userId),
+            //         );
+
+            //         if (matchedData.length > 0) {
+            //             setCheckerData(matchedData);
+            //             setChecker(matchedData[0].EmpCode);
+            //         } else {
+            //             setCheckerData(checkerList);
+            //         }
+            //     } else {
+            //         setCheckerData(checkerList);
             //     }
-            // } else {
-            //     setCheckerData([]);
             // }
 
+
             if (response.data.success && response.data.response.data.length > 0) {
+
                 const checkerList = response.data.response.data;
 
-                const userId = response.data.response.user_id; // <-- response se
+                setCheckerData(checkerList);
 
-                if (userId && userId !== "" && userId !== "0") {
-                    const matchedData = checkerList.filter(
-                        (item) => String(item.EmpCode) === String(userId),
+                // ================= CACHE ==================
+                const cache = await AsyncStorage.getItem(QR_CHECKER_KEY);
+
+                if (cache) {
+
+                    const lastChecker = JSON.parse(cache);
+
+                    const matched = checkerList.find(
+                        item => String(item.EmpCode) === String(lastChecker.EmpCode)
                     );
 
-                    if (matchedData.length > 0) {
-                        setCheckerData(matchedData);
-                        setChecker(matchedData[0].EmpCode);
-                    } else {
-                        setCheckerData(checkerList);
+                    if (matched) {
+
+                        setSelectedChecker(matched);
+                        setChecker(matched.EmpCode);
+
+                        return;
                     }
-                } else {
-                    setCheckerData(checkerList);
                 }
+
+                // ================= USER ID ==================
+                const userId = response.data.response.user_id;
+
+                if (userId && userId !== "" && userId !== "0") {
+
+                    const matched = checkerList.find(
+                        item => String(item.EmpCode) === String(userId)
+                    );
+
+                    if (matched) {
+
+                        setSelectedChecker(matched);
+                        setChecker(matched.EmpCode);
+
+                        return;
+                    }
+                }
+
+                // ================= DEFAULT ==================
+                setSelectedChecker(null);
+                setChecker("");
             }
         } catch (error) {
             console.log("API getCheckers error:", error);
@@ -339,14 +384,12 @@ const CheckingScanner: React.FC<Props> = ({
             let yno = await AsyncStorage.getItem("yno");
 
             const historyPayload = {
-                // text: parcode,
                 txntype: "beam_checking_tablet",
                 referrer: "dashboard",
                 fetch: "shift",
                 prpcode: qrValue.prpcode,
                 yearno: yno,
             };
-            //console.log("get shift api historyPayload payload :", historyPayload)
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -380,7 +423,6 @@ const CheckingScanner: React.FC<Props> = ({
                 referrer: "dashboard",
                 scannedString: temp,
                 prpcode: temp.prpcode,
-                // yearno: yno
                 yearno: getCurrentFinancialYear(),
             };
             console.log("infoPyload", infoPyload);
@@ -410,6 +452,82 @@ const CheckingScanner: React.FC<Props> = ({
         }
     };
 
+    const BeamNoHelp = async () => {
+        setIsLoading(true);
+
+        try {
+            const userPtype = await AsyncStorage.getItem("user_prptype");
+            const payload = {
+                txntype: "chekingScanner",
+                referrer: "dashboard",
+                scannedString: {
+                    // {
+                    prpcode: FormState.values.PrpCode || "",
+                    prptype: userPtype || "",
+                    beamuid: FormState.values.BeamUId || "",
+                    beamno: FormState.values.BeamNo || "",
+                    // takano: FormState.values.TakaNo || "",
+                    takano: "",
+                    isfirsttaka: FormState.values.isfirsttaka || "",
+                    islasttaka: FormState.values.islasttaka || "",
+                    yearno: getCurrentFinancialYear(),
+                    // },
+                },
+                prpcode: FormState.values.PrpCode || "",
+                prptype: userPtype || "",
+                dsncode: FormState.values.DsnCode || "",
+                yearno: getCurrentFinancialYear(),
+            };
+
+            console.log("BeamNoHelp payload", payload);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                "Content-Type": "application/json",
+                "X-Requested-with": "XMLHttpRequest",
+            };
+
+            const response = await axios.post(
+                `${API}/api/get_auto_checking_help`,
+                payload,
+                { headers }
+            );
+
+            const data = response?.data?.response?.data || [];
+
+            console.log("response ==", response);
+            console.log("data ==", data);
+            console.log("response?.data?.response?.data ==", response?.data?.response?.data);
+
+            const uniqueBeamList = data.filter(
+                (item, index, self) =>
+                    index === self.findIndex(x => x.BeamNo === item.BeamNo)
+            ).map(item => ({
+                label: item.BeamNo,
+                value: item.BeamNo,
+                ...item,
+            }));
+
+            setManualBeamData(uniqueBeamList);
+        } catch (error) {
+            console.log("BeamNoHelp Error", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showManual) {
+            BeamNoHelp();
+            // fetchDesignHelp(
+            //     FormState.values.PrpCode,
+            //     FormState.values.BeamNo
+            // );
+        }
+    }, [showManual]);
+
+    console.log("manualBeamData ==> ", manualBeamData)
+
     const sendScannedValue1 = async (qrValue, dsncode) => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -425,7 +543,6 @@ const CheckingScanner: React.FC<Props> = ({
                 scannedString: temp,
                 prpcode: temp.prpcode,
                 dsncode: dsncode,
-                // yearno: yno
                 yearno: getCurrentFinancialYear(),
             };
             console.log("infoPyload1-----", infoPyload);
@@ -443,11 +560,9 @@ const CheckingScanner: React.FC<Props> = ({
             const dataArr = response.data.response.data || [];
             if (response.data.success) {
                 if (dataArr.length > 0) {
-                    // ✅ Data available
                     setDesigndata(dataArr);
                     setWarpLen(dataArr[0].WarpLen || "0");
                 } else {
-                    // ❌ No data case
                     setDesigndata([]);
                     setWarpLen("0");
 
@@ -464,45 +579,6 @@ const CheckingScanner: React.FC<Props> = ({
             setIsLoading(false);
         }
     };
-
-    // const handleMeterChange = (value: string) => {
-
-    //     if (typeof design == 'undefined' || design == null || design == '') {
-    //         Alert.alert("Design", "Please select design first");
-    //         return;
-    //     } else {
-    //         let qltWt = 0.00;
-
-    //         console.log("design =", design);
-    //         console.log("getData =", getData);
-
-    //         getData && getData.filter((el, ind) => {
-    //             if (el.DsnCode == design) {
-    //                 qltWt = el.QltWt;
-    //             }
-    //         })
-
-    //         value = value.replace(',', '.');
-    //         const regex = /^\d*(?:\.\d{0,2})?$/;
-
-    //         if (value === '' || regex.test(value)) {
-    //             setMeter(value);
-    //             setValidMeter(value);
-    //         }
-
-    //         let qty = 0.0;
-    //         qty = isNaN(value) ? 0.0 : parseFloat(value);
-
-    //         let wt = 0.0;
-    //         wt = isNaN(qty) || isNaN(qltWt) || parseFloat(qty) == 0 || parseFloat(qltWt) == 0 ? 0.0 : (parseFloat(qty) * parseFloat(qltWt)).toFixed(2);
-
-    //         let avgWt = 0.0;
-    //         avgWt = isNaN(qty) || isNaN(wt) || parseFloat(qty) == 0 || parseFloat(wt) == 0 ? 0.0 : ((parseFloat(wt) * 100) / parseFloat(qty)).toFixed(2);
-
-    //         setKgs(wt);
-    //         setavgWt(avgWt);
-    //     }
-    // };
 
     const handleMeterChange = (value) => {
         value = value.replace(",", ".");
@@ -544,65 +620,6 @@ const CheckingScanner: React.FC<Props> = ({
             console.log("AvgWt =", avgWt);
         }
     };
-
-    // const handleMeterChange = (value) => {
-
-    //     value = value.replace(',', '.');
-
-    //     // 3 decimal places allow
-    //     const regex = /^\d*(?:\.\d{0,3})?$/;
-
-    //     if (value === '' || regex.test(value)) {
-
-    //         setMeter(value);
-
-    //         let qty = parseFloat(value) || 0;
-
-    //         let qltWt = 0;
-
-    //         if (
-    //             Designdata &&
-    //             Designdata.length > 0 &&
-    //             Designdata[0].QltWt
-    //         ) {
-    //             qltWt = parseFloat(Designdata[0].QltWt);
-    //         }
-
-    //         let wt =
-    //             qty === 0 || qltWt === 0
-    //                 ? 0
-    //                 : (qty * qltWt).toFixed(2);
-
-    //         let avgWt =
-    //             qty === 0 || parseFloat(wt) === 0
-    //                 ? 0
-    //                 : ((parseFloat(wt) * 100) / qty).toFixed(2);
-
-    //         setKgs(wt.toString());
-    //         setavgWt(avgWt.toString());
-    //     }
-    // };
-
-    // const handleKgsChange = (value: string) => {
-
-    //     value = value.replace(',', '.');
-    //     const regex = /^\d*(?:\.\d{0,2})?$/;
-
-    //     if (value === '' || regex.test(value)) {
-
-    //         setKgs(value);
-
-    //         let qty = parseFloat(meter) || 0;
-    //         let wt = parseFloat(value) || 0;
-
-    //         let avgWt =
-    //             qty === 0 || wt === 0
-    //                 ? 0
-    //                 : ((wt * 100) / qty).toFixed(2);
-
-    //         setavgWt(avgWt);
-    //     }
-    // }
 
     const handleKgsChange = (value) => {
         value = value.replace(",", ".");
@@ -699,15 +716,10 @@ const CheckingScanner: React.FC<Props> = ({
                 let yno = await AsyncStorage.getItem("yno");
                 let payloadObj = new Object();
                 payloadObj = finalObj;
-                // payloadObj = {
-                //     ...finalObj,       // ✅ existing data
-                //     ...Designdata      // ✅ new API data (merge)
-                // };
                 payloadObj["prpcode"] = getScannedObj.prpcode;
                 payloadObj["yearno"] = yno;
                 payloadObj["TakaNo"] = takaNo;
                 payloadObj["GrdCode"] = grade;
-                //payloadObj['EmpCode'] = checker;
                 payloadObj["ChkCode"] = checker;
                 payloadObj["Qty"] = meter;
                 payloadObj["Wt"] = kgs;
@@ -745,6 +757,7 @@ const CheckingScanner: React.FC<Props> = ({
                 payloadObj["IsAuth"] = Designdata[0].IsAuth;
                 payloadObj["AuthStatus"] = Designdata[0].AuthStatus;
                 payloadObj["PrpCode"] = Designdata[0].PrpCode;
+                payloadObj["EMode"] = "S";
 
                 const headers = {
                     Authorization: `Bearer ${getToken()}`,
@@ -761,6 +774,18 @@ const CheckingScanner: React.FC<Props> = ({
                 console.log("response", response);
 
                 if (response.data.success == true) {
+
+                    const checkerObj = getCheckerData.find(
+                        x => String(x.EmpCode) === String(checker)
+                    );
+
+                    if (checkerObj) {
+                        await AsyncStorage.setItem(
+                            QR_CHECKER_KEY,
+                            JSON.stringify(checkerObj)
+                        );
+                    }
+
                     setIsLoading(false);
                     setDataSaved(true);
 
@@ -768,8 +793,6 @@ const CheckingScanner: React.FC<Props> = ({
                         response.data.hasOwnProperty("data") &&
                         typeof response.data.data != "undefined" &&
                         response.data.data
-                        // &&
-                        // response.data.data.length > 0
                     ) {
                         console.log("Sticker Data =>", response.data.data.main[0]);
 
@@ -833,6 +856,7 @@ const CheckingScanner: React.FC<Props> = ({
         setPrinter("");
     };
 
+
     const getPrinterHeaders = () => ({
         Authorization: `Bearer ${getToken()}`,
         "Content-Type": "application/json",
@@ -841,17 +865,9 @@ const CheckingScanner: React.FC<Props> = ({
         "x-api-key": "PRINT_SECRET_123",
     });
 
-    /**
-     * Printer list must be loaded ONLY through Laravel.
-     * Laravel /api/printers internally calls the Node print server / Cloudflare tunnel.
-     * React Native should not call localhost:4000 / PRINTERSLISTAPI directly, because
-     * on Android localhost points to the phone/emulator, not the PC/server.
-     */
     const getPrintersUrl = () => `${String(API).replace(/\/$/, "")}/api/printers`;
 
     const getPrintStickerUrl = () => {
-        // Keep existing print sticker constant for the actual print job.
-        // Printer discovery is intentionally Laravel-only through getPrintersUrl().
         return PRINTSTICKER;
     };
 
@@ -882,8 +898,6 @@ const CheckingScanner: React.FC<Props> = ({
         setSelectedPrinterStatus(item?.StatusText || "Idle");
         AsyncStorage.setItem("lastSelectedPrinter", printerName);
 
-        // For normal saved-sticker selection close immediately.
-        // For Scanner List row printing keep modal open so user can press Print.
         if (!pendingPrintItem) {
             setPrinterModalVisible(false);
         }
@@ -944,7 +958,6 @@ const CheckingScanner: React.FC<Props> = ({
         console.log("=====================================");
 
         setIsLoading(true);
-        // return;
         try {
             const response = await postPrintSticker(
                 buildStickerParams(rowData, printerName),
@@ -1108,9 +1121,6 @@ const CheckingScanner: React.FC<Props> = ({
         try {
             setIsLoading(true);
 
-            // if (cancelToken?.cancel) cancelToken.cancel();
-            // cancelToken = axios.CancelToken.source();
-
             let infoPyload = {
                 prptype: userPtype,
                 yearno: getCurrentFinancialYear(),
@@ -1135,9 +1145,8 @@ const CheckingScanner: React.FC<Props> = ({
 
             console.log("design response", response);
 
-            // 🔥 FIXED CONDITION
             if (response.data.success && response.data.response.design) {
-                setdesigndata(response.data.response.design); // ✅ correct path
+                setdesigndata(response.data.response.design);
             } else {
                 console.error("Unexpected response structure:", response.data);
                 Alert.alert("No Design Data Found");
@@ -1146,6 +1155,195 @@ const CheckingScanner: React.FC<Props> = ({
             console.log("API error:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const fetchDesignHelp = async (beamData) => {
+        setIsLoading(true);
+
+        try {
+            const userPtype = await AsyncStorage.getItem("user_prptype");
+            const payload = {
+                txntype: "chekingScanner",
+                referrer: "dashboard",
+                scannedString:
+                {
+                    prpcode: beamData.PrpCode,
+                    prptype: userPtype,
+                    beamuid: beamData.BeamUId,
+                    beamno: beamData.BeamNo,
+                    // takano: beamData.TakaNo,
+                    takano: "",
+                    isfirsttaka: beamData.isfirsttaka || 0,
+                    islasttaka: beamData.islasttaka || 1,
+                    yearno: getCurrentFinancialYear(),
+                },
+                // ],
+                prpcode: beamData.PrpCode,
+                prptype: userPtype,
+                dsncode: beamData.DsnCode || "",
+                yearno: getCurrentFinancialYear(),
+            };
+
+            console.log("Design Payload", payload);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                "Content-Type": "application/json",
+                "X-Requested-with": "XMLHttpRequest",
+            };
+
+            const response = await axios.post(
+                `${API}/api/get_auto_checking_help`,
+                payload,
+                { headers }
+            );
+
+            const maxTakaNo =
+                response?.data?.response?.maxtakano ??
+                "";
+
+            setFormState((prev) => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    TakaNo: maxTakaNo,
+                },
+            }));
+
+            console.log("Response maxTakaNo", maxTakaNo);
+            console.log("Design Help Response", response.data);
+
+            if (response.data.success) {
+                setdesigndata(response.data.response.design || []);
+            }
+
+        } catch (error) {
+            console.log("Design Help Error", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleManualMeterChange = (value) => {
+        value = value.replace(",", ".");
+
+        const regex = /^\d{0,3}(?:\.\d{0,3})?$/;
+
+        if (value === "" || regex.test(value)) {
+            setMeter(value);
+
+            let qty = isNaN(value) ? 0.0 : parseFloat(value);
+            let wt = isNaN(kgs) ? 0.0 : parseFloat(kgs);
+
+            let avgWt = 0.0;
+            avgWt =
+                isNaN(qty) || isNaN(wt) || qty === 0 || wt === 0
+                    ? 0.0
+                    : ((wt * 100) / qty).toFixed(2);
+
+            setavgWt(avgWt.toString());
+            handleChange("Qty", value);
+        }
+    };
+
+    const handleManualKgsChange = (value) => {
+        value = value.replace(",", ".");
+
+        const regex = /^\d{0,3}(?:\.\d{0,3})?$/;
+
+        if (value === "" || regex.test(value)) {
+            setKgs(value);
+
+            let qty = isNaN(meter) ? 0.0 : parseFloat(meter);
+            let wt = isNaN(value) ? 0.0 : parseFloat(value);
+
+            let avgWt = 0.0;
+            avgWt =
+                isNaN(qty) || isNaN(wt) || qty === 0 || wt === 0
+                    ? 0.0
+                    : ((wt * 100) / qty).toFixed(2);
+
+            setavgWt(avgWt.toString());
+            handleChange("Wt", value);
+        }
+    };
+
+    const fetchManualGradeCheckerShift = async () => {
+        try {
+            let yno = await AsyncStorage.getItem("yno");
+            const userPtype = await AsyncStorage.getItem("user_prptype");
+            const gradePayload = {
+                txntype: "manual_checking",
+                referrer: "dashboard",
+                fetch: "grd",
+                prpcode: "",
+                yearno: yno,
+                prptype: userPtype
+            };
+            const checkerPayload = {
+                txntype: "manual_checking",
+                referrer: "dashboard",
+                fetch: "prodrepackchkby",
+                prpcode: "",
+                yearno: yno,
+                prptype: userPtype
+            };
+            const shiftPayload = {
+                txntype: "manual_checking",
+                referrer: "dashboard",
+                fetch: "shift",
+                prpcode: "",
+                yearno: yno,
+                prptype: userPtype
+            };
+
+            const [gradeRes, checkerRes, shiftRes] = await Promise.all([
+                axios.get(`${API}/api/get_criterion`, getRequestConfig({ params: { ...gradePayload } })),
+                axios.get(`${API}/api/get_criterion`, getRequestConfig({ params: { ...checkerPayload } })),
+                axios.get(`${API}/api/get_criterion`, getRequestConfig({ params: { ...shiftPayload } })),
+            ]);
+
+            if (gradeRes?.data?.success && gradeRes.data.response?.data?.length > 0) {
+                setManualGradeData(gradeRes.data.response.data);
+            } else {
+                setManualGradeData([]);
+            }
+
+            if (checkerRes?.data?.success && checkerRes.data.response?.data?.length > 0) {
+                const checkerList = checkerRes.data.response.data;
+
+                setManualCheckerData(checkerList);
+
+                // NEW
+                const cache = await AsyncStorage.getItem(MANUAL_CHECKER_KEY);
+
+                if (cache) {
+                    const lastChecker = JSON.parse(cache);
+
+                    const matched = checkerList.find(
+                        x => String(x.EmpCode) === String(lastChecker.EmpCode)
+                    );
+
+                    if (matched) {
+                        setSelectedManualChecker(matched);
+                        setManualChecker(matched.EmpCode);
+
+                        handleChange("ChkCode", matched.EmpCode);
+                        handleChange("ChkName", matched.EmpName);
+                    }
+                }
+            } else {
+                setManualCheckerData([]);
+            }
+
+            if (shiftRes?.data?.success && shiftRes.data.response?.data?.length > 0) {
+                setManualShiftData(shiftRes.data.response.data);
+            } else {
+                setManualShiftData([]);
+            }
+        } catch (error) {
+            console.log("fetchManualGradeCheckerShift error:", error);
         }
     };
 
@@ -1173,7 +1371,6 @@ const CheckingScanner: React.FC<Props> = ({
             const mainData = response?.data?.data?.main || [];
             const newMain = response?.data?.data?.new_main || [];
 
-            // ✅ SAFE CHECK
             if (response?.data?.success && newMain.length > 0) {
                 console.log("Main Data 👉", mainData);
                 if (newMain.length > 0 && typeof newMain[0] === "object") {
@@ -1185,9 +1382,9 @@ const CheckingScanner: React.FC<Props> = ({
                         },
                     }));
                 }
-                setShowManualPopup(true);
                 fetchmachine();
                 fetchdesign();
+                fetchManualGradeCheckerShift();
             } else {
                 Alert.alert("No Data Found");
             }
@@ -1215,11 +1412,10 @@ const CheckingScanner: React.FC<Props> = ({
     };
 
     const validateForm = async () => {
-        const qty = parseFloat(FormState.values.Qty);
-        if (!FormState.values.MacCode) {
-            await showAlert("Please select a valid machine");
-            return false;
-        }
+        // if (!FormState.values.MacCode) {
+        //     await showAlert("Please select a valid machine");
+        //     return false;
+        // }
 
         if (!FormState.values.TakaNo) {
             await showAlert("Please Enter TakaNo");
@@ -1230,10 +1426,34 @@ const CheckingScanner: React.FC<Props> = ({
             await showAlert("Please Enter Design");
             return false;
         }
-        if (FormState.values.Qty === "" || isNaN(qty) || qty <= 0) {
-            await showAlert("Please Enter valid Qty");
+
+        const meterVal = parseFloat(meter);
+        if (meter === "" || isNaN(meterVal) || meterVal <= 0) {
+            await showAlert("Please Enter valid Meter");
             return false;
         }
+
+        const kgsVal = parseFloat(kgs);
+        if (kgs === "" || isNaN(kgsVal) || kgsVal <= 0) {
+            await showAlert("Please Enter valid Kgs");
+            return false;
+        }
+
+        if (!FormState.values.GrdCode) {
+            await showAlert("Please select Grade");
+            return false;
+        }
+
+        if (!FormState.values.ChkCode) {
+            await showAlert("Please select Checker");
+            return false;
+        }
+
+        if (!FormState.values.ShfCode) {
+            await showAlert("Please select Shift");
+            return false;
+        }
+
         return true;
     };
 
@@ -1248,6 +1468,16 @@ const CheckingScanner: React.FC<Props> = ({
                 DsnName: "",
                 DsnCode: "",
                 Qty: "",
+                Wt: "",
+                AvgWt: "",
+                GrdCode: "",
+                GrdName: "",
+                // ChkCode: "",
+                // ChkName: "",
+                ChkCode: prev.values.ChkCode,
+                ChkName: prev.values.ChkName,
+                ShfCode: "",
+                ismending: 0,
                 BalQty: "",
                 UsrCode: "",
                 LastDate: "",
@@ -1260,7 +1490,86 @@ const CheckingScanner: React.FC<Props> = ({
             },
         }));
         setSelectedMachine(null);
+        setSelectedBeam(null);
+        handleChange("BeamNo", "");
+        handleChange("BeamUId", "");
+        handleChange("PrpCode", "");
+        handleChange("TakaNo", "");
+        handleChange("DsnCode", "");
+        handleChange("DsnName", "");
+        handleChange("GrdCode", "");
+        handleChange("GrdName", "");
+        handleChange("ShfCode", "");
+        handleChange("ShfName", "");
+        handleChange("OrderDsnCode", "");
+        handleChange("OrderDsnName", "");
+        handleChange("OrderLastDate", "");
+        handleChange("OrderNo", "");
+        handleChange("OrderUId", "");
+        handleChange("PlanNo", "");
+        handleChange("PlanUId", "");
+        handleChange("QltWt", "");
+        handleChange("Status", "");
+        handleChange("WarpLen", "");
+        handleChange("UId", "");
+
+        setselecteddesign(null);
+        setMeter("");
+        setKgs("");
+        setavgWt("0");
+        setGrade("");
+        setShift("");
+        setIsMending(false);
+        setSelectedGrade(null);
+
+        // Grade
+        setManualGrade("");
+        setSelectedManualGrade(null);
+        handleChange("GrdCode", "");
+        handleChange("GrdName", "");
+
+        // Shift
+        setManualShift("");
+        handleChange("ShfCode", "");
+        handleChange("ShfName", "");
+
+        // Machine
+        setSelectedMachine(null);
+
+        // Beam
+        setSelectedBeam(null);
+        setManualBeamData([]);
+
+        // Design
+        setselecteddesign(null);
+        setdesigndata([]);
+        setData([]);
+
+        // Meter / Kgs
+        setMeter("");
+        setKgs("");
+        setavgWt("0");
+        setWarpLen("0");
+
+        // Grade
+        setSelectedManualGrade(null);
+        setManualGrade("");
+
+        // Shift
+        setManualShift("");
+
+        // Mending
+        setIsMending(false);
+
+        // Agar Beam dropdown dobara load karna ho
+        BeamNoHelp();
+
+        // setChecker("");
+        // setSelectedChecker(null);
     };
+
+
+    console.log("FormState.values === ", FormState.values);
 
     const handlesave = async () => {
         const userPtype = await AsyncStorage.getItem("user_prptype");
@@ -1273,23 +1582,48 @@ const CheckingScanner: React.FC<Props> = ({
         try {
             const payloadObj = {
                 ...FormState.values,
+                AvgWt: getavgWt,
+                AuthStatus: FormState.values.AuthStatus,
+                MacCode: FormState.values.MacCode,
+                MacName: FormState.values.MacName,
+                prpcode: FormState.values.PrpCode,
+                isfirsttaka: FormState.values.isfirsttaka || "",
+                IsFirstTaka: FormState.values.isfirsttaka || "",
+                islasttaka: FormState.values.islasttaka || "",
+                IsLastTaka: FormState.values.islasttaka || "",
+                ismending: isMending ? 1 : 0,
                 prptype: userPtype,
-                txntype: "manual_checking",
+                OrderDsnCode: FormState.values.OrderDsnCode,
+                OrderDsnName: FormState.values.OrderDsnName,
+                OrderLastDate: FormState.values.OrderLastDate,
+                OrderNo: FormState.values.OrderNo,
+                OrderUId: FormState.values.OrderUId,
+                PlanNo: FormState.values.PlanNo,
+                PlanUId: FormState.values.PlanUId,
+                QltWt: FormState.values.QltWt,
+                Status: FormState.values.Status,
+                WarpLen: FormState.values.WarpLen,
+                UId: FormState.values.UId,
+                // txntype: "manual_checking",
+                txntype: "chekingScanner",
                 yearno: getCurrentFinancialYear(),
+                EMode: "M",
             };
 
-            console.log("payload...........333", payloadObj);
+            console.log("FormState.values === ", FormState.values);
 
+            console.log("payload...........333", payloadObj);
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 "Content-Type": "application/json",
                 "X-Requested-with": "XMLHttpRequest",
             };
             const response = await axios.post(
-                `${API}/api/add_edit_manual_checking_detail`,
+                `${API}/api/add_auto_checking_detail`,
                 payloadObj,
                 { headers },
             );
+            // return 0;
             console.log("response", response);
 
             if (response.data.success === true) {
@@ -1298,7 +1632,12 @@ const CheckingScanner: React.FC<Props> = ({
                         text: "OK",
                         onPress: async () => {
                             handleClearForm();
-                            setShowManualPopup(false);
+
+                            // Beam dropdown reload
+                            await BeamNoHelp();
+
+                            // Agar Taka No / Main data fresh chahiye to
+                            await soshow();
                         },
                     },
                 ]);
@@ -1308,7 +1647,7 @@ const CheckingScanner: React.FC<Props> = ({
                 Snackbar.show({
                     text: `⚠️ ${response.data.message}`,
                     duration: Snackbar.LENGTH_LONG,
-                    backgroundColor: "#D32F2F", // 🔥 RED (error)
+                    backgroundColor: "#D32F2F",
                     textColor: "#fff",
                     numberOfLines: 2,
                     action: {
@@ -1337,7 +1676,7 @@ const CheckingScanner: React.FC<Props> = ({
         }
     };
 
-    const handleScannerList = async () => {
+    const handleScannerList = async (mode = "S") => {
         const userPtype = await AsyncStorage.getItem("user_prptype");
 
         try {
@@ -1358,7 +1697,7 @@ const CheckingScanner: React.FC<Props> = ({
                 ChkDate: "",
                 PrpCode: "",
                 BeamNo: "",
-                // ImgTag: txntype === "manual_checking" ? 2 : 1,
+                EMode: mode,
             };
 
             console.log("scanner list Payload:", payload);
@@ -1389,16 +1728,13 @@ const CheckingScanner: React.FC<Props> = ({
                 console.log("API getshifts error:", error);
             }
         } finally {
-            // 👇 YE IMPORTANT FIX HAI
             setScannerLoading(false);
         }
     };
 
     const loadMoreData = () => {
-        // already loading
         if (footerLoading) return;
 
-        // all data loaded
         if (visibleData.length >= scannerCardData.length) return;
 
         setFooterLoading(true);
@@ -1521,6 +1857,24 @@ const CheckingScanner: React.FC<Props> = ({
     }, [getPrinters, printerSearch]);
 
 
+    if (!device || !hasPermission) {
+        return (
+            <View>
+                <Text>No camera permission or device not available</Text>
+            </View>
+        );
+    }
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+
+        await soshow();        // Manual Entry initial API
+        await BeamNoHelp();    // Beam No dropdown API
+
+        setRefreshing(false);
+    };
+
+
     return (
         <>
             {isLoading && <FullScreenLoader />}
@@ -1535,6 +1889,14 @@ const CheckingScanner: React.FC<Props> = ({
                 contentContainerStyle={{ padding: 14, paddingBottom: 28 }}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={["#0284C7"]}
+                        tintColor="#0284C7"
+                    />
+                }
             >
                 <View
                     style={{
@@ -1691,308 +2053,663 @@ const CheckingScanner: React.FC<Props> = ({
                     </View>
                 )}
 
-                <View
-                    style={{
-                        backgroundColor: "#FFFFFF",
-                        borderRadius: 24,
-                        padding: 16,
-                        borderWidth: 1,
-                        borderColor: "#E2E8F0",
-                        shadowColor: "#0F172A",
-                        shadowOpacity: 0.08,
-                        shadowRadius: 14,
-                        shadowOffset: { width: 0, height: 5 },
-                        elevation: 4,
-                    }}
-                >
-                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#E0F2FE", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                            <Icon name="inventory-2" size={20} color="#0369A1" />
-                        </View>
-                        <Text style={{ color: "#075985", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>FABRIC INFO</Text>
-                    </View>
-
-                    <View style={{ flexDirection: "row", gap: 10 }}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Beam Number <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                            <TextInput
-                                style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
-                                value={beamNo}
-                                editable={false}
-                                placeholder="Auto"
-                                placeholderTextColor="#94A3B8"
-                            />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Taka No <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                            <TextInput
-                                style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
-                                value={takaNo}
-                                editable={false}
-                                placeholder="Auto"
-                                placeholderTextColor="#94A3B8"
-                            />
-                        </View>
-                    </View>
-
-                    <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Design <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                    <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
-                        <PartyDropdown
-                            data={getData}
-                            placeholder="Choose design..."
-                            labelKey={["dsnname", "dsncode"]}
-                            valueKey="dsncode"
-                            pageSize={12}
-                            initialValue={null}
-                            selected={selecteddesign}
-                            loading={false}
-                            type="checkingdesigndata"
-                            onSelect={(item) => {
-                                const selectedDesign = item?.dsncode || "";
-                                console.log("👉 DESIGN SELECTED:", selectedDesign);
-                                console.log("👉 SCANNED VALUE:", scannedValue);
-                                setselecteddesign(item);
-                                setDesign(item.dsncode);
-                                if (scannedValue) {
-                                    sendScannedValue1(scannedValue, item.dsncode);
-                                }
-                            }}
-                            setSelected={(val) => {
-                                if (!val) {
-                                    setDesign("");
-                                    setWarpLen("0");
-                                } else {
-                                    setDesign(val.dsncode);
-                                    setWarpLen(val.WarpLen || "0");
-                                }
-                            }}
-                        />
-                    </View>
-
-                    <View style={{ height: 1, backgroundColor: "#E2E8F0", marginVertical: 18 }} />
-
-                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#ECFDF5", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                            <Icon name="settings" size={20} color="#059669" />
-                        </View>
-                        <Text style={{ color: "#047857", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>PRODUCTION DETAILS</Text>
-                    </View>
-
-                    <View style={{ flexDirection: "row", gap: 10 }}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>
-                                Meter <Text style={{ color: "#DC2626" }}>*</Text>
-                                {typeof getWarpLen != "undefined" && getWarpLen != "" && getWarpLen != null && parseFloat(getWarpLen) != 0 ? (
-                                    <Text style={{ fontSize: 11, color: "#64748B" }}> [{getWarpLen}]</Text>
-                                ) : null}
-                            </Text>
-                            <TextInput
-                                style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
-                                value={meter}
-                                keyboardType="decimal-pad"
-                                onChangeText={handleMeterChange}
-                                placeholder="Meter"
-                                placeholderTextColor="#94A3B8"
-                            />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Kgs <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                            <TextInput
-                                style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
-                                value={kgs}
-                                keyboardType="decimal-pad"
-                                onChangeText={handleKgsChange}
-                                placeholder="Kgs"
-                                placeholderTextColor="#94A3B8"
-                            />
-                        </View>
-                    </View>
-
-                    <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Avg. Wt <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                    <TextInput
-                        style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "900" }}
-                        value={getavgWt}
-                        editable={false}
-                    />
-
-                    <View style={{ height: 1, backgroundColor: "#E2E8F0", marginVertical: 18 }} />
-
-                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
-                        <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#FEF3C7", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                            <Icon name="verified" size={20} color="#B45309" />
-                        </View>
-                        <Text style={{ color: "#92400E", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>QUALITY DETAILS</Text>
-                    </View>
-
-                    <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Grade <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                    <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
-                        <PartyDropdown
-                            data={getGradeData}
-                            placeholder="Choose grade..."
-                            labelKey={["GrdName", "GrdCode"]}
-                            valueKey="GrdCode"
-                            pageSize={12}
-                            initialValue={null}
-                            selected={selectedGrade}
-                            loading={false}
-                            type="grd"
-                            onSelect={(item) => {
-                                setSelectedGrade(item);
-                                setGrade(item.GrdCode);
-                            }}
-                            setSelected={(val) => {
-                                if (!val) setGrade("");
-                                else setGrade(val.GrdCode);
-                            }}
-                        />
-                    </View>
-
-                    <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Checker <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                    <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
-                        <PartyDropdown
-                            data={getCheckerData}
-                            placeholder="Choose checker..."
-                            labelKey={["EmpName", "EmpCode"]}
-                            valueKey="EmpCode"
-                            pageSize={12}
-                            initialValue={null}
-                            selected={selectedChecker}
-                            loading={false}
-                            type="checker"
-                            onSelect={(item) => {
-                                setSelectedChecker(item);
-                                setChecker(item.EmpCode);
-                            }}
-                            setSelected={(val) => {
-                                if (!val) setChecker("");
-                                else setChecker(val.EmpCode);
-                            }}
-                        />
-                    </View>
-
-                    <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Shift <Text style={{ color: "#DC2626" }}>*</Text></Text>
-                    <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
-                        <Picker selectedValue={shift} onValueChange={setShift} dropdownIconColor="#475569">
-                            <Picker.Item label="Select shift" value="" enabled={false} />
-                            {getShiftData.map((item, i) => (
-                                <Picker.Item key={i} label={item.ShfName} value={item.ShfCode} />
-                            ))}
-                        </Picker>
-                    </View>
-
+                {!showManual && (
                     <View
                         style={{
-                            marginTop: 16,
-                            padding: 12,
-                            borderRadius: 16,
-                            backgroundColor: "#F8FAFC",
+                            backgroundColor: "#FFFFFF",
+                            borderRadius: 24,
+                            padding: 16,
                             borderWidth: 1,
                             borderColor: "#E2E8F0",
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
+                            shadowColor: "#0F172A",
+                            shadowOpacity: 0.08,
+                            shadowRadius: 14,
+                            shadowOffset: { width: 0, height: 5 },
+                            elevation: 4,
                         }}
                     >
-                        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: isMending ? "#DBEAFE" : "#E2E8F0", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                                <Icon name="build" size={19} color={isMending ? "#1D4ED8" : "#64748B"} />
+                        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#E0F2FE", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                <Icon name="inventory-2" size={20} color="#0369A1" />
                             </View>
-                            <View>
-                                <Text style={{ color: "#0F172A", fontWeight: "900" }}>Mending Entry</Text>
-                                <Text style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}>{isMending ? "This taka requires mending" : "Normal checking entry"}</Text>
+                            <Text style={{ color: "#075985", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>FABRIC INFO</Text>
+                        </View>
+
+                        <View style={{ flexDirection: "row", gap: 10 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Beam Number <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                                <TextInput
+                                    style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                    value={beamNo}
+                                    editable={false}
+                                    placeholder="Auto"
+                                    placeholderTextColor="#94A3B8"
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Taka No <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                                <TextInput
+                                    style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                    value={takaNo}
+                                    editable={false}
+                                    placeholder="Auto"
+                                    placeholderTextColor="#94A3B8"
+                                />
                             </View>
                         </View>
-                        <Switch value={isMending} onValueChange={setIsMending} trackColor={{ false: "#CBD5E1", true: "#93C5FD" }} thumbColor={isMending ? "#0284C7" : "#FFFFFF"} />
-                    </View>
 
-                    <View style={{ marginTop: 18, flexDirection: "row", gap: 10 }}>
-                        <TouchableOpacity
-                            activeOpacity={0.88}
-                            style={{ flex: 1, minHeight: 54, borderRadius: 16, borderWidth: 1.5, borderColor: "#0284C7", backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", justifyContent: "center" }}
-                            onPress={handleScannerList}
-                        >
-                            <Icon name="format-list-bulleted" size={21} color="#0284C7" />
-                            <Text style={{ color: "#0284C7", fontWeight: "900", marginLeft: 8 }}>Scanner List</Text>
-                        </TouchableOpacity>
+                        <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Design <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                        <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                            <PartyDropdown
+                                data={getData}
+                                placeholder="Choose design..."
+                                labelKey={["dsnname", "dsncode"]}
+                                valueKey="dsncode"
+                                pageSize={12}
+                                initialValue={null}
+                                selected={selecteddesign}
+                                loading={false}
+                                type="checkingdesigndata"
+                                onSelect={(item) => {
+                                    const selectedDesign = item?.dsncode || "";
+                                    console.log("👉 DESIGN SELECTED:", selectedDesign);
+                                    console.log("👉 SCANNED VALUE:", scannedValue);
+                                    setselecteddesign(item);
+                                    setDesign(item.dsncode);
+                                    if (scannedValue) {
+                                        sendScannedValue1(scannedValue, item.dsncode);
+                                    }
+                                }}
+                                setSelected={(val) => {
+                                    if (!val) {
+                                        setDesign("");
+                                        setWarpLen("0");
+                                    } else {
+                                        setDesign(val.dsncode);
+                                        setWarpLen(val.WarpLen || "0");
+                                    }
+                                }}
+                            />
+                        </View>
 
-                        <TouchableOpacity
-                            activeOpacity={0.88}
-                            style={{ flex: 1, minHeight: 54, borderRadius: 16, backgroundColor: "#0284C7", flexDirection: "row", alignItems: "center", justifyContent: "center", shadowColor: "#0284C7", shadowOpacity: 0.28, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}
-                            onPress={handleSubmitScan}
-                        >
-                            <Icon name="save" size={21} color="#FFFFFF" />
-                            <Text style={{ color: "#FFFFFF", fontWeight: "900", marginLeft: 8 }}>Save Entry</Text>
-                        </TouchableOpacity>
-                    </View>
+                        <View style={{ height: 1, backgroundColor: "#E2E8F0", marginVertical: 18 }} />
 
-                    {getDataSaved && (
+                        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#ECFDF5", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                <Icon name="settings" size={20} color="#059669" />
+                            </View>
+                            <Text style={{ color: "#047857", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>PRODUCTION DETAILS</Text>
+                        </View>
+
+                        <View style={{ flexDirection: "row", gap: 10 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>
+                                    Meter <Text style={{ color: "#DC2626" }}>*</Text>
+                                    {typeof getWarpLen != "undefined" && getWarpLen != "" && getWarpLen != null && parseFloat(getWarpLen) != 0 ? (
+                                        <Text style={{ fontSize: 11, color: "#64748B" }}> [{getWarpLen}]</Text>
+                                    ) : null}
+                                </Text>
+                                <TextInput
+                                    style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                    value={meter}
+                                    keyboardType="decimal-pad"
+                                    onChangeText={handleMeterChange}
+                                    placeholder="Meter"
+                                    placeholderTextColor="#94A3B8"
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Kgs <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                                <TextInput
+                                    style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                    value={kgs}
+                                    keyboardType="decimal-pad"
+                                    onChangeText={handleKgsChange}
+                                    placeholder="Kgs"
+                                    placeholderTextColor="#94A3B8"
+                                />
+                            </View>
+                        </View>
+
+                        <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Avg. Wt <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                        <TextInput
+                            style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "900" }}
+                            value={getavgWt}
+                            editable={false}
+                        />
+
+                        <View style={{ height: 1, backgroundColor: "#E2E8F0", marginVertical: 18 }} />
+
+                        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#FEF3C7", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                <Icon name="verified" size={20} color="#B45309" />
+                            </View>
+                            <Text style={{ color: "#92400E", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>QUALITY DETAILS</Text>
+                        </View>
+
+                        <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Grade <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                        <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                            <PartyDropdown
+                                data={getGradeData}
+                                placeholder="Choose grade..."
+                                labelKey={["GrdName", "GrdCode"]}
+                                valueKey="GrdCode"
+                                pageSize={12}
+                                initialValue={null}
+                                selected={selectedGrade}
+                                loading={false}
+                                type="grd"
+                                onSelect={(item) => {
+                                    setSelectedGrade(item);
+                                    setGrade(item.GrdCode);
+                                }}
+                                setSelected={(val) => {
+                                    if (!val) setGrade("");
+                                    else setGrade(val.GrdCode);
+                                }}
+                            />
+                        </View>
+
+                        <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Checker <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                        <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                            <PartyDropdown
+                                data={getCheckerData}
+                                placeholder="Choose checker..."
+                                labelKey={["EmpName", "EmpCode"]}
+                                valueKey="EmpCode"
+                                pageSize={12}
+                                initialValue={null}
+                                selected={selectedChecker}
+                                loading={false}
+                                type="checker"
+                                onSelect={(item) => {
+                                    setSelectedChecker(item);
+                                    setChecker(item.EmpCode);
+                                }}
+                                setSelected={(val) => {
+                                    if (!val) setChecker("");
+                                    else setChecker(val.EmpCode);
+                                }}
+                            />
+                        </View>
+
+                        <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Shift <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                        <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                            <Picker selectedValue={shift} onValueChange={setShift} dropdownIconColor="#475569">
+                                <Picker.Item label="Select shift" value="" enabled={false} />
+                                {getShiftData.map((item, i) => (
+                                    <Picker.Item key={i} label={item.ShfName} value={item.ShfCode} />
+                                ))}
+                            </Picker>
+                        </View>
+
                         <View
                             style={{
                                 marginTop: 16,
+                                padding: 12,
+                                borderRadius: 16,
                                 backgroundColor: "#F8FAFC",
                                 borderWidth: 1,
                                 borderColor: "#E2E8F0",
-                                borderRadius: 18,
-                                padding: 14,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
                             }}
                         >
-                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-                                <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: "#E0F2FE", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                                    <Icon name="print" size={22} color="#0369A1" />
+                            <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: isMending ? "#DBEAFE" : "#E2E8F0", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                    <Icon name="build" size={19} color={isMending ? "#1D4ED8" : "#64748B"} />
+                                </View>
+                                <View>
+                                    <Text style={{ color: "#0F172A", fontWeight: "900" }}>Mending Entry</Text>
+                                    <Text style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}>{isMending ? "This taka requires mending" : "Normal checking entry"}</Text>
+                                </View>
+                            </View>
+                            <Switch value={isMending} onValueChange={setIsMending} trackColor={{ false: "#CBD5E1", true: "#93C5FD" }} thumbColor={isMending ? "#0284C7" : "#FFFFFF"} />
+                        </View>
+
+                        <View style={{ marginTop: 18, flexDirection: "row", gap: 10 }}>
+                            <TouchableOpacity
+                                activeOpacity={0.88}
+                                style={{ flex: 1, minHeight: 54, borderRadius: 16, borderWidth: 1.5, borderColor: "#0284C7", backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+                                onPress={() => handleScannerList("S")}
+                            >
+                                <Icon name="format-list-bulleted" size={21} color="#0284C7" />
+                                <Text style={{ color: "#0284C7", fontWeight: "900", marginLeft: 8 }}>Scanner List</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                activeOpacity={0.88}
+                                style={{ flex: 1, minHeight: 54, borderRadius: 16, backgroundColor: "#0284C7", flexDirection: "row", alignItems: "center", justifyContent: "center", shadowColor: "#0284C7", shadowOpacity: 0.28, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}
+                                onPress={handleSubmitScan}
+                            >
+                                <Icon name="save" size={21} color="#FFFFFF" />
+                                <Text style={{ color: "#FFFFFF", fontWeight: "900", marginLeft: 8 }}>Save Entry</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {getDataSaved && (
+                            <View
+                                style={{
+                                    marginTop: 16,
+                                    backgroundColor: "#F8FAFC",
+                                    borderWidth: 1,
+                                    borderColor: "#E2E8F0",
+                                    borderRadius: 18,
+                                    padding: 14,
+                                }}
+                            >
+                                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                                    <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: "#E0F2FE", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                        <Icon name="print" size={22} color="#0369A1" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: "#0F172A", fontWeight: "900", fontSize: 15 }}>Sticker Printing</Text>
+                                        <Text style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}>Select printer and print saved checking sticker</Text>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    onPress={() => {
+                                        setPendingPrintItem(null);
+                                        if (getPrinters.length === 0) getAllPrinters();
+                                        setPrinterModalVisible(true);
+                                    }}
+                                    style={{
+                                        minHeight: 50,
+                                        borderRadius: 14,
+                                        borderWidth: 1,
+                                        borderColor: printer ? "#93C5FD" : "#CBD5E1",
+                                        backgroundColor: "#FFFFFF",
+                                        paddingHorizontal: 12,
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                    }}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: printer ? "#0F172A" : "#94A3B8", fontWeight: "900" }}>{printer || "Select Printer"}</Text>
+                                        <Text style={{ color: getPrinterStatusColor(selectedPrinterStatus), fontSize: 11, fontWeight: "900", marginTop: 3 }}>
+                                            {selectedPrinterStatus || "Tap to choose printer"}
+                                        </Text>
+                                    </View>
+                                    <Icon name="keyboard-arrow-down" size={24} color="#475569" />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.88}
+                                    onPress={printSticker}
+                                    style={{
+                                        marginTop: 10,
+                                        minHeight: 50,
+                                        borderRadius: 14,
+                                        backgroundColor: printer ? "#16A34A" : "#94A3B8",
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    <Icon name="local-printshop" size={20} color="#FFFFFF" />
+                                    <Text style={{ color: "#FFFFFF", fontWeight: "900", marginLeft: 8 }}>Print Sticker</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {showManual && (
+                    <>
+                        <View
+                            style={{
+                                backgroundColor: "#FFFFFF",
+                                borderRadius: 24,
+                                padding: 16,
+                                borderWidth: 1,
+                                borderColor: "#E2E8F0",
+                                shadowColor: "#0F172A",
+                                shadowOpacity: 0.08,
+                                shadowRadius: 14,
+                                shadowOffset: { width: 0, height: 5 },
+                                elevation: 4,
+                            }}
+                        >
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#E0F2FE", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                    <Icon name="inventory-2" size={20} color="#0369A1" />
+                                </View>
+                                <Text style={{ color: "#075985", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>FABRIC INFO</Text>
+                            </View>
+
+                            {/* <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Machine <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                        <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                            <PartyDropdown
+                                key={selectedMachine ? selectedMachine.MacCode : "empty"}
+                                data={machinedata}
+                                placeholder="Choose machine..."
+                                labelKey={["MacName", "MacCode"]}
+                                valueKey="MacCode"
+                                pageSize={12}
+                                selected={selectedMachine}
+                                loading={false}
+                                type="machine"
+                                onSelect={(item) => {
+                                    setFormState((prev) => ({
+                                        ...prev,
+                                        values: {
+                                            ...prev.values,
+                                            MacCode: item.MacCode,
+                                            MacName: item.MacName,
+                                        },
+                                    }));
+                                    setSelectedMachine(item);
+                                }}
+                            />
+                        </View> */}
+
+                            <Text
+                                style={{
+                                    color: "#0F172A",
+                                    fontWeight: "900",
+                                    marginTop: 14,
+                                    marginBottom: 7,
+                                }}
+                            >
+                                Beam No <Text style={{ color: "#DC2626" }}>*</Text>
+                            </Text>
+
+                            <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                                <PartyDropdown
+                                    data={manualBeamData}
+                                    placeholder="Select Beam No"
+                                    labelKey="BeamNo"
+                                    valueKey="BeamNo"
+                                    selected={selectedBeam}
+                                    loading={false}
+                                    type="beam"
+                                    onSelect={(item) => {
+                                        setSelectedBeam(item);
+
+                                        setFormState((prev) => ({
+                                            ...prev,
+                                            values: {
+                                                ...prev.values,
+                                                AuthStatus: item.AuthStatus,
+                                                MacCode: item.MacCode,
+                                                MacName: item.MacName,
+                                                PrpCode: item.PrpCode,
+                                                BeamNo: item.BeamNo,
+                                                BeamUId: item.BeamUId,
+                                                TakaNo: item.TakaNo,
+                                                DsnCode: item.DsnCode,
+                                                isfirsttaka: item.isfirsttaka,
+                                                islasttaka: item.islasttaka,
+                                                bstatus: item.bstatus,
+                                                IsAuth: item.IsAuth,
+                                                islasttakatrack: item.islasttakatrack,
+                                                OrderDsnCode: item.OrderDsnCode,
+                                                OrderDsnName: item.OrderDsnName,
+                                                OrderLastDate: item.OrderLastDate,
+                                                OrderNo: item.OrderNo,
+                                                OrderUId: item.OrderUId,
+                                                PlanNo: item.PlanNo,
+                                                PlanUId: item.PlanUId,
+                                                QltWt: item.QltWt,
+                                                Status: item.Status,
+                                                WarpLen: item.WarpLen,
+                                                UId: item.UId,
+                                            },
+                                        }));
+
+                                        fetchDesignHelp(item);
+                                    }}
+                                />
+                            </View>
+
+                            <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Taka No <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                            <TextInput
+                                style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                value={FormState.values.TakaNo}
+                                onChangeText={(text) => handleChange("TakaNo", text)}
+                                maxLength={20}
+                                placeholder="Taka No"
+                                placeholderTextColor="#94A3B8"
+                            />
+
+                            <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Design <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                            <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                                <PartyDropdown
+                                    key={selecteddesign ? selecteddesign.dsncode : "empty"}
+                                    data={getdesigndata}
+                                    placeholder="Choose Design..."
+                                    labelKey={["dsnname", "dsncode"]}
+                                    valueKey="dsncode"
+                                    pageSize={12}
+                                    selected={selecteddesign}
+                                    loading={false}
+                                    type="checkingdesigndata"
+                                    onSelect={(item) => {
+                                        setFormState((prev) => ({
+                                            ...prev,
+                                            values: {
+                                                ...prev.values,
+                                                DsnCode: item.dsncode,
+                                                DsnName: item.dsnname,
+                                            },
+                                        }));
+                                        setselecteddesign(item);
+                                    }}
+                                />
+                            </View>
+
+                            <View style={{ height: 1, backgroundColor: "#E2E8F0", marginVertical: 18 }} />
+
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#ECFDF5", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                    <Icon name="settings" size={20} color="#059669" />
+                                </View>
+                                <Text style={{ color: "#047857", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>PRODUCTION DETAILS</Text>
+                            </View>
+
+                            <View style={{ flexDirection: "row", gap: 10 }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Meter <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                                    <TextInput
+                                        style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                        value={meter}
+                                        keyboardType="decimal-pad"
+                                        onChangeText={handleManualMeterChange}
+                                        placeholder="Meter"
+                                        placeholderTextColor="#94A3B8"
+                                    />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ color: "#0F172A", fontWeight: "900", fontSize: 15 }}>Sticker Printing</Text>
-                                    <Text style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}>Select printer and print saved checking sticker</Text>
+                                    <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Kgs <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                                    <TextInput
+                                        style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", paddingHorizontal: 12, color: "#0F172A", fontWeight: "800" }}
+                                        value={kgs}
+                                        keyboardType="decimal-pad"
+                                        onChangeText={handleManualKgsChange}
+                                        placeholder="Kgs"
+                                        placeholderTextColor="#94A3B8"
+                                    />
                                 </View>
                             </View>
 
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                onPress={() => {
-                                    setPendingPrintItem(null);
-                                    if (getPrinters.length === 0) getAllPrinters();
-                                    setPrinterModalVisible(true);
-                                }}
+                            <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Avg. Wt</Text>
+                            <TextInput
+                                style={{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#F8FAFC", paddingHorizontal: 12, color: "#0F172A", fontWeight: "900" }}
+                                value={getavgWt}
+                                editable={false}
+                            />
+
+                            <View style={{ height: 1, backgroundColor: "#E2E8F0", marginVertical: 18 }} />
+
+                            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                                <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: "#FEF3C7", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                    <Icon name="verified" size={20} color="#B45309" />
+                                </View>
+                                <Text style={{ color: "#92400E", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>QUALITY DETAILS</Text>
+                            </View>
+
+                            <Text style={{ color: "#0F172A", fontWeight: "900", marginBottom: 7 }}>Grade <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                            <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                                <PartyDropdown
+                                    data={manualGradeData}
+                                    placeholder="Choose grade..."
+                                    labelKey={["GrdName", "GrdCode"]}
+                                    valueKey="GrdCode"
+                                    pageSize={12}
+                                    initialValue={null}
+                                    selected={selectedManualGrade}
+                                    loading={false}
+                                    type="grd"
+                                    onSelect={(item) => {
+                                        setSelectedManualGrade(item);
+                                        setManualGrade(item.GrdCode);
+                                        handleChange("GrdCode", item.GrdCode);
+                                        handleChange("GrdName", item.GrdName);
+                                    }}
+                                    setSelected={(val) => {
+                                        if (!val) setManualGrade("");
+                                        else setManualGrade(val.GrdCode);
+                                    }}
+                                />
+                            </View>
+
+                            <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Checker <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                            <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                                <PartyDropdown
+                                    data={manualCheckerData}
+                                    placeholder="Choose checker..."
+                                    labelKey={["EmpName", "EmpCode"]}
+                                    valueKey="EmpCode"
+                                    pageSize={12}
+                                    initialValue={null}
+                                    selected={selectedManualChecker}
+                                    loading={false}
+                                    type="checker"
+                                    onSelect={async (item) => {
+                                        setSelectedManualChecker(item);
+                                        setManualChecker(item.EmpCode);
+                                        handleChange("ChkCode", item.EmpCode);
+                                        handleChange("ChkName", item.EmpName);
+                                        // NEW
+                                        await AsyncStorage.setItem(
+                                            MANUAL_CHECKER_KEY,
+                                            JSON.stringify(item)
+                                        );
+                                        console.log("MANUAL_CHECKER_KEY ==", MANUAL_CHECKER_KEY);
+                                    }}
+                                    setSelected={(val) => {
+                                        if (!val) setManualChecker("");
+                                        else setManualChecker(val.EmpCode);
+                                    }}
+                                />
+                            </View>
+
+                            <Text style={{ color: "#0F172A", fontWeight: "900", marginTop: 14, marginBottom: 7 }}>Shift <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                            <View style={{ minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: "#CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", overflow: "hidden" }}>
+                                <Picker
+                                    selectedValue={manualShift}
+                                    onValueChange={(val) => {
+                                        setManualShift(val);
+                                        handleChange("ShfCode", val);
+                                    }}
+                                    dropdownIconColor="#475569"
+                                >
+                                    <Picker.Item label="Select shift" value="" enabled={false} />
+                                    {manualShiftData.map((item, i) => (
+                                        <Picker.Item key={i} label={item.ShfName} value={item.ShfCode} />
+                                    ))}
+                                </Picker>
+                            </View>
+
+                            <View
                                 style={{
-                                    minHeight: 50,
-                                    borderRadius: 14,
+                                    marginTop: 16,
+                                    padding: 12,
+                                    borderRadius: 16,
+                                    backgroundColor: "#F8FAFC",
                                     borderWidth: 1,
-                                    borderColor: printer ? "#93C5FD" : "#CBD5E1",
-                                    backgroundColor: "#FFFFFF",
-                                    paddingHorizontal: 12,
+                                    borderColor: "#E2E8F0",
                                     flexDirection: "row",
                                     alignItems: "center",
                                     justifyContent: "space-between",
                                 }}
                             >
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ color: printer ? "#0F172A" : "#94A3B8", fontWeight: "900" }}>{printer || "Select Printer"}</Text>
-                                    <Text style={{ color: getPrinterStatusColor(selectedPrinterStatus), fontSize: 11, fontWeight: "900", marginTop: 3 }}>
-                                        {selectedPrinterStatus || "Tap to choose printer"}
-                                    </Text>
+                                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: isMending ? "#DBEAFE" : "#E2E8F0", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                                        <Icon name="build" size={19} color={isMending ? "#1D4ED8" : "#64748B"} />
+                                    </View>
+                                    <View>
+                                        <Text style={{ color: "#0F172A", fontWeight: "900" }}>Mending Entry</Text>
+                                        <Text style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}>{isMending ? "This taka requires mending" : "Normal checking entry"}</Text>
+                                    </View>
                                 </View>
-                                <Icon name="keyboard-arrow-down" size={24} color="#475569" />
-                            </TouchableOpacity>
+                                <Switch
+                                    value={isMending}
+                                    onValueChange={(val) => {
+                                        setIsMending(val);
+                                        handleChange("ismending", val ? 1 : 0);
+                                    }}
+                                    trackColor={{ false: "#CBD5E1", true: "#93C5FD" }}
+                                    thumbColor={isMending ? "#0284C7" : "#FFFFFF"}
+                                />
+                            </View>
+
+                            <View style={{ marginTop: 18, flexDirection: "row", gap: 10 }}>
+                                <TouchableOpacity
+                                    activeOpacity={0.88}
+                                    style={{ flex: 1, minHeight: 54, borderRadius: 16, backgroundColor: "#0284C7", flexDirection: "row", alignItems: "center", justifyContent: "center", shadowColor: "#0284C7", shadowOpacity: 0.28, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}
+                                    onPress={handlesave}
+                                >
+                                    <Icon name="save" size={21} color="#FFFFFF" />
+                                    <Text style={{ color: "#FFFFFF", fontWeight: "900", marginLeft: 8 }}>Save</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    activeOpacity={0.88}
+                                    style={{ flex: 1, minHeight: 54, borderRadius: 16, borderWidth: 1.5, borderColor: "#94A3B8", backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", justifyContent: "center" }}
+                                    onPress={handleClearForm}
+                                >
+                                    <Icon name="close" size={21} color="#475569" />
+                                    <Text style={{ color: "#475569", fontWeight: "900", marginLeft: 8 }}>Clear</Text>
+                                </TouchableOpacity>
+                            </View>
 
                             <TouchableOpacity
-                                activeOpacity={0.88}
-                                onPress={printSticker}
+                                onPress={() => handleScannerList("M")}
+                                activeOpacity={0.8}
                                 style={{
-                                    marginTop: 10,
-                                    minHeight: 50,
-                                    borderRadius: 14,
-                                    backgroundColor: printer ? "#16A34A" : "#94A3B8",
-                                    flexDirection: "row",
-                                    alignItems: "center",
+                                    backgroundColor: "#0284C7",
+                                    height: 48,
+                                    borderRadius: 12,
                                     justifyContent: "center",
+                                    alignItems: "center",
+                                    flexDirection: "row",
+                                    marginBottom: 15,
+                                    marginTop: 20,
                                 }}
                             >
-                                <Icon name="local-printshop" size={20} color="#FFFFFF" />
-                                <Text style={{ color: "#FFFFFF", fontWeight: "900", marginLeft: 8 }}>Print Sticker</Text>
+                                <Icon
+                                    name="list-alt"
+                                    size={22}
+                                    color="#fff"
+                                />
+                                <Text
+                                    style={{
+                                        color: "#fff",
+                                        fontWeight: "bold",
+                                        marginLeft: 8,
+                                    }}
+                                >
+                                    Scanner List
+                                </Text>
                             </TouchableOpacity>
                         </View>
-                    )}
-                </View>
+                    </>
+                )}
             </ScrollView>
             <Modal
                 visible={printerModalVisible}
@@ -2421,193 +3138,6 @@ const CheckingScanner: React.FC<Props> = ({
             </Modal>
 
             <Modal
-                visible={showManualPopup}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowManualPopup(false)}
-            >
-                <View style={checkingScannerStyles.modalOverlay}>
-                    <View style={checkingScannerStyles.modalBox}>
-                        <Text style={checkingScannerStyles.modalTitle}>Manual Entry</Text>
-                        <View style={checkingScannerStyles.formGroup}>
-                            <View style={checkingScannerStyles.rowHorizontal}>
-                                <Text style={checkingScannerStyles.labelHorizontal}>
-                                    Machine <Text style={{ color: "red" }}>*</Text>
-                                </Text>
-
-                                <View style={{ flex: 1 }}>
-                                    <PartyDropdown
-                                        key={selectedMachine ? selectedMachine.MacCode : "empty"}
-                                        data={machinedata}
-                                        placeholder="Choose machine..."
-                                        labelKey={["MacName", "MacCode"]}
-                                        valueKey="MacCode"
-                                        pageSize={12}
-                                        selected={selectedMachine}
-                                        loading={false}
-                                        type="machine"
-                                        onSelect={(item) => {
-                                            setFormState((prev) => ({
-                                                ...prev,
-                                                values: {
-                                                    ...prev.values,
-                                                    MacCode: item.MacCode,
-                                                    MacName: item.MacName,
-                                                },
-                                            }));
-                                            setSelectedMachine(item);
-                                        }}
-
-                                    // setSelected={(val) => {
-                                    //     if (!val) {
-                                    //         setFormState(prev => ({
-                                    //             ...prev,
-                                    //             values: {
-                                    //                 ...prev.values,
-                                    //                 MacCode: '',
-                                    //                 MacName: ''
-                                    //             }
-                                    //         }));
-                                    //         setSelectedMachine(null);
-                                    //     } else {
-                                    //         setFormState(prev => ({
-                                    //             ...prev,
-                                    //             values: {
-                                    //                 ...prev.values,
-                                    //                 MacCode: val.MacCode,
-                                    //                 MacName: val.MacName
-                                    //             }
-                                    //         }));
-                                    //         setSelectedMachine(val);
-                                    //     }
-                                    // }}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Taka */}
-                            <View style={checkingScannerStyles.rowHorizontal}>
-                                <Text style={checkingScannerStyles.labelHorizontal}>
-                                    Taka No
-                                </Text>
-                                <TextInput
-                                    style={checkingScannerStyles.inputDisabledHorizontal}
-                                    value={FormState.values.TakaNo}
-                                    onChangeText={(text) => handleChange("TakaNo", text)}
-                                    maxLength={20}
-                                />
-                            </View>
-
-                            <View style={checkingScannerStyles.rowHorizontal}>
-                                <Text style={checkingScannerStyles.labelHorizontal}>
-                                    Design
-                                </Text>
-                                <View style={{ flex: 1 }}>
-                                    <PartyDropdown
-                                        key={selecteddesign ? selecteddesign.dsncode : "empty"}
-                                        data={getdesigndata}
-                                        placeholder="Choose Design..."
-                                        labelKey={["dsnname", "dsncode"]}
-                                        valueKey="dsncode"
-                                        pageSize={12}
-                                        selected={selecteddesign}
-                                        loading={false}
-                                        type="checkingdesigndata"
-                                        onSelect={(item) => {
-                                            setFormState((prev) => ({
-                                                ...prev,
-                                                values: {
-                                                    ...prev.values,
-                                                    DsnCode: item.dsncode,
-                                                    DsnName: item.dsnname,
-                                                },
-                                            }));
-                                            setselecteddesign(item);
-                                        }}
-
-                                    // setSelected={(val) => {
-                                    //     if (!val) {
-                                    //         setFormState(prev => ({
-                                    //             ...prev,
-                                    //             values: {
-                                    //                 ...prev.values,
-                                    //                 MacCode: '',
-                                    //                 MacName: ''
-                                    //             }
-                                    //         }));
-                                    //         setSelectedMachine(null);
-                                    //     } else {
-                                    //         setFormState(prev => ({
-                                    //             ...prev,
-                                    //             values: {
-                                    //                 ...prev.values,
-                                    //                 MacCode: val.MacCode,
-                                    //                 MacName: val.MacName
-                                    //             }
-                                    //         }));
-                                    //         setSelectedMachine(val);
-                                    //     }
-                                    // }}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Qty */}
-                            <View style={checkingScannerStyles.rowHorizontal}>
-                                <Text style={checkingScannerStyles.labelHorizontal}>Qty</Text>
-                                <TextInput
-                                    style={checkingScannerStyles.inputDisabledHorizontal}
-                                    keyboardType="decimal-pad"
-                                    onFocus={() => {
-                                        if (FormState.values.Qty === "0.00") {
-                                            handleChange("Qty", "");
-                                        }
-                                    }}
-                                    onChangeText={(text) => {
-                                        const re = /^\d*(?:[.,]\d{0,3})?$/;
-
-                                        if (text === "" || re.test(text)) {
-                                            handleChange("Qty", text);
-                                        }
-                                    }}
-                                    value={FormState?.values?.Qty}
-                                />
-                            </View>
-                        </View>
-
-                        {/* 🔘 BUTTONS */}
-                        <View style={{ flexDirection: "row", marginTop: 15 }}>
-                            <TouchableOpacity
-                                style={[
-                                    checkingScannerStyles.submitBtn,
-                                    { flex: 1, marginRight: 5 },
-                                ]}
-                                onPress={handlesave}
-                            >
-                                <Text style={checkingScannerStyles.submitText}>Save</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[
-                                    checkingScannerStyles.submitBtn,
-                                    { flex: 1, marginLeft: 5, backgroundColor: "#999" },
-                                ]}
-                                // onPress={() => setShowManualPopup(false)
-                                //      handleClearForm();
-                                // }
-                                onPress={() => {
-                                    setShowManualPopup(false);
-                                    handleClearForm();
-                                }}
-                            >
-                                <Text style={checkingScannerStyles.submitText}>Close</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal
                 visible={scannerModal}
                 animationType="slide"
                 transparent={false}
@@ -2619,7 +3149,6 @@ const CheckingScanner: React.FC<Props> = ({
                         backgroundColor: "#fff",
                     }}
                 >
-                    {/* HEADER */}
                     <View style={checkingScannerStyles.headerContainer}>
                         <View>
                             <Text
@@ -2650,7 +3179,6 @@ const CheckingScanner: React.FC<Props> = ({
                         </TouchableOpacity>
                     </View>
 
-                    {/* SEARCH */}
                     <View style={checkingScannerStyles.searchContainer}>
                         <Icon name="search" size={22} color="#777" />
 
@@ -2727,14 +3255,6 @@ const CheckingScanner: React.FC<Props> = ({
                                             Taka : {item.TakaNo}
                                         </Text>
 
-                                        {/* <Text style={checkingScannerStyles.subText}>
-                                                Machine : {item.MacName}
-                                            </Text> */}
-
-                                        {/* <Text style={checkingScannerStyles.subText}>
-                                                Design Code : {item.OrdDsnCode}
-                                            </Text> */}
-
                                         <Text style={checkingScannerStyles.subText}>
                                             Design : {item.OrdDsnName || item.DsnName}
                                         </Text>
@@ -2747,21 +3267,13 @@ const CheckingScanner: React.FC<Props> = ({
                                             Avg Weight : {item.AvgWt}
                                         </Text>
 
-                                        {/* <Text style={checkingScannerStyles.subText}>
-                                                Grade Code : {item.GrdCode}
-                                            </Text> */}
-
                                         <Text style={checkingScannerStyles.subText}>
                                             Grade : {item.GrdName}
                                         </Text>
-                                        {/* 
-                                            <Text style={checkingScannerStyles.subText}>
-                                                Checker Code : {item.ChkCode}
-                                            </Text>
 
-                                            <Text style={checkingScannerStyles.subText}>
-                                               Checker : {item.ChkName}
-                                            </Text> */}
+                                        <Text style={checkingScannerStyles.subText}>
+                                            Linked Order No : {item.LinkedOrderNo}
+                                        </Text>
 
                                         <View
                                             style={{
@@ -2785,7 +3297,6 @@ const CheckingScanner: React.FC<Props> = ({
                                         </View>
                                     </View>
 
-                                    {/* RIGHT */}
                                     <View
                                         style={{
                                             alignItems: "flex-end",
@@ -2808,7 +3319,6 @@ const CheckingScanner: React.FC<Props> = ({
                                         </TouchableOpacity>
 
                                         <TouchableOpacity
-                                            // style={checkingScannerStyles.deleteButton}
                                             disabled={Number(item.islasttakatrack) === 1}
                                             style={[
                                                 checkingScannerStyles.deleteButton,
@@ -2860,7 +3370,6 @@ const CheckingScanner: React.FC<Props> = ({
                                 padding: 20,
                             }}
                         >
-                            {/* TITLE */}
                             <Text
                                 style={{
                                     fontSize: 20,
@@ -2872,7 +3381,6 @@ const CheckingScanner: React.FC<Props> = ({
                                 Delete Record
                             </Text>
 
-                            {/* MESSAGE */}
                             <Text
                                 style={{
                                     marginTop: 14,
@@ -2885,14 +3393,12 @@ const CheckingScanner: React.FC<Props> = ({
                                 Are you sure you want to delete this scanner record?
                             </Text>
 
-                            {/* BUTTONS */}
                             <View
                                 style={{
                                     flexDirection: "row",
                                     marginTop: 24,
                                 }}
                             >
-                                {/* CANCEL */}
                                 <TouchableOpacity
                                     style={{
                                         flex: 1,
@@ -2915,7 +3421,6 @@ const CheckingScanner: React.FC<Props> = ({
                                     </Text>
                                 </TouchableOpacity>
 
-                                {/* DELETE */}
                                 <TouchableOpacity
                                     style={{
                                         flex: 1,
@@ -2925,7 +3430,6 @@ const CheckingScanner: React.FC<Props> = ({
                                         marginLeft: 8,
                                         alignItems: "center",
                                     }}
-                                    // onPress={handledelete}
                                     onPress={() => {
                                         console.log("CONFIRM DELETE CLICK");
 

@@ -23,6 +23,7 @@ import { urlSafeEncode } from './urlSafeEncode';
 import { encodeData } from './encodingUtils';
 import theme from '../../android/app/src/theme';
 import { API } from '../../common/API/dynamicAPI';
+import { ScrollView } from "react-native";
 
 interface CardData {
     [key: string]: string;
@@ -127,6 +128,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
     const [prodorderLoadingSPO, setIsPrdoOrderLoadingSPO] = useState(false);
     const [getSuccessSPO, setSuccessSPO] = useState(false);
     const [data, setData] = useState<CardData[]>([]);
+    const [partyData, setPartyData] = useState([]);
     const [historyDataSPO, setHistoryDataSPO] = useState<CardData[]>([]);
     const [allhistoryDataSPO, setAllHistoryDataSPO] = useState<CardData[]>([]);
     const [allverifyDataSPO, setAllVerifyDataSPO] = useState<AllHistoryData[]>([]);
@@ -174,18 +176,53 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
         cancelToken = axios.CancelToken.source();
         setIsLoadingSPO(true);
         try {
-            const payload = { txntype: 'production_order_sudo', referrer: 'dashboard', prptype: 'S',  yearno: getCurrentFinancialYear(), atype: 'B' };
+            const payload = { txntype: 'production_order_sudo', referrer: 'dashboard', prptype: 'S', yearno: getCurrentFinancialYear(), atype: 'B' };
             const response = await axios.get(
                 // `https://apig.tms-webapp.com/api/prodorderbrowsesudo`,
                 `${API}/api/prodorderbrowsesudo`,
                 getRequestConfig({ params: { ...payload } })
             );
             console.log('🔵 payload & response', payload, response);
-            if (response.data.success && response.data.data.length > 0) {
+            if (response.data.success && response.data.data.data.length > 0) {
                 console.log('✅ Data:', response.data.data);
-                setData(response.data.data);
-                setAllHistoryDataSPO([])
-                setAllVerifyDataSPO([])
+                // setData(response.data.data.data);
+                // setAllHistoryDataSPO([])
+                // setAllVerifyDataSPO([])
+
+                // const mainData = response.data.data.data || [];
+                // const d1Data = response.data.data.d1 || [];
+
+                // setData(mainData);
+                // setPartyData(d1Data);
+
+                const mainData = response.data.data.data || [];
+                const d1Data = response.data.data.d1 || [];
+
+                console.log("mainData", mainData);
+                console.log("d1Data", d1Data);
+                // uid wise map bana lo
+                const d1Map = {};
+
+                d1Data.forEach(item => {
+                    if (!d1Map[item.uid]) {
+                        d1Map[item.uid] = [];
+                    }
+                    d1Map[item.uid].push(item);
+                });
+
+                // main data me d1 attach kar do
+                const finalData = mainData.map(item => ({
+                    ...item,
+                    partyList: d1Map[item.uid] || []
+                }));
+
+
+                console.log("finalData", finalData);
+                setData(finalData);
+
+                setAllHistoryDataSPO([]);
+                setAllVerifyDataSPO([]);
+
             } else {
                 setData([]);
             }
@@ -247,7 +284,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                 txntype: 'production_order_sudo',
                 referrer: 'dashboard',
                 prptype: 'S',
-                 yearno: getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 atype: 'H',
             };
             const response = await axios.get(
@@ -260,13 +297,45 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                 })
             );
             console.log('🔵all history payload', allhistoryPayload);
-            if (response.data.success && response.data.data.length > 0) {
-                console.log('✅All History Data:', response.data.data);
-                setAllHistoryDataSPO(response.data.data);
+            // if (response.data.success && response.data.data.length > 0) {
+            //     console.log('✅All History Data:', response.data.data);
+            //     setAllHistoryDataSPO(response.data.data);
+            //     setData([]);
+            //     setAllVerifyDataSPO([]);
+
+            // } 
+            if (response.data.success && response.data.data.data.length > 0) {
+                console.log('✅ Data:', response.data.data);
+
+                const mainData = response.data.data.data || [];
+                const d1Data = response.data.data.d1 || [];
+
+                console.log("mainData", mainData);
+                console.log("d1Data", d1Data);
+                // uid wise map bana lo
+                const d1Map = {};
+
+                d1Data.forEach(item => {
+                    if (!d1Map[item.uid]) {
+                        d1Map[item.uid] = [];
+                    }
+                    d1Map[item.uid].push(item);
+                });
+
+                // main data me d1 attach kar do
+                const finalData = mainData.map(item => ({
+                    ...item,
+                    partyList: d1Map[item.uid] || []
+                }));
+
+
+                console.log("finalData", finalData);
+                setAllHistoryDataSPO(finalData);
+
                 setData([]);
                 setAllVerifyDataSPO([]);
-
-            } else {
+            }
+            else {
                 setAllHistoryDataSPO([]);
                 // setPartyListSPO([]);
                 // setHistoryDataSPO([]);
@@ -290,7 +359,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                 txntype: 'production_order_sudo',
                 referrer: 'dashboard',
                 prptype: 'S',
-                 yearno: getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 atype: 'A',
             };
             const response = await axios.get(
@@ -303,14 +372,45 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                 })
             );
             console.log('🔵all history payload', allhistoryPayload);
-            if (response.data.success && response.data.data.length > 0) {
-                console.log('✅All History Data:', response.data.data);
+            // if (response.data.success && response.data.data.length > 0) {
+            //     console.log('✅All History Data:', response.data.data);
 
-                setAllVerifyDataSPO(response.data.data);
+            //     setAllVerifyDataSPO(response.data.data);
+            //     setData([]);
+            //     setAllHistoryDataSPO([]);
+
+            // } 
+            if (response.data.success && response.data.data.data.length > 0) {
+                console.log('✅ Data:', response.data.data);
+                const mainData = response.data.data.data || [];
+                const d1Data = response.data.data.d1 || [];
+
+                console.log("mainData", mainData);
+                console.log("d1Data", d1Data);
+                // uid wise map bana lo
+                const d1Map = {};
+
+                d1Data.forEach(item => {
+                    if (!d1Map[item.uid]) {
+                        d1Map[item.uid] = [];
+                    }
+                    d1Map[item.uid].push(item);
+                });
+
+                // main data me d1 attach kar do
+                const finalData = mainData.map(item => ({
+                    ...item,
+                    partyList: d1Map[item.uid] || []
+                }));
+
+
+                console.log("finalData", finalData);
+                setAllVerifyDataSPO(finalData);
+
                 setData([]);
                 setAllHistoryDataSPO([]);
-
-            } else {
+            }
+            else {
                 setAllVerifyDataSPO([]);
                 // setPartyListSPO([]);
                 // setHistoryDataSPO([]);
@@ -769,10 +869,22 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                         </Text>
                     </View>
                 </View> */}
-                <View style={crlimtreq_styles.fullWidthRow}>
+                {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                </View> */}
+
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>SExe:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                    </View>
                 </View>
+
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Shrink Per%:</Text>
@@ -853,6 +965,79 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                         </Text> */}
                     </View>
                 </View>
+                {/* {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Party Name
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        {item.partyList.map((party, index) => (
+                            <View
+                                key={index}
+                                style={crlimtreq_styles.partyRow}
+                            >
+                                <Text
+                                    style={crlimtreq_styles.partyName1}
+                                    numberOfLines={2}
+                                >
+                                    {party.Partyname}
+                                </Text>
+
+                                <Text style={crlimtreq_styles.partyQty}>
+                                    {party.qty}
+                                </Text>
+                            </View>
+                        ))}
+
+                    </View>
+                )} */}
+
+                {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Job Work Party
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        <ScrollView
+                            style={{ maxHeight: 150 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            {item.partyList.map((party, index) => (
+                                <View
+                                    key={index}
+                                    style={crlimtreq_styles.partyRow}
+                                >
+                                    <Text
+                                        style={crlimtreq_styles.partyName1}
+                                        numberOfLines={2}
+                                    >
+                                        {party.Partyname}
+                                    </Text>
+
+                                    <Text style={crlimtreq_styles.partyQty}>
+                                        {party.qty}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                    </View>
+                )}
 
             </View>
             <View style={crlimtreq_styles.cardActions}>
@@ -980,9 +1165,19 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                         </Text>
                     </View>
                 </View> */}
-                <View style={crlimtreq_styles.fullWidthRow}>
+                {/* <View style={crlimtreq_styles.fullWidthRow}>
                     <Text style={crlimtreq_styles.key}>SExe:</Text>
                     <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                </View> */}
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>SExe:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                    </View>
                 </View>
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
@@ -1054,6 +1249,79 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                         </Text> */}
                     </View>
                 </View>
+                {/* {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Party Name
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        {item.partyList.map((party, index) => (
+                            <View
+                                key={index}
+                                style={crlimtreq_styles.partyRow}
+                            >
+                                <Text
+                                    style={crlimtreq_styles.partyName1}
+                                    numberOfLines={2}
+                                >
+                                    {party.Partyname}
+                                </Text>
+
+                                <Text style={crlimtreq_styles.partyQty}>
+                                    {party.qty}
+                                </Text>
+                            </View>
+                        ))}
+
+                    </View>
+                )} */}
+
+                {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Job Work Party
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        <ScrollView
+                            style={{ maxHeight: 150 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            {item.partyList.map((party, index) => (
+                                <View
+                                    key={index}
+                                    style={crlimtreq_styles.partyRow}
+                                >
+                                    <Text
+                                        style={crlimtreq_styles.partyName1}
+                                        numberOfLines={2}
+                                    >
+                                        {party.Partyname}
+                                    </Text>
+
+                                    <Text style={crlimtreq_styles.partyQty}>
+                                        {party.qty}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                    </View>
+                )}
                 <View style={crlimtreq_styles.cardActions}>
                     {/* <TouchableOpacity
                     onPress={() => {
@@ -1205,9 +1473,15 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                     </View> */}
                 </View>
 
-                <View style={crlimtreq_styles.fullWidthRow}>
-                    <Text style={crlimtreq_styles.key}>SExe:</Text>
-                    <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                <View style={crlimtreq_styles.twoColumnRow}>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>SExe:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.sexename}</Text>
+                    </View>
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Pick Rate:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.pickrate}</Text>
+                    </View>
                 </View>
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
@@ -1292,6 +1566,79 @@ const SudamoProdOrder: React.FC<Props> = ({ token, navigation, isConnected, user
                         </Text> */}
                     </View>
                 </View>
+                {/* {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Party Name
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        {item.partyList.map((party, index) => (
+                            <View
+                                key={index}
+                                style={crlimtreq_styles.partyRow}
+                            >
+                                <Text
+                                    style={crlimtreq_styles.partyName1}
+                                    numberOfLines={2}
+                                >
+                                    {party.Partyname}
+                                </Text>
+
+                                <Text style={crlimtreq_styles.partyQty}>
+                                    {party.qty}
+                                </Text>
+                            </View>
+                        ))}
+
+                    </View>
+                )} */}
+
+                {item.partyList?.length > 0 && (
+                    <View style={crlimtreq_styles.partyContainer}>
+
+                        <View style={crlimtreq_styles.partyHeader}>
+                            <Text style={[crlimtreq_styles.headerText, { flex: 1 }]}>
+                                Job Work Party
+                            </Text>
+
+                            <Text style={[crlimtreq_styles.headerText, { width: 90, textAlign: 'right' }]}>
+                                Qty
+                            </Text>
+                        </View>
+
+                        <ScrollView
+                            style={{ maxHeight: 150 }}
+                            nestedScrollEnabled={true}
+                            showsVerticalScrollIndicator={true}
+                        >
+                            {item.partyList.map((party, index) => (
+                                <View
+                                    key={index}
+                                    style={crlimtreq_styles.partyRow}
+                                >
+                                    <Text
+                                        style={crlimtreq_styles.partyName1}
+                                        numberOfLines={2}
+                                    >
+                                        {party.Partyname}
+                                    </Text>
+
+                                    <Text style={crlimtreq_styles.partyQty}>
+                                        {party.qty}
+                                    </Text>
+                                </View>
+                            ))}
+                        </ScrollView>
+
+                    </View>
+                )}
 
             </View>
             <View style={crlimtreq_styles.cardActions}>

@@ -810,7 +810,8 @@ export async function syncPendingEnquiries(token, yearno, prptype) {
 export async function syncShowEnquiries(id, token, yearno, prptype) {
   try {
     const res = await api.get(
-      `${API}/api/enquiries/${id}?prptype=${prptype}&yearno=${yearno}`,
+      // `${API}/api/enquiries/${id}?prptype=${prptype}&yearno=${yearno}`,
+      `${API}/api/enquiriesnew/${id}?prptype=${prptype}&yearno=${yearno}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
     // Parse items JSON if present

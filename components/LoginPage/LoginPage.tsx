@@ -928,8 +928,8 @@ const LoginScreen: React.FC<Props> = ({
             }
           }
         } else {
-          Alert.alert('❌ Error', `${response}`);
-          console.log('❌ Login API Error:', JSON.stringify(response));
+          Alert.alert('⚠️ Warning!', `${response && response?.data.message}`);
+          console.log('❌ Login API Error:', response);
         }
       } else {
         Alert.alert('❌ Error', `${response}`);

@@ -642,6 +642,7 @@ export default function App() {
                                   token={gettoken || ''}
                                   isConnected={isConnected}
                                   username={getUserDetails}
+                                  userid={getUserId}
                                 />
                                 {/* <Footer onLogout={() => setIsLoggedIn(false)} isConnected={isConnected} /> */}
                               </>

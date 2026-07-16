@@ -39,7 +39,7 @@ interface Props {
     online?: boolean;
 }
 
-const HomeScreen: React.FC<Props> = ({ username }) => {
+const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
     const [search, setSearch] = useState('');
     const [apps, setApps] = useState<any[]>([]);
     // const [selectedLetter, setSelectedLetter] = useState('');
@@ -278,9 +278,21 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
         { name: 'Doff Entry', route: 'doff-entry', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Yarn Sales Order', route: 'yarn-sales-order', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
         { name: 'Event', route: 'event', icon: 'event', color: '#923070', category: 'Production' },
-        { name: 'Sales Order', route: 'sales-order', icon: 'point-of-sale', color: '#20BEC1', category: 'Production'  },
+        { name: 'Sales Order', route: 'sales-order', icon: 'point-of-sale', color: '#20BEC1', category: 'Production' },
         { name: 'Employ Dashboard', route: 'employ-dashboard', icon: 'fact-check', color: '#5f338f', category: 'Production' },
         { name: 'Price List', route: 'price-list', icon: 'assessment', color: '#1E3A5F', category: 'Production' },
+        { name: 'Sales Order Dashborad', route: 'sales-order-dashboard', icon: 'dashboard', color: '#0B7285', category: 'Production' },
+        { name: 'Sales Order Price List Auth', route: 'sales-order-price-list-auth', icon: 'receipt-long', color: '#740cea', category: 'Production' },
+        // { name: 'Packing Automation', route: 'packing-automation', icon: 'table-view', color: 'rgb(194, 213, 52)', category: 'Production' },
+        { name: 'Poy Rate Entry', route: 'PoyRateEntry', icon: 'price-change', color: '#6A1B9A', category: 'Production' },
+        { name: 'Purchase Auth', route: 'purchase-auth', icon: 'fact-check', color: '#5f738f', category: 'Production' },
+        { name: 'Purchase Import Auth', route: 'purchase-import-auth', icon: 'task-alt', color: '#991070', category: 'Production' },
+        { name: 'Purchase Transport Auth', route: 'purchase-transport-auth', icon: 'route', color: '#7a2a49', category: 'Production' },
+        { name: 'Warehouse', route: 'warehouse', icon: 'warehouse', color: '#991070', category: 'Production' },
+        { name: 'Beam Close', route: 'beam-close', icon: 'assignment-turned-in', color: '#0ceebd', category: 'Production' },
+        { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
+        { name: 'Inquiry Report', route: 'inquiry-report', icon: 'view-comfortable', color: '#69e3ad', category: 'Production' },
+        // { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
     ];
 
     useEffect(() => {
@@ -664,7 +676,7 @@ const HomeScreen: React.FC<Props> = ({ username }) => {
                                 <TouchableOpacity
                                     key={item.name}
                                     // style={styles.appCard}
-                                     style={[
+                                    style={[
                                         styles.appCard,
                                         item.disabled && { opacity: 0.4 }
                                     ]}

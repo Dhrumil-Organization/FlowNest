@@ -1,22 +1,23 @@
+import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    FlatList,
-    TextInput,
     Alert,
+    FlatList,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import axios from 'axios';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { API } from '../../common/API/dynamicAPI';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { API } from '../../common/API/dynamicAPI';
 const toText = v => String(v || '').trim();
 
 const SalesOrderGradeList = ({ navigation, route }) => {
     const router = useRouter();
+    const [editMode1, setEditMode] = useState(false);
     const params = useLocalSearchParams();
     const {
         mode = 'ADD',
@@ -28,22 +29,39 @@ const SalesOrderGradeList = ({ navigation, route }) => {
         editLineId = null,
         oldRow = null,
         selectedItem = null,
-
         workingRows = [],
-
-        isCustomGradeEdit = false,
-
+        isCustomGradeEdit = false, // 👈 Add this
         party = null,
         partyData = null,
         selectedParty = null,
-
         prpcode = '',
         strcode = '002',
         yearno = '',
         token = '',
     } = params || {};
 
-    const finalParty = party || partyData || selectedParty || null;
+    useEffect(() => {
+        if (editMode === 'true') {
+            setEditMode(true);
+        } else {
+            setEditMode(false);
+        }
+    }, [editMode]);
+
+    console.log("edit mode SalesOrderGradeList: ", editMode, editMode1);
+
+    const parseMaybeJSON = (v) => {
+        if (v === null || v === undefined || v === '') return null;
+        if (typeof v === 'string') {
+            try { return JSON.parse(v); } catch { return v; }
+        }
+        return v;
+    };
+
+    const parsedOldRow = parseMaybeJSON(oldRow);
+    const parsedSelectedItem = parseMaybeJSON(selectedItem);
+    const parsedWorkingRows = Array.isArray(parseMaybeJSON(workingRows)) ? parseMaybeJSON(workingRows) : [];
+    const finalParty = parseMaybeJSON(party) || parseMaybeJSON(partyData) || parseMaybeJSON(selectedParty) || null;
 
     const [search, setSearch] = useState('');
     const [designs, setDesigns] = useState([]);
@@ -51,7 +69,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
 
 
     let cancelToken: any;
-
+    console.log("parsedWorkingRows in add grade: ", workingRows, parsedWorkingRows);
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -64,7 +82,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
         cancelToken: cancelToken?.token,
     });
 
-    console.log("selectedItem", selectedItem);
+    console.log("selectedItem", parsedSelectedItem);
     //   const loadDesigns = async () => {
     //     if (!selectedItem?.ItmCode) {
     //       Alert.alert('Required', 'Item is missing.');
@@ -112,7 +130,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
 
     const loadDesigns = async () => {
         const yrno = yearno ? yearno.slice(-2) : '';
-        if (!selectedItem?.ItmCode) {
+        if (!parsedSelectedItem?.ItmCode) {
             Alert.alert('Required', 'Item is missing.');
             return;
         }
@@ -122,30 +140,22 @@ const SalesOrderGradeList = ({ navigation, route }) => {
                 prpcode,
                 strcode,
                 yearno: yrno,
-                ItmCode: selectedItem.ItmCode,
+                ItmCode: parsedSelectedItem.ItmCode, // 👈 Use parsedSelectedItem
                 ttype: ['8', '3', '30', '2', '34', '83', '42'],
                 fetch: '',
                 MerCode: '',
                 ShdCode: '',
                 txntype: 'mob_app_sales_order'
             };
-            console.log("party type historyPayload:", payload);
-
             const res = await axios.get(
                 `${API}/api/getgrade`,
                 getRequestConfig({ params: { ...payload } }),
             );
-            console.log("getgrade Response:", res);
-            const data =
-                res.data?.response?.data ||
-                res.data?.response ||
-                res.data?.data ||
-                [];
-
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
             setDesigns(Array.isArray(data) ? data : []);
         } catch (error) {
             console.log('getgrade ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load getgrade');
+            Alert.alert('Error', 'Unable to load grades');
             setDesigns([]);
         } finally {
             setLoading(false);
@@ -168,63 +178,252 @@ const SalesOrderGradeList = ({ navigation, route }) => {
     // }, [search]);
 
 
+    // const filteredDesigns = useMemo(() => {
+    //     const s = search.toLowerCase();
+
+    //     let arr = [...designs];
+
+    //     if (editMode1 && parsedOldRow?.GrdCode) {
+    //         const oldExists = arr.some(
+    //             item => String(item.GrdCode) === String(oldRow.GrdCode),
+    //         );
+
+    //         if (!oldExists) {
+    //             arr.unshift({
+    //                 GrdCode: oldRow.GrdCode,
+    //                 GrdName: oldRow.GrdName,
+    //                 GradeName: oldRow.GrdName,
+    //                 __oldSelected: true,
+    //             });
+    //         }
+    //     }
+
+    //     // arr = arr
+    //     //     .filter(item => {
+    //     //         return (
+    //     //             toText(item.GrdCode).toLowerCase().includes(s) ||
+    //     //             toText(item.GrdName).toLowerCase().includes(s) ||
+    //     //             toText(item.GradeName).toLowerCase().includes(s)
+    //     //         );
+    //     //     })
+    //     arr = arr.filter((item) => {
+
+    //         const fullText = `
+    //     ${toText(item.GrdCode)}
+    //     ${toText(item.GrdName)}
+    //     ${toText(item.GradeName)}
+    // `.toLowerCase();
+
+    //         return fullText.includes(s.toLowerCase());
+    //     })
+    //         .sort((a, b) => {
+    //             if (editMode1 && oldRow?.GrdCode) {
+    //                 if (String(a.GrdCode) === String(oldRow.GrdCode)) return -1;
+    //                 if (String(b.GrdCode) === String(oldRow.GrdCode)) return 1;
+    //             }
+    //             return 0;
+    //         });
+
+    //     return arr;
+    // }, [designs, search, editMode1, oldRow]);
     const filteredDesigns = useMemo(() => {
         const s = search.toLowerCase();
-
         let arr = [...designs];
 
-        if (editMode && oldRow?.GrdCode) {
+        if (editMode1 && parsedOldRow?.GrdCode) { // 👈 Use parsedOldRow
             const oldExists = arr.some(
-                item => String(item.GrdCode) === String(oldRow.GrdCode),
+                item => String(item.GrdCode) === String(parsedOldRow.GrdCode),
             );
-
             if (!oldExists) {
                 arr.unshift({
-                    GrdCode: oldRow.GrdCode,
-                    GrdName: oldRow.GrdName,
-                    GradeName: oldRow.GrdName,
+                    GrdCode: parsedOldRow.GrdCode,
+                    GrdName: parsedOldRow.GrdName,
+                    GradeName: parsedOldRow.GrdName,
                     __oldSelected: true,
                 });
             }
         }
 
-        // arr = arr
-        //     .filter(item => {
-        //         return (
-        //             toText(item.GrdCode).toLowerCase().includes(s) ||
-        //             toText(item.GrdName).toLowerCase().includes(s) ||
-        //             toText(item.GradeName).toLowerCase().includes(s)
-        //         );
-        //     })
         arr = arr.filter((item) => {
-
             const fullText = `
-        ${toText(item.GrdCode)}
-        ${toText(item.GrdName)}
-        ${toText(item.GradeName)}
-    `.toLowerCase();
-
+                ${toText(item.GrdCode)}
+                ${toText(item.GrdName)}
+                ${toText(item.GradeName)}
+            `.toLowerCase();
             return fullText.includes(s.toLowerCase());
-        })
-            .sort((a, b) => {
-                if (editMode && oldRow?.GrdCode) {
-                    if (String(a.GrdCode) === String(oldRow.GrdCode)) return -1;
-                    if (String(b.GrdCode) === String(oldRow.GrdCode)) return 1;
-                }
-                return 0;
-            });
+        }).sort((a, b) => {
+            if (editMode1 && parsedOldRow?.GrdCode) { // 👈 Use parsedOldRow
+                if (String(a.GrdCode) === String(parsedOldRow.GrdCode)) return -1;
+                if (String(b.GrdCode) === String(parsedOldRow.GrdCode)) return 1;
+            }
+            return 0;
+        });
 
         return arr;
-    }, [designs, search, editMode, oldRow]);
+    }, [designs, search, editMode1, parsedOldRow]); // 👈 Use parsedOldRow
+
+    // const selectDesign = grade => {
+    //     // if (editMode1 && oldRow && String(oldRow.ItmCode) === '-1') {
+    //     if (editMode1 && oldRow && isCustomGradeEdit) {
+    //         const nextRows = (workingRows || []).map(row => {
+    //             const sameLine =
+    //                 String(row.LineId || '') === String(oldRow.LineId || '') ||
+    //                 Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+
+    //             if (!sameLine) return row;
+
+    //             return {
+    //                 ...row,
+    //                 GrdCode: grade.GrdCode,
+    //                 GrdName: grade.GrdName || grade.GradeName || '',
+    //             };
+    //         });
+
+    //         // navigation.replace({
+    //         //     name: 'OrderSummaryScreen',
+    //         //     params: {
+    //         //         completedRows: nextRows,
+    //         //         editMode1: true,
+    //         //         replaceItemOnlyDone: true,
+
+    //         //         mode,
+    //         //         uid,
+    //         //         screenMode: mode,
+    //         //         soNo,
+    //         //         soDate,
+
+    //         //         party: finalParty,
+    //         //         partyData: finalParty,
+    //         //         selectedParty: finalParty,
+
+    //         //         prpcode,
+    //         //         strcode,
+    //         //         yearno,
+    //         //         token,
+
+    //         //         skipReload: true,
+    //         //     },
+    //         //     merge: true,
+    //         // });
+
+    //         // navigation.replace(
+    //         //     'OrderSummaryScreen',
+    //         //     {
+    //         //         completedRows: nextRows,
+    //         //         editMode1: true,
+    //         //         replaceItemOnlyDone: true,
+    //         //         mode,
+    //         //         uid,
+    //         //         screenMode: mode,
+    //         //         soNo,
+    //         //         soDate,
+    //         //         party: finalParty,
+    //         //         partyData: finalParty,
+    //         //         selectedParty: finalParty,
+    //         //         prpcode,
+    //         //         strcode,
+    //         //         yearno,
+    //         //         token,
+    //         //         skipReload: true,
+    //         //     }
+    //         // );
+
+    //         // router.push({
+    //         //     pathname: '/OrderSummaryScreen',
+    //         //     params: {
+    //         //         completedRows: nextRows,
+    //         //         editMode1: true,
+    //         //         replaceItemOnlyDone: true,
+    //         //         mode: mode,
+    //         //         uid: uid,
+    //         //         screenMode: mode,
+    //         //         soNo: soNo,
+    //         //         soDate: soDate,
+    //         //         party: finalParty,
+    //         //         partyData: finalParty,
+    //         //         selectedParty: finalParty,
+    //         //         prpcode: prpcode,
+    //         //         strcode: strcode,
+    //         //         yearno: yearno,
+    //         //         token: token,
+    //         //     }
+    //         // });
+
+    //         return;
+    //     }
 
 
-    const selectDesign = grade => {
-        // if (editMode && oldRow && String(oldRow.ItmCode) === '-1') {
-        if (editMode && oldRow && isCustomGradeEdit) {
-            const nextRows = (workingRows || []).map(row => {
+    //     // navigation.navigate('SalesOrderShadeList', {
+    //     //     mode,
+    //     //     uid,
+    //     //     soNo,
+    //     //     soDate,
+    //     //     editMode1,
+    //     //     editIndex,
+    //     //     editLineId,
+    //     //     oldRow,
+
+    //     //     selectedItem,
+
+    //     //     selectedGrade: {
+    //     //         GrdCode: grade.GrdCode,
+    //     //         GrdName: grade.GrdName || grade.GradeName || '',
+    //     //         Raw: grade,
+    //     //     },
+
+    //     //     workingRows,
+
+    //     //     party: finalParty,
+    //     //     partyData: finalParty,
+    //     //     selectedParty: finalParty,
+
+    //     //     prpcode,
+    //     //     strcode,
+    //     //     yearno,
+    //     //     token,
+    //     // });
+
+    //     router.push({
+    //         pathname: '/SalesOrderShadeList',
+    //         params: {
+    //             mode: mode,
+    //             uid: uid,
+    //             soNo: soNo,
+    //             soDate: soDate,
+    //             editMode1: editMode1,
+    //             editIndex: editIndex,
+    //             editLineId: editLineId,
+    //             oldRow: oldRow,
+
+    //             selectedItem: selectedItem,
+
+    //             selectedGrade: {
+    //                 GrdCode: grade.GrdCode,
+    //                 GrdName: grade.GrdName || grade.GradeName || '',
+    //                 Raw: grade,
+    //             },
+
+    //             workingRows: workingRows,
+
+    //             party: finalParty,
+    //             partyData: finalParty,
+    //             selectedParty: finalParty,
+
+    //             prpcode: prpcode,
+    //             strcode: strcode,
+    //             yearno: yearno,
+    //             token: token,
+    //         }
+    //     });
+    // };
+
+
+    const selectDesign = (grade) => {
+        if (editMode1 && parsedOldRow && isCustomGradeEdit) {
+            const nextRows = parsedWorkingRows.map(row => {
                 const sameLine =
-                    String(row.LineId || '') === String(oldRow.LineId || '') ||
-                    Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+                    String(row.LineId || '') === String(parsedOldRow.LineId || '') ||
+                    Number(row.SrNo || 0) === Number(parsedOldRow.SrNo || 0);
 
                 if (!sameLine) return row;
 
@@ -235,110 +434,32 @@ const SalesOrderGradeList = ({ navigation, route }) => {
                 };
             });
 
-            // navigation.replace({
-            //     name: 'OrderSummaryScreen',
-            //     params: {
-            //         completedRows: nextRows,
-            //         editMode: true,
-            //         replaceItemOnlyDone: true,
-
-            //         mode,
-            //         uid,
-            //         screenMode: mode,
-            //         soNo,
-            //         soDate,
-
-            //         party: finalParty,
-            //         partyData: finalParty,
-            //         selectedParty: finalParty,
-
-            //         prpcode,
-            //         strcode,
-            //         yearno,
-            //         token,
-
-            //         skipReload: true,
-            //     },
-            //     merge: true,
-            // });
-
-            // navigation.replace(
-            //     'OrderSummaryScreen',
-            //     {
-            //         completedRows: nextRows,
-            //         editMode: true,
-            //         replaceItemOnlyDone: true,
-            //         mode,
-            //         uid,
-            //         screenMode: mode,
-            //         soNo,
-            //         soDate,
-            //         party: finalParty,
-            //         partyData: finalParty,
-            //         selectedParty: finalParty,
-            //         prpcode,
-            //         strcode,
-            //         yearno,
-            //         token,
-            //         skipReload: true,
-            //     }
-            // );
-
-            // router.push({
-            //     pathname: '/OrderSummaryScreen',
-            //     params: {
-            //         completedRows: nextRows,
-            //         editMode: true,
-            //         replaceItemOnlyDone: true,
-            //         mode: mode,
-            //         uid: uid,
-            //         screenMode: mode,
-            //         soNo: soNo,
-            //         soDate: soDate,
-            //         party: finalParty,
-            //         partyData: finalParty,
-            //         selectedParty: finalParty,
-            //         prpcode: prpcode,
-            //         strcode: strcode,
-            //         yearno: yearno,
-            //         token: token,
-            //     }
-            // });
-
+            router.push({
+                pathname: '/OrderSummaryScreen',
+                params: {
+                    completedRows: JSON.stringify(nextRows),
+                    editMode1: true,
+                    replaceItemOnlyDone: true,
+                    mode: mode,
+                    uid: uid,
+                    screenMode: mode,
+                    soNo: soNo,
+                    soDate: soDate,
+                    workingRows: JSON.stringify(nextRows),
+                    party: JSON.stringify(finalParty),
+                    partyData: JSON.stringify(finalParty),
+                    selectedParty: JSON.stringify(finalParty),
+                    prpcode: prpcode,
+                    strcode: strcode,
+                    yearno: yearno,
+                    token: token,
+                    skipReload: true,
+                }
+            });
             return;
         }
 
-
-        // navigation.navigate('SalesOrderShadeList', {
-        //     mode,
-        //     uid,
-        //     soNo,
-        //     soDate,
-        //     editMode,
-        //     editIndex,
-        //     editLineId,
-        //     oldRow,
-
-        //     selectedItem,
-
-        //     selectedGrade: {
-        //         GrdCode: grade.GrdCode,
-        //         GrdName: grade.GrdName || grade.GradeName || '',
-        //         Raw: grade,
-        //     },
-
-        //     workingRows,
-
-        //     party: finalParty,
-        //     partyData: finalParty,
-        //     selectedParty: finalParty,
-
-        //     prpcode,
-        //     strcode,
-        //     yearno,
-        //     token,
-        // });
-
+        // Normal flow: Navigate to ShadeList
         router.push({
             pathname: '/SalesOrderShadeList',
             params: {
@@ -346,25 +467,20 @@ const SalesOrderGradeList = ({ navigation, route }) => {
                 uid: uid,
                 soNo: soNo,
                 soDate: soDate,
-                editMode: editMode,
+                editMode1: editMode1,
                 editIndex: editIndex,
                 editLineId: editLineId,
-                oldRow: oldRow,
-
-                selectedItem: selectedItem,
-
-                selectedGrade: {
+                oldRow: JSON.stringify(parsedOldRow), // 👈 Stringify
+                selectedItem: JSON.stringify(parsedSelectedItem), // 👈 Stringify
+                selectedGrade: JSON.stringify({
                     GrdCode: grade.GrdCode,
                     GrdName: grade.GrdName || grade.GradeName || '',
                     Raw: grade,
-                },
-
-                workingRows: workingRows,
-
-                party: finalParty,
-                partyData: finalParty,
-                selectedParty: finalParty,
-
+                }),
+                workingRows: JSON.stringify(parsedWorkingRows), // 👈 Stringify
+                party: JSON.stringify(finalParty),
+                partyData: JSON.stringify(finalParty),
+                selectedParty: JSON.stringify(finalParty),
                 prpcode: prpcode,
                 strcode: strcode,
                 yearno: yearno,
@@ -390,7 +506,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
         const grdname = item.GrdName || item.GradeName || '';
 
         const isOld =
-            editMode && oldRow && String(oldRow.GrdCode) === String(grdcode);
+            editMode1 && parsedOldRow && String(parsedOldRow.GrdCode) === String(grdcode);
         return (
             <TouchableOpacity
                 activeOpacity={0.85}
@@ -425,7 +541,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>
-                    {editMode ? 'Modify Grade' : 'Select Grade'}
+                    {editMode1 ? 'Modify Grade' : 'Select Grade'}
                 </Text>
                 <View style={{ width: 22 }} />
             </View>
@@ -434,17 +550,16 @@ const SalesOrderGradeList = ({ navigation, route }) => {
                 <View style={styles.itemBox}>
                     <Text style={styles.boxLabel}>Selected Item</Text>
                     <Text style={styles.boxTitle}>
-                        {selectedItem?.ItmCode} - {selectedItem?.ItmName}
+                        {parsedSelectedItem?.ItmCode} - {parsedSelectedItem?.ItmName}
                     </Text>
                 </View>
-                {editMode && oldRow && (
+                {editMode1 && parsedOldRow && (
                     <View style={styles.oldBox}>
-                        <Text style={styles.oldLabel}>Current Selected Grade</Text>
                         <Text style={styles.oldTitle}>
-                            {oldRow.GrdCode} - {oldRow.GrdName}
+                            {parsedOldRow.GrdCode} - {parsedOldRow.GrdName}
                         </Text>
                         <Text style={styles.oldSub}>
-                            Shade: {oldRow.ShdCode} {oldRow.ShdName}
+                            Shade: {parsedOldRow.ShdCode} {parsedOldRow.ShdName}
                         </Text>
                     </View>
                 )}

@@ -1,29 +1,50 @@
+import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    FlatList,
-    TextInput,
     Alert,
+    FlatList,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import axios from 'axios';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { API } from '../../common/API/dynamicAPI';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { API } from '../../common/API/dynamicAPI';
 const toText = v => String(v || '').trim();
-import { useLocalSearchParams, useRouter } from 'expo-router';
+
+interface PARAMS {
+    mode?: 'ADD' | 'EDIT';
+    uid?: number;
+    soNo?: string;
+    soDate?: string;
+    editMode?: any;
+    editIndex?: number;
+    editLineId?: number;
+    oldRow?: string;
+    workingRows?: string;
+    isCustomItemEdit?: boolean;
+    party?: string;
+    partyData?: string;
+    selectedParty?: string;
+    prpcode?: string;
+    strcode?: string;
+    yearno?: string;
+    token?: string;
+}
 
 const SalesOrderItemList = ({ navigation, route }) => {
     const router = useRouter();
+    const [editMode1, setEditMode] = useState(false);
     const params = useLocalSearchParams();
     const {
         mode = 'ADD',
         uid = 0,
         soNo = '',
         soDate = '',
-        editMode = false,
+        editMode,
         editIndex = null,
         editLineId = null,
         oldRow = null,
@@ -40,9 +61,52 @@ const SalesOrderItemList = ({ navigation, route }) => {
         strcode = '002',
         yearno = '',
         token = '',
-    } = params || {};
+    } = params as PARAMS || {};
 
-    const finalParty = party || partyData || selectedParty || null;
+
+    useEffect(() => {
+        if (editMode === 'true') {
+            setEditMode(true);
+        } else {
+            setEditMode(false);
+        }
+    }, [editMode]);
+
+    console.log("edit mode SalesOrderGradeList: ", editMode, editMode1);
+
+    useEffect(() => {
+        if (editMode === 'true') {
+            setEditMode(true);
+        } else {
+            setEditMode(false);
+        }
+    }, [editMode]);
+
+    console.log("edit mode SalesOrderItemList Final: ", editMode1);
+
+    // Parse parsedOldRow if it exists
+    const parsedOldRow = oldRow ? JSON.parse(oldRow) : null;
+
+    // 👇 YE ADD KARO
+    const parsedWorkingRows = (() => {
+        try {
+            return workingRows ? JSON.parse(workingRows) : [];
+        } catch {
+            return Array.isArray(workingRows) ? workingRows : [];
+        }
+    })();
+
+
+    console.log("parsedWorkingRows in add Items: ", workingRows, parsedWorkingRows);
+    const parseMaybeJSON = (v) => {
+        if (!v) return null;
+        if (typeof v === 'string') {
+            try { return JSON.parse(v); } catch { return v; }
+        }
+        return v;
+    };
+
+    const finalParty = parseMaybeJSON(party) || parseMaybeJSON(partyData) || parseMaybeJSON(selectedParty) || null;
     const isCustomItem = params?.isCustomItem;
 
     const [search, setSearch] = useState('');
@@ -136,7 +200,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
     };
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         loadItems();
     }, [token]);
 
@@ -153,16 +217,16 @@ const SalesOrderItemList = ({ navigation, route }) => {
 
     //     let arr = [...items];
 
-    //     if (editMode && oldRow?.ItmCode) {
+    //     if (editMode1 && parsedOldRow?.ItmCode) {
     //         const oldExists = arr.some(
-    //             item => String(item.ItmCode) === String(oldRow.ItmCode),
+    //             item => String(item.ItmCode) === String(parsedOldRow.ItmCode),
     //         );
 
     //         if (!oldExists) {
     //             arr.unshift({
-    //                 ItmCode: oldRow.ItmCode,
-    //                 ItmName: oldRow.ItmName,
-    //                 MItmCode: oldRow.MItmCode || oldRow.ItmCode,
+    //                 ItmCode: parsedOldRow.ItmCode,
+    //                 ItmName: parsedOldRow.ItmName,
+    //                 MItmCode: parsedOldRow.MItmCode || parsedOldRow.ItmCode,
     //                 __oldSelected: true,
     //             });
     //         }
@@ -177,30 +241,30 @@ const SalesOrderItemList = ({ navigation, route }) => {
     //             );
     //         })
     //         .sort((a, b) => {
-    //             if (editMode && oldRow?.ItmCode) {
-    //                 if (String(a.ItmCode) === String(oldRow.ItmCode)) return -1;
-    //                 if (String(b.ItmCode) === String(oldRow.ItmCode)) return 1;
+    //             if (editMode1 && parsedOldRow?.ItmCode) {
+    //                 if (String(a.ItmCode) === String(parsedOldRow.ItmCode)) return -1;
+    //                 if (String(b.ItmCode) === String(parsedOldRow.ItmCode)) return 1;
     //             }
     //             return 0;
     //         });
 
     //     return arr;
-    // }, [items, search, editMode, oldRow]);
+    // }, [items, search, editMode1, parsedOldRow]);
 
 
     const filteredItems = useMemo(() => {
         const s = search.toLowerCase();
         let arr: any[] = [...items];
-        if (editMode && oldRow?.ItmCode) {
+        if (editMode1 && parsedOldRow?.ItmCode) {
             const oldExists = arr.some(
                 (item) =>
-                    String(item.ItmCode) === String(oldRow.ItmCode)
+                    String(item.ItmCode) === String(parsedOldRow.ItmCode)
             );
             if (!oldExists) {
                 arr.unshift({
-                    ItmCode: oldRow.ItmCode,
-                    ItmName: oldRow.ItmName,
-                    MItmCode: oldRow.MItmCode || oldRow.ItmCode,
+                    ItmCode: parsedOldRow.ItmCode,
+                    ItmName: parsedOldRow.ItmName,
+                    MItmCode: parsedOldRow.MItmCode || parsedOldRow.ItmCode,
                     __oldSelected: true,
                 });
             }
@@ -241,18 +305,18 @@ const SalesOrderItemList = ({ navigation, route }) => {
         })
             .sort((a, b) => {
 
-                if (editMode && oldRow?.ItmCode) {
+                if (editMode1 && parsedOldRow?.ItmCode) {
 
                     if (
                         String(a.ItmCode) ===
-                        String(oldRow.ItmCode)
+                        String(parsedOldRow.ItmCode)
                     ) {
                         return -1;
                     }
 
                     if (
                         String(b.ItmCode) ===
-                        String(oldRow.ItmCode)
+                        String(parsedOldRow.ItmCode)
                     ) {
                         return 1;
                     }
@@ -263,7 +327,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
 
         return arr;
 
-    }, [items, search, editMode, oldRow]);
+    }, [items, search, editMode1, parsedOldRow]);
 
     const selectItem = item => {
         // =====================================================
@@ -272,12 +336,29 @@ const SalesOrderItemList = ({ navigation, route }) => {
         // Only replace item code/name in same SrNo row
         // Do not go to Grade/Shade screen
         // =====================================================
-        // if (editMode && oldRow && String(oldRow.ItmCode) === '-1') {
-        if (editMode && oldRow && isCustomItemEdit) {
-            const nextRows = (workingRows || []).map(row => {
+        // if (editMode1 && parsedOldRow && String(parsedOldRow.ItmCode) === '-1') {
+        if (editMode1 && parsedOldRow && isCustomItemEdit) {
+            // const nextRows = workingRows && Array.isArray(workingRows) && workingRows.map(row => {
+            //     const sameLine =
+            //         String(row.LineId || '') === String(parsedOldRow.LineId || '') ||
+            //         Number(row.SrNo || 0) === Number(parsedOldRow.SrNo || 0);
+
+            //     if (!sameLine) return row;
+
+            //     return {
+            //         ...row,
+            //         ItmCode: item.ItmCode,
+            //         ItmName: item.ItmName,
+            //         MItmCode: item.MItmCode || item.ItmCode,
+            //         UOM: item.UOM || row.UOM || '',
+            //         Denier: item.Denier || row.Denier || '',
+            //         HsnCode: item.HsnCode || row.HsnCode || '',
+            //     };
+            // });
+            const nextRows = parsedWorkingRows.map(row => {
                 const sameLine =
-                    String(row.LineId || '') === String(oldRow.LineId || '') ||
-                    Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+                    String(row.LineId || '') === String(parsedOldRow.LineId || '') ||
+                    Number(row.SrNo || 0) === Number(parsedOldRow.SrNo || 0);
 
                 if (!sameLine) return row;
 
@@ -296,7 +377,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
             //     name: 'OrderSummaryScreen',
             //     params: {
             //         completedRows: nextRows,
-            //         editMode: true,
+            //         editMode1: true,
             //         replaceItemOnlyDone: true,
 
             //         mode,
@@ -324,7 +405,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
             //     {
             //         completedRows: nextRows,
 
-            //         editMode: true,
+            //         editMode1: true,
 
             //         replaceItemOnlyDone: true,
 
@@ -351,28 +432,57 @@ const SalesOrderItemList = ({ navigation, route }) => {
             //     }
             // );
 
+            // router.push({
+            //     pathname: '/OrderSummaryScreen',
+            //     params: {
+            //         completedRows: nextRows,
+
+            //         editMode1: true,
+
+            //         replaceItemOnlyDone: true,
+
+            //         mode: mode,
+            //         uid: uid,
+
+            //         screenMode: mode,
+
+            //         soNo: soNo,
+            //         soDate: soDate,
+
+            //         workingRows: nextRows,
+
+            //         party: finalParty,
+            //         partyData: finalParty,
+            //         selectedParty: finalParty,
+
+            //         prpcode: prpcode,
+            //         strcode: strcode,
+            //         yearno: yearno,
+            //         token: token,
+
+            //         skipReload: true,
+            //     }
+            // });
+
             router.push({
                 pathname: '/OrderSummaryScreen',
                 params: {
-                    completedRows: nextRows,
-
-                    editMode: true,
-
+                    completedRows: JSON.stringify(nextRows),      // 👈 stringify
+                    editMode1: true,
                     replaceItemOnlyDone: true,
 
                     mode: mode,
                     uid: uid,
-
                     screenMode: mode,
 
                     soNo: soNo,
                     soDate: soDate,
 
-                    workingRows: nextRows,
+                    workingRows: JSON.stringify(nextRows),        // 👈 stringify
 
-                    party: finalParty,
-                    partyData: finalParty,
-                    selectedParty: finalParty,
+                    party: JSON.stringify(finalParty),             // 👈 stringify
+                    partyData: JSON.stringify(finalParty),
+                    selectedParty: JSON.stringify(finalParty),
 
                     prpcode: prpcode,
                     strcode: strcode,
@@ -394,10 +504,10 @@ const SalesOrderItemList = ({ navigation, route }) => {
         //     uid,
         //     soNo,
         //     soDate,
-        //     editMode,
+        //     editMode1,
         //     editIndex,
         //     editLineId,
-        //     oldRow,
+        //     parsedOldRow,
         //     selectedItem: {
         //         ItmCode: item.ItmCode,
         //         ItmName: item.ItmName,
@@ -417,6 +527,37 @@ const SalesOrderItemList = ({ navigation, route }) => {
         //     token,
         // });
 
+        // router.push({
+        //     pathname: '/SalesOrderGradeList',
+        //     params: {
+        //         mode: mode,
+        //         uid: uid,
+        //         soNo: soNo,
+        //         soDate: soDate,
+        //         editMode1: editMode1,
+        //         editIndex: editIndex,
+        //         editLineId: editLineId,
+        //         parsedOldRow: parsedOldRow,
+        //         selectedItem: {
+        //             ItmCode: item.ItmCode,
+        //             ItmName: item.ItmName,
+        //             MItmCode: item.MItmCode || item.ItmCode,
+        //             UOM: item.UOM || '',
+        //             Denier: item.Denier,
+        //             HsnCode: item.HsnCode,
+        //             Raw: item,
+        //         },
+        //         workingRows: workingRows,
+        //         party: finalParty,
+        //         partyData: finalParty,
+        //         selectedParty: finalParty,
+        //         prpcode: prpcode,
+        //         strcode: strcode,
+        //         yearno: yearno,
+        //         token: token,
+        //     }
+        // });
+
         router.push({
             pathname: '/SalesOrderGradeList',
             params: {
@@ -424,23 +565,16 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 uid: uid,
                 soNo: soNo,
                 soDate: soDate,
-                editMode: editMode,
+                editMode1: editMode1,
                 editIndex: editIndex,
                 editLineId: editLineId,
-                oldRow: oldRow,
-                selectedItem: {
-                    ItmCode: item.ItmCode,
-                    ItmName: item.ItmName,
-                    MItmCode: item.MItmCode || item.ItmCode,
-                    UOM: item.UOM || '',
-                    Denier: item.Denier,
-                    HsnCode: item.HsnCode,
-                    Raw: item,
-                },
-                workingRows: workingRows,
-                party: finalParty,
-                partyData: finalParty,
-                selectedParty: finalParty,
+                oldRow: JSON.stringify(parsedOldRow), // 👈 Stringify
+                selectedItem: JSON.stringify(item), // 👈 Stringify
+                workingRows: JSON.stringify(parsedWorkingRows), // 👈 Stringify
+                isCustomItemEdit: isCustomItemEdit, // 👈 Pass this flag
+                party: JSON.stringify(finalParty),
+                partyData: JSON.stringify(finalParty),
+                selectedParty: JSON.stringify(finalParty),
                 prpcode: prpcode,
                 strcode: strcode,
                 yearno: yearno,
@@ -463,9 +597,9 @@ const SalesOrderItemList = ({ navigation, route }) => {
 
     const renderItem = ({ item }) => {
         const isOld =
-            editMode &&
-            oldRow &&
-            String(oldRow.ItmCode) === String(item.ItmCode);
+            editMode1 &&
+            parsedOldRow &&
+            String(parsedOldRow.ItmCode) === String(item.ItmCode);
 
         return (
             <TouchableOpacity
@@ -515,24 +649,24 @@ const SalesOrderItemList = ({ navigation, route }) => {
                 </TouchableOpacity>
 
                 <Text style={styles.headerTitle}>
-                    {editMode ? 'Modify Item' : 'Select Item'}
+                    {editMode1 ? 'Modify Item' : 'Select Item'}
                 </Text>
 
                 <View style={{ width: 22 }} />
             </View>
 
             <View style={styles.container}>
-                {editMode && oldRow && (
+                {editMode1 && parsedOldRow && (
                     <View style={styles.oldBox}>
                         <Text style={styles.oldLabel}>Currently Saved Item</Text>
                         <Text style={styles.oldTitle}>
-                            {oldRow.ItmCode} - {oldRow.ItmName}
+                            {parsedOldRow.ItmCode} - {parsedOldRow.ItmName}
                         </Text>
                         <Text style={styles.oldSub}>
-                            Grade: {oldRow.GrdCode} {oldRow.GrdName}
+                            Grade: {parsedOldRow.GrdCode} {parsedOldRow.GrdName}
                         </Text>
                         <Text style={styles.oldSub}>
-                            Shade: {oldRow.ShdCode} {oldRow.ShdName}
+                            Shade: {parsedOldRow.ShdCode} {parsedOldRow.ShdName}
                         </Text>
                     </View>
                 )}
@@ -579,10 +713,10 @@ const SalesOrderItemList = ({ navigation, route }) => {
                         //     uid,
                         //     soNo,
                         //     soDate,
-                        //     editMode,
+                        //     editMode1,
                         //     editIndex,
                         //     editLineId,
-                        //     oldRow,
+                        //     parsedOldRow,
                         //     workingRows,
                         //     party: finalParty,
                         //     partyData: finalParty,
@@ -599,10 +733,10 @@ const SalesOrderItemList = ({ navigation, route }) => {
                                 uid: uid,
                                 soNo: soNo,
                                 soDate: soDate,
-                                editMode: editMode,
+                                editMode1: editMode1,
                                 editIndex: editIndex,
                                 editLineId: editLineId,
-                                oldRow: oldRow,
+                                parsedOldRow: parsedOldRow,
                                 workingRows: workingRows,
                                 party: finalParty,
                                 partyData: finalParty,

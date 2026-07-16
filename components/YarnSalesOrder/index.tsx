@@ -1,21 +1,28 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    View, Text, StyleSheet, TextInput,
-    TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
-    ScrollView, Modal,
-    Platform, StatusBar,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 // import { StatusBar } from 'expo-status-bar';
-import axios from 'axios';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { fetchPropertyData } from '../../common/API/Functions';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { API } from "../../common/API/dynamicAPI";
-import { useSalesOrder } from './SalesOrderContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { API } from "../../common/API/dynamicAPI";
+import { fetchPropertyData } from '../../common/API/Functions';
+import { useSalesOrder } from './SalesOrderContext';
 
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 
@@ -602,6 +609,11 @@ const YarnSalesOrder = ({ token }) => {
         );
     };
 
+    const goBack = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/');
+    };
+
     return (
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
             <StatusBar
@@ -613,7 +625,7 @@ const YarnSalesOrder = ({ token }) => {
                 // style={styles.header}
                 style={[styles.header, { height: HEADER_HEIGHT }]}
             >
-                <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <Text style={styles.back}>‹</Text>
                 </TouchableOpacity>
 

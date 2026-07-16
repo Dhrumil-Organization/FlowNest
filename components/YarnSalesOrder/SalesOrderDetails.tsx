@@ -1,21 +1,20 @@
+import Icon from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
   Alert,
   Modal,
-  FlatList
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { API } from '../../common/API/dynamicAPI';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { API } from '../../common/API/dynamicAPI';
 const num = v => {
   const n = parseFloat(String(v || '').replace(/,/g, ''));
   return isNaN(n) ? 0 : n;
@@ -29,6 +28,15 @@ const createLineId = () =>
 const SalesOrderDetails = ({ navigation, route }) => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [editMode1, setEditMode] = useState(false);
+  const parseMaybeJSON = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'string') {
+      try { return JSON.parse(v); } catch { return v; }
+    }
+    return v;
+  };
+
   const {
     mode = 'ADD',
     uid = 0,
@@ -38,25 +46,36 @@ const SalesOrderDetails = ({ navigation, route }) => {
     editIndex = null,
     editLineId = null,
     oldRow = null,
-
     selectedItem = null,
     selectedGrade = null,
-    // selectedShade = null,
-    selectedShade = [],
-
+    selectedShade = [], // Default to empty array
     workingRows = [],
-
     party = null,
     partyData = null,
     selectedParty = null,
-
     prpcode = '',
     strcode = '002',
     yearno = '',
     token = '',
   } = params || {};
 
-  const finalParty = party || partyData || selectedParty || null;
+  useEffect(() => {
+    if (editMode === 'true') {
+      setEditMode(true);
+    } else {
+      setEditMode(false);
+    }
+  }, [editMode]);
+
+  console.log("edit mode SalesOrderDetails: ", editMode, editMode1);
+
+  // Parse all stringified params
+  const parsedOldRow = parseMaybeJSON(oldRow);
+  const parsedSelectedItem = parseMaybeJSON(selectedItem);
+  const parsedSelectedGrade = parseMaybeJSON(selectedGrade);
+  const parsedSelectedShade = parseMaybeJSON(selectedShade) || []; // 👈 Parse selectedShade
+  const parsedWorkingRows = parseMaybeJSON(workingRows) || [];
+  const finalParty = parseMaybeJSON(party) || parseMaybeJSON(partyData) || parseMaybeJSON(selectedParty) || null;
   const stableUid =
     Number(uid || oldRow?.UId || workingRows?.[0]?.UId || 0);
 
@@ -76,6 +95,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
 
   console.log("remark", remark, isDyeing)
+  console.log("parsedWorkingRows: ", workingRows, parsedWorkingRows);
 
   let cancelToken: any;
 
@@ -95,13 +115,13 @@ const SalesOrderDetails = ({ navigation, route }) => {
   }, [qty, rate]);
 
   useEffect(() => {
-    if (editMode && oldRow) {
+    if (editMode1 && oldRow) {
       setQty(String(oldRow.Qty ?? ''));
       setPcs(String(oldRow.Pcs ?? ''));
       setRate(String(oldRow.Rate ?? ''));
       setRemark(String(oldRow.Remark ?? ''));
     }
-  }, [editMode, oldRow]);
+  }, [oldRow]);
 
   // const onSave = () => {
   //   if (!selectedItem?.ItmCode) {
@@ -135,7 +155,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
   //   }
 
   //   const lineId =
-  //     editMode && oldRow?.LineId
+  //     editMode1 && oldRow?.LineId
   //       ? oldRow.LineId
   //       : editLineId || createLineId();
 
@@ -144,7 +164,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
   //     UId: stableUid,
   //     Mode: stableMode,
   //     SrNo:
-  //       editMode && oldRow?.SrNo
+  //       editMode1 && oldRow?.SrNo
   //         ? oldRow.SrNo
   //         : workingRows.length + 1,
 
@@ -173,7 +193,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
   //   let updatedRows = [];
 
-  //   if (editMode && oldRow) {
+  //   if (editMode1 && oldRow) {
   //     const editLineId = oldRow.LineId || newRow.LineId;
 
   //     let replaced = false;
@@ -210,7 +230,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
   //     uid: stableUid,
   //     soNo,
   //     soDate,
-  //     editMode,
+  //     editMode1,
   //     editIndex,
   //     editLineId: lineId,
   //     oldRow,
@@ -229,20 +249,240 @@ const SalesOrderDetails = ({ navigation, route }) => {
   //   });
   // };
 
-  const onSave = () => {
+  // const onSave = () => {
 
-    if (!selectedItem?.ItmCode) {
+  //   if (!selectedItem?.ItmCode) {
+  //     Alert.alert('Required', 'Item missing');
+  //     return;
+  //   }
+
+  //   if (!selectedGrade?.GrdCode) {
+  //     Alert.alert('Required', 'Grade missing');
+  //     return;
+  //   }
+
+  //   // MULTIPLE SHADE VALIDATION
+  //   if (!selectedShade || selectedShade.length === 0) {
+  //     Alert.alert('Required', 'Please select shade');
+  //     return;
+  //   }
+
+  //   if (num(qty) <= 0) {
+  //     Alert.alert('Required', 'Enter valid qty');
+  //     return;
+  //   }
+
+  //   if (num(rate) <= 0) {
+  //     Alert.alert('Required', 'Enter valid rate');
+  //     return;
+  //   }
+
+  //   let updatedRows = [...workingRows];
+
+  //   let latestRow = null;
+
+  //   // MULTIPLE SHADE LOOP
+  //   selectedShade.forEach((shadeItem, index) => {
+
+  //     const lineId =
+  //       editMode1 && oldRow?.LineId
+  //         ? oldRow.LineId
+  //         : createLineId();
+
+  //     const newRow = {
+
+  //       LineId: lineId,
+
+  //       UId: stableUid,
+
+  //       Mode: stableMode,
+
+  //       SrNo:
+  //         editMode1 && oldRow?.SrNo
+  //           ? oldRow.SrNo
+  //           : updatedRows.length + 1,
+
+  //       PrpCode: prpcode,
+
+  //       StrCode: strcode,
+
+  //       YearNo: yearno,
+
+  //       ItmCode: selectedItem?.ItmCode || '',
+
+  //       ItmName: selectedItem?.ItmName || '',
+
+  //       Denier: selectedItem.Denier,
+
+  //       UOM: selectedItem.UOM,
+  //       HsnCode: selectedItem.HsnCode,
+
+  //       MItmCode:
+  //         selectedItem?.MItmCode ||
+  //         selectedItem?.ItmCode ||
+  //         '',
+
+  //       GrdCode: selectedGrade?.GrdCode || '',
+
+  //       GrdName: selectedGrade?.GrdName || '',
+
+  //       // MULTIPLE SHADE
+  //       ShdCode: shadeItem?.ShdCode || '',
+
+  //       ShdName:
+  //         shadeItem?.ShdName ||
+  //         shadeItem?.ShadeName ||
+  //         '',
+
+  //       Qty: num(qty),
+
+  //       Pcs: num(pcs),
+
+  //       Rate: num(rate),
+
+  //       Amount: num(amount),
+
+  //       Remark: remark,
+
+  //       IsDyeing: isDyeing ? 1 : 0,
+
+  //       RowKey:
+  //         `${selectedItem?.ItmCode || ''}_` +
+  //         `${selectedGrade?.GrdCode || ''}_` +
+  //         `${shadeItem?.ShdCode || ''}`,
+  //     };
+
+  //     latestRow = newRow;
+
+  //     // EDIT MODE
+  //     if (editMode1 && oldRow) {
+
+  //       const editLineId =
+  //         oldRow.LineId || newRow.LineId;
+
+  //       let replaced = false;
+
+  //       updatedRows = updatedRows.map(row => {
+
+  //         if (
+  //           String(row.LineId) ===
+  //           String(editLineId)
+  //         ) {
+  //           replaced = true;
+
+  //           return {
+  //             ...newRow,
+  //             LineId: editLineId,
+  //           };
+  //         }
+
+  //         return row;
+  //       });
+
+  //       if (!replaced) {
+  //         updatedRows.push(newRow);
+  //       }
+
+  //     } else {
+
+  //       // DUPLICATE CHECK
+  //       const existsIndex = updatedRows.findIndex(
+  //         x => makeRowKey(x) === makeRowKey(newRow),
+  //       );
+
+  //       if (existsIndex >= 0) {
+  //         return;
+  //       }
+
+  //       updatedRows.push(newRow);
+  //     }
+
+  //   });
+
+  //   console.log("updatedRows", updatedRows);
+
+  //   // navigation.navigate(
+  //   //   'SalesOrderAddAnotherShade',
+  //   //   {
+  //   //     mode: stableMode,
+  //   //     uid: stableUid,
+  //   //     soNo: soNo,
+  //   //     soDate: soDate,
+
+  //   //     editMode1: editMode1,
+  //   //     editIndex: editIndex,
+
+  //   //     oldRow: oldRow,
+
+  //   //     selectedItem: selectedItem,
+  //   //     selectedGrade: selectedGrade,
+
+  //   //     // IMPORTANT
+  //   //     selectedShade: selectedShade,
+
+  //   //     lastRow: latestRow,
+
+  //   //     workingRows: updatedRows,
+
+  //   //     party: finalParty,
+  //   //     partyData: finalParty,
+  //   //     selectedParty: finalParty,
+
+  //   //     prpcode: prpcode,
+  //   //     strcode: strcode,
+  //   //     yearno: yearno,
+  //   //     token: token,
+  //   //   }
+  //   // );
+
+  //   router.push({
+  //     pathname: '/SOPartyDetailsPart1',
+  //     params: {
+  //       mode: stableMode,
+  //       uid: stableUid,
+  //       soNo: soNo,
+  //       soDate: soDate,
+
+  //       editMode1: editMode1,
+  //       editIndex: editIndex,
+
+  //       oldRow: oldRow,
+
+  //       selectedItem: selectedItem,
+  //       selectedGrade: selectedGrade,
+
+  //       // IMPORTANT
+  //       selectedShade: selectedShade,
+
+  //       lastRow: latestRow,
+
+  //       workingRows: updatedRows,
+
+  //       party: finalParty,
+  //       partyData: finalParty,
+  //       selectedParty: finalParty,
+
+  //       prpcode: prpcode,
+  //       strcode: strcode,
+  //       yearno: yearno,
+  //       token: token,
+  //     }
+  //   });
+  // };
+
+  const onSave = () => {
+    if (!parsedSelectedItem?.ItmCode) {
       Alert.alert('Required', 'Item missing');
       return;
     }
 
-    if (!selectedGrade?.GrdCode) {
+    if (!parsedSelectedGrade?.GrdCode) {
       Alert.alert('Required', 'Grade missing');
       return;
     }
 
-    // MULTIPLE SHADE VALIDATION
-    if (!selectedShade || selectedShade.length === 0) {
+    // Use parsedSelectedShade
+    if (!parsedSelectedShade || parsedSelectedShade.length === 0) {
       Alert.alert('Required', 'Please select shade');
       return;
     }
@@ -257,191 +497,84 @@ const SalesOrderDetails = ({ navigation, route }) => {
       return;
     }
 
-    let updatedRows = [...workingRows];
-
+    let updatedRows = [...parsedWorkingRows];
     let latestRow = null;
 
-    // MULTIPLE SHADE LOOP
-    selectedShade.forEach((shadeItem, index) => {
-
-      const lineId =
-        editMode && oldRow?.LineId
-          ? oldRow.LineId
-          : createLineId();
+    // Loop through parsedSelectedShade
+    parsedSelectedShade.forEach((shadeItem, index) => {
+      const lineId = editMode1 && parsedOldRow?.LineId ? parsedOldRow.LineId : createLineId();
 
       const newRow = {
-
         LineId: lineId,
-
         UId: stableUid,
-
         Mode: stableMode,
-
-        SrNo:
-          editMode && oldRow?.SrNo
-            ? oldRow.SrNo
-            : updatedRows.length + 1,
-
+        SrNo: editMode1 && parsedOldRow?.SrNo ? parsedOldRow.SrNo : updatedRows.length + 1,
         PrpCode: prpcode,
-
         StrCode: strcode,
-
         YearNo: yearno,
-
-        ItmCode: selectedItem?.ItmCode || '',
-
-        ItmName: selectedItem?.ItmName || '',
-
-        Denier: selectedItem.Denier,
-
-        UOM: selectedItem.UOM,
-        HsnCode: selectedItem.HsnCode,
-
-        MItmCode:
-          selectedItem?.MItmCode ||
-          selectedItem?.ItmCode ||
-          '',
-
-        GrdCode: selectedGrade?.GrdCode || '',
-
-        GrdName: selectedGrade?.GrdName || '',
-
-        // MULTIPLE SHADE
+        ItmCode: parsedSelectedItem?.ItmCode || '',
+        ItmName: parsedSelectedItem?.ItmName || '',
+        Denier: parsedSelectedItem.Denier,
+        UOM: parsedSelectedItem.UOM,
+        HsnCode: parsedSelectedItem.HsnCode,
+        MItmCode: parsedSelectedItem?.MItmCode || parsedSelectedItem?.ItmCode || '',
+        GrdCode: parsedSelectedGrade?.GrdCode || '',
+        GrdName: parsedSelectedGrade?.GrdName || '',
         ShdCode: shadeItem?.ShdCode || '',
-
-        ShdName:
-          shadeItem?.ShdName ||
-          shadeItem?.ShadeName ||
-          '',
-
+        ShdName: shadeItem?.ShdName || shadeItem?.ShadeName || '',
         Qty: num(qty),
-
         Pcs: num(pcs),
-
         Rate: num(rate),
-
         Amount: num(amount),
-
         Remark: remark,
-
         IsDyeing: isDyeing ? 1 : 0,
-
-        RowKey:
-          `${selectedItem?.ItmCode || ''}_` +
-          `${selectedGrade?.GrdCode || ''}_` +
-          `${shadeItem?.ShdCode || ''}`,
+        RowKey: `${parsedSelectedItem?.ItmCode || ''}_${parsedSelectedGrade?.GrdCode || ''}_${shadeItem?.ShdCode || ''}`,
       };
 
       latestRow = newRow;
 
-      // EDIT MODE
-      if (editMode && oldRow) {
-
-        const editLineId =
-          oldRow.LineId || newRow.LineId;
-
+      if (editMode1 && parsedOldRow) {
+        const editLineId = parsedOldRow.LineId || newRow.LineId;
         let replaced = false;
 
         updatedRows = updatedRows.map(row => {
-
-          if (
-            String(row.LineId) ===
-            String(editLineId)
-          ) {
+          if (String(row.LineId) === String(editLineId)) {
             replaced = true;
-
-            return {
-              ...newRow,
-              LineId: editLineId,
-            };
+            return { ...newRow, LineId: editLineId };
           }
-
           return row;
         });
 
         if (!replaced) {
           updatedRows.push(newRow);
         }
-
       } else {
-
-        // DUPLICATE CHECK
-        const existsIndex = updatedRows.findIndex(
-          x => makeRowKey(x) === makeRowKey(newRow),
-        );
-
+        const existsIndex = updatedRows.findIndex(x => makeRowKey(x) === makeRowKey(newRow));
         if (existsIndex >= 0) {
           return;
         }
-
         updatedRows.push(newRow);
       }
-
     });
-
-    console.log("updatedRows", updatedRows);
-
-    // navigation.navigate(
-    //   'SalesOrderAddAnotherShade',
-    //   {
-    //     mode: stableMode,
-    //     uid: stableUid,
-    //     soNo: soNo,
-    //     soDate: soDate,
-
-    //     editMode: editMode,
-    //     editIndex: editIndex,
-
-    //     oldRow: oldRow,
-
-    //     selectedItem: selectedItem,
-    //     selectedGrade: selectedGrade,
-
-    //     // IMPORTANT
-    //     selectedShade: selectedShade,
-
-    //     lastRow: latestRow,
-
-    //     workingRows: updatedRows,
-
-    //     party: finalParty,
-    //     partyData: finalParty,
-    //     selectedParty: finalParty,
-
-    //     prpcode: prpcode,
-    //     strcode: strcode,
-    //     yearno: yearno,
-    //     token: token,
-    //   }
-    // );
-
+    const isEditMode = editMode === true || editMode === 'true';
     router.push({
-      pathname: '/SOPartyDetailsPart1',
+      pathname: '/SalesOrderAddAnotherShade',
       params: {
         mode: stableMode,
         uid: stableUid,
         soNo: soNo,
         soDate: soDate,
-
-        editMode: editMode,
+        editMode: isEditMode,
         editIndex: editIndex,
-
-        oldRow: oldRow,
-
-        selectedItem: selectedItem,
-        selectedGrade: selectedGrade,
-
-        // IMPORTANT
-        selectedShade: selectedShade,
-
-        lastRow: latestRow,
-
-        workingRows: updatedRows,
-
-        party: finalParty,
-        partyData: finalParty,
-        selectedParty: finalParty,
-
+        oldRow: JSON.stringify(parsedOldRow),
+        selectedItem: JSON.stringify(parsedSelectedItem),
+        selectedGrade: JSON.stringify(parsedSelectedGrade),
+        selectedShade: JSON.stringify(parsedSelectedShade), // 👈 Stringify parsedSelectedShade
+        lastRow: JSON.stringify(latestRow),
+        workingRows: JSON.stringify(updatedRows),
+        party: JSON.stringify(finalParty),
+        partyData: JSON.stringify(finalParty),
+        selectedParty: JSON.stringify(finalParty),
         prpcode: prpcode,
         strcode: strcode,
         yearno: yearno,
@@ -450,178 +583,234 @@ const SalesOrderDetails = ({ navigation, route }) => {
     });
   };
 
+  // const handleaddstock = async () => {
+
+  //   const yrno = yearno ? yearno.slice(-2) : '';
+
+  //   const userPtype = await AsyncStorage.getItem('user_prptype');
+
+  //   try {
+
+  //     setLoading(true);
+  //     const shadeArray = Array.isArray(parsedSelectedShade)
+  //       ? parsedSelectedShade
+  //       : [parsedSelectedShade];
+
+  //     const lastRow = workingRows?.length > 0 ? workingRows[workingRows.length - 1] : null;
+
+  //     const lastSrNo =
+  //       Number(lastRow?.SrNo || 0);
+
+  //     const d1 = shadeArray.map((shadeItem, index) => ({
+  //       srno: oldRow?.SrNo ? Number(oldRow?.SrNo) : lastSrNo + index + 1,
+  //       itmcode: parsedSelectedItem?.ItmCode || oldRow?.ItmCode || '',
+  //       grdcode: parsedSelectedGrade?.GrdCode || oldRow?.GrdCode || '',
+  //       shdcode: shadeItem?.ShdCode || oldRow?.ShdCode || '',
+  //     }));
+
+  //     const selectedd1 =
+  //       workingRows?.length > 0
+  //         ? workingRows.map(row => ({
+
+  //           srno:
+  //             row?.SrNo || 0,
+
+  //           itmcode:
+  //             row?.ItmCode || '',
+
+  //           grdcode:
+  //             row?.GrdCode || '',
+
+  //           shdcode:
+  //             row?.ShdCode || '',
+  //         }))
+  //         : [];
+
+  //     const payload = {
+
+  //       prptype: userPtype,
+
+  //       prpcode,
+
+  //       strcode,
+
+  //       yearno: yrno,
+
+  //       d1,
+
+  //       selectedd1,
+
+  //     };
+
+  //     console.log(
+  //       'stock payload:', JSON.stringify(payload, null, 2)
+  //     );
+
+  //     const res = await axios.post(
+  //       `${API}/api/get_so_current_stock`,
+  //       payload,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
+  //           Accept: 'application/json', 'x-platform': 'mob',
+  //         },
+  //       });
+
+  //     console.log('stock Response:', res);
+
+  //     // const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+
+  //     const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+
+  //     console.log('stock data:', data);
+
+  //     const stockRows = data?.stockdata || [];
+
+  //     setStockData(stockRows);
+
+  //     const totalQty = stockRows.reduce(
+  //       (sum, item) => sum + Number(item?.StkQty || 0),
+  //       0
+  //     );
+
+  //     setTotalStockQty(totalQty);
+
+
+  //     if (totalQty > 0) {
+
+  //       setIsDyeing(1);
+
+  //     } else {
+
+  //       setIsDyeing(0);
+  //     }
+
+  //     console.log('TOTAL STOCK:', totalQty);
+
+  //     console.log('stock data:', data);
+
+  //   } catch (error) {
+
+  //     console.log('get stock ERROR:', error?.response?.data || error.message);
+
+  //     Alert.alert('Error', 'Unable to get stock');
+
+  //   } finally {
+
+  //     setLoading(false);
+
+  //   }
+  // };
+
+
   const handleaddstock = async () => {
-
     const yrno = yearno ? yearno.slice(-2) : '';
-
     const userPtype = await AsyncStorage.getItem('user_prptype');
 
     try {
-
       setLoading(true);
-      const shadeArray =
-        Array.isArray(selectedShade)
-          ? selectedShade
-          : [selectedShade];
+      const shadeArray = Array.isArray(parsedSelectedShade)
+        ? parsedSelectedShade
+        : [parsedSelectedShade];
 
-      const lastRow =
-        workingRows?.length > 0
-          ? workingRows[workingRows.length - 1]
-          : null;
+      // Use parsedWorkingRows instead of workingRows
+      const lastRow = parsedWorkingRows?.length > 0
+        ? parsedWorkingRows[parsedWorkingRows.length - 1]
+        : null;
+      const lastSrNo = Number(lastRow?.SrNo || 0);
 
-      const lastSrNo =
-        Number(lastRow?.SrNo || 0);
+      // Use parsedOldRow instead of oldRow
+      const d1 = shadeArray.map((shadeItem, index) => ({
+        srno: parsedOldRow?.SrNo ? Number(parsedOldRow?.SrNo) : lastSrNo + index + 1,
+        itmcode: parsedSelectedItem?.ItmCode || parsedOldRow?.ItmCode || '',
+        grdcode: parsedSelectedGrade?.GrdCode || parsedOldRow?.GrdCode || '',
+        shdcode: shadeItem?.ShdCode || parsedOldRow?.ShdCode || '',
+      }));
 
-      const d1 = shadeArray.map(
-        (shadeItem, index) => ({
-          // srno: lastSrNo + index + 1,
-          // itmcode:
-          //   selectedItem?.ItmCode || '',
-          // grdcode:
-          //   selectedGrade?.GrdCode || '',
-          // shdcode:
-          //   shadeItem?.ShdCode || '',
-          srno:
-            oldRow?.SrNo
-              ? Number(oldRow?.SrNo)
-              : lastSrNo + index + 1,
-
-          // itmcode:
-          //   oldRow?.SrNo
-          //     ? 
-          //     oldRow?.ItmCode || ''
-          //     : selectedItem?.ItmCode || '',
-
-          // grdcode:
-          //   oldRow?.SrNo
-          //     ? oldRow?.GrdCode || ''
-          //     : selectedGrade?.GrdCode || '',
-
-          // shdcode:
-          //   oldRow?.SrNo
-          //     ? oldRow?.ShdCode || ''
-          //     : shadeItem?.ShdCode || '',
-          itmcode:
-            selectedItem?.ItmCode ||
-            oldRow?.ItmCode ||
-            '',
-
-          grdcode:
-            selectedGrade?.GrdCode ||
-            oldRow?.GrdCode ||
-            '',
-
-          shdcode:
-            shadeItem?.ShdCode ||
-            oldRow?.ShdCode ||
-            '',
-        })
-      );
-
-      const selectedd1 =
-        workingRows?.length > 0
-          ? workingRows.map(row => ({
-
-            srno:
-              row?.SrNo || 0,
-
-            itmcode:
-              row?.ItmCode || '',
-
-            grdcode:
-              row?.GrdCode || '',
-
-            shdcode:
-              row?.ShdCode || '',
-          }))
-          : [];
+      // Use parsedWorkingRows for selectedd1
+      const selectedd1 = parsedWorkingRows?.length > 0
+        ? parsedWorkingRows.map(row => ({
+          srno: row?.SrNo || 0,
+          itmcode: row?.ItmCode || '',
+          grdcode: row?.GrdCode || '',
+          shdcode: row?.ShdCode || '',
+        }))
+        : [];
 
       const payload = {
-
         prptype: userPtype,
-
         prpcode,
-
         strcode,
-
         yearno: yrno,
-
         d1,
-
         selectedd1,
-
       };
 
-      console.log(
-        'stock payload:', JSON.stringify(payload, null, 2)
-      );
+      console.log('stock payload:', JSON.stringify(payload, null, 2));
 
       const res = await axios.post(
         `${API}/api/get_so_current_stock`,
         payload,
         {
           headers: {
-            Authorization: `Bearer ${token}`, 'Content-Type': 'application/json',
-            Accept: 'application/json', 'x-platform': 'mob',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'x-platform': 'mob',
           },
-        });
+        }
+      );
 
-      console.log('stock Response:', res);
-
-      // const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
-
+      console.log('stock Response:', res.data);
       const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
-
-      console.log('stock data:', data);
-
       const stockRows = data?.stockdata || [];
-
       setStockData(stockRows);
 
       const totalQty = stockRows.reduce(
         (sum, item) => sum + Number(item?.StkQty || 0),
         0
       );
-
       setTotalStockQty(totalQty);
-
-
-      if (totalQty > 0) {
-
-        setIsDyeing(1);
-
-      } else {
-
-        setIsDyeing(0);
-      }
-
-      console.log('TOTAL STOCK:', totalQty);
-
-      console.log('stock data:', data);
-
+      setIsDyeing(totalQty > 0 ? 1 : 0);
     } catch (error) {
-
       console.log('get stock ERROR:', error?.response?.data || error.message);
-
-      Alert.alert('Error', 'Unable to get stock');
-
+      Alert.alert(
+        'Error',
+        `Unable to get stock. Error: ${error?.response?.data?.message || error.message}`
+      );
     } finally {
-
       setLoading(false);
-
     }
   };
 
+  // useEffect(() => {
+  //   const shadeArray = Array.isArray(parsedSelectedShade)
+  //     ? parsedSelectedShade
+  //     : [parsedSelectedShade];
+
+  //   if (parsedSelectedItem?.ItmCode && parsedSelectedGrade?.GrdCode && shadeArray?.length > 0) {
+  //     handleaddstock();
+  //   }
+  // }, []);
   useEffect(() => {
+    const shadeArray = Array.isArray(parsedSelectedShade)
+      ? parsedSelectedShade
+      : [parsedSelectedShade];
 
-    const shadeArray = Array.isArray(selectedShade)
-      ? selectedShade
-      : [selectedShade];
-
-    if (selectedItem?.ItmCode && selectedGrade?.GrdCode && shadeArray?.length > 0) {
+    if (
+      parsedSelectedItem?.ItmCode &&
+      parsedSelectedGrade?.GrdCode &&
+      shadeArray?.length > 0
+    ) {
       handleaddstock();
+    } else {
+      console.log(
+        'Missing data:',
+        !parsedSelectedItem?.ItmCode ? 'Item missing' : '',
+        !parsedSelectedGrade?.GrdCode ? 'Grade missing' : '',
+        shadeArray?.length === 0 ? 'Shade missing' : ''
+      );
     }
-
   }, []);
 
   return (
@@ -632,7 +821,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>
-          {editMode ? 'Modify Details' : 'Enter Details'}
+          {editMode1 ? 'Modify Details' : 'Enter Details'}
         </Text>
 
         <View style={{ width: 22 }} />
@@ -733,12 +922,12 @@ const SalesOrderDetails = ({ navigation, route }) => {
         <View style={styles.infoBox}>
           <Text style={styles.label}>Item</Text>
           <Text style={styles.value}>
-            {selectedItem?.ItmCode} - {selectedItem?.ItmName}
+            {parsedSelectedItem?.ItmCode} - {parsedSelectedItem?.ItmName}
           </Text>
 
           <Text style={styles.label}>Grade</Text>
           <Text style={styles.value}>
-            {selectedGrade?.GrdCode} - {selectedGrade?.GrdName}
+            {parsedSelectedGrade?.GrdCode} - {parsedSelectedGrade?.GrdName}
           </Text>
 
           <Text style={styles.label}>Shade</Text>
@@ -752,12 +941,11 @@ const SalesOrderDetails = ({ navigation, route }) => {
               ))}
             </Text> */}
             <Text style={styles.value1}>
-              {selectedShade
-                ?.map(
-                  x =>
-                    `${x?.ShdCode} - ${x?.ShdName || x?.ShadeName}`
-                )
-                .join(', ')}
+              {Array.isArray(parsedSelectedShade)
+                ? parsedSelectedShade
+                  .map(x => `${x?.ShdCode} - ${x?.ShdName || x?.ShadeName}`)
+                  .join(', ')
+                : `${parsedSelectedShade?.ShdCode} - ${parsedSelectedShade?.ShdName || parsedSelectedShade?.ShadeName}`}
             </Text>
           </Text>
         </View>
@@ -868,7 +1056,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
         <TouchableOpacity style={styles.btn} onPress={onSave}>
           <Text style={styles.btnText}>
-            {editMode ? 'Update Shade' : 'Add This Shade'}
+            {editMode1 ? 'Update Shade' : 'Add This Shade'}
           </Text>
         </TouchableOpacity>
       </ScrollView>

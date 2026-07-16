@@ -1,24 +1,24 @@
-import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    SafeAreaView,
-    TouchableOpacity,
-    FlatList,
-    TextInput,
-    Alert,
-    ScrollView,
-    Modal,
-    ActivityIndicator
-} from 'react-native';
-import axios from 'axios';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
+import axios from 'axios';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { API } from '../../common/API/dynamicAPI';
 import { useSalesOrder } from './SalesOrderContext';
-import DateTimePicker from '@react-native-community/datetimepicker';
 
 const money = value => {
     return Number(value || 0).toLocaleString('en-IN', {
@@ -192,6 +192,14 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const router = useRouter();
     const params = useLocalSearchParams();
 
+    const parseMaybeJSON = (v) => {
+        if (v === null || v === undefined || v === '') return null;
+        if (typeof v === 'string') {
+            try { return JSON.parse(v); } catch { return v; }
+        }
+        return v;
+    };
+
     const {
         mode: contextMode = 'ADD',
         uid: contextUid = 0,
@@ -201,20 +209,37 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         clearOrder,
     } = salesOrder || {};
 
+    // Parse all stringified params
     const {
         mode: routeMode,
         uid: routeUid,
         skipReload = false,
-        party: routeParty,
-        partyData,
-        selectedParty,
+        soNo: routeSoNo = '',
+        soDate: routeSoDate = '',
+        completedRows = [],
+        completedRow = null,
+        editMode = false,
+        editIndex = null,
+        editLineId = null,
+        oldRow = null,
+        party: routeParty = null,
+        partyData = null,
+        selectedParty = null,
+        selectedTempParty = null, // Add this
+        preservedRows = null, // Add this
         prpcode = '',
         strcode = '002',
         yearno = '',
         token = '',
-        soNo: routeSoNo = '',
-        soDate: routeSoDate = '',
     } = params || {};
+
+    // Parse stringified params
+    const parsedCompletedRows = parseMaybeJSON(completedRows) || [];
+    const parsedCompletedRow = parseMaybeJSON(completedRow);
+    const parsedOldRow = parseMaybeJSON(oldRow);
+    const parsedParty = parseMaybeJSON(routeParty) || parseMaybeJSON(partyData) || parseMaybeJSON(selectedParty) || null;
+    const parsedTempParty = parseMaybeJSON(selectedTempParty); // Parse temp party
+    const parsedPreservedRows = parseMaybeJSON(preservedRows) || []; // Parse preserved rows
 
     const initialMode = routeMode || contextMode || 'ADD';
     const initialUid = routeUid || contextUid || 0;
@@ -235,7 +260,17 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const [addressListVisible, setAddressListVisible] = useState(false);
     const [AddressList, setAdedressList] = useState([]);
     const [addressLoading, setAddressLoading] = useState(false);
-
+    // const parseMaybeJSON = (v) => {
+    //     if (v === null || v === undefined || v === '') return null;
+    //     if (typeof v === 'string') {
+    //         try {
+    //             return JSON.parse(v);
+    //         } catch {
+    //             return v; // already a plain string/object case
+    //         }
+    //     }
+    //     return v; // already an object
+    // };
     // const party =
     //     routeParty ||
     //     partyData ||
@@ -245,9 +280,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     //     headerData?.party ||
     //     null;
     const initialParty =
-        routeParty ||
-        partyData ||
-        selectedParty ||
+        parseMaybeJSON(routeParty) ||
+        parseMaybeJSON(partyData) ||
+        parseMaybeJSON(selectedParty) ||
         contextParty ||
         headerData?.Party ||
         headerData?.party ||
@@ -255,24 +290,17 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
     const [currentParty, setCurrentParty] = useState(initialParty);
 
+    // Update party if received via params
     useEffect(() => {
-        if (params?.selectedTempParty) {
-            setCurrentParty(params.selectedTempParty);
-
-            if (Array.isArray(params?.preservedRows)) {
-                setRows(reSrNo(params.preservedRows));
+        console.log('selectedTempParty =>', parsedTempParty);
+        if (parsedTempParty) {
+            setCurrentParty(parsedTempParty); // Use parsed temp party
+            if (Array.isArray(parsedPreservedRows)) {
+                setRows(reSrNo(parsedPreservedRows)); // Use parsed preserved rows
             }
-
-            // navigation.setParams({
-            //     selectedTempParty: undefined,
-            //     preservedRows: undefined,
-            // });
-            router.setParams({
-                selectedTempParty: undefined,
-                preservedRows: undefined,
-            });
         }
-    }, [params?.selectedTempParty]);
+        }, []);
+    // }, [params?.selectedTempParty]);
 
     const [rows, setRows] = useState(() => reSrNo(normalizeRows(contextItems)));
 
@@ -325,43 +353,109 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         }
     }, [mode, uid, skipReload]);
 
+    // useEffect(() => {
+    //     const p = params || {};
+
+    //     // =========================================
+    //     // TEMP PARTY REPLACEMENT
+    //     // DO NOT CHANGE MODE TO ADD
+    //     // =========================================
+
+    //     if (p.replaceTempPartyDone === true) {
+
+    //         setScreenMode(
+    //             p.screenMode || p.mode || 'EDIT'
+    //         );
+
+    //         setScreenUid(
+    //             Number(
+    //                 p.uid ||
+    //                 screenUid ||
+    //                 uid ||
+    //                 0
+    //             )
+    //         );
+
+    //         // navigation.setParams({
+    //         //     replaceTempPartyDone: undefined,
+    //         // });
+    //         router.setParams({
+    //             replaceTempPartyDone: undefined,
+    //         });
+
+    //         return;
+    //     }
+
+    //     // =========================================
+    //     // NORMAL FLOW
+    //     // =========================================
+
+    //     const nextUid = Number(
+    //         p.uid ||
+    //         p.completedRow?.UId ||
+    //         p.completedRows?.[0]?.UId ||
+    //         screenUid ||
+    //         0
+    //     );
+
+    //     const nextMode =
+    //         nextUid > 0 ||
+    //             p.mode === 'EDIT' ||
+    //             screenMode === 'EDIT'
+    //             ? 'EDIT'
+    //             : p.mode || screenMode || 'ADD';
+
+    //     if (nextMode !== screenMode) {
+    //         setScreenMode(nextMode);
+    //     }
+
+    //     if (nextUid !== Number(screenUid || 0)) {
+    //         setScreenUid(nextUid);
+    //     }
+
+    // }, [params]);
+    // useEffect(() => {
+    //     const p = params || {};
+
+    //     // Handle temp party replacement
+    //     if (p.replaceTempPartyDone === true) {
+    //         setScreenMode(p.screenMode || p.mode || 'EDIT');
+    //         setScreenUid(Number(p.uid || screenUid || uid || 0));
+    //         router.setParams({ replaceTempPartyDone: undefined });
+    //         return;
+    //     }
+
+    //     // Normal flow: Update mode and UID
+    //     const nextUid = Number(
+    //         p.uid ||
+    //         p.completedRow?.UId ||
+    //         p.completedRows?.[0]?.UId ||
+    //         screenUid ||
+    //         0
+    //     );
+
+    //     const nextMode =
+    //         nextUid > 0 ||
+    //             p.mode === 'EDIT' ||
+    //             screenMode === 'EDIT'
+    //             ? 'EDIT'
+    //             : p.mode || screenMode || 'ADD';
+
+    //     if (nextMode !== screenMode) setScreenMode(nextMode);
+    //     if (nextUid !== Number(screenUid || 0)) setScreenUid(nextUid);
+    // }, [params]);
     useEffect(() => {
         const p = params || {};
 
-        // =========================================
-        // TEMP PARTY REPLACEMENT
-        // DO NOT CHANGE MODE TO ADD
-        // =========================================
-
+        // Handle temp party replacement
         if (p.replaceTempPartyDone === true) {
-
-            setScreenMode(
-                p.screenMode || p.mode || 'EDIT'
-            );
-
-            setScreenUid(
-                Number(
-                    p.uid ||
-                    screenUid ||
-                    uid ||
-                    0
-                )
-            );
-
-            // navigation.setParams({
-            //     replaceTempPartyDone: undefined,
-            // });
-            router.setParams({
-                replaceTempPartyDone: undefined,
-            });
-
+            setScreenMode(p.screenMode || p.mode || 'EDIT');
+            setScreenUid(Number(p.uid || screenUid || uid || 0));
+            router.setParams({ replaceTempPartyDone: undefined });
             return;
         }
 
-        // =========================================
-        // NORMAL FLOW
-        // =========================================
-
+        // Normal flow: Update mode and UID
         const nextUid = Number(
             p.uid ||
             p.completedRow?.UId ||
@@ -377,14 +471,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 ? 'EDIT'
                 : p.mode || screenMode || 'ADD';
 
-        if (nextMode !== screenMode) {
-            setScreenMode(nextMode);
-        }
-
-        if (nextUid !== Number(screenUid || 0)) {
-            setScreenUid(nextUid);
-        }
-
+        if (nextMode !== screenMode) setScreenMode(nextMode);
+        if (nextUid !== Number(screenUid || 0)) setScreenUid(nextUid);
     }, [params]);
 
     const toNumber = value => {
@@ -392,108 +480,199 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         return isNaN(n) ? 0 : n;
     };
 
+    // useFocusEffect(
+    //     useCallback(() => {
+    //         const p = params || {};
+
+
+    //         // 👇 parse first
+    //         let incomingRows = null;
+    //         try {
+    //             incomingRows = p.completedRows ? JSON.parse(p.completedRows) : null;
+    //         } catch {
+    //             incomingRows = Array.isArray(p.completedRows) ? p.completedRows : null;
+    //         }
+
+    //         if (!Array.isArray(incomingRows)) return;
+
+    //         setRows(prev => {
+    //             let next = [...prev];
+
+    //             // ==================================================
+    //             // EDIT MODE
+    //             // ==================================================
+    //             // During edit we receive FULL updated rows
+    //             // so replace everything safely
+    //             // ==================================================
+
+    //             if (p.editMode) {
+    //                 next = reSrNo(
+    //                     incomingRows.map(row => ({
+    //                         ...row,
+    //                         LineId: row.LineId || createLineId(),
+    //                     })),
+    //                 );
+    //             } else {
+
+    //                 // ==================================================
+    //                 // ADD MODE
+    //                 // ==================================================
+    //                 // During add we receive ONLY new rows
+    //                 // so append/merge with old rows
+    //                 // ==================================================
+
+    //                 // else {
+    //                 incomingRows.forEach(rawRow => {
+    //                     // (p.completedRows || []).forEach(rawRow => {
+    //                     const newRow = {
+    //                         ...rawRow,
+    //                         LineId: rawRow.LineId || createLineId(),
+    //                     };
+
+    //                     // prevent duplicate same LineId
+    //                     const lineExists = next.findIndex(
+    //                         x => String(x.LineId) === String(newRow.LineId),
+    //                     );
+
+    //                     if (lineExists >= 0) {
+    //                         next[lineExists] = {
+    //                             ...newRow,
+    //                         };
+
+    //                         return;
+    //                     }
+
+    //                     // merge same item/design/shade
+    //                     const existsIndex = next.findIndex(
+    //                         oldRow =>
+    //                             makeRowKey(oldRow) === makeRowKey(newRow),
+    //                     );
+
+    //                     if (existsIndex >= 0) {
+    //                         const newQty =
+    //                             num(next[existsIndex].Qty) +
+    //                             num(newRow.Qty);
+
+    //                         const newPcs =
+    //                             num(next[existsIndex].Pcs) +
+    //                             num(newRow.Pcs);
+
+    //                         next[existsIndex] = {
+    //                             ...next[existsIndex],
+    //                             Qty: newQty,
+    //                             Pcs: newPcs,
+    //                             Rate: num(newRow.Rate),
+    //                             Amount: newQty * num(newRow.Rate),
+    //                             Remark:
+    //                                 newRow.Remark ||
+    //                                 next[existsIndex].Remark ||
+    //                                 '',
+    //                             // IsDyeing: newRow.isDyeing ||
+    //                             //     next[existsIndex].isDyeing ||
+    //                             //     ''
+    //                         };
+    //                     } else {
+    //                         next.push(newRow);
+    //                     }
+    //                 });
+    //                 next = reSrNo(next);
+    //             }
+
+    //             return next;
+    //         });
+
+    //         // navigation.setParams({
+    //         //     completedRows: undefined,
+    //         //     completedRow: undefined,
+    //         //     editMode: undefined,
+    //         //     editIndex: undefined,
+    //         //     editLineId: undefined,
+    //         //     oldRow: undefined,
+    //         //     originalKey: undefined,
+    //         //     replaceItemOnlyDone: undefined,
+    //         // });
+    //         router.setParams({
+    //             completedRows: undefined,
+    //             completedRow: undefined,
+    //             editMode: undefined,
+    //             editIndex: undefined,
+    //             editLineId: undefined,
+    //             oldRow: undefined,
+    //             originalKey: undefined,
+    //             replaceItemOnlyDone: undefined,
+    //         });
+    //     }, [router?.query, router]),
+    // );
     useFocusEffect(
         useCallback(() => {
             const p = params || {};
 
-            if (!Array.isArray(p.completedRows)) return;
+            // Parse incoming rows
+            let incomingRows = null;
+            try {
+                incomingRows = p.completedRows ? JSON.parse(p.completedRows) : null;
+            } catch {
+                incomingRows = Array.isArray(p.completedRows) ? p.completedRows : null;
+            }
+
+            if (!Array.isArray(incomingRows)) return;
 
             setRows(prev => {
                 let next = [...prev];
-
-                // ==================================================
-                // EDIT MODE
-                // ==================================================
-                // During edit we receive FULL updated rows
-                // so replace everything safely
-                // ==================================================
-
-                if (p.editMode) {
+                const isEditMode = p.editMode === true || p.editMode === 'true';
+                if (isEditMode) {
+                    // EDIT MODE: Replace all rows
                     next = reSrNo(
-                        (p.completedRows || []).map(row => ({
+                        incomingRows.map(row => ({
                             ...row,
                             LineId: row.LineId || createLineId(),
                         })),
                     );
-                }
-
-                // ==================================================
-                // ADD MODE
-                // ==================================================
-                // During add we receive ONLY new rows
-                // so append/merge with old rows
-                // ==================================================
-
-                else {
-                    (p.completedRows || []).forEach(rawRow => {
+                } else {
+                    // ADD MODE: Append/merge new rows
+                    incomingRows.forEach(rawRow => {
                         const newRow = {
                             ...rawRow,
                             LineId: rawRow.LineId || createLineId(),
                         };
 
-                        // prevent duplicate same LineId
+                        // Prevent duplicate LineId
                         const lineExists = next.findIndex(
                             x => String(x.LineId) === String(newRow.LineId),
                         );
 
                         if (lineExists >= 0) {
-                            next[lineExists] = {
-                                ...newRow,
-                            };
-
+                            next[lineExists] = { ...newRow };
                             return;
                         }
 
-                        // merge same item/design/shade
+                        // Merge same item/grade/shade
                         const existsIndex = next.findIndex(
-                            oldRow =>
-                                makeRowKey(oldRow) === makeRowKey(newRow),
+                            oldRow => makeRowKey(oldRow) === makeRowKey(newRow),
                         );
 
                         if (existsIndex >= 0) {
-                            const newQty =
-                                num(next[existsIndex].Qty) +
-                                num(newRow.Qty);
-
-                            const newPcs =
-                                num(next[existsIndex].Pcs) +
-                                num(newRow.Pcs);
-
+                            const newQty = num(next[existsIndex].Qty) + num(newRow.Qty);
+                            const newPcs = num(next[existsIndex].Pcs) + num(newRow.Pcs);
                             next[existsIndex] = {
                                 ...next[existsIndex],
                                 Qty: newQty,
                                 Pcs: newPcs,
                                 Rate: num(newRow.Rate),
                                 Amount: newQty * num(newRow.Rate),
-                                Remark:
-                                    newRow.Remark ||
-                                    next[existsIndex].Remark ||
-                                    '',
-                                // IsDyeing: newRow.isDyeing ||
-                                //     next[existsIndex].isDyeing ||
-                                //     ''
+                                Remark: newRow.Remark || next[existsIndex].Remark || '',
                             };
                         } else {
                             next.push(newRow);
                         }
                     });
-
                     next = reSrNo(next);
                 }
 
                 return next;
             });
 
-            // navigation.setParams({
-            //     completedRows: undefined,
-            //     completedRow: undefined,
-            //     editMode: undefined,
-            //     editIndex: undefined,
-            //     editLineId: undefined,
-            //     oldRow: undefined,
-            //     originalKey: undefined,
-            //     replaceItemOnlyDone: undefined,
-            // });
+            // Clear params after processing
             router.setParams({
                 completedRows: undefined,
                 completedRow: undefined,
@@ -501,8 +680,6 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 editIndex: undefined,
                 editLineId: undefined,
                 oldRow: undefined,
-                originalKey: undefined,
-                replaceItemOnlyDone: undefined,
             });
         }, [router?.query, router]),
     );
@@ -548,6 +725,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     const fmt = (value, dec = 2) => num(value).toFixed(dec);
 
     const addItem = () => {
+        // const stableUid = Number(uid || params?.uid || rawMain?.UId || 0);
+        // const stableMode = stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
         const stableUid = Number(uid || params?.uid || rawMain?.UId || 0);
         const stableMode = stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
 
@@ -582,11 +761,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 editIndex: null,
                 editLineId: null,
                 oldRow: null,
-                workingRows: rows,
+                // workingRows: rows,
+                workingRows: JSON.stringify(rows),
 
-                party: currentParty,
-                partyData: currentParty,
-                selectedParty: currentParty,
+                party: JSON.stringify(currentParty),
+                partyData: JSON.stringify(currentParty),
+                selectedParty: JSON.stringify(currentParty),
 
                 prpcode: prpcode,
                 strcode: strcode,
@@ -620,27 +800,47 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         //     yearno,
         //     token,
         // });
+        // router.push({
+        //     pathname: '/SalesOrderItemList',
+        //     params: {
+        //         mode: stableMode,
+        //         uid: stableUid,
+        //         soNo: soNo,
+        //         soDate: soDate,
+        //         editMode: true,
+        //         editIndex: rows.findIndex(x => x.LineId === row.LineId),
+        //         editLineId: row.LineId,
+        //         oldRow: row,
+        //         workingRows: rows,
+
+        //         party: currentParty,
+        //         partyData: currentParty,
+        //         selectedParty: currentParty,
+
+        //         prpcode: prpcode,
+        //         strcode: strcode,
+        //         yearno: yearno,
+        //         token: token,
+        //     }
+        // });
         router.push({
             pathname: '/SalesOrderItemList',
             params: {
                 mode: stableMode,
                 uid: stableUid,
-                soNo: soNo,
-                soDate: soDate,
+                soNo,
+                soDate,
                 editMode: true,
                 editIndex: rows.findIndex(x => x.LineId === row.LineId),
                 editLineId: row.LineId,
-                oldRow: row,
-                workingRows: rows,
+                oldRow: JSON.stringify(row),
+                workingRows: JSON.stringify(rows),        // 👈 add this
+                isCustomItemEdit: true,
+                party: JSON.stringify(currentParty),      // 👈 add this
+                partyData: JSON.stringify(currentParty),
+                selectedParty: JSON.stringify(currentParty),
 
-                party: currentParty,
-                partyData: currentParty,
-                selectedParty: currentParty,
-
-                prpcode: prpcode,
-                strcode: strcode,
-                yearno: yearno,
-                token: token,
+                prpcode, strcode, yearno, token,
             }
         });
     };
@@ -670,85 +870,190 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         //     yearno,
         //     token,
         // });
+        // router.push({
+        //     pathname: '/SalesOrderItemList',
+        //     params: {
+        //         mode: stableMode,
+        //         uid: stableUid,
+        //         soNo: soNo,
+        //         soDate: soDate,
+        //         editMode: true,
+        //         editIndex: rows.findIndex(x => x.LineId === row.LineId),
+        //         editLineId: row.LineId,
+        //         oldRow: JSON.stringify(row),
+        //         workingRows: rows,
+        //         isCustomItemEdit: true,
+        //         party: currentParty,
+        //         partyData: currentParty,
+        //         selectedParty: currentParty,
+
+        //         prpcode: prpcode,
+        //         strcode: strcode,
+        //         yearno: yearno,
+        //         token: token,
+        //     }
+        // });
         router.push({
             pathname: '/SalesOrderItemList',
             params: {
                 mode: stableMode,
                 uid: stableUid,
-                soNo: soNo,
-                soDate: soDate,
+                soNo,
+                soDate,
                 editMode: true,
                 editIndex: rows.findIndex(x => x.LineId === row.LineId),
                 editLineId: row.LineId,
-                oldRow: row,
-                workingRows: rows,
+                oldRow: JSON.stringify(row),
+                workingRows: JSON.stringify(rows),        // 👈 add this
                 isCustomItemEdit: true,
-                party: currentParty,
-                partyData: currentParty,
-                selectedParty: currentParty,
+                party: JSON.stringify(currentParty),      // 👈 add this
+                partyData: JSON.stringify(currentParty),
+                selectedParty: JSON.stringify(currentParty),
 
-                prpcode: prpcode,
-                strcode: strcode,
-                yearno: yearno,
-                token: token,
+                prpcode, strcode, yearno, token,
             }
         });
     };
 
+    // const handleEditgrade = row => {
+
+    //     const stableUid = Number(
+    //         uid || row?.UId || router?.query?.uid || rawMain?.UId || 0
+    //     );
+
+    //     const stableMode =
+    //         stableUid > 0 || mode === 'EDIT'
+    //             ? 'EDIT'
+    //             : 'ADD';
+
+    //     // const isCustomItem = row?.ItmCode == '-1';
+
+    //     // navigation.navigate('SalesOrderGradeList', {
+    //     //     mode: stableMode,
+    //     //     uid: stableUid,
+    //     //     soNo,
+    //     //     soDate,
+
+    //     //     editMode: true,
+
+    //     //     editIndex: rows.findIndex(
+    //     //         x => x.LineId === row.LineId
+    //     //     ),
+
+    //     //     editLineId: row.LineId,
+
+    //     //     oldRow: row,
+
+    //     //     // =========================
+    //     //     // IMPORTANT
+    //     //     // =========================
+    //     //     selectedItem: {
+    //     //         ItmCode: row.ItmCode,
+    //     //         ItmName: row.ItmName,
+    //     //         MItmCode: row.MItmCode || row.ItmCode,
+    //     //         UOM: row.UOM || '',
+    //     //         Denier: row.Denier || '',
+    //     //         HsnCode: row.HsnCode || '',
+    //     //         Raw: row,
+    //     //     },
+
+    //     //     workingRows: rows,
+
+    //     //     isCustomGradeEdit: true,
+
+    //     //     party: currentParty,
+    //     //     partyData: currentParty,
+    //     //     selectedParty: currentParty,
+
+    //     //     prpcode,
+    //     //     strcode,
+    //     //     yearno,
+    //     //     token,
+    //     // });
+
+    //     // router.push({
+    //     //     pathname: '/SalesOrderGradeList',
+    //     //     params: {
+    //     //         mode: stableMode,
+    //     //         uid: stableUid,
+    //     //         soNo: soNo,
+    //     //         soDate: soDate,
+
+    //     //         editMode: true,
+
+    //     //         editIndex: rows.findIndex(
+    //     //             x => x.LineId === row.LineId
+    //     //         ),
+
+    //     //         editLineId: row.LineId,
+
+    //     //         oldRow: row,
+
+    //     //         // =========================
+    //     //         // IMPORTANT
+    //     //         // =========================
+    //     //         selectedItem: {
+    //     //             ItmCode: row.ItmCode,
+    //     //             ItmName: row.ItmName,
+    //     //             MItmCode: row.MItmCode || row.ItmCode,
+    //     //             UOM: row.UOM || '',
+    //     //             Denier: row.Denier || '',
+    //     //             HsnCode: row.HsnCode || '',
+    //     //             Raw: row,
+    //     //         },
+
+    //     //         workingRows: rows,
+
+    //     //         isCustomGradeEdit: true,
+
+    //     //         party: currentParty,
+    //     //         partyData: currentParty,
+    //     //         selectedParty: currentParty,
+
+    //     //         prpcode: prpcode,
+    //     //         strcode: strcode,
+    //     //         yearno: yearno,
+    //     //         token: token,
+    //     //     }
+    //     // });
+    //     router.push({
+    //         pathname: '/SalesOrderGradeList',
+    //         params: {
+    //             mode: mode,
+    //             uid: uid,
+    //             soNo: soNo,
+    //             soDate: soDate,
+    //             editMode: editMode,
+    //             editIndex: editIndex,
+    //             editLineId: editLineId,
+    //             oldRow: JSON.stringify(parsedOldRow),          // 👈 stringify
+    //             selectedItem: JSON.stringify({
+    //                 ItmCode: item.ItmCode,
+    //                 ItmName: item.ItmName,
+    //                 MItmCode: item.MItmCode || item.ItmCode,
+    //                 UOM: item.UOM || '',
+    //                 Denier: item.Denier,
+    //                 HsnCode: item.HsnCode,
+    //                 Raw: item,
+    //             }),                                             // 👈 stringify
+    //             workingRows: JSON.stringify(parsedWorkingRows), // 👈 stringify (use parsed version)
+    //             party: JSON.stringify(finalParty),              // 👈 stringify
+    //             partyData: JSON.stringify(finalParty),
+    //             selectedParty: JSON.stringify(finalParty),
+    //             prpcode: prpcode,
+    //             strcode: strcode,
+    //             yearno: yearno,
+    //             token: token,
+    //         }
+    //     });
+    // };
     const handleEditgrade = row => {
         const stableUid = Number(
             uid || row?.UId || router?.query?.uid || rawMain?.UId || 0
         );
 
         const stableMode =
-            stableUid > 0 || mode === 'EDIT'
-                ? 'EDIT'
-                : 'ADD';
-
-        // const isCustomItem = row?.ItmCode == '-1';
-
-        // navigation.navigate('SalesOrderGradeList', {
-        //     mode: stableMode,
-        //     uid: stableUid,
-        //     soNo,
-        //     soDate,
-
-        //     editMode: true,
-
-        //     editIndex: rows.findIndex(
-        //         x => x.LineId === row.LineId
-        //     ),
-
-        //     editLineId: row.LineId,
-
-        //     oldRow: row,
-
-        //     // =========================
-        //     // IMPORTANT
-        //     // =========================
-        //     selectedItem: {
-        //         ItmCode: row.ItmCode,
-        //         ItmName: row.ItmName,
-        //         MItmCode: row.MItmCode || row.ItmCode,
-        //         UOM: row.UOM || '',
-        //         Denier: row.Denier || '',
-        //         HsnCode: row.HsnCode || '',
-        //         Raw: row,
-        //     },
-
-        //     workingRows: rows,
-
-        //     isCustomGradeEdit: true,
-
-        //     party: currentParty,
-        //     partyData: currentParty,
-        //     selectedParty: currentParty,
-
-        //     prpcode,
-        //     strcode,
-        //     yearno,
-        //     token,
-        // });
+            stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
 
         router.push({
             pathname: '/SalesOrderGradeList',
@@ -759,19 +1064,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 soDate: soDate,
 
                 editMode: true,
-
-                editIndex: rows.findIndex(
-                    x => x.LineId === row.LineId
-                ),
-
+                editIndex: rows.findIndex(x => x.LineId === row.LineId),
                 editLineId: row.LineId,
 
-                oldRow: row,
-
-                // =========================
-                // IMPORTANT
-                // =========================
-                selectedItem: {
+                oldRow: JSON.stringify(row),                    // 👈 row use karo
+                selectedItem: JSON.stringify({
                     ItmCode: row.ItmCode,
                     ItmName: row.ItmName,
                     MItmCode: row.MItmCode || row.ItmCode,
@@ -779,15 +1076,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     Denier: row.Denier || '',
                     HsnCode: row.HsnCode || '',
                     Raw: row,
-                },
-
-                workingRows: rows,
-
+                }),
+                workingRows: JSON.stringify(rows),              // 👈 rows use karo
                 isCustomGradeEdit: true,
-
-                party: currentParty,
-                partyData: currentParty,
-                selectedParty: currentParty,
+                party: JSON.stringify(currentParty),            // 👈 currentParty use karo
+                partyData: JSON.stringify(currentParty),
+                selectedParty: JSON.stringify(currentParty),
 
                 prpcode: prpcode,
                 strcode: strcode,
@@ -796,6 +1090,119 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             }
         });
     };
+    // const handleEditShade = row => {
+    //     const stableUid = Number(
+    //         uid || row?.UId || router?.query?.uid || rawMain?.UId || 0
+    //     );
+
+    //     const stableMode =
+    //         stableUid > 0 || mode === 'EDIT'
+    //             ? 'EDIT'
+    //             : 'ADD';
+
+    //     // const isCustomItem = row?.ItmCode == '-1';
+
+    //     // navigation.navigate('SalesOrderShadeList', {
+    //     //     mode: stableMode,
+    //     //     uid: stableUid,
+    //     //     soNo,
+    //     //     soDate,
+
+    //     //     editMode: true,
+
+    //     //     editIndex: rows.findIndex(
+    //     //         x => x.LineId === row.LineId
+    //     //     ),
+
+    //     //     editLineId: row.LineId,
+
+    //     //     oldRow: row,
+
+    //     //     // =================================
+    //     //     // IMPORTANT
+    //     //     // =================================
+    //     //     selectedItem: {
+    //     //         ItmCode: row.ItmCode,
+    //     //         ItmName: row.ItmName,
+    //     //         MItmCode: row.MItmCode || row.ItmCode,
+    //     //         UOM: row.UOM || '',
+    //     //         Denier: row.Denier || '',
+    //     //         HsnCode: row.HsnCode || '',
+    //     //         Raw: row,
+    //     //     },
+
+    //     //     selectedGrade: {
+    //     //         GrdCode: row.GrdCode,
+    //     //         GrdName: row.GrdName,
+    //     //         Raw: row,
+    //     //     },
+
+    //     //     workingRows: rows,
+
+    //     //     isCustomShadeEdit: true,
+
+    //     //     party: currentParty,
+    //     //     partyData: currentParty,
+    //     //     selectedParty: currentParty,
+
+    //     //     prpcode,
+    //     //     strcode,
+    //     //     yearno,
+    //     //     token,
+    //     // });
+
+    //     router.push({
+    //         pathname: '/SalesOrderShadeList',
+    //         params: {
+    //             mode: stableMode,
+    //             uid: stableUid,
+    //             soNo: soNo,
+    //             soDate: soDate,
+
+    //             editMode: true,
+
+    //             editIndex: rows.findIndex(
+    //                 x => x.LineId === row.LineId
+    //             ),
+
+    //             editLineId: row.LineId,
+
+    //             oldRow: row,
+
+    //             // =================================
+    //             // IMPORTANT
+    //             // =================================
+    //             selectedItem: {
+    //                 ItmCode: row.ItmCode,
+    //                 ItmName: row.ItmName,
+    //                 MItmCode: row.MItmCode || row.ItmCode,
+    //                 UOM: row.UOM || '',
+    //                 Denier: row.Denier || '',
+    //                 HsnCode: row.HsnCode || '',
+    //                 Raw: row,
+    //             },
+
+    //             selectedGrade: {
+    //                 GrdCode: row.GrdCode,
+    //                 GrdName: row.GrdName,
+    //                 Raw: row,
+    //             },
+
+    //             workingRows: rows,
+
+    //             isCustomShadeEdit: true,
+
+    //             party: currentParty,
+    //             partyData: currentParty,
+    //             selectedParty: currentParty,
+
+    //             prpcode: prpcode,
+    //             strcode: strcode,
+    //             yearno: yearno,
+    //             token: token,
+    //         }
+    //     });
+    // };
 
     const handleEditShade = row => {
         const stableUid = Number(
@@ -803,60 +1210,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         );
 
         const stableMode =
-            stableUid > 0 || mode === 'EDIT'
-                ? 'EDIT'
-                : 'ADD';
-
-        // const isCustomItem = row?.ItmCode == '-1';
-
-        // navigation.navigate('SalesOrderShadeList', {
-        //     mode: stableMode,
-        //     uid: stableUid,
-        //     soNo,
-        //     soDate,
-
-        //     editMode: true,
-
-        //     editIndex: rows.findIndex(
-        //         x => x.LineId === row.LineId
-        //     ),
-
-        //     editLineId: row.LineId,
-
-        //     oldRow: row,
-
-        //     // =================================
-        //     // IMPORTANT
-        //     // =================================
-        //     selectedItem: {
-        //         ItmCode: row.ItmCode,
-        //         ItmName: row.ItmName,
-        //         MItmCode: row.MItmCode || row.ItmCode,
-        //         UOM: row.UOM || '',
-        //         Denier: row.Denier || '',
-        //         HsnCode: row.HsnCode || '',
-        //         Raw: row,
-        //     },
-
-        //     selectedGrade: {
-        //         GrdCode: row.GrdCode,
-        //         GrdName: row.GrdName,
-        //         Raw: row,
-        //     },
-
-        //     workingRows: rows,
-
-        //     isCustomShadeEdit: true,
-
-        //     party: currentParty,
-        //     partyData: currentParty,
-        //     selectedParty: currentParty,
-
-        //     prpcode,
-        //     strcode,
-        //     yearno,
-        //     token,
-        // });
+            stableUid > 0 || mode === 'EDIT' ? 'EDIT' : 'ADD';
 
         router.push({
             pathname: '/SalesOrderShadeList',
@@ -867,19 +1221,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 soDate: soDate,
 
                 editMode: true,
-
-                editIndex: rows.findIndex(
-                    x => x.LineId === row.LineId
-                ),
-
+                editIndex: rows.findIndex(x => x.LineId === row.LineId),
                 editLineId: row.LineId,
 
-                oldRow: row,
+                oldRow: JSON.stringify(row),                    // 👈 stringify
 
-                // =================================
-                // IMPORTANT
-                // =================================
-                selectedItem: {
+                selectedItem: JSON.stringify({                  // 👈 stringify
                     ItmCode: row.ItmCode,
                     ItmName: row.ItmName,
                     MItmCode: row.MItmCode || row.ItmCode,
@@ -887,21 +1234,21 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     Denier: row.Denier || '',
                     HsnCode: row.HsnCode || '',
                     Raw: row,
-                },
+                }),
 
-                selectedGrade: {
+                selectedGrade: JSON.stringify({                 // 👈 stringify
                     GrdCode: row.GrdCode,
                     GrdName: row.GrdName,
                     Raw: row,
-                },
+                }),
 
-                workingRows: rows,
+                workingRows: JSON.stringify(rows),              // 👈 stringify
 
                 isCustomShadeEdit: true,
 
-                party: currentParty,
-                partyData: currentParty,
-                selectedParty: currentParty,
+                party: JSON.stringify(currentParty),            // 👈 stringify
+                partyData: JSON.stringify(currentParty),
+                selectedParty: JSON.stringify(currentParty),
 
                 prpcode: prpcode,
                 strcode: strcode,
@@ -910,7 +1257,6 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             }
         });
     };
-
     const removeRow = row => {
         Alert.alert('Delete Row', 'Are you sure you want to delete this shade?', [
             { text: 'Cancel', style: 'cancel' },
@@ -1121,9 +1467,9 @@ const OrderSummaryScreen = ({ navigation, route }) => {
             //     selectedParty: loadedParty,
             // });
             router.setParams({
-                party: loadedParty,
-                partyData: loadedParty,
-                selectedParty: loadedParty,
+                party: JSON.stringify(loadedParty),
+                partyData: JSON.stringify(loadedParty),
+                selectedParty: JSON.stringify(loadedParty),
             });
         } catch (error) {
             console.log('LOAD SO ERROR =>', error?.response?.data || error);
@@ -1941,6 +2287,8 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     if (loadingOrder) {
         return <OrderSummarySkeleton />;
     }
+
+    console.log('prpcode', prpcode, 'yearno', yearno, 'soNo', soNo, 'uid', uid);
 
     return (
         <SafeAreaView style={styles.safe}>

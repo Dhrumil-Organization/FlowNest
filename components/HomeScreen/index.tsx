@@ -299,7 +299,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         if (prp) {
             const loadApps = async () => {
                 try {
-                    const data = await AsyncStorage.getItem('user_menu_apps'); 
+                    const data = await AsyncStorage.getItem('user_menu_apps');
                     if (!data) return;
                     const decoded = atob(data);
                     const parsed = JSON.parse(decoded);

@@ -1,5 +1,7 @@
 import { initDatabase } from '@/common/API/DatabaseManager';
 import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
+import { setCustomUsername } from '@/common/utils/feedbackStorage';
+import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 import {
     fetchAndCacheGlobalData,
     getCachedGlobalData,
@@ -22,11 +24,9 @@ import {
     Text, TextInput, TouchableOpacity,
     View
 } from 'react-native';
+import main from '../../assets/images/main.png';
 import { API, initAPI } from '../../common/API/dynamicAPI';
 import { theme } from '../../components/theme';
-import main from '../../assets/images/main.png';
-import { setCustomUsername } from '@/common/utils/feedbackStorage';
-import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 // import { getStoredToken } from '../../hooks/NotificationService';
 
 export default function LoginScreen() {
@@ -390,15 +390,15 @@ export default function LoginScreen() {
                     </Text>
                 </View>
 
-                <Text style={styles.tagline}>
+                {/* <Text style={styles.tagline}>
                     Smart Business Operations Platform
-                </Text>
+                </Text> */}
 
-                <Text style={styles.desc}>
+                {/* <Text style={styles.desc}>
                     Manage production, receivables,
                     collections, sales analysis and
                     operational workflows from anywhere.
-                </Text>
+                </Text> */}
 
             </View>
 

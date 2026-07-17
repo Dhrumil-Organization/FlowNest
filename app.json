@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "12",
+      "buildNumber": "13",
       "jsEngine": "jsc",
       "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 21,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/log_white.png",
@@ -39,7 +39,8 @@
         "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
-      "package": "com.dhrumil.FlowNest"
+      "package": "com.anonymous.FlowNest",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

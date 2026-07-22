@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 21,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/log_white.png",
@@ -39,7 +39,8 @@
         "CAMERA"
       ],
       "predictiveBackGestureEnabled": false,
-      "package": "com.dhrumil.FlowNest"
+      "package": "com.anonymous.FlowNest",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

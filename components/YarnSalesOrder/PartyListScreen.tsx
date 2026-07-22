@@ -1,23 +1,22 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
+    ActivityIndicator,
     FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
     TextInput,
     TouchableOpacity,
-    ActivityIndicator,
-    RefreshControl,
-    Alert
+    View
 } from 'react-native';
-import axios from 'axios';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from "../../common/API/dynamicAPI";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSalesOrder } from './SalesOrderContext';
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-const PartyListScreen = ({ navigation, route, token }) => {
+const PartyListScreen = ({ token }) => {
     // const { prpcode, yearno, strcode,token } = route.params || {};
     const router = useRouter();
     const params = useLocalSearchParams();
@@ -32,7 +31,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
     const { salesOrderParams, startNewOrder } = useSalesOrder();
     let cancelToken: any;
 
-    const getRequestConfig = (props: any) => ({
+    const getRequestConfig = (props: any, token: string) => ({
         headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -40,7 +39,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
             'x-platform': 'mob'
         },
         params: props.params,
-        cancelToken: cancelToken?.token,
+        // cancelToken: cancelToken?.token,
     });
 
     console.log("prpcode, yearno, strcode", prpcode, yearno, strcode);
@@ -106,7 +105,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
 
             const response = await axios.get(
                 `${API}/api/accountbasic`,
-                getRequestConfig({ params: { ...payload } }),
+                getRequestConfig({ params: { ...payload } }, token),
             );
             console.log("party type Response:", response);
 
@@ -144,7 +143,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
 
             const response = await axios.get(
                 `${API}/api/get_criterion`,
-                getRequestConfig({ params: { ...payload } }),
+                getRequestConfig({ params: { ...payload } }, token),
             );
             console.log("Exe type Response:", response);
 
@@ -166,24 +165,28 @@ const PartyListScreen = ({ navigation, route, token }) => {
     };
 
     useEffect(() => {
+        if (!token) return
         loadParties('');
         loadExecutive();
-    }, []);
+    }, [token]);
 
     useEffect(() => {
+        if (!token) return
         const delay = setTimeout(() => {
             loadParties(search);
         }, 400);
 
         return () => clearTimeout(delay);
-    }, [search]);
+    }, [search, token]);
 
     const onRefresh = useCallback(() => {
+        if (!token) return
         setRefreshing(true);
         loadParties(search);
-    }, [search]);
+    }, [search, token]);
 
     const selectParty = party => {
+        console.log("Selected Party:", party);
 
         const executiveData = exename.find(
             item => String(item.Code) === String(party.sexe)
@@ -204,74 +207,67 @@ const PartyListScreen = ({ navigation, route, token }) => {
             DCnty: party.Cnty || '',
             DZip: party.Zip || '',
         };
-
+        console.log("Selected Party data:", selectedPartyData, JSON.stringify(selectedPartyData));
         if (params?.replaceTempPartyOnly === true) {
-            // navigation.navigate({
-            //     name: 'OrderSummaryScreen',
-            //     params: {
-            //         selectedTempParty: selectedPartyData,
-            //         preservedRows: params?.workingRows || [],
-
-            //         mode: params?.mode || 'EDIT',
-            //         uid: params?.uid || 0,
-            //         screenMode: params?.screenMode || 'EDIT',
-
-            //         soNo: params?.soNo || '',
-            //         soDate: params?.soDate || '',
-
-            //         prpcode: params?.prpcode || '',
-            //         strcode: params?.strcode || '002',
-            //         yearno: params?.yearno || '',
-            //         token: params?.token || '',
-
-            //         skipReload: true,
-            //         replaceTempPartyDone: true,
-            //     },
-            //     merge: true,
-            // });
+            console.log("Replace Temp Party Only");
             router.push({
                 pathname: '/OrderSummaryScreen',
                 params: {
-                    selectedTempParty: selectedPartyData,
-                    preservedRows: params?.workingRows || [],
-
+                    selectedTempParty: JSON.stringify(selectedPartyData), // Stringify the party data
+                    preservedRows: JSON.stringify(params?.workingRows || []), // Stringify workingRows
                     mode: params?.mode || 'EDIT',
                     uid: params?.uid || 0,
                     screenMode: params?.screenMode || 'EDIT',
-
                     soNo: params?.soNo || '',
                     soDate: params?.soDate || '',
-
                     prpcode: params?.prpcode || '',
                     strcode: params?.strcode || '002',
                     yearno: params?.yearno || '',
                     token: params?.token || '',
-
                     skipReload: true,
                     replaceTempPartyDone: true,
-                    merge: true,
                 },
             });
-
             return;
         }
+        console.log('dd prpcode', prpcode, 'yearno', yearno, 'strcode', strcode);
 
+        // For new party selection (non-replacement)
         const params123 = {
             mode: 'ADD',
             uid: 0,
-            prpcode: params?.prpcode || salesOrderParams?.prpcode || '',
-            strcode: params?.strcode || salesOrderParams?.strcode || '002',
-            yearno: params?.yearno || salesOrderParams?.yearno || '',
-            token: params?.token || salesOrderParams?.token || token,
-            partyData: selectedPartyData,
+            prpcode: prpcode || salesOrderParams?.prpcode || '',
+            strcode: strcode || salesOrderParams?.strcode || '002',
+            yearno: yearno || salesOrderParams?.yearno || '',
+            token: token || salesOrderParams?.token,
+            party: JSON.stringify(selectedPartyData), // Stringify the party data
+            partyData: JSON.stringify(selectedPartyData),
+            selectedParty: JSON.stringify(selectedPartyData),
+            selectedTempParty: JSON.stringify(selectedPartyData),
+            // party: selectedPartyData, // Stringify the party daa
+            // partyData: selectedPartyData,
+            // selectedParty: selectedPartyData,
         };
 
         startNewOrder(params123);
         // navigation.navigate('OrderSummaryScreen', params);
+        console.log("Navigating to OrderSummaryScreen with params:", params123);
         router.push({
             pathname: '/OrderSummaryScreen',
             params: {
-                params: params
+                params: params123,
+                selectedTempParty: JSON.stringify(selectedPartyData),
+                // 
+                mode: 'ADD',
+                uid: 0,
+                prpcode: prpcode || salesOrderParams?.prpcode || '',
+                strcode: strcode || salesOrderParams?.strcode || '002',
+                yearno: yearno || salesOrderParams?.yearno || '',
+                token: token || salesOrderParams?.token,
+                party: JSON.stringify(selectedPartyData), // Stringify the party data
+                partyData: JSON.stringify(selectedPartyData),
+                selectedParty: JSON.stringify(selectedPartyData),
+                // selectedTempParty: JSON.stringify(selectedPartyData),
             }
         });
     };
@@ -403,7 +399,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
                 {/* <TouchableOpacity style={styles.addBtn}>
                     <Text style={styles.addBtnText}>＋ Add New Party</Text>
                 </TouchableOpacity> */}
-                <TouchableOpacity
+                {/* <TouchableOpacity
                     style={styles.addBtn}
                     // onPress={() => navigation.navigate('AddNewPartyScreen')}
                     onPress={() =>
@@ -425,7 +421,7 @@ const PartyListScreen = ({ navigation, route, token }) => {
                     }
                 >
                     <Text style={styles.addBtnText}>＋ Add New Party</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </View>
         </SafeAreaView >
     );

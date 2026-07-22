@@ -3219,6 +3219,17 @@ interface Item {
   designs: Design[];
 }
 
+const blankDesign = (): Design => ({
+  dsn_code: 0,
+  is_new: false,
+  design_requirement: 'Existing',
+  dsn_name: '',
+  dsn_qty: '',
+  unit: '',
+  dsn_rate: '',
+  remark: '',
+});
+
 export default function NewEnquiryScreen({ token, username }) {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -3283,9 +3294,13 @@ export default function NewEnquiryScreen({ token, username }) {
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   // For design selection – which item's design
   const [editingDesignItemIndex, setEditingDesignItemIndex] = useState<number | null>(null);
+  const [editingDesignIndex, setEditingDesignIndex] = useState<number | null>(null);
 
   // Design mode per item (for S) – 'Existing' or 'New'
   const [designModePerItem, setDesignModePerItem] = useState<{ [key: number]: 'Existing' | 'New' }>({});
+
+  // Accordion: whether an item's design list is expanded (only relevant when an item has >1 design)
+  const [expandedDesignItems, setExpandedDesignItems] = useState<{ [key: number]: boolean }>({});
 
   // Sync status
   const [syncStatus, setSyncStatus] = useState({
@@ -3370,6 +3385,71 @@ export default function NewEnquiryScreen({ token, username }) {
   }, [token]);
 
   // Load existing enquiry for editing
+  // useEffect(() => {
+  //   if (id && id) {
+  //     if (!token) return;
+  //     const loadData = async () => {
+  //       setLoading(true);
+  //       try {
+  //         const user_prptype = await AsyncStorage.getItem('user_prptype');
+  //         const result = await syncShowEnquiries(id, token, getCurrentFinancialYear(), user_prptype);
+  //         console.log('API RESULT =>', result);
+  //         setEnquiries(result);
+
+  //         if (result.party_name) setPartyName(result.party_name);
+  //         if (result.address) setAddress(result.address);
+  //         if (result.gst_no) setGstNo(result.gst_no);
+  //         if (result.contact_name) setContactName(result.contact_name);
+  //         if (result.mobile) setMobile(result.mobile);
+  //         if (result.email) setEmail(result.email);
+  //         if (result.front_img) setFronImage(result.front_img);
+  //         if (result.front_img_path) setFrontPath(result.front_img_path);
+  //         if (result.back_img) setBackUri(result.back_img);
+  //         if (result.back_img_path) setBackPath(result.back_img_path);
+  //         if (result.event_code) setEventCode(result.event_code);
+  //         if (result.prptype) setPrpCode(result.prptype);
+  //         if (result.designation) setDesignation(result.designation);
+  //         // Load items from API
+  //         if (result.items && Array.isArray(result.items)) {
+  //           setSelectedItems(result.items);
+  //           // Initialize design modes for S items
+  //           if (getUserPrptype === 'S') {
+  //             const modes = {};
+  //             result.items.forEach((_, idx) => {
+  //               modes[idx] = 'Existing';
+  //               // Ensure each item has at least one design
+  //               if (!result.items[idx].designs || result.items[idx].designs.length === 0) {
+  //                 result.items[idx].designs = [{
+  //                   dsn_code: 0,
+  //                   is_new: false,
+  //                   design_requirement: 'Existing',
+  //                   dsn_name: '',
+  //                   dsn_qty: '',
+  //                   unit: '',
+  //                   dsn_rate: '',
+  //                   remark: '',
+  //                 }];
+  //               }
+  //             });
+  //             setDesignModePerItem(modes);
+  //             setSelectedItems([...result.items]); // force update
+  //           }
+  //         }
+  //         setMode('edit');
+  //       } catch (err) {
+  //         setLoading(false);
+  //         console.log('LOAD ERROR =>', err);
+  //       } finally {
+  //         setLoading(false);
+  //       }
+  //     };
+  //     loadData();
+  //   } else {
+  //     // New enquiry: create default item
+  //     setMode('added');
+  //     initializeDefaultItems();
+  //   }
+  // }, [token, id]);
   useEffect(() => {
     if (id && id) {
       if (!token) return;
@@ -3381,6 +3461,7 @@ export default function NewEnquiryScreen({ token, username }) {
           console.log('API RESULT =>', result);
           setEnquiries(result);
 
+          // Set basic fields
           if (result.party_name) setPartyName(result.party_name);
           if (result.address) setAddress(result.address);
           if (result.gst_no) setGstNo(result.gst_no);
@@ -3394,31 +3475,49 @@ export default function NewEnquiryScreen({ token, username }) {
           if (result.event_code) setEventCode(result.event_code);
           if (result.prptype) setPrpCode(result.prptype);
           if (result.designation) setDesignation(result.designation);
-          // Load items from API
+
+          // Load items and designs
           if (result.items && Array.isArray(result.items)) {
-            setSelectedItems(result.items);
-            // Initialize design modes for S items
-            if (getUserPrptype === 'S') {
-              const modes = {};
-              result.items.forEach((_, idx) => {
-                modes[idx] = 'Existing';
-                // Ensure each item has at least one design
-                if (!result.items[idx].designs || result.items[idx].designs.length === 0) {
-                  result.items[idx].designs = [{
-                    dsn_code: 0,
-                    is_new: false,
-                    design_requirement: 'Existing',
-                    dsn_name: '',
-                    dsn_qty: '',
-                    unit: '',
-                    dsn_rate: '',
-                    remark: '',
-                  }];
-                }
-              });
-              setDesignModePerItem(modes);
-              setSelectedItems([...result.items]); // force update
-            }
+
+            const normalizedItems = result.items.map(item => ({
+              ...item,
+
+              // "0" => false (Existing)
+              // "1" => true  (New)
+              is_new_item:
+                item.is_new_item === 1 ||
+                item.is_new_item === "1" ||
+                item.is_new_item === true,
+
+              designs: (item.designs && item.designs.length > 0)
+                ? item.designs.map(d => ({
+                  ...d,
+                  is_new:
+                    d.is_new === true ||
+                    d.is_new === 1 ||
+                    d.is_new === "1" ||
+                    d.design_requirement === "New",
+                }))
+                : [blankDesign()],
+            }));
+
+            setSelectedItems(normalizedItems);
+            // setSelectedItems(result.items);
+            // if (getUserPrptype === 'S') {
+            // if (getUserPrptype === 'S') {
+            const modes = {};
+            normalizedItems.forEach((item, idx) => {
+              if (!item.designs || item.designs.length === 0) {
+                item.designs = [blankDesign()];
+              }
+              modes[idx] = item.designs.map((d) =>
+                // (d && (d.is_new === true || d.design_requirement === 'New')) ? 'New' : 'Existing'
+                d.is_new ? "New" : "Existing"
+              );
+            });
+            console.log('MODES =>', modes);
+            setDesignModePerItem(modes);
+            // }
           }
           setMode('edit');
         } catch (err) {
@@ -3430,7 +3529,6 @@ export default function NewEnquiryScreen({ token, username }) {
       };
       loadData();
     } else {
-      // New enquiry: create default item
       setMode('added');
       initializeDefaultItems();
     }
@@ -3441,16 +3539,6 @@ export default function NewEnquiryScreen({ token, username }) {
     const isPrptypeS = getUserPrptype === 'S';
     if (isPrptypeS) {
       // For S: one item with one blank design (Existing mode by default)
-      const defaultDesign: Design = {
-        dsn_code: 0,
-        is_new: false,
-        design_requirement: 'Existing',
-        dsn_name: '',
-        dsn_qty: '',
-        unit: '',
-        dsn_rate: '',
-        remark: '',
-      };
       const defaultItem: Item = {
         item_name: '',
         item_code: 0,
@@ -3459,10 +3547,10 @@ export default function NewEnquiryScreen({ token, username }) {
         item_unit: '',
         item_rate: '',
         item_remark: '',
-        designs: [defaultDesign],
+        designs: [blankDesign()],
       };
       setSelectedItems([defaultItem]);
-      setDesignModePerItem({ 0: 'Existing' });
+      setDesignModePerItem({ 0: ['Existing'] });
     } else {
       // For non-S: one item with no designs, default Existing
       const defaultItem: Item = {
@@ -3512,14 +3600,11 @@ export default function NewEnquiryScreen({ token, username }) {
         }
       }
       // Offline, or API call failed/returned nothing usable -> use cache
-      const eventsString = await AsyncStorage.getItem('cached_events');
-      if (eventsString) {
-        const events = JSON.parse(eventsString);
-        if (events && events.length > 0) {
-          setEVENTS(events);
-          setEventCode(events[0].EventId);
-          console.log('Loaded events from cache', events);
-        }
+      const events = await getCachedEvents();
+      if (events && events.length > 0) {
+        setEVENTS(events);
+        setEventCode(events[0].EventId);
+        console.log('Loaded events from cache', events);
       }
     } catch (err) {
       console.log('Failed to load events', err);
@@ -3543,7 +3628,9 @@ export default function NewEnquiryScreen({ token, username }) {
           const prp = response.data?.data;
           if (prp && prp.length > 0) {
             setPRPS(prp);
-            setPrpCode(prptypeForApi || prp[0].code);
+            if (!id) {
+              setPrpCode(prptypeForApi || prp[0].code);
+            }
             await setCachedPrp(prp);
             console.log('Loaded prps from API and refreshed cache', prp);
             setLoading(false);
@@ -3554,14 +3641,11 @@ export default function NewEnquiryScreen({ token, username }) {
         }
       }
       // Offline, or API call failed/returned nothing usable -> use cache
-      const prpString = await AsyncStorage.getItem('cached_prp');
-      if (prpString) {
-        const prp = JSON.parse(prpString);
-        if (prp && prp.length > 0) {
-          setPRPS(prp);
-          setPrpCode(prptypeForApi || prp[0].code);
-          console.log('Loaded prps from cache', prp);
-        }
+      const prp = await getCachedPrp();
+      if (prp && prp.length > 0) {
+        setPRPS(prp);
+        setPrpCode(prptypeForApi || prp[0].code);
+        console.log('Loaded prps from cache', prp);
       }
     } catch (err) {
       console.log('Failed to load cached prps', err);
@@ -3807,7 +3891,8 @@ export default function NewEnquiryScreen({ token, username }) {
   const getSelectedItemCodeForDesign = useCallback(() => {
     if (editingDesignItemIndex === null) return null;
     const itm = selectedItems[editingDesignItemIndex];
-    if (!itm || itm.is_new_item) return null;
+    if (!itm) return null;
+    // if (!id && !itm || itm.is_new_item !== false) return null;
     if (itm.item_code === undefined || itm.item_code === null || String(itm.item_code) === '' || String(itm.item_code) === '0') {
       return null;
     }
@@ -3916,8 +4001,6 @@ export default function NewEnquiryScreen({ token, username }) {
         item_name: item.name,
         item_code: Number(item.dsn_code),
         is_new_item: false,
-        // Unit comes from the selected item's UOM key if present, else empty.
-        item_unit: item.UOM || '',
       };
       return updated;
     });
@@ -3942,16 +4025,6 @@ export default function NewEnquiryScreen({ token, username }) {
 
   // For S: add new item with a blank design (default Existing)
   const addBlankItemForS = () => {
-    const defaultDesign: Design = {
-      dsn_code: 0,
-      is_new: false,
-      design_requirement: 'Existing',
-      dsn_name: '',
-      dsn_qty: '',
-      unit: '',
-      dsn_rate: '',
-      remark: '',
-    };
     const newItem: Item = {
       item_name: '',
       item_code: 0,
@@ -3960,11 +4033,13 @@ export default function NewEnquiryScreen({ token, username }) {
       item_unit: '',
       item_rate: '',
       item_remark: '',
-      designs: [defaultDesign],
+      designs: [blankDesign()],
     };
-    setSelectedItems(prev => [...prev, newItem]);
-    const newIndex = selectedItems.length;
-    setDesignModePerItem(prev => ({ ...prev, [newIndex]: 'Existing' }));
+    setSelectedItems(prev => {
+      const newIndex = prev.length;
+      setDesignModePerItem(p => ({ ...p, [newIndex]: ['Existing'] }));
+      return [...prev, newItem];
+    });
   };
 
   const removeItem = (index: number) => {
@@ -3981,6 +4056,19 @@ export default function NewEnquiryScreen({ token, username }) {
           reindexed[k - 1] = newModes[k];
         } else {
           reindexed[k] = newModes[k];
+        }
+      });
+      return reindexed;
+    });
+    // Re-index expanded/collapsed accordion state too
+    setExpandedDesignItems(prev => {
+      const reindexed = {};
+      Object.keys(prev).forEach(key => {
+        const k = parseInt(key);
+        if (k > index) {
+          reindexed[k - 1] = prev[k];
+        } else if (k !== index) {
+          reindexed[k] = prev[k];
         }
       });
       return reindexed;
@@ -4017,38 +4105,107 @@ export default function NewEnquiryScreen({ token, username }) {
   };
 
   // --- Design functions (for S) ---
-  // Toggle design mode per item (S only) – clears name to force selection/typing
-  const toggleDesignMode = (itemIndex: number, mode: 'Existing' | 'New') => {
-    setDesignModePerItem(prev => ({ ...prev, [itemIndex]: mode }));
+  // Toggle design mode for a specific design slot inside an item – clears its name to force reselection/typing
+  const toggleDesignMode = (itemIndex: number, designIndex: number, mode: 'Existing' | 'New') => {
+    setDesignModePerItem(prev => {
+      const updated = { ...prev };
+      const modes = updated[itemIndex] ? [...updated[itemIndex]] : [];
+      modes[designIndex] = mode;
+      updated[itemIndex] = modes;
+      return updated;
+    });
     setSelectedItems(prev => {
       const updated = [...prev];
       const item = updated[itemIndex];
-      if (item.designs && item.designs.length > 0) {
-        const design = item.designs[0];
-        if (mode === 'Existing') {
-          design.is_new = false;
-          design.design_requirement = 'Existing';
-          design.dsn_name = '';
-          design.dsn_code = 0;
-        } else {
-          design.is_new = true;
-          design.design_requirement = 'New';
-          design.dsn_name = '';
-          design.dsn_code = 0;
-        }
+      if (!item.designs) item.designs = [];
+      if (!item.designs[designIndex]) {
+        item.designs[designIndex] = blankDesign();
+      }
+      const design = item.designs[designIndex];
+      if (mode === 'Existing') {
+        design.is_new = false;
+        design.design_requirement = 'Existing';
+        // design.dsn_name = '';
+        // design.dsn_code = 0;
+      } else {
+        design.is_new = true;
+        design.design_requirement = 'New';
+        design.dsn_name = '';
+        design.dsn_code = 0;
       }
       return updated;
     });
   };
 
-  // Open design modal for S (Existing mode)
-  const openDesignModalForItem = (itemIndex) => {
+  // Add a brand-new (blank) design slot to an item – used by the "Add Design" button.
+  // The first design of an item can never be removed; only ones added this way can be.
+  const addDesignRow = (itemIndex: number) => {
+    setSelectedItems(prev => {
+      const updated = [...prev];
+      const item = updated[itemIndex];
+      if (!item.designs) item.designs = [];
+      item.designs.push(blankDesign());
+      return updated;
+    });
+    setDesignModePerItem(prev => {
+      const updated = { ...prev };
+      const modes = updated[itemIndex] ? [...updated[itemIndex]] : [];
+      modes.push('Existing');
+      updated[itemIndex] = modes;
+      return updated;
+    });
+    // Make sure the item's design list is visible so the new row is seen right away
+    setExpandedDesignItems(prev => ({ ...prev, [itemIndex]: true }));
+  };
+
+  // Remove a design slot from an item. Slot 0 (the item's default/required design) can't be removed.
+  const removeDesignRow = (itemIndex: number, designIndex: number) => {
+    if (designIndex === 0) return;
+    setSelectedItems(prev => {
+      const updated = [...prev];
+      const item = updated[itemIndex];
+      if (item.designs) {
+        item.designs = item.designs.filter((_, i) => i !== designIndex);
+      }
+      return updated;
+    });
+    setDesignModePerItem(prev => {
+      const updated = { ...prev };
+      if (updated[itemIndex]) {
+        updated[itemIndex] = updated[itemIndex].filter((_, i) => i !== designIndex);
+      }
+      return updated;
+    });
+  };
+
+  // Whether an item's design list is currently expanded (default true / visible)
+  const isDesignsExpanded = (itemIndex: number) => expandedDesignItems[itemIndex] !== false;
+
+  const toggleDesignsExpanded = (itemIndex: number) => {
+    setExpandedDesignItems(prev => ({ ...prev, [itemIndex]: !isDesignsExpanded(itemIndex) }));
+  };
+
+  // Should the "Add Design" button for this item be disabled (an incomplete New design already exists in it)
+  const isAddDesignDisabledForItem = (itemIndex: number) => {
+    const item = selectedItems[itemIndex];
+    if (!item || !item.designs) return false;
+    return item.designs.some(d => d.is_new && (!d.dsn_name.trim() || !d.dsn_qty.trim()));
+  };
+
+  // Open design modal for S (Existing mode) – scoped to a specific item + design slot
+  const openDesignModalForItem = (itemIndex: number, designIndex: number) => {
     const currentItem = selectedItems[itemIndex];
-    if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
-      Alert.alert('Select item first', 'Please select an item before choosing a design.');
-      return;
-    }
+    console.log("currentItem: ", currentItem);
+    // if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
+    // if (!currentItem || currentItem.is_new_item !== "0" || !currentItem.item_code || String(currentItem.item_code) === '0') {
+    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    //   return;
+    // } 
+    // else if (!id && !currentItem || currentItem.is_new_item !== false || !currentItem.item_code || String(currentItem.item_code) === '0') {
+    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    // }
     setEditingDesignItemIndex(itemIndex);
+    setEditingDesignIndex(designIndex);
     setDesignSearchQuery('');
     setAllDesigns([]);
     setDisplayedDesigns([]);
@@ -4059,64 +4216,87 @@ export default function NewEnquiryScreen({ token, username }) {
     loadDesing();
   };
 
-  // Add selected design to the item (replaces the existing design) - for S Existing mode
+  const openDesignModalForItem123 = (itemIndex: number, designIndex: number) => {
+    const currentItem = selectedItems[itemIndex];
+    console.log("currentItem: ", currentItem);
+    // if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
+    // if (!currentItem || currentItem.is_new_item !== false || !currentItem.item_code || String(currentItem.item_code) === '0') {
+    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    //   return;
+    // } 
+    // else if (!id && !currentItem || currentItem.is_new_item !== false || !currentItem.item_code || String(currentItem.item_code) === '0') {
+    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    // }
+    setEditingDesignItemIndex(itemIndex);
+    setEditingDesignIndex(designIndex);
+    setDesignSearchQuery('');
+    setAllDesigns([]);
+    setDisplayedDesigns([]);
+    setHasMore(false);
+    loadingMoreDesignsRef.current = false;
+    setLoadingMoreDesigns(false);
+    setDesignModalVisible(true);
+    loadDesing();
+  };
+
+
+  // Add selected design to the item (replaces the design at the currently-editing slot) - for S Existing mode
   const addDesignToItem = (design) => {
-    if (editingDesignItemIndex === null) return false;
+    if (editingDesignItemIndex === null || editingDesignIndex === null) return false;
     const itemIndex = editingDesignItemIndex;
+    const designIndex = editingDesignIndex;
     setSelectedItems(prev => {
       const updated = [...prev];
-      if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
+      if (!updated[itemIndex].designs) {
         updated[itemIndex].designs = [];
       }
+      // const newDesign: Design = {
+      //   dsn_code: design.dsn_code,
+      //   is_new: false,
+      //   design_requirement: 'Existing',
+      //   dsn_name: design.name,
+      //   dsn_qty: '',
+      //   unit: 'mtr',
+      //   dsn_rate: '',
+      //   remark: '',
+      // };
       const newDesign: Design = {
         dsn_code: design.dsn_code,
         is_new: false,
         design_requirement: 'Existing',
         dsn_name: design.name,
-        dsn_qty: '',
-        // Unit comes from the selected design's UOM key if present, else empty.
-        unit: design.UOM || '',
-        dsn_rate: '',
-        remark: '',
+        dsn_qty: design.dsn_qty || '', // ✅ Preserve if available
+        unit: design.unit || '',    // ✅ Preserve if available
+        dsn_rate: design.dsn_rate || '', // ✅ Preserve if available
+        remark: design.remark || '',    // ✅ Preserve if available
       };
-      if (updated[itemIndex].designs.length === 0) {
-        updated[itemIndex].designs.push(newDesign);
-      } else {
-        updated[itemIndex].designs[0] = newDesign;
-      }
+      updated[itemIndex].designs[designIndex] = newDesign;
       return updated;
     });
     setDesignModalVisible(false);
     setEditingDesignItemIndex(null);
+    setEditingDesignIndex(null);
     setDesignSearchQuery('');
     setDisplayedDesigns([]);
     setHasMore(false);
     return true;
   };
 
-  // Update design fields (for S) – if no design exists, create one
+  // Update design fields (for S) – if no design exists at that slot, create one
   const updateDesignField = (itemIndex: number, designIndex: number, field: keyof Design, value: string) => {
     setSelectedItems(prev => {
       const updated = [...prev];
       // Ensure there is a design at designIndex
       if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
-        updated[itemIndex].designs = [{
-          dsn_code: 0,
-          is_new: false,
-          design_requirement: 'Existing',
-          dsn_name: '',
-          dsn_qty: '',
-          unit: '',
-          dsn_rate: '',
-          remark: '',
-        }];
+        updated[itemIndex].designs = [blankDesign()];
       }
-      if (updated[itemIndex].designs[designIndex]) {
-        updated[itemIndex].designs[designIndex] = {
-          ...updated[itemIndex].designs[designIndex],
-          [field]: value,
-        };
+      if (!updated[itemIndex].designs[designIndex]) {
+        updated[itemIndex].designs[designIndex] = blankDesign();
       }
+      updated[itemIndex].designs[designIndex] = {
+        ...updated[itemIndex].designs[designIndex],
+        [field]: value,
+      };
       return updated;
     });
   };
@@ -4365,6 +4545,7 @@ export default function NewEnquiryScreen({ token, username }) {
     }
   }
 
+
   const resetFormFields = () => {
     setPartyName('');
     setAddress('');
@@ -4382,6 +4563,7 @@ export default function NewEnquiryScreen({ token, username }) {
     setFront_off_Uri('');
     setSelectedItems([]);
     setDesignModePerItem({});
+    setExpandedDesignItems({});
     setCardFields({}); // Reset scan highlights
   };
 
@@ -4507,11 +4689,11 @@ export default function NewEnquiryScreen({ token, username }) {
       Alert.alert('Email required', 'Please enter the email.');
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
+    // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // if (!emailRegex.test(email)) {
+    //   Alert.alert('Invalid Email', 'Please enter a valid email address.');
+    //   return;
+    // }
     if (!mobile) {
       Alert.alert('Mobile number required', 'Please enter the mobile number.');
       return;
@@ -4524,10 +4706,13 @@ export default function NewEnquiryScreen({ token, username }) {
       );
       return;
     }
+
     if (selectedItems.length === 0) {
       Alert.alert('Items required', 'Please add at least one item.');
       return;
     }
+
+    // Check for empty item names if any new items (non-S)
     const emptyName = selectedItems.some(i => i.is_new_item && !i.item_name.trim());
     if (emptyName) {
       Alert.alert('Item name required', 'Please enter a name for all new items.');
@@ -4540,16 +4725,19 @@ export default function NewEnquiryScreen({ token, username }) {
         return;
       }
     } else {
+      // For S, check if each item has at least one design and ALL of its designs are valid
       for (const item of selectedItems) {
         if (item.designs && item.designs.length > 0) {
-          const design = item.designs[0];
-          if (design.is_new && !design.dsn_name.trim()) {
-            Alert.alert('Design name required', 'Please enter a name for new designs.');
-            return;
-          }
-          if (!design.dsn_qty || !design.dsn_qty.trim()) {
-            Alert.alert('Quantity required', 'Please enter quantity for all designs.');
-            return;
+          for (const design of item.designs) {
+            // If design is New, name must be filled
+            if (design.is_new && !design.dsn_name.trim()) {
+              Alert.alert('Design name required', 'Please enter a name for new designs.');
+              return;
+            }
+            if (!design.dsn_qty || !design.dsn_qty.trim()) {
+              Alert.alert('Quantity required', 'Please enter quantity for all designs.');
+              return;
+            }
           }
         } else {
           Alert.alert('Design required', 'Each item must have a design.');
@@ -4744,287 +4932,209 @@ export default function NewEnquiryScreen({ token, username }) {
 
         {!isPrptypeS && (
           <View style={styles.designFields}>
-            <View style={[styles.fieldGroup, { flexDirection: 'row', justifyContent: 'space-between' }]}>
-              <View style={{ flex: 1 }}>
-                <Field label="Qty">
-                  <TextInput
-                    style={styles.designFieldInput}
-                    value={item.item_qty}
-                    onChangeText={(text) => updateItemField(itemIndex, 'item_qty', text)}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                </Field>
+            {/* <View style={[styles.fieldGroup, { flexDirection: 'row', justifyContent: 'space-between' }]}> */}
+            <View style={styles.designFieldsRow}>
+              <View style={{ flex: 1.15 }}>
+                {/* <Field label="Qty"> */}
+                <Text style={styles.designFieldLabel}>Qty</Text>
+                <TextInput
+                  style={styles.designFieldInput}
+                  value={item.item_qty}
+                  onChangeText={(text) => updateItemField(itemIndex, 'item_qty', text)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                />
+                {/* </Field> */}
               </View>
-              <View style={{ flex: 1 }}>
-                <Field label="Rate">
-                  <TextInput
-                    style={styles.designFieldInput}
-                    value={item.item_rate}
-                    onChangeText={(text) => updateItemField(itemIndex, 'item_rate', text)}
-                    keyboardType="numeric"
-                    placeholder="0"
-                  />
-                </Field>
+              <View style={{ flex: 1.15 }}>
+                {/* <Field label="Rate"> */}
+                <Text style={styles.designFieldLabel}>Rate</Text>
+                <TextInput
+                  style={styles.designFieldInput}
+                  value={item.item_rate}
+                  onChangeText={(text) => updateItemField(itemIndex, 'item_rate', text)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                />
+                {/* </Field> */}
+              </View>
+              {/* </View> */}
+              <View style={{ flex: 1.15 }}>
+                {/* <Field label="Unit"> */}
+                <Text style={styles.designFieldLabel}>Unit</Text>
+                <TextInput
+                  style={styles.designFieldInput}
+                  value={item.item_unit}
+                  onChangeText={(text) => updateItemField(itemIndex, 'item_unit', text)}
+                  placeholder=""
+                />
+                {/* </Field> */}
               </View>
             </View>
-            <Field label="Unit">
-              <TextInput
-                style={styles.designFieldInput}
-                value={item.item_unit}
-                onChangeText={(text) => updateItemField(itemIndex, 'item_unit', text)}
-                placeholder="Unit"
-              />
-            </Field>
-            <Field label="Remark / Color Requirements">
-              <TextInput
-                style={[styles.designFieldInput, styles.remarkInput]}
-                value={item.item_remark}
-                onChangeText={(text) => updateItemField(itemIndex, 'item_remark', text)}
-                placeholder="Optional remark"
-              />
-            </Field>
+            <Text style={[styles.designFieldLabel, { marginTop: 8, marginBottom: 4 }]}>
+              Remark / Color Requirements
+            </Text>
+            <TextInput
+              style={[styles.designFieldInput, styles.remarkInput]}
+              value={item.item_remark}
+              onChangeText={(text) => updateItemField(itemIndex, 'item_remark', text)}
+              placeholder="Optional remark"
+            />
+            {/* </Field> */}
           </View>
         )}
 
         {isPrptypeS && (
           <View style={styles.designsContainer}>
             <View style={styles.designsHeader}>
-              <Text style={styles.designsTitle}>Design</Text>
-            </View>
-            <View style={styles.designsHeader}>
-              <View style={styles.tabContainerSmall1}>
-                <TouchableOpacity
-                  style={[styles.tabSmall1, designModePerItem[itemIndex] === 'Existing' && styles.activeTabSmall]}
-                  onPress={() => toggleDesignMode(itemIndex, 'Existing')}
-                >
-                  <Text style={[styles.tabTextSmall, designModePerItem[itemIndex] === 'Existing' && styles.activeTabTextSmall]}>Existing</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.tabSmall1, designModePerItem[itemIndex] === 'New' && styles.activeTabSmall]}
-                  onPress={() => toggleDesignMode(itemIndex, 'New')}
-                >
-                  <Text style={[styles.tabTextSmall, designModePerItem[itemIndex] === 'New' && styles.activeTabTextSmall]}>New</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.designsTitle}>
+                Design{item.designs && item.designs.length > 1 ? 's' : ''}
+                {item.item_name ? ` for "${item.item_name}"` : ''}
+              </Text>
             </View>
 
-            {(() => {
-              const design = (item.designs && item.designs.length > 0) ? item.designs[0] : null;
-              const designIndex = 0;
-              const displayDesign = design || {
-                dsn_code: 0,
-                is_new: false,
-                design_requirement: 'Existing',
-                dsn_name: '',
-                dsn_qty: '',
-                unit: '',
-                dsn_rate: '',
-                remark: '',
-              };
-              const isPlaceholder = !design;
-              return (
-                <View style={styles.designCard}>
-                  {designModePerItem[itemIndex] === 'Existing' ? (
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.label}>Design</Text>
+            {/* Accordion show/hide + count — only appears once an item has more than 1 design */}
+            {item.designs && item.designs.length > 1 && (
+              <TouchableOpacity
+                style={styles.designAccordionBtn}
+                onPress={() => toggleDesignsExpanded(itemIndex)}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.designAccordionText}>{item.designs.length} Designs</Text>
+                <Icon
+                  name={isDesignsExpanded(itemIndex) ? 'expand-less' : 'expand-more'}
+                  size={22}
+                  color={C.brandDark}
+                />
+              </TouchableOpacity>
+            )}
+
+            {(!item.designs || item.designs.length <= 1 || isDesignsExpanded(itemIndex)) && (
+              (item.designs && item.designs.length > 0 ? item.designs : [blankDesign()]).map((design, designIndex) => {
+                const displayDesign = design || blankDesign();
+                const modeForThisDesign =
+                  (designModePerItem[itemIndex] && designModePerItem[itemIndex][designIndex]) || 'Existing';
+
+                console.log("modeForThisDesign: ", modeForThisDesign);
+
+                return (
+                  <View key={designIndex} style={styles.designCard}>
+                    {/* Design badge + remove (remove only allowed for extra designs, not the first) */}
+                    <View style={styles.designCardHeader}>
+                      <Text style={styles.designCardBadge}>Design {designIndex + 1}</Text>
+                      {designIndex > 0 && (
+                        <TouchableOpacity
+                          onPress={() => removeDesignRow(itemIndex, designIndex)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Icon name="close" size={18} color={C.danger} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* Per-design Existing/New tab */}
+                    <View style={styles.tabContainerSmall1}>
                       <TouchableOpacity
-                        style={[styles.dropdown, { backgroundColor: displayDesign.dsn_name ? '#f0f0f0' : '#fff' }]}
-                        onPress={() => {
-                          const currentItem = selectedItems[itemIndex];
-                          if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
-                            Alert.alert('Select item first', 'Please select an item before choosing a design.');
-                            return;
-                          }
-                          setEditingDesignItemIndex(itemIndex);
-                          setDesignSearchQuery('');
-                          setAllDesigns([]);
-                          setDisplayedDesigns([]);
-                          setHasMore(false);
-                          loadingMoreDesignsRef.current = false;
-                          setLoadingMoreDesigns(false);
-                          setDesignModalVisible(true);
-                          loadDesing();
-                        }}
+                        style={[styles.tabSmall1, modeForThisDesign === 'Existing' && styles.activeTabSmall]}
+                        onPress={() => toggleDesignMode(itemIndex, designIndex, 'Existing')}
                       >
-                        <Text style={styles.dropdownText}>
-                          {displayDesign.dsn_name || 'Select Design'}
-                        </Text>
-                        <Text style={styles.dropdownArrow}>▼</Text>
+                        <Text style={[styles.tabTextSmall, modeForThisDesign === 'Existing' && styles.activeTabTextSmall]}>Existing</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.tabSmall1, modeForThisDesign === 'New' && styles.activeTabSmall]}
+                        onPress={() => toggleDesignMode(itemIndex, designIndex, 'New')}
+                      >
+                        <Text style={[styles.tabTextSmall, modeForThisDesign === 'New' && styles.activeTabTextSmall]}>New</Text>
                       </TouchableOpacity>
                     </View>
-                  ) : (
-                    <View style={styles.fieldGroup}>
-                      <Text style={styles.label}>Design Name *</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter design name"
-                        value={displayDesign.dsn_name}
-                        onChangeText={(text) => {
-                          if (isPlaceholder) {
-                            setSelectedItems(prev => {
-                              const updated = [...prev];
-                              if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
-                                updated[itemIndex].designs = [{
-                                  dsn_code: 0,
-                                  is_new: true,
-                                  design_requirement: 'New',
-                                  dsn_name: text,
-                                  dsn_qty: '',
-                                  unit: '',
-                                  dsn_rate: '',
-                                  remark: '',
-                                }];
-                              } else {
-                                updated[itemIndex].designs[0].dsn_name = text;
-                              }
-                              return updated;
-                            });
-                          } else {
-                            updateDesignField(itemIndex, designIndex, 'dsn_name', text);
-                          }
-                        }}
-                      />
-                    </View>
-                  )}
 
-                  <View style={styles.designFields}>
-                    <View style={[styles.fieldGroup, { flexDirection: 'row', justifyContent: 'space-between' }]}>
-                      <View style={{ flex: 1 }}>
-                        <Field label="Qty">
+                    {/* Design selection or name input based on mode */}
+                    {modeForThisDesign === 'Existing' ? (
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>Design</Text>
+                        <TouchableOpacity
+                          style={[styles.dropdown, { backgroundColor: displayDesign.dsn_name ? '#f0f0f0' : '#fff' }]}
+                          // onPress={() => openDesignModalForItem(itemIndex, designIndex)}
+                          onPress={() => id ? openDesignModalForItem(itemIndex, designIndex) : openDesignModalForItem123(itemIndex, designIndex)}
+                        >
+                          <Text style={styles.dropdownText}>
+                            {displayDesign.dsn_name || 'Select Design'}
+                          </Text>
+                          <Text style={styles.dropdownArrow}>▼</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      // New mode: inline text field for design name
+                      <View style={styles.fieldGroup}>
+                        <Text style={styles.label}>Design Name *</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Enter design name"
+                          value={displayDesign.dsn_name}
+                          onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'dsn_name', text)}
+                        />
+                      </View>
+                    )}
+
+                    {/* Design fields: Qty, Rate & Unit share one compact row, Remark below */}
+                    <View style={styles.designFields}>
+                      <View style={styles.designFieldsRow}>
+                        <View style={{ flex: 1.15 }}>
+                          <Text style={styles.designFieldLabel}>Qty</Text>
                           <TextInput
-                            style={styles.input}
+                            style={styles.designFieldInput}
                             value={displayDesign.dsn_qty}
-                            onChangeText={(text) => {
-                              if (isPlaceholder) {
-                                setSelectedItems(prev => {
-                                  const updated = [...prev];
-                                  if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
-                                    updated[itemIndex].designs = [{
-                                      dsn_code: 0,
-                                      is_new: false,
-                                      design_requirement: 'Existing',
-                                      dsn_name: '',
-                                      dsn_qty: text,
-                                      unit: '',
-                                      dsn_rate: '',
-                                      remark: '',
-                                    }];
-                                  } else {
-                                    updated[itemIndex].designs[0].dsn_qty = text;
-                                  }
-                                  return updated;
-                                });
-                              } else {
-                                updateDesignField(itemIndex, designIndex, 'dsn_qty', text);
-                              }
-                            }}
+                            onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'dsn_qty', text)}
                             keyboardType="numeric"
                             placeholder="0"
                           />
-                        </Field>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Field label="Rate">
+                        </View>
+                        <View style={{ flex: 1.15 }}>
+                          <Text style={styles.designFieldLabel}>Rate</Text>
                           <TextInput
-                            style={styles.input}
+                            style={styles.designFieldInput}
                             value={displayDesign.dsn_rate}
-                            onChangeText={(text) => {
-                              if (isPlaceholder) {
-                                setSelectedItems(prev => {
-                                  const updated = [...prev];
-                                  if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
-                                    updated[itemIndex].designs = [{
-                                      dsn_code: 0,
-                                      is_new: false,
-                                      design_requirement: 'Existing',
-                                      dsn_name: '',
-                                      dsn_qty: '',
-                                      unit: '',
-                                      dsn_rate: text,
-                                      remark: '',
-                                    }];
-                                  } else {
-                                    updated[itemIndex].designs[0].dsn_rate = text;
-                                  }
-                                  return updated;
-                                });
-                              } else {
-                                updateDesignField(itemIndex, designIndex, 'dsn_rate', text);
-                              }
-                            }}
+                            onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'dsn_rate', text)}
                             keyboardType="numeric"
                             placeholder="0"
                           />
-                        </Field>
+                        </View>
+                        <View style={{ flex: 0.9 }}>
+                          <Text style={styles.designFieldLabel}>Unit</Text>
+                          <TextInput
+                            style={styles.designFieldInput}
+                            value={displayDesign.unit}
+                            onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'unit', text)}
+                            placeholder=""
+                          />
+                        </View>
                       </View>
-                    </View>
-                    <Field label="Unit">
-                      <TextInput
-                        style={styles.input}
-                        value={displayDesign.unit}
-                        onChangeText={(text) => {
-                          if (isPlaceholder) {
-                            setSelectedItems(prev => {
-                              const updated = [...prev];
-                              if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
-                                updated[itemIndex].designs = [{
-                                  dsn_code: 0,
-                                  is_new: false,
-                                  design_requirement: 'Existing',
-                                  dsn_name: '',
-                                  dsn_qty: '',
-                                  unit: text,
-                                  dsn_rate: '',
-                                  remark: '',
-                                }];
-                              } else {
-                                updated[itemIndex].designs[0].unit = text;
-                              }
-                              return updated;
-                            });
-                          } else {
-                            updateDesignField(itemIndex, designIndex, 'unit', text);
-                          }
-                        }}
-                        placeholder="Unit"
-                      />
-                    </Field>
-                    <Field label="Remark/Color Requirements">
+                      <Text style={[styles.designFieldLabel, { marginTop: 8, marginBottom: 4 }]}>
+                        Remark / Color Requirements
+                      </Text>
                       <TextInput
                         style={[styles.designFieldInput, styles.remarkInput]}
                         value={displayDesign.remark}
-                        onChangeText={(text) => {
-                          if (isPlaceholder) {
-                            setSelectedItems(prev => {
-                              const updated = [...prev];
-                              if (!updated[itemIndex].designs || updated[itemIndex].designs.length === 0) {
-                                updated[itemIndex].designs = [{
-                                  dsn_code: 0,
-                                  is_new: false,
-                                  design_requirement: 'Existing',
-                                  dsn_name: '',
-                                  dsn_qty: '',
-                                  unit: '',
-                                  dsn_rate: '',
-                                  remark: text,
-                                }];
-                              } else {
-                                updated[itemIndex].designs[0].remark = text;
-                              }
-                              return updated;
-                            });
-                          } else {
-                            updateDesignField(itemIndex, designIndex, 'remark', text);
-                          }
-                        }}
+                        onChangeText={(text) => updateDesignField(itemIndex, designIndex, 'remark', text)}
                         placeholder="Optional remark"
                       />
-                    </Field>
+                    </View>
                   </View>
-                </View>
-              );
-            })()}
+                );
+              })
+            )}
+
+            {/* Add Design – appends another design row to THIS item */}
+            <TouchableOpacity
+              style={[styles.addDesignBtn, isAddDesignDisabledForItem(itemIndex) && styles.disabledBtn]}
+              onPress={() => addDesignRow(itemIndex)}
+              disabled={isAddDesignDisabledForItem(itemIndex)}
+            >
+              <Icon name="add" size={18} color={isAddDesignDisabledForItem(itemIndex) ? '#aaa' : C.brand} />
+              <Text style={[styles.addDesignBtnText, { color: isAddDesignDisabledForItem(itemIndex) ? '#aaa' : C.brand }]}>
+                {' '}Add Design
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -5034,29 +5144,35 @@ export default function NewEnquiryScreen({ token, username }) {
   const renderItemsSection = () => {
     const isPrptypeS = getUserPrptype === 'S';
 
+    // Determine if Add New Item button should be disabled
     let isAddDisabled = false;
     if (isPrptypeS) {
+      // Disable if ANY design in ANY item is New with empty name/qty
       isAddDisabled = selectedItems.some(item => {
         if (item.designs && item.designs.length > 0) {
-          const design = item.designs[0];
-          return design.is_new && (!design.dsn_name.trim() || !design.dsn_qty.trim());
+          // return item.designs.some(design => design.is_new && (!design.dsn_name.trim() || !design.dsn_qty.trim()));
+          return item.designs.some(design => (!design.dsn_name.trim() || !design.dsn_qty.trim()));
         }
         return false;
       });
     } else {
-      isAddDisabled = selectedItems.some(item => item.is_new_item && (!item.item_name.trim() || !item.item_qty.trim()));
+      // Disable if any item is New with empty name or qty
+      // isAddDisabled = selectedItems.some(item => item.is_new_item && (!item.item_name.trim() || !item.item_qty.trim()));
+      isAddDisabled = selectedItems.some(item => (!item.item_name.trim() || !item.item_qty.trim()));
     }
 
     return (
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Items</Text>
 
+        {/* Selected Items List */}
         {selectedItems.map((item, index) => renderItemCard(item, index))}
 
         {selectedItems.length === 0 && (
           <Text style={styles.noItemsText}>No items added. Tap "Add Item" to start.</Text>
         )}
 
+        {/* Add Item Button */}
         <TouchableOpacity
           style={[styles.addItemBtn, styles.scanBtnDash, isAddDisabled && styles.disabledBtn]}
           onPress={isPrptypeS ? addBlankItemForS : addBlankItem}
@@ -5705,6 +5821,7 @@ export default function NewEnquiryScreen({ token, username }) {
         onRequestClose={() => {
           setDesignModalVisible(false);
           setEditingDesignItemIndex(null);
+          setEditingDesignIndex(null);
           setDesignSearchQuery('');
           setDisplayedDesigns([]);
           setHasMore(false);
@@ -5718,6 +5835,7 @@ export default function NewEnquiryScreen({ token, username }) {
               onPress={() => {
                 setDesignModalVisible(false);
                 setEditingDesignItemIndex(null);
+                setEditingDesignIndex(null);
                 setDesignSearchQuery('');
                 setDisplayedDesigns([]);
                 setHasMore(false);
@@ -5754,14 +5872,15 @@ export default function NewEnquiryScreen({ token, username }) {
                   <TouchableOpacity
                     style={[styles.modalDesignItem, alreadyAdded && styles.modalDesignItemSelected]}
                     onPress={() => {
-                      if (alreadyAdded) {
-                        Alert.alert('Already added', `${item.name} is already selected.`);
-                        return;
-                      }
+                      // if (alreadyAdded) {
+                      //   Alert.alert('Already added', `${item.name} is already selected.`);
+                      //   return;
+                      // }
                       const success = addDesignToItem(item);
                       if (success) {
                         setDesignModalVisible(false);
                         setEditingDesignItemIndex(null);
+                        setEditingDesignIndex(null);
                         setDesignSearchQuery('');
                         setDisplayedDesigns([]);
                         setHasMore(false);
@@ -5949,6 +6068,8 @@ const shadowBtn = {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
+
+  // Scan card block
   scanBlock: {
     margin: 16,
     marginTop: 8,
@@ -6005,6 +6126,8 @@ const styles = StyleSheet.create({
   scanBtnTextDash: { color: C.brand, fontWeight: '700', fontSize: 14, letterSpacing: 0.2 },
   reportBtnText: { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 0.2 },
   scanHint: { fontSize: 11.5, color: C.muted, marginTop: 10, lineHeight: 17 },
+
+  // Form fields
   fieldGroup: { paddingHorizontal: 16, marginBottom: 16 },
   label: {
     fontSize: 11,
@@ -6021,12 +6144,15 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 14,
     fontSize: 14.5,
-    color: C.ink,
+    // color: C.ink,
+    color: '#000',
     backgroundColor: C.surface,
   },
   textarea: { minHeight: 74, textAlignVertical: 'top', paddingTop: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   halfField: { flex: 1 },
+
+  // Chips (only for designation, removed for units)
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1,
@@ -6041,6 +6167,8 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: C.brand, backgroundColor: C.brandSoft },
   chipText: { fontSize: 13, color: C.body },
   chipTextActive: { color: C.brandDark, fontWeight: '700' },
+
+  // Save button
   saveBtn: {
     backgroundColor: C.brand,
     borderRadius: 12,
@@ -6051,6 +6179,7 @@ const styles = StyleSheet.create({
     ...shadowBtn,
   },
   saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 15, letterSpacing: 0.3 },
+
   cancelBtn: {
     backgroundColor: '#9ca3af',
     borderRadius: 12,
@@ -6059,6 +6188,7 @@ const styles = StyleSheet.create({
     ...shadowSoft,
   },
   cancelBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
   dropdown: {
     borderWidth: 1,
     borderColor: C.borderInput,
@@ -6077,6 +6207,8 @@ const styles = StyleSheet.create({
   dropdownModal: { backgroundColor: '#fff', marginHorizontal: 20, marginTop: 120, borderRadius: 12, maxHeight: 300, width: '80%', alignSelf: 'center', ...shadowSoft },
   dropdownItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   dropdownItemText: { fontSize: 15, color: '#222' },
+
+  // Items & Designs
   addItemBtn: { marginBottom: 12 },
   itemCard: {
     backgroundColor: C.surface,
@@ -6098,6 +6230,7 @@ const styles = StyleSheet.create({
   itemHeaderLeft: { flex: 1 },
   itemName: { fontSize: 16, fontWeight: '700', color: C.ink },
   itemCode: { fontSize: 12, color: C.muted, marginTop: 2 },
+
   designsContainer: { marginTop: 10 },
   designsHeader: {
     flexDirection: 'row',
@@ -6105,7 +6238,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  designsTitle: { fontSize: 13, fontWeight: '700', color: C.body },
+  designsTitle: { fontSize: 13, fontWeight: '700', color: C.body, flex: 1 },
+
+  // Accordion show/hide + count button, sits above the design card(s), full width
+  designAccordionBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    backgroundColor: C.brandSoft,
+    borderWidth: 1,
+    borderColor: C.brandBorder,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  designAccordionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.brandDark,
+  },
+
   designCard: {
     backgroundColor: C.surfaceAlt,
     borderRadius: 10,
@@ -6113,21 +6267,69 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: C.border,
+    borderLeftWidth: 3,
+    borderLeftColor: C.brand,
+  },
+  designCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  designCardBadge: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: C.brandDark,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: C.brandBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    overflow: 'hidden',
   },
   designFields: { marginTop: 4 },
-  designFieldLabel: { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 2 },
+  designFieldsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  designFieldLabel: { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 4 },
   designFieldInput: {
     borderWidth: 1,
     borderColor: C.borderInput,
     borderRadius: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 8,
     fontSize: 13,
     backgroundColor: C.surface,
+    color: '#000',
   },
-  remarkInput: { minHeight: 34 },
+  remarkInput: { minHeight: 34, color: '#000' },
   noDesignsText: { fontSize: 12, color: C.muted, textAlign: 'center', paddingVertical: 10 },
   noItemsText: { fontSize: 13, color: C.muted, textAlign: 'center', paddingVertical: 20 },
+
+  // Add Design button (per item, appended below its design cards)
+  addDesignBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: C.brand,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 2,
+    backgroundColor: '#fff',
+  },
+  addDesignBtnText: {
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
+  // Tab styles for small tabs inside item card
   tabContainerSmall: {
     flexDirection: 'row',
     borderWidth: 1,
@@ -6176,6 +6378,8 @@ const styles = StyleSheet.create({
     color: C.brandDark,
     fontWeight: '700',
   },
+
+  // Card preview
   cardPreviewContainer: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -6225,6 +6429,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF7F0',
   },
   uploadPlaceholderText: { color: C.brand, fontWeight: '700', fontSize: 13 },
+
+  // Sync banner
   syncBanner: {
     padding: 14,
     marginHorizontal: 12,
@@ -6247,6 +6453,8 @@ const styles = StyleSheet.create({
   bannerTapHint: { fontSize: 12, color: C.muted, marginRight: 12 },
   retryBtn: { backgroundColor: C.brand, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
   retryText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+
+  // Modals
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(17,19,21,0.55)',
@@ -6292,6 +6500,8 @@ const styles = StyleSheet.create({
   modalDesignItemText: { fontSize: 16, color: C.ink, fontWeight: '600', flex: 1 },
   modalDesignItemCode: { fontSize: 12, color: C.muted, marginHorizontal: 10 },
   modalNoDesignsText: { textAlign: 'center', color: C.muted, marginTop: 20 },
+
+  // Failed Items Modal
   failedItemsModal: {
     backgroundColor: C.surface,
     borderRadius: 16,
@@ -6335,10 +6545,14 @@ const styles = StyleSheet.create({
   closeBtn: { backgroundColor: '#6B7280' },
   failedItemsBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   modalCloseText: { fontSize: 16, color: C.muted },
+
+  // Disabled button style
   disabledBtn: {
     opacity: 0.6,
     borderColor: '#aaa',
   },
+
+  // 🟢 Highlight scanned fields
   cardFilledInput: {
     backgroundColor: C.successBg,
     borderColor: C.successBorder,

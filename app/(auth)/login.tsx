@@ -1,5 +1,7 @@
 import { initDatabase } from '@/common/API/DatabaseManager';
 import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
+import { setCustomUsername } from '@/common/utils/feedbackStorage';
+import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 import {
     fetchAndCacheGlobalData,
     getCachedGlobalData,
@@ -7,6 +9,7 @@ import {
 } from '@/common/utils/sqliteCacheManager';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import * as Device from 'expo-device';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,14 +25,14 @@ import {
     Text, TextInput, TouchableOpacity,
     View
 } from 'react-native';
+import main from '../../assets/images/main.png';
 import { API, initAPI } from '../../common/API/dynamicAPI';
 import { theme } from '../../components/theme';
-import main from '../../assets/images/main.png';
-import { setCustomUsername } from '@/common/utils/feedbackStorage';
-import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 // import { getStoredToken } from '../../hooks/NotificationService';
+type Nav = any;
 
 export default function LoginScreen() {
+    const navigation = useNavigation<Nav>();
     const router = useRouter();
 
     const [username, setUsername] = useState('');
@@ -44,10 +47,14 @@ export default function LoginScreen() {
     useEffect(() => {
         const check = async () => {
             const token = await AsyncStorage.getItem('access_token');
+            const l = await AsyncStorage.getItem('LOOKUP_PLATFORM');
             // const noti_token = await AsyncStorage.getItem('notification_token');
             // setNotitoken(noti_token || '');
 
-            if (token) {
+            if (token && l === 'NEW') {
+                navigation.navigate('Main')
+            } else
+             if (token && l !== 'NEW') {
                 router.replace('/');
             }
         };
@@ -195,7 +202,7 @@ export default function LoginScreen() {
                     // }
 
                     // 
-                    if (user_avaible === "1") { 
+                    if (user_avaible === "1") {
                         Alert.alert('Warning', `User not available!, Please Register yourself by Create Account`);
                         return;
                     }
@@ -250,7 +257,7 @@ export default function LoginScreen() {
                                             const key = normalizePrptype(itm.prptype ?? itm.PrpType ?? '');
                                             const summary = await getPrptypeSummary(key);
                                             console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
-                                        }x
+                                        } x
 
                                         // await printCachedPrptypesWithData();
                                         console.log("💾 SAVED SUCCESS");
@@ -390,15 +397,15 @@ export default function LoginScreen() {
                     </Text>
                 </View>
 
-                <Text style={styles.tagline}>
+                {/* <Text style={styles.tagline}>
                     Smart Business Operations Platform
-                </Text>
+                </Text> */}
 
-                <Text style={styles.desc}>
+                {/* <Text style={styles.desc}>
                     Manage production, receivables,
                     collections, sales analysis and
                     operational workflows from anywhere.
-                </Text>
+                </Text> */}
 
             </View>
 

@@ -30,6 +30,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -51,6 +52,11 @@ const getCurrentFinancialYear = () => {
 const DEFAULT_PRPCODE = 'SIP';
 const DEFAULT_STRCODE = '002';
 const DEFAULT_YEARNO = getCurrentFinancialYear();
+
+// This is a real form value, not a visual placeholder.
+// Live Spec and Save both receive it even when the user does not edit the field.
+const DEFAULT_FINISHED_WIDTH = 58;
+
 
 type ERPContextValue = { prpcode: string; strcode: string; yearno: string };
 
@@ -112,9 +118,22 @@ function calcSpec(d: any) {
 
     // ends are conserved loom → greige → finished
     const epiGreige = widthGreige > 0 ? totalEnds / widthGreige : 0;
-    const finWidthIn = (Number(d.fin_width) || 0) > 0
-        ? Number(d.fin_width)
-        : (gf < 1 ? widthGreige * (1 - gf) : widthGreige);
+
+    // IMPORTANT:
+    // Finished Width is an explicit engineering input and must win over every
+    // calculated fallback. Support the current API field plus older aliases.
+    const enteredFinWidth = [
+        d.fin_width,
+        d.finished_width,
+        d.finWidth,
+    ]
+        .map((value: any) => Number(value) || 0)
+        .find((value: number) => value > 0) || DEFAULT_FINISHED_WIDTH;
+
+    // Finished Width must always come from the actual field/default.
+    // Do not derive it from greige width and finish shrink.
+    const finWidthIn = enteredFinWidth;
+
     const epiFinished = finWidthIn > 0 ? totalEnds / finWidthIn : 0;
     // picks pack closer as length shrinks in finishing
     const ppiFinished = gf < 1 ? ppiTable / (1 - gf) : ppiTable;
@@ -122,7 +141,10 @@ function calcSpec(d: any) {
     // ── GLM (per-yarn, same formulas as CostingEngine::compute) ──
     let warpGLM = 0;
     warpYarns.forEach((y) => {
-        warpGLM += (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+        warpGLM +=
+            (Number(y.epi) || 0) *
+            reed *
+            GPM(y.sys, Number(y.cnt));
     });
     let weftGLM = 0;
     weftYarns.forEach((y) => {
@@ -141,8 +163,15 @@ function calcSpec(d: any) {
             : (sys === 'Den' || sys === 'Dtx') ? 'Polyester' : 'Other';
     const blendTotals: Record<string, number> = {};
     warpYarns.forEach((y) => {
-        const g = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
-        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+        const g =
+            (Number(y.epi) || 0) *
+            reed *
+            GPM(y.sys, Number(y.cnt));
+
+        if (g > 0) {
+            blendTotals[fibreOf(y.sys)] =
+                (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+        }
     });
     weftYarns.forEach((y) => {
         const g = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
@@ -157,7 +186,8 @@ function calcSpec(d: any) {
         epiGreige, epiFinished, ppiFinished,
         warpGLM, weftGLM, greigGLM, greigGSM, finGLM, finGSM,
         blendTotals, blendGrand, hasNaturalFibre,
-        finWidthEntered: (Number(d.fin_width) || 0) > 0,
+        finWidthEntered: enteredFinWidth > 0,
+        enteredFinWidth,
     };
 }
 
@@ -224,9 +254,23 @@ function enrich(d: Design): Design & { epi_total: number; ppi_total: number } {
 // ═══════════════════════════════════════════════════════════════
 // ✅ NEW — LIVE SPEC PANEL (the whole MISSING right-hand panel)
 // ═══════════════════════════════════════════════════════════════
-function LiveSpecPanel({ design }: { design: any }) {
+function LiveSpecPanel({
+    design,
+    finishedWidth,
+    finishShrink,
+}: {
+    design: any;
+    finishedWidth: number;
+    finishShrink: number;
+}) {
     const [showFormula, setShowFormula] = useState(false);
-    const spec = useMemo(() => calcSpec(design), [design]);
+
+    // Explicit primitive inputs prevent stale Live Spec values.
+    const spec = calcSpec({
+        ...design,
+        fin_width: Number(finishedWidth) || 0,
+        gf_shrink: Number(finishShrink) || 0,
+    });
 
     const hasConstruction = spec.epiLoom > 0 && spec.reed > 0;
     const hasWeight = spec.greigGLM > 0;
@@ -281,7 +325,9 @@ function LiveSpecPanel({ design }: { design: any }) {
                     <Text style={[ls.td, ls.tdLabel]}>Width"</Text>
                     <Text style={ls.td}>{f1(spec.reed)}</Text>
                     <Text style={[ls.td, ls.tdGreige]}>{f1(spec.widthGreige)}</Text>
-                    <Text style={[ls.td, ls.tdFin]}>{f1(spec.finWidthIn)}</Text>
+                    <Text style={[ls.td, ls.tdFin]}>
+                        {spec.finWidthEntered ? f1(spec.enteredFinWidth) : f1(spec.finWidthIn)}
+                    </Text>
                 </View>
             </View>
 
@@ -299,7 +345,7 @@ function LiveSpecPanel({ design }: { design: any }) {
                     <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
                         <Text style={ls.gsmLabel}>Finished GSM</Text>
                         <Text style={ls.gsmVal}>{Math.round(spec.finGSM)}</Text>
-                        {spec.finWidthEntered && <Text style={ls.gsmNote}>{spec.finWidthIn}" fin</Text>}
+                        <Text style={ls.gsmNote}>using finished width {spec.finWidthIn}"</Text>
                     </View>
                     <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
                         <Text style={ls.gsmLabel}>Finished GLM</Text>
@@ -339,12 +385,32 @@ function LiveSpecPanel({ design }: { design: any }) {
             {showFormula && (
                 <View style={ls.formulaBox}>
                     <Text style={ls.formulaTxt}>
-                        Reed and greige width are interchangeable: greige width = reed × (1 − warp shrink).
-                        Total ends = ΣEPI(loom) × reed. EPI greige = ΣEPI ÷ (1 − warp shrink),
-                        PPI greige = ΣPPI + 2. Greige GSM = greige GLM ÷ width(m).
-                        Finished GLM = greige GLM ÷ (1 − finish shrink); mass conserved.
-                        Finished EPI = total ends ÷ finished width (ends conserved).
-                        Finished PPI = PPI greige ÷ (1 − finish shrink) — picks pack closer as length shrinks.
+                        CONSTRUCTION{`\n`}
+                        Greige Width = Reed Space × (1 − Warp Shrink).{`\n`}
+                        Total Ends = ΣEPI Loom × Reed Space.{`\n`}
+                        EPI Greige = Total Ends ÷ Greige Width.{`\n`}
+                        PPI Greige = ΣPPI Loom + 2.{`\n\n`}
+
+                        YARN WEIGHT FACTOR{`\n`}
+                        Denier GPM = Denier ÷ 9,000.{`\n`}
+                        Dtex GPM = Dtex ÷ 10,000.{`\n`}
+                        Ne GPM = 0.5905 ÷ Count.{`\n`}
+                        Lea GPM = 1.6535 ÷ Count.{`\n\n`}
+
+                        GREIGE LINEAR WEIGHT{`\n`}
+                        Warp GLM = Σ(EPI Yarn × Reed Space × Yarn GPM).{`\n`}
+                        Weft GLM = Σ(PPI Greige Contribution × Greige Width × Yarn GPM).{`\n`}
+                        Greige GLM = Warp GLM + Weft GLM.{`\n`}
+                        Equivalent: Greige GLM = Greige GSM × Greige Width in metres.{`\n`}
+                        Greige GSM = Greige GLM ÷ Greige Width in metres.{`\n\n`}
+
+                        FINISHED FABRIC{`\n`}
+                        Finished Width = entered Finished Width.{`\n`}
+                        Finished GLM = Greige GLM ÷ (1 − Finish Length Shrink).{`\n`}
+                        This keeps yarn mass conserved while finished length becomes shorter.{`\n`}
+                        Finished GSM = Finished GLM ÷ Finished Width in metres.{`\n`}
+                        Finished EPI = Total Ends ÷ Finished Width; ends are conserved.{`\n`}
+                        Finished PPI = PPI Greige ÷ (1 − Finish Length Shrink); picks pack closer as length shrinks.
                     </Text>
                 </View>
             )}
@@ -662,6 +728,11 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
                         keyExtractor={(item, index) =>
                             `${item.ItmCode}_${item.ItmName}_${index}`
                         }
+                        contentContainerStyle={{
+                            flexGrow: 1,
+                            paddingBottom: 30,
+                        }}
+                        // keyboardShouldPersistTaps="handled"
                         keyboardShouldPersistTaps="handled"
                         renderItem={({ item }) => (
                             <TouchableOpacity
@@ -713,7 +784,7 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
 
 const yp = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: T.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%' },
+    sheet: { backgroundColor: T.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '80%', minHeight: '80%', },
     handle: { width: 40, height: 4, backgroundColor: T.border, borderRadius: 2, alignSelf: 'center', marginTop: 10 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: T.border },
     title: { fontSize: 16, fontWeight: '700', color: T.ink },
@@ -1120,7 +1191,8 @@ const ct = StyleSheet.create({
 const EMPTY_FORM = {
     code: '', category: '', type: 'YD',
     weave: '', reed_space: 0, greige_width: 0, warp_shrink: 0, gf_shrink: 0,
-    fin_width: 0, warp_wastage: 0, weft_wastage: 0,
+    fin_width: DEFAULT_FINISHED_WIDTH,
+    warp_wastage: 0, weft_wastage: 0,
     warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
 };
 
@@ -1133,16 +1205,62 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
 
     useEffect(() => {
-        if (design) setForm({
-            ...EMPTY_FORM, ...design,
-            width_basis: (design as any).width_basis ?? 'reed',
-            greige_width: (design as any).greige_width ?? 0,
-            selvedge_yarns: (design as any).selvedge_yarns ?? [],
-            warp_wastage: (design as any).warp_wastage ?? 0,
-            weft_wastage: (design as any).weft_wastage ?? 6,
-        });
-        else setForm({ ...EMPTY_FORM });
-    }, [design?.id]);
+        if (design) {
+            const fullDesign: any = design;
+
+            setForm({
+                ...EMPTY_FORM,
+                ...fullDesign,
+                width_basis: fullDesign.width_basis ?? 'reed',
+                reed_space: Number(fullDesign.reed_space) || 0,
+                greige_width: Number(fullDesign.greige_width) || 0,
+                warp_shrink: Number(fullDesign.warp_shrink) || 0,
+
+                // Normalize all supported backend/legacy field names immediately
+                // when the full design detail arrives.
+                fin_width: (() => {
+                    const savedFinishedWidth = Number(
+                        fullDesign.fin_width ??
+                        fullDesign.finished_width ??
+                        fullDesign.finWidth ??
+                        0
+                    );
+
+                    return savedFinishedWidth > 0
+                        ? savedFinishedWidth
+                        : DEFAULT_FINISHED_WIDTH;
+                })(),
+                gf_shrink: Number(
+                    fullDesign.gf_shrink ??
+                    fullDesign.finish_shrink ??
+                    fullDesign.finishShrink ??
+                    0
+                ) || 0,
+
+                warp_yarns: fullDesign.warp_yarns ?? [],
+                weft_yarns: fullDesign.weft_yarns ?? [],
+                selvedge_yarns: fullDesign.selvedge_yarns ?? [],
+                warp_wastage: Number(fullDesign.warp_wastage) || 0,
+                weft_wastage: Number(fullDesign.weft_wastage) || 0,
+            });
+        } else {
+            setForm({ ...EMPTY_FORM });
+        }
+    }, [
+        design?.id,
+        (design as any)?.fin_width,
+        (design as any)?.finished_width,
+        (design as any)?.finWidth,
+        (design as any)?.gf_shrink,
+        (design as any)?.finish_shrink,
+        (design as any)?.finishShrink,
+        (design as any)?.reed_space,
+        (design as any)?.greige_width,
+        (design as any)?.warp_shrink,
+        (design as any)?.warp_yarns,
+        (design as any)?.weft_yarns,
+        (design as any)?.selvedge_yarns,
+    ]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
@@ -1169,11 +1287,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
         setSaving(true);
         try {
             // send both widths — backend resolves from width_basis
+            const normalizedFinishedWidth =
+                Number(form.fin_width) > 0
+                    ? Number(form.fin_width)
+                    : DEFAULT_FINISHED_WIDTH;
+
             const payload = {
                 ...form,
                 width_basis: 'reed',
                 reed_space: form.reed_space,
                 greige_width: autoGreige,
+                fin_width: normalizedFinishedWidth,
             };
             if (design?.id) await DesignAPI.update(design.id, payload);
             else await DesignAPI.create(payload);
@@ -1335,12 +1459,21 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         <Text style={fm.label}>FINISHED WIDTH</Text>
                         <Text style={fm.hint}>optional</Text>
                         <View style={fm.inputRow}>
-                            <TextInput editable={!form.finish_locked} value={form.fin_width ? String(form.fin_width) : ''} onChangeText={v => set('fin_width', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="58" placeholderTextColor={T.muted} />
+                            <TextInput
+                                editable={!form.finish_locked}
+                                value={String(form.fin_width ?? DEFAULT_FINISHED_WIDTH)}
+                                onChangeText={v => {
+                                    const parsed = parseFloat(v);
+                                    set('fin_width', Number.isFinite(parsed) ? parsed : DEFAULT_FINISHED_WIDTH);
+                                }}
+                                keyboardType="numeric"
+                                style={[fm.input, { flex: 1 }]}
+                            />
                             <Text style={fm.unit}>"</Text>
                         </View>
                     </View>
                     <View style={{ flex: 1 }}>
-                        <Text style={fm.label}>FINISH SHRINK</Text>
+                        <Text style={fm.label}>FINISH LENGTH SHRINK</Text>
                         <View style={fm.inputRow}>
                             <TextInput editable={!form.finish_locked} value={String(form.gf_shrink ?? '5')} onChangeText={v => set('gf_shrink', parseFloat(v) || 0)} keyboardType="numeric" style={[fm.input, { flex: 1 }]} placeholder="5" placeholderTextColor={T.muted} />
                             <Text style={fm.unit}>%</Text>
@@ -1349,12 +1482,28 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 </View>
 
                 {/* ✅ MISSING #3 — LIVE SPEC panel (updates as you type) */}
-                <LiveSpecPanel design={{
-                    ...form,
-                    width_basis: 'reed',
-                    reed_space: form.reed_space,
-                    greige_width: autoGreige,
-                }} />
+                <LiveSpecPanel
+                    key={[
+                        Number(form.reed_space) || 0,
+                        Number(form.warp_shrink) || 0,
+                        Number(form.fin_width) || 0,
+                        Number(form.gf_shrink) || 0,
+                        (form.warp_yarns ?? []).map((y: any) => `${y.mi_id}:${y.epi}:${y.cnt}:${y.sys}`).join('|'),
+                        (form.weft_yarns ?? []).map((y: any) => `${y.mi_id}:${y.ppi}:${y.cnt}:${y.sys}`).join('|'),
+                    ].join('::')}
+                    design={{
+                        ...form,
+                        width_basis: 'reed',
+                        reed_space: Number(form.reed_space) || 0,
+                        greige_width: autoGreige,
+                    }}
+                    finishedWidth={
+                        Number(form.fin_width) > 0
+                            ? Number(form.fin_width)
+                            : DEFAULT_FINISHED_WIDTH
+                    }
+                    finishShrink={Number(form.gf_shrink) || 0}
+                />
 
                 <TouchableOpacity style={[fm.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving}>
                     <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
@@ -1965,8 +2114,10 @@ export function DesignsScreen() {
 
     return (
         <ERPContext.Provider value={context}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-                <View style={hdr.wrap}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: T.nav }} edges={['top']}>
+                <StatusBar style="light" backgroundColor={T.nav} />
+                <View style={screen.body}>
+                    <View style={hdr.wrap}>
                     <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
                     <Text style={hdr.title}>Designs</Text>
                     {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
@@ -1980,6 +2131,13 @@ export function DesignsScreen() {
                     }
                     {tab === 'Design' && (
                         <DesignTab
+                            key={[
+                                detailDesign?.id ?? 'new',
+                                Number((detailDesign as any)?.fin_width ?? (detailDesign as any)?.finished_width ?? 0),
+                                Number((detailDesign as any)?.gf_shrink ?? (detailDesign as any)?.finish_shrink ?? 0),
+                                (detailDesign as any)?.warp_yarns?.length ?? 0,
+                                (detailDesign as any)?.weft_yarns?.length ?? 0,
+                            ].join('::')}
                             design={detailDesign}
                             onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
                             onCancelEdit={handleCancelEdit}
@@ -1989,10 +2147,15 @@ export function DesignsScreen() {
                     {tab === 'Yarns' && <YarnsTab />}
                     {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
                 </View>
+            </View>
             </SafeAreaView>
         </ERPContext.Provider>
     );
 }
+
+const screen = StyleSheet.create({
+    body: { flex: 1, backgroundColor: T.bg },
+});
 
 const hdr = StyleSheet.create({
     wrap: { backgroundColor: T.nav, paddingHorizontal: 16, paddingVertical: 12 },

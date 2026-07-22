@@ -3,14 +3,26 @@
 // GET /api/appgreyinstockdata logic (dptcode 'PR' = greige split,
 // item → design → sub-design → shade drill-down, sort, search).
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { API } from '@/common/API/dynamicAPI';
+import { T } from '@/common/utils/theme';
+import axios from 'axios';
+import { StatusBar } from 'expo-status-bar';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity,
-  TextInput, Modal, ActivityIndicator, RefreshControl, Alert, Platform,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios';
-import { API } from '@/common/API/dynamicAPI';
 
 // ── Helpers ───────────────────────────────────────────────────────
 const num = (v: any) => {
@@ -287,18 +299,26 @@ export default function StockScreen({ token }: any) {
         (a, r) => ({ qty: a.qty + num(r.QTY), val: a.val + rowValue(r) }),
         { qty: 0, val: 0 });
     return [
-      { label: 'Greige Yarn', tag: 'godown', 
+      {
+        label: 'Greige Yarn', tag: 'godown',
         // unit: 'kg', 
-        color: '#14532D', ...yrn(true) },
-      { label: 'Dyed Yarn', tag: 'godown', 
+        color: '#14532D', ...yrn(true)
+      },
+      {
+        label: 'Dyed Yarn', tag: 'godown',
         // unit: 'kg', 
-        color: '#C2823A', ...yrn(false) },
-      { label: 'Greige Fabric', tag: 'godown', 
+        color: '#C2823A', ...yrn(false)
+      },
+      {
+        label: 'Greige Fabric', tag: 'godown',
         // unit: 'm', 
-        color: '#1D4ED8', ...fab(true) },
-      { label: 'Finished Fabric', tag: 'ready stock', 
+        color: '#1D4ED8', ...fab(true)
+      },
+      {
+        label: 'Finished Fabric', tag: 'ready stock',
         // unit: 'm', 
-        color: '#7C3AED', ...fab(false) },
+        color: '#7C3AED', ...fab(false)
+      },
     ];
   }, [fabricRows, yarnRows]);
   const flowTotal = flow.reduce((s, f) => s + f.val, 0);
@@ -517,7 +537,9 @@ export default function StockScreen({ token }: any) {
 
   // ── Main render ──
   return (
-    <SafeAreaView style={S.safe} edges={['top']}>
+    <>
+      <SafeAreaView style={{ flex: 0, backgroundColor: T.nav }} edges={['top']} />
+      <StatusBar style="light" backgroundColor={T.nav} />
       {/* dark header */}
       <View style={S.header}>
         <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
@@ -549,112 +571,114 @@ export default function StockScreen({ token }: any) {
         })}
       </View>
 
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator color="#13879A" size="large" />
-        </View>
-      ) : activeTab === 'flow' ? (
-        // ── FLOW TAB ──
-        <ScrollView
-          refreshControl={
-            <RefreshControl refreshing={refreshing}
-              onRefresh={() => loadStock(selectedPrps, true)} colors={['#13879A']} />
-          }
-        >
-          <View style={S.flowHero}>
-            <Text style={S.flowHeroLbl}>CONSOLIDATED STOCK VALUE</Text>
-            <Text style={S.flowHeroVal}>
-              {flowTotal > 0 ? moneyShort(flowTotal) : `${fmtIN(flowTotalQty)} units`}
-            </Text>
+      {
+        loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator color="#13879A" size="large" />
           </View>
-          <View style={{ padding: 0 }}>
-            {flow.map((f, i) => (
-              <View key={f.label}>
-                <View style={S.flowRow}>
-                  <View style={[S.flowBar, { backgroundColor: f.color }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={S.flowName}>
-                      {f.label} <Text style={S.flowTag}>· {f.tag}</Text>
-                    </Text>
-                    <Text style={S.flowQty}>{fmtIN(f.qty)} {f.unit}</Text>
-                  </View>
-                  <Text style={S.flowVal}>
-                    {f.val > 0 ? moneyShort(f.val) : '—'}
-                  </Text>
-                </View>
-                {i < flow.length - 1 && (
-                  <View style={S.flowArrowRow}>
-                    <Text style={S.flowArrow}>↓</Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      ) : (
-        // ── YARN / FABRIC TAB ──
-        <FlatList
-          data={listGroups}
-          keyExtractor={(_, i) => String(i)}
-          refreshControl={
-            <RefreshControl refreshing={refreshing}
-              onRefresh={() => loadStock(selectedPrps, true)} colors={['#13879A']} />
-          }
-          renderItem={renderStockRow}
-          contentContainerStyle={{ paddingBottom: 30 }}
-          ListHeaderComponent={
-            <>
-              <StatStrip />
-              <View style={{ paddingHorizontal: 14 }}>
-                {activeTab === 'yarn' ? (
-                  <ModeToggle
-                    options={[
-                      { key: 'greige', label: 'Greige Yarn' },
-                      { key: 'dyed', label: 'Dyed Yarn' },
-                    ]}
-                    value={yarnMode}
-                    onChange={setYarnMode}
-                    activeColor="#13879A"
-                  />
-                ) : (
-                  <ModeToggle
-                    options={[
-                      { key: 'greige', label: 'Greige' },
-                      { key: 'finished', label: 'Finished' },
-                    ]}
-                    value={fabricMode}
-                    onChange={setFabricMode}
-                    activeColor="#13879A"
-                  />
-                )}
-                <TextInput
-                  value={search}
-                  onChangeText={setSearch}
-                  placeholder="Search stock..."
-                  placeholderTextColor="#000"
-                  style={S.searchInput}
-                />
-              </View>
-              <SectionHead
-                text={
-                  activeTab === 'yarn'
-                    ? `${yarnMode === 'greige' ? 'GREIGE' : 'DYED'} YARN — BY YARN`
-                    : `${fabricMode === 'greige' ? 'GREIGE' : 'FINISHED'} FABRIC — BY DESIGN`
-                }
-              />
-            </>
-          }
-          ListEmptyComponent={
-            <View style={{ padding: 40, alignItems: 'center' }}>
-              <Text style={{ color: '#9ca3af' }}>
-                {activeTab === 'yarn'
-                  ? 'No yarn stock data (endpoint pending)'
-                  : 'No stock data found'}
+        ) : activeTab === 'flow' ? (
+          // ── FLOW TAB ──
+          <ScrollView
+            refreshControl={
+              <RefreshControl refreshing={refreshing}
+                onRefresh={() => loadStock(selectedPrps, true)} colors={['#13879A']} />
+            }
+          >
+            <View style={S.flowHero}>
+              <Text style={S.flowHeroLbl}>CONSOLIDATED STOCK VALUE</Text>
+              <Text style={S.flowHeroVal}>
+                {flowTotal > 0 ? moneyShort(flowTotal) : `${fmtIN(flowTotalQty)} units`}
               </Text>
             </View>
-          }
-        />
-      )}
+            <View style={{ padding: 0 }}>
+              {flow.map((f, i) => (
+                <View key={f.label}>
+                  <View style={S.flowRow}>
+                    <View style={[S.flowBar, { backgroundColor: f.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={S.flowName}>
+                        {f.label} <Text style={S.flowTag}>· {f.tag}</Text>
+                      </Text>
+                      <Text style={S.flowQty}>{fmtIN(f.qty)} {f.unit}</Text>
+                    </View>
+                    <Text style={S.flowVal}>
+                      {f.val > 0 ? moneyShort(f.val) : '—'}
+                    </Text>
+                  </View>
+                  {i < flow.length - 1 && (
+                    <View style={S.flowArrowRow}>
+                      <Text style={S.flowArrow}>↓</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        ) : (
+          // ── YARN / FABRIC TAB ──
+          <FlatList
+            data={listGroups}
+            keyExtractor={(_, i) => String(i)}
+            refreshControl={
+              <RefreshControl refreshing={refreshing}
+                onRefresh={() => loadStock(selectedPrps, true)} colors={['#13879A']} />
+            }
+            renderItem={renderStockRow}
+            contentContainerStyle={{ paddingBottom: 30 }}
+            ListHeaderComponent={
+              <>
+                <StatStrip />
+                <View style={{ paddingHorizontal: 14 }}>
+                  {activeTab === 'yarn' ? (
+                    <ModeToggle
+                      options={[
+                        { key: 'greige', label: 'Greige Yarn' },
+                        { key: 'dyed', label: 'Dyed Yarn' },
+                      ]}
+                      value={yarnMode}
+                      onChange={setYarnMode}
+                      activeColor="#13879A"
+                    />
+                  ) : (
+                    <ModeToggle
+                      options={[
+                        { key: 'greige', label: 'Greige' },
+                        { key: 'finished', label: 'Finished' },
+                      ]}
+                      value={fabricMode}
+                      onChange={setFabricMode}
+                      activeColor="#13879A"
+                    />
+                  )}
+                  <TextInput
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholder="Search stock..."
+                    placeholderTextColor="#000"
+                    style={S.searchInput}
+                  />
+                </View>
+                <SectionHead
+                  text={
+                    activeTab === 'yarn'
+                      ? `${yarnMode === 'greige' ? 'GREIGE' : 'DYED'} YARN — BY YARN`
+                      : `${fabricMode === 'greige' ? 'GREIGE' : 'FINISHED'} FABRIC — BY DESIGN`
+                  }
+                />
+              </>
+            }
+            ListEmptyComponent={
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <Text style={{ color: '#9ca3af' }}>
+                  {activeTab === 'yarn'
+                    ? 'No yarn stock data (endpoint pending)'
+                    : 'No stock data found'}
+                </Text>
+              </View>
+            }
+          />
+        )
+      }
 
       {/* Property picker */}
       <Modal visible={showPrpPicker} animationType="slide" transparent
@@ -724,13 +748,18 @@ export default function StockScreen({ token }: any) {
         onClose={() => { setDrillYarnItem(null); setDrillSearch(''); }}
         onRowPress={null}
       />
-    </SafeAreaView>
+
+      <SafeAreaView edges={['bottom']} style={{ flex: 0, backgroundColor: '#fff' }}
+      />
+    </>
+
+    // {/* </SafeAreaView> */ }
   );
 }
 
 // ── Styles (mockup palette) ───────────────────────────────────────
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 0, backgroundColor: '#13879A' },
 
   header: {
     backgroundColor: '#13879A', paddingHorizontal: 16,

@@ -14,6 +14,7 @@ import StockScreen from './screen/StockScreen';
 import ExpenseScreen from './screen/ExpenseScreen';
 import ManufacturingControlTower from './screen/ManufacturingControlTower';
 import RealCostingReferenceDashboard from './screen/RealCostingReferenceDashboard';
+import { SafeAreaProvider } from "react-native-safe-area-context";
 // import ProdScreen from './screen//ProdScreen';
 
 const TABS = [
@@ -43,60 +44,62 @@ function TabIcon({ label, active }) {
 }
 
 export default function AppNavigator({ token, apiBase }) {
-  const [activeTab, setActiveTab] = useState('expense');
+  const [activeTab, setActiveTab] = useState('designs');
 
   const ActiveScreen =
     TABS.find(t => t.id === activeTab)?.Screen || ExpenseScreen;
 
   return (
-    <View style={styles.root}>
-      {/* Screen Area */}
-      <View style={styles.screenArea}>
-        <ActiveScreen
-          token={token}
-          apiBase={apiBase}
-          isActive={true}
-        />
-      </View>
+    <SafeAreaProvider>
+      <View style={styles.root}>
+        {/* Screen Area */}
+        <View style={styles.screenArea}>
+          <ActiveScreen
+            token={token}
+            apiBase={apiBase}
+            isActive={true}
+          />
+        </View>
 
-      {/* Bottom Navigation */}
-      <View style={styles.navbar}>
-        {TABS.map(tab => {
-          const isActive = activeTab === tab.id;
+        {/* Bottom Navigation */}
+        <View style={styles.navbar}>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id;
 
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.navItem}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              {isActive && <View style={styles.activeDot} />}
-
-              <TabIcon
-                label={tab.label}
-                active={isActive}
-              />
-
-              <Text
-                style={[
-                  styles.navLabel,
-                  {
-                    color: isActive
-                      ? '#c2823a'
-                      : '#9ca3af',
-                    fontWeight: isActive
-                      ? '700'
-                      : '400',
-                  },
-                ]}
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                style={styles.navItem}
+                onPress={() => setActiveTab(tab.id)}
               >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                {isActive && <View style={styles.activeDot} />}
+
+                <TabIcon
+                  label={tab.label}
+                  active={isActive}
+                />
+
+                <Text
+                  style={[
+                    styles.navLabel,
+                    {
+                      color: isActive
+                        ? '#c2823a'
+                        : '#9ca3af',
+                      fontWeight: isActive
+                        ? '700'
+                        : '400',
+                    },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
-    </View>
+    </SafeAreaProvider>
   );
 }
 

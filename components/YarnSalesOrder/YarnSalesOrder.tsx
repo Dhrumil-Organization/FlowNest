@@ -14,6 +14,7 @@ import {
     View
 } from 'react-native';
 // import { StatusBar } from 'expo-status-bar';
+import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -43,8 +44,24 @@ const todayYmd = () => {
 
 const HEADER_HEIGHT = 52;
 
-const YarnSalesOrder = ({ token }) => {
+const YarnSalesOrder = (props: any) => {
+
+    const { token, username, userid, isConnected, navigation, route, } = props;
+
     const insets = useSafeAreaInsets();
+    const {
+        loadDefaultPreference,
+        savePreference,
+        loadPreferenceList,
+    } = useMobileUserPreference({
+        UserId: userid || 0,
+        ModuleCode: 'SALES',
+        ModuleName: 'Sales',
+        ScreenCode: 'SALES_ORDER_BROWSER',
+        ScreenName: 'Sales Order Browser',
+        token: token,
+    });
+
     const router = useRouter();
     const params = useLocalSearchParams();
     const { startNewOrder, loadExistingOrder } = useSalesOrder();
@@ -81,6 +98,8 @@ const YarnSalesOrder = ({ token }) => {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);
+    // const memoryLoadedRef = useRef(false);
+    const filtersRef = useRef(false);
     useFocusEffect(
         useCallback(() => {
             StatusBar.setTranslucent(false);
@@ -90,6 +109,9 @@ const YarnSalesOrder = ({ token }) => {
             return () => { };
         }, [])
     );
+
+    console.log('User Id ', userid, username);
+
     const { refreshAfterDelete, refreshKey, prpcode, yearno, strcode } = params;
 
     const getRequestConfig = (props: any) => ({
@@ -102,6 +124,7 @@ const YarnSalesOrder = ({ token }) => {
         params: props.params,
         cancelToken: cancelToken?.token,
     });
+
     useFocusEffect(
         useCallback(() => {
 
@@ -193,6 +216,102 @@ const YarnSalesOrder = ({ token }) => {
         load();
     }, [token]);
 
+    const formatYmdToDateString = (ymd: string) => {
+        if (!ymd || ymd.length !== 8) return '';
+
+        return `${ymd.substring(0, 4)}-${ymd.substring(4, 6)}-${ymd.substring(6, 8)}`;
+    };
+
+    useEffect(() => {
+        if (!userid || !token) return;
+
+        const initScreen = async () => {
+            const data = await fetchPropertyData(token);
+            setPropertyData(data || []);
+
+            const saved = await loadDefaultPreference();
+
+            console.log('saved raw', saved);
+            console.log('saved keys', Object.keys(saved || {}));
+
+            let savedFilters = {
+                prpcode: '',
+                yearno: '',
+                strcode: '002',
+                fromdate: todayYmd(),
+                todate: todayYmd(),
+                show_authorized: false,
+            };
+
+            if (saved?.criteria) {
+                savedFilters = {
+                    ...savedFilters,
+                    prpcode: saved.prpcode || saved?.criteria?.prpcode || '',
+                    yearno: getShortYearNo(
+                        saved.yearno || saved?.criteria?.yearno || ''
+                    ),
+                    strcode: saved.strcode || saved?.criteria?.strcode || '002',
+                    fromdate: saved.fromdate || saved?.criteria?.fromdate || todayYmd(),
+                    todate: saved.todate || saved?.criteria?.todate || todayYmd(),
+                    show_authorized:
+                        saved.show_authorized ??
+                        saved?.criteria?.show_authorized ??
+                        false,
+                };
+            }
+
+            console.log('Final savedFilters:', savedFilters);
+
+            console.log('Final savedFilters:', savedFilters);
+
+            setFilters(savedFilters);
+            if (savedFilters.prpcode) {
+
+                const matchedProperty = data?.find(
+                    x => String(x.PrpCode) === String(savedFilters.prpcode)
+                );
+
+                matchedProperty && setSelectedProperty(matchedProperty);
+            }
+
+            if (savedFilters.yearno) {
+
+                const matchedYear = yearOptions?.find(
+                    y => String(y).slice(-2) === String(savedFilters.yearno)
+                );
+
+                matchedYear && setSelectedYear(matchedYear);
+            }
+            filtersRef.current = savedFilters;
+
+            if (savedFilters.fromdate) {
+                setFromDate(new Date(formatYmdToDateString(savedFilters.fromdate)));
+            }
+
+            if (savedFilters.todate) {
+                setToDate(new Date(formatYmdToDateString(savedFilters.todate)));
+            }
+
+            if (savedFilters.prpcode && data?.length > 0) {
+                const matched = data.find(
+                    x => String(x.PrpCode) === String(savedFilters.prpcode)
+                );
+
+                if (matched) {
+                    setSelectedProperty(matched);
+                }
+            }
+
+            memoryLoadedRef.current = true;
+            didInitialLoadRef.current = true;
+
+            loadOrders('', false, savedFilters);
+        };
+
+        initScreen();
+    }, [userid, token]);
+
+
     useEffect(() => {
         const y = new Date().getFullYear();
         const arr = [];
@@ -248,62 +367,225 @@ const YarnSalesOrder = ({ token }) => {
         }));
     };
 
-    const loadOrders = async (text = '', isFilter = false, customFilters = null) => {
+    const getShortYearNo = (yearValue: any) => {
+        if (!yearValue) return '';
+
+        const y = String(yearValue);
+
+        if (y.length === 2) return y;
+
+        if (y.includes('-')) {
+            return y.split('-')[1].slice(-2);
+        }
+
+        return y.slice(-2);
+    };
+
+    // const loadOrders = async (text = '', isFilter = false, customFilters = null) => {
+    //     const userPtype = await AsyncStorage.getItem('user_prptype');
+    //     const activeFilters = customFilters || filters;
+
+    //     try {
+    //         if (isFilter) {
+    //             setFilterLoading(true);
+    //         } else {
+    //             setLoading(true);
+    //         }
+
+    //         const yearno =
+    //             activeFilters.yearno
+    //                 ? String(activeFilters.yearno).slice(-2)
+    //                 : selectedYear
+    //                     ? selectedYear.slice(-2)
+    //                     : '';
+
+    //         const payload = {
+    //             search: text,
+    //             prpcode: activeFilters.prpcode,
+    //             prptype: userPtype,
+    //             yearno: yearno,
+    //             strcode: '002',
+    //             fromdate: activeFilters.fromdate,
+    //             todate: activeFilters.todate,
+    //             isauth: activeFilters.show_authorized ? 1 : 0,
+    //             strtype: 'Y',
+    //             txntype: 'sales_order',
+    //             referrer: 'mob_yarn_sales_order',
+    //             // atype: 'B',
+    //             atype: activeFilters.show_authorized ? 'm' : 'b',
+    //         };
+
+    //         console.log("browse payload", payload);
+
+    //         const res = await axios.get(
+    //             `${API}/api/sosortbrowse`,
+    //             getRequestConfig({ params: { ...payload } }),
+    //         );
+    //         console.log("browse res", res)
+
+    //         if (res.data.success === true) {
+    //             setOrders(res.data.response.data || []);
+    //         } else {
+    //             setOrders([]);
+    //         }
+    //     } catch (error) {
+    //         console.log('ERROR ::', error?.response?.data || error.message);
+    //         setOrders([]);
+    //     } finally {
+    //         setLoading(false);
+    //         setFilterLoading(false);
+    //         setRefreshing(false);
+    //     }
+    // };
+
+
+    const loadOrders = async (
+        text = '',
+        isFilter = false,
+        customFilters = null
+    ) => {
+
         const userPtype = await AsyncStorage.getItem('user_prptype');
+
         const activeFilters = customFilters || filters;
 
+        console.log('loadOrders customFilters:', customFilters);
+        console.log('loadOrders activeFilters:', activeFilters);
+
+        const finalPrpCode = String(
+            activeFilters.prpcode ||
+            activeFilters.PrpCode ||
+            selectedProperty?.PrpCode ||
+            ''
+        ).trim();
+
+        const finalYearNo =
+            getShortYearNo(activeFilters.yearno) ||
+            getShortYearNo(activeFilters.YearNo) ||
+            getShortYearNo(selectedYear) ||
+            '';
+
+        console.log('final values', {
+            finalPrpCode,
+            finalYearNo,
+        });
+
+        if (!finalPrpCode || !finalYearNo) {
+            console.log('Skipping browse: property/year missing', {
+                finalPrpCode,
+                finalYearNo,
+            });
+            return;
+        }
+
         try {
+
             if (isFilter) {
                 setFilterLoading(true);
             } else {
                 setLoading(true);
             }
 
-            const yearno =
-                activeFilters.yearno
-                    ? String(activeFilters.yearno).slice(-2)
-                    : selectedYear
-                        ? selectedYear.slice(-2)
-                        : '';
-
             const payload = {
                 search: text,
-                prpcode: activeFilters.prpcode,
+                prpcode: finalPrpCode,
                 prptype: userPtype,
-                yearno: yearno,
-                strcode: '002',
+                yearno: finalYearNo,
+                strcode: activeFilters.strcode || '002',
                 fromdate: activeFilters.fromdate,
                 todate: activeFilters.todate,
                 isauth: activeFilters.show_authorized ? 1 : 0,
                 strtype: 'Y',
                 txntype: 'sales_order',
                 referrer: 'mob_yarn_sales_order',
-                // atype: 'B',
                 atype: activeFilters.show_authorized ? 'm' : 'b',
             };
 
-            console.log("browse payload", payload);
+            console.log('browse payload', payload);
 
             const res = await axios.get(
                 `${API}/api/sosortbrowse`,
-                getRequestConfig({ params: { ...payload } }),
+                getRequestConfig({
+                    params: payload,
+                }),
             );
-            console.log("browse res", res)
 
-            if (res.data.success === true) {
+            console.log('browse res', res.data);
+
+            if (
+                res.data.success === true &&
+                !res.data.response?.error
+            ) {
+
                 setOrders(res.data.response.data || []);
+
+                if (userid) {
+
+                    // await savePreference({
+                    //     CriteriaName: 'Default',
+                    //     IsDefault: true,
+                    //     PreferenceJson: {
+                    //         criteria: {
+                    //             prpcode: finalPrpCode,
+                    //             yearno: finalYearNo,
+                    //             strcode: activeFilters.strcode || '002',
+                    //             fromdate: activeFilters.fromdate,
+                    //             todate: activeFilters.todate,
+                    //             show_authorized:
+                    //                 activeFilters.show_authorized,
+                    //         },
+                    //     },
+                    // });
+
+                    const response = await savePreference({
+                        CriteriaName: 'Default',
+                        IsDefault: true,
+                        PreferenceJson: {
+                            criteria: {
+                                prpcode: finalPrpCode,
+                                yearno: finalYearNo,
+                                strcode: activeFilters.strcode || '002',
+                                fromdate: activeFilters.fromdate,
+                                todate: activeFilters.todate,
+                                show_authorized: activeFilters.show_authorized,
+                            },
+                        },
+                    });
+
+                    console.log('savePreference response =>', response);
+                }
+
             } else {
+
+                console.log(
+                    'Browse API Error:',
+                    res.data.message ||
+                    res.data.response?.message
+                );
+
                 setOrders([]);
+
             }
+
         } catch (error) {
-            console.log('ERROR ::', error?.response?.data || error.message);
+
+            console.log(
+                'ERROR ::',
+                error?.response?.data ||
+                error?.message
+            );
+
             setOrders([]);
+
         } finally {
+
             setLoading(false);
             setFilterLoading(false);
             setRefreshing(false);
+
         }
     };
+
 
     useEffect(() => {
 

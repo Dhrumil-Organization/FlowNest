@@ -57,6 +57,9 @@ client.interceptors.response.use(
 
 // ── Types ────────────────────────────────────────────────────
 export interface YarnLine {
+    id?: number;
+    line_key?: string;
+    sort_order?: number;
     mi_id: string;
     blend_ratio: string | null;
     epi?: number;
@@ -126,9 +129,17 @@ export interface YarnMaster {
     itm_name?: string;
 }
 
+export type CostingTierCode = 'LOW' | 'MID' | 'HIGH';
+
 export interface CostInputs {
+    sub_design_id?: string | null;
+    colourway_code?: string | null;
+    tier_code?: CostingTierCode;
+    tier_name?: string;
+    scenario_group_id?: string | null;
     price_map: Record<string, number>;
     dye_map: Record<string, number>;
+    sizing_map: Record<string, number>;
     weaving_rate: number;
     rpm: number;
     eff: number;
@@ -138,9 +149,47 @@ export interface CostInputs {
     cut_pack: number;
 }
 
+export interface CostingYarnRow {
+    line_key: string;
+    line_ref_id?: number | null;
+    yarn_type: 'warp' | 'weft' | 'selvedge';
+    mi_id: string;
+    blend_ratio: string | null;
+    name: string;
+    sys: string;
+    cnt: number;
+    epi?: number | null;
+    ppi?: number | null;
+    ends?: number | null;
+    sizing?: boolean;
+    grams_per_metre: number;
+    kg_per_metre: number;
+    price: number;
+    dye_cost: number;
+    sizing_cost: number;
+    rate: number;
+    cost: number;
+    sort_order: number;
+}
+
 export interface ComputeResult {
-    warp_rows: any[];
-    weft_rows: any[];
+    sub_design_id?: string | null;
+    colourway_code?: string | null;
+    tier_code?: CostingTierCode;
+    tier_name?: string;
+    scenario_group_id?: string | null;
+    is_yd: boolean;
+    warp_rows: CostingYarnRow[];
+    weft_rows: CostingYarnRow[];
+    selvedge_rows: CostingYarnRow[];
+    snap_warp_cost: number;
+    snap_weft_cost: number;
+    snap_selvedge_cost: number;
+    snap_warp_wastage: number;
+    snap_weft_wastage: number;
+    snap_warp_waste_cost: number;
+    snap_weft_waste_cost: number;
+    snap_waste_cost: number;
     snap_rm: number;
     snap_weaving_cost: number;
     snap_greige_mfg: number;
@@ -148,19 +197,36 @@ export interface ComputeResult {
     snap_greige_price: number;
     snap_greige_kg: number;
     snap_greige_glm: number;
+    snap_greige_width: number;
     snap_has_fin: boolean;
+    snap_finished_base: number;
+    snap_shrink_impact: number;
+    snap_dye_proc_amount: number;
+    snap_fin_brok_amt: number;
+    snap_cut_pack: number;
+    snap_fin_glm: number;
     snap_finished_price: number;
     snap_finished_kg: number;
     snap_final_cost: number;
     snap_ppi_loom: number;
     snap_ppi_table: number;
     snap_prod_day: number;
+    snap_per_day_conversion: number;
     snap_rm_pct: number;
     snap_weave_pct: number;
     warp_cost: number;
     weft_cost: number;
+    selvedge_cost: number;
+    warp_waste_cost: number;
+    weft_waste_cost: number;
+    waste_cost: number;
     greige_width: number;
     shrink_impact: number;
+    dye_proc_amount: number;
+    fin_brok_amt: number;
+    cut_pack: number;
+    fin_glm: number;
+    per_day_conversion: number;
 }
 
 export interface CostingRecord {

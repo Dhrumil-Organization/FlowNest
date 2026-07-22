@@ -88,6 +88,11 @@ export default function Header({
                     await AsyncStorage.removeItem('receivables_prpgroup');
                     await AsyncStorage.removeItem('live_logs_unlocked');
                     await AsyncStorage.removeItem('user_prptype');
+                    // 
+                    await AsyncStorage.removeItem('app_session');
+                    await AsyncStorage.removeItem('user_prptype');
+                    await AsyncStorage.removeItem('user_id');
+                    await AsyncStorage.removeItem('yno');
                     router.replace('/(all)/landing');
                 },
             },
@@ -262,7 +267,7 @@ const styles = StyleSheet.create({
     container: {
         paddingHorizontal: 16,
         paddingBottom: 16,
-        paddingTop: Platform.OS === 'android' ? 25 : 0,
+        paddingTop: Platform.OS === 'android' ? 45 : 0,
         borderBottomLeftRadius: 16,
         borderBottomRightRadius: 16,
         elevation: 6,
@@ -333,7 +338,8 @@ const styles = StyleSheet.create({
         flexShrink: 1,
         textAlign: 'right',
     },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+    // modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+    modalOverlay: { height: '100%', justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.35)' },
     sheet: {
         backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
         padding: 20,

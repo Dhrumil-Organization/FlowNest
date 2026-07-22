@@ -4,6 +4,7 @@ import TourOverlay from '@/common/TourOverlay';
 import Header from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
@@ -18,6 +19,7 @@ import {
     View
 } from 'react-native';
 import { isOnline } from '../Event/CardScanService';
+type Nav = any;
 
 const { width } = Dimensions.get('window');
 const getNumColumns = () => {
@@ -39,7 +41,8 @@ interface Props {
     online?: boolean;
 }
 
-const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
+const HomeScreen: React.FC<Props> = ({ username }) => {
+    const navigation = useNavigation<Nav>();
     const [search, setSearch] = useState('');
     const [apps, setApps] = useState<any[]>([]);
     // const [selectedLetter, setSelectedLetter] = useState('');
@@ -61,6 +64,27 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
     const ENABLE_DEVICE_CHECK = true;
 
     console.log("home screen device online: ", online);
+
+    // const token = useAppSessionStore((s) => s.token);
+    // useEffect(() => {
+    //     const check = async () => {
+    //         // const token = await AsyncStorage.getItem('access_token');
+    //         const l = await AsyncStorage.getItem('LOOKUP_PLATFORM');
+    //         // const noti_token = await AsyncStorage.getItem('notification_token');
+    //         // setNotitoken(noti_token || '');
+
+    //         if (l === 'NEW') {
+    //             console.log('hey Dhrumil..., I am called,  token and l NEW');
+    //             // navigation.navigate('Main')
+    //             // navigateSCreens('Main');
+    //             // router.replace('/new-app-screen');
+    //             router.replace('/new');
+    //             return;
+    //         }
+    //     };
+
+    //     check();
+    // }, []);
 
     async function checkConnectivity() {
         const result = await isOnline();

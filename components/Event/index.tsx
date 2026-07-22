@@ -3230,7 +3230,7 @@ const blankDesign = (): Design => ({
   remark: '',
 });
 
-export default function NewEnquiryScreen({ token, username }) {
+export default function NewEnquiryScreen({ token, username }) { 
   const router = useRouter();
   const params = useLocalSearchParams();
   const { id } = params || '';

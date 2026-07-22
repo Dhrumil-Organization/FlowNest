@@ -1,22 +1,21 @@
 // screens/AboutScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
-import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    StyleSheet,
-    Dimensions,
-    Image,
-    StatusBar,
-    Animated,
-    Linking,
-    Platform,
-} from 'react-native';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import theme from '@/components/theme';
+import React, { useEffect, useRef } from 'react';
+import {
+    Animated,
+    Dimensions,
+    Image,
+    Linking,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -121,22 +120,70 @@ const VALUES: Value[] = [
 
 const LEADERS: Leader[] = [
     {
-        name: 'Mr. Ramesh Agarwal',
-        position: 'Chairman & Managing Director',
-        image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400',
-        bio: '45+ years of experience in textile industry, visionary leader driving innovation.',
+        name: 'Mr. Krishnagopal Mundra',
+        position: 'Chairman',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.04.06_REC-removebg-preview-300x300.png',
+        bio: '',
+    },
+     {
+        name: 'Mr. Ramgopal Mundra',
+        position: 'Vice Chairman',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.03.47_REC-removebg-preview-295x300.png',
+        bio: '',
     },
     {
-        name: 'Mr. Suresh Agarwal',
-        position: 'Joint Managing Director',
-        image: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400',
-        bio: 'Strategic leader overseeing global operations and business development.',
+        name: 'Mr. Girdhargopal Mundra',
+        position: 'Vice Chairman',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.04.30_REC-removebg-preview-300x300.png',
+        bio: '',
     },
     {
-        name: 'Mr. Anil Agarwal',
+        name: 'Mr. Shrikant Mundra',
+        position: 'Managing Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.02.56_REC-removebg-preview-300x300.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Manmohan Mundra',
         position: 'Executive Director',
-        image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
-        bio: 'Leading manufacturing excellence and quality initiatives across all plants.',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.03.13_REC-removebg-preview-300x300.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Navneet Mundra',
+        position: 'Executive Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.02.04_REC-removebg-preview-300x300.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Deepak Mundra',
+        position: 'Executive Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.04.49_REC-removebg-preview-300x294.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Yatiraj Mundra',
+        position: 'Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.03.30_REC-removebg-preview-300x292.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Sudarshan Mundra',
+        position: 'Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.02.35_REC-removebg-preview-300x293.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Nikunj Mundra',
+        position: 'Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/05/16.05.2023_18.20.36_REC-removebg-preview-300x298.png',
+        bio: '',
+    },
+    {
+        name: 'Mr. Saulabhya Mundra',
+        position: 'Director',
+        image: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.05.06_REC-removebg-preview-300x295.png',
+        bio: '',
     },
 ];
 
@@ -1014,7 +1061,7 @@ const styles = StyleSheet.create({
         marginRight: 14,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: '#000',
+        backgroundColor: '#ffffff9b',
         height: 320,
     },
     leaderImage: {

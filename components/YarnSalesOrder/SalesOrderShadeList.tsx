@@ -1,23 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-    View,
-    Text,
-    StyleSheet,
-    TouchableOpacity,
-    FlatList,
-    TextInput,
-    Alert,
-} from 'react-native';
-import axios from 'axios';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { API } from '../../common/API/dynamicAPI';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    Alert,
+    FlatList,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { API } from '../../common/API/dynamicAPI';
 const toText = v => String(v || '').trim();
 
 const SalesOrderShadeList = ({ navigation, route }) => {
     const router = useRouter();
     const params = useLocalSearchParams();
+    const [editMode1, setEditMode] = useState(false);
     const {
         mode = 'ADD',
         uid = 0,
@@ -45,10 +46,36 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         token = '',
     } = params || {};
 
+    useEffect(() => {
+        if (editMode === 'true') {
+            setEditMode(true);
+        } else {
+            setEditMode(false);
+        }
+    }, [editMode]);
+
+    console.log("edit mode SalesOrderShadeList: ", editMode1, editMode1);
+
+    const parseMaybeJSON = (v) => {
+        if (v === null || v === undefined || v === '') return null;
+        if (typeof v === 'string') {
+            try { return JSON.parse(v); } catch { return v; }
+        }
+        return v;
+    };
+
+    const parsedOldRow = parseMaybeJSON(oldRow);
+    const parsedSelectedItem = parseMaybeJSON(selectedItem);
+    const parsedSelectedGrade = parseMaybeJSON(selectedGrade);
+    const parsedWorkingRows = (() => {
+        const wr = parseMaybeJSON(workingRows);
+        return Array.isArray(wr) ? wr : [];
+    })();
+
     const finalParty =
-        party ||
-        partyData ||
-        selectedParty ||
+        parseMaybeJSON(party) ||
+        parseMaybeJSON(partyData) ||
+        parseMaybeJSON(selectedParty) ||
         null;
 
     const [search, setSearch] = useState('');
@@ -116,7 +143,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //         const list = Array.isArray(data) ? data : [];
     //         setShades(list);
 
-    //         if (editMode && oldRow?.ShdCode) {
+    //         if (editMode1 && oldRow?.ShdCode) {
     //             const oldShade = list.find(
     //                 x => String(x.ShdCode) === String(oldRow.ShdCode),
     //             );
@@ -143,7 +170,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     const loadShades = async (searchText = '') => {
         const yrno = yearno ? yearno.slice(-2) : '';
 
-        if (!selectedItem?.ItmCode) {
+        if (!parsedSelectedItem?.ItmCode) {          // instead of selectedItem?.ItmCode
             Alert.alert('Required', 'Item is missing.');
             return;
         }
@@ -155,8 +182,8 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 prpcode,
                 strcode,
                 yearno: yrno,
-                itmcode: selectedItem.ItmCode,
-                mitmcode: selectedItem.MItmCode || selectedItem.ItmCode,
+                itmcode: parsedSelectedItem.ItmCode,
+                mitmcode: parsedSelectedItem.MItmCode || parsedSelectedItem.ItmCode,
                 search: searchText,
                 limit: 100,
             };
@@ -182,20 +209,31 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         }
     };
 
+    // useEffect(() => {
+    //     if (editMode1 && parsedOldRow?.ShdCode) {     // instead of oldRow?.ShdCode
+    //         const oldShade = shades.find(
+    //             x => String(x.ShdCode) === String(parsedOldRow.ShdCode),
+    //         ) || {
+    //             ShdCode: parsedOldRow.ShdCode,
+    //             ShdName: parsedOldRow.ShdName,
+    //             ShadeName: parsedOldRow.ShdName,
+    //         };
+    //         setSelectedShade([oldShade]);
+    //     }
+    // }, [editMode1, parsedOldRow, shades]);
     useEffect(() => {
-        if (editMode && oldRow?.ShdCode) {
-            const oldShade =
-                shades.find(
-                    x => String(x.ShdCode) === String(oldRow.ShdCode),
-                ) || {
-                    ShdCode: oldRow.ShdCode,
-                    ShdName: oldRow.ShdName,
-                    ShadeName: oldRow.ShdName,
-                };
-
-            setSelectedShade(oldShade);
+        if (!parsedOldRow) return;
+        if (editMode1 && parsedOldRow?.ShdCode) {
+            const oldShade = shades.find(
+                x => String(x.ShdCode) === String(parsedOldRow.ShdCode),
+            ) || {
+                ShdCode: parsedOldRow.ShdCode,
+                ShdName: parsedOldRow.ShdName,
+                ShadeName: parsedOldRow.ShdName,
+            };
+            setSelectedShade([oldShade]);
         }
-    }, [editMode, oldRow, shades]);
+    }, [editMode1]); // Remove `shades` from dependencies
 
     //useEffect(() => {
     //    loadShades();
@@ -211,44 +249,41 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
     const filteredShades = useMemo(() => {
         const s = search.toLowerCase();
-
         let arr = [...shades];
 
-        if (editMode && oldRow?.ShdCode) {
+        if (editMode1 && parsedOldRow?.ShdCode) {                     // 👈 fix
             const oldExists = arr.some(
-                item => String(item.ShdCode) === String(oldRow.ShdCode),
+                item => String(item.ShdCode) === String(parsedOldRow.ShdCode),  // 👈 fix
             );
 
             if (!oldExists) {
                 arr.unshift({
-                    ShdCode: oldRow.ShdCode,
-                    ShdName: oldRow.ShdName,
-                    ShadeName: oldRow.ShdName,
+                    ShdCode: parsedOldRow.ShdCode,     // 👈 fix
+                    ShdName: parsedOldRow.ShdName,     // 👈 fix
+                    ShadeName: parsedOldRow.ShdName,   // 👈 fix
                     __oldSelected: true,
                 });
             }
         }
 
         arr = arr.filter((item) => {
-
             const fullText = `
-        ${toText(item.ShdCode)}
-        ${toText(item.ShdName)}
-        ${toText(item.ShadeName)}
-    `.toLowerCase();
-
+                ${toText(item.ShdCode)}
+                ${toText(item.ShdName)}
+                ${toText(item.ShadeName)}
+            `.toLowerCase();
             return fullText.includes(s.toLowerCase());
         })
             .sort((a, b) => {
-                if (editMode && oldRow?.ShdCode) {
-                    if (String(a.ShdCode) === String(oldRow.ShdCode)) return -1;
-                    if (String(b.ShdCode) === String(oldRow.ShdCode)) return 1;
+                if (editMode1 && parsedOldRow?.ShdCode) {                          // 👈 fix
+                    if (String(a.ShdCode) === String(parsedOldRow.ShdCode)) return -1;  // 👈 fix
+                    if (String(b.ShdCode) === String(parsedOldRow.ShdCode)) return 1;   // 👈 fix
                 }
                 return 0;
             });
 
         return arr;
-    }, [shades, search, editMode, oldRow]);
+    }, [shades, search, editMode1, parsedOldRow]);   // 👈 fix
 
     // const onNext = () => {
     //     // if (!selectedShade?.ShdCode) {
@@ -261,7 +296,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //         uid,
     //         soNo,
     //         soDate,
-    //         editMode,
+    //         editMode1,
     //         editIndex,
     //         editLineId,
     //         oldRow,
@@ -288,91 +323,199 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //     });
     // };
 
-    useEffect(() => {
-        if (editMode && oldRow?.ShdCode) {
+    // useEffect(() => {
+    //     if (editMode1 && oldRow?.ShdCode) {
 
-            const oldShade =
-                shades.find(
-                    x => String(x.ShdCode) === String(oldRow.ShdCode),
-                ) || {
-                    ShdCode: oldRow.ShdCode,
-                    ShdName: oldRow.ShdName,
-                    ShadeName: oldRow.ShdName,
-                };
+    //         const oldShade =
+    //             shades.find(
+    //                 x => String(x.ShdCode) === String(oldRow.ShdCode),
+    //             ) || {
+    //                 ShdCode: oldRow.ShdCode,
+    //                 ShdName: oldRow.ShdName,
+    //                 ShadeName: oldRow.ShdName,
+    //             };
 
-            // IMPORTANT
-            setSelectedShade([oldShade]);
-        }
-    }, [editMode, oldRow, shades]);
+    //         // IMPORTANT
+    //         setSelectedShade([oldShade]);
+    //     }
+    // }, [editMode1, oldRow, shades]);
+
+    // const onNext = () => {
+
+    //     // const shadeData = item || selectedShade;
+    //     const shadeData = selectedShade;
+
+    //     // always convert into array
+    //     const finalShadeData = Array.isArray(shadeData)
+    //         ? shadeData
+    //         : [shadeData];
+
+    //     console.log("finalShadeData", finalShadeData);
+
+    //     if (editMode1 && oldRow && isCustomShadeEdit) {
+
+    //         const nextRows = (workingRows || []).map(row => {
+
+    //             const sameLine =
+    //                 String(row.LineId || '') === String(oldRow.LineId || '') ||
+    //                 Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+
+    //             if (!sameLine) return row;
+
+    //             return {
+    //                 ...row,
+    //                 ShdCode: finalShadeData[0]?.ShdCode,
+    //                 ShdName:
+    //                     finalShadeData[0]?.ShdName ||
+    //                     finalShadeData[0]?.ShadeName ||
+    //                     '',
+    //             };
+    //         });
+
+    //         // navigation.replace(
+    //         //     'OrderSummaryScreen',
+    //         //     {
+    //         //         completedRows: nextRows,
+    //         //         editMode1: true,
+    //         //         replaceItemOnlyDone: true,
+    //         //         mode,
+    //         //         uid,
+    //         //         screenMode: mode,
+    //         //         soNo,
+    //         //         soDate,
+    //         //         party: finalParty,
+    //         //         partyData: finalParty,
+    //         //         selectedParty: finalParty,
+    //         //         prpcode,
+    //         //         strcode,
+    //         //         yearno,
+    //         //         token,
+    //         //         skipReload: true,
+    //         //     }
+    //         // );
+
+    //         router.push({
+    //             pathname: '/OrderSummaryScreen',
+    //             params: {
+    //                 completedRows: nextRows,
+    //                 editMode1: true,
+    //                 replaceItemOnlyDone: true,
+    //                 mode: mode,
+    //                 uid: uid,
+    //                 screenMode: mode,
+    //                 soNo: soNo,
+    //                 soDate: soDate,
+    //                 party: finalParty,
+    //                 partyData: finalParty,
+    //                 selectedParty: finalParty,
+    //                 prpcode: prpcode,
+    //                 strcode: strcode,
+    //                 yearno: yearno,
+    //                 token: token,
+    //                 skipReload: true,
+    //             }
+    //         });
+
+    //         return;
+    //     }
+
+    //     // navigation.navigate('SalesOrderDetails', {
+    //     //     mode,
+    //     //     uid,
+    //     //     soNo,
+    //     //     soDate,
+    //     //     editMode1,
+    //     //     editIndex,
+    //     //     editLineId,
+    //     //     oldRow,
+    //     //     selectedItem,
+    //     //     selectedGrade,
+
+    //     //     selectedShade: finalShadeData.map(x => ({
+    //     //         ShdCode: x?.ShdCode,
+    //     //         ShdName: x?.ShdName || x?.ShadeName || '',
+    //     //         Raw: x,
+    //     //     })),
+
+    //     //     workingRows,
+    //     //     party: finalParty,
+    //     //     partyData: finalParty,
+    //     //     selectedParty: finalParty,
+    //     //     prpcode,
+    //     //     strcode,
+    //     //     yearno,
+    //     //     token,
+    //     // });
+
+    //     router.push({
+    //         pathname: '/SalesOrderDetails',
+    //         params: {
+    //             mode: mode,
+    //             uid: uid,
+    //             soNo: soNo,
+    //             soDate: soDate,
+    //             editMode1: editMode1,
+    //             editIndex: editIndex,
+    //             editLineId: editLineId,
+    //             oldRow: oldRow,
+    //             selectedItem: selectedItem,
+    //             selectedGrade: selectedGrade,
+
+    //             selectedShade: finalShadeData.map(x => ({
+    //                 ShdCode: x?.ShdCode,
+    //                 ShdName: x?.ShdName || x?.ShadeName || '',
+    //                 Raw: x,
+    //             })),
+
+    //             workingRows: workingRows,
+    //             party: finalParty,
+    //             partyData: finalParty,
+    //             selectedParty: finalParty,
+    //             prpcode: prpcode,
+    //             strcode: strcode,
+    //             yearno: yearno,
+    //             token: token,
+    //         }
+    //     });
+    // };
 
     const onNext = () => {
-
-        // const shadeData = item || selectedShade;
         const shadeData = selectedShade;
+        const finalShadeData = Array.isArray(shadeData) ? shadeData : [shadeData];
 
-        // always convert into array
-        const finalShadeData = Array.isArray(shadeData)
-            ? shadeData
-            : [shadeData];
+        console.log('onNext: ', editMode1);
 
-        console.log("finalShadeData", finalShadeData);
-
-        if (editMode && oldRow && isCustomShadeEdit) {
-
-            const nextRows = (workingRows || []).map(row => {
-
+        if (editMode1 && parsedOldRow && isCustomShadeEdit) {
+            console.log("parsedWorkingRows in edit shade: ", workingRows, parsedWorkingRows);
+            const nextRows = parsedWorkingRows.map(row => {
                 const sameLine =
-                    String(row.LineId || '') === String(oldRow.LineId || '') ||
-                    Number(row.SrNo || 0) === Number(oldRow.SrNo || 0);
+                    String(row.LineId || '') === String(parsedOldRow.LineId || '') ||
+                    Number(row.SrNo || 0) === Number(parsedOldRow.SrNo || 0);
 
                 if (!sameLine) return row;
 
                 return {
                     ...row,
                     ShdCode: finalShadeData[0]?.ShdCode,
-                    ShdName:
-                        finalShadeData[0]?.ShdName ||
-                        finalShadeData[0]?.ShadeName ||
-                        '',
+                    ShdName: finalShadeData[0]?.ShdName || finalShadeData[0]?.ShadeName || '',
                 };
             });
-
-            // navigation.replace(
-            //     'OrderSummaryScreen',
-            //     {
-            //         completedRows: nextRows,
-            //         editMode: true,
-            //         replaceItemOnlyDone: true,
-            //         mode,
-            //         uid,
-            //         screenMode: mode,
-            //         soNo,
-            //         soDate,
-            //         party: finalParty,
-            //         partyData: finalParty,
-            //         selectedParty: finalParty,
-            //         prpcode,
-            //         strcode,
-            //         yearno,
-            //         token,
-            //         skipReload: true,
-            //     }
-            // );
 
             router.push({
                 pathname: '/OrderSummaryScreen',
                 params: {
-                    completedRows: nextRows,
-                    editMode: true,
+                    completedRows: JSON.stringify(nextRows),      // 👈 stringify
+                    editMode1: true,
                     replaceItemOnlyDone: true,
                     mode: mode,
                     uid: uid,
                     screenMode: mode,
                     soNo: soNo,
                     soDate: soDate,
-                    party: finalParty,
-                    partyData: finalParty,
-                    selectedParty: finalParty,
+                    workingRows: JSON.stringify(nextRows),        // 👈 add + stringify
+                    party: JSON.stringify(finalParty),            // 👈 stringify
+                    partyData: JSON.stringify(finalParty),
+                    selectedParty: JSON.stringify(finalParty),
                     prpcode: prpcode,
                     strcode: strcode,
                     yearno: yearno,
@@ -382,66 +525,42 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             });
 
             return;
+        } else {
+            console.log("parsedWorkingRows in add shade: ", workingRows, parsedWorkingRows);
+            console.log('onNext i am called: ', editMode1);
+            router.push({
+                pathname: '/SalesOrderDetails',
+                params: {
+                    mode: mode,
+                    uid: uid,
+                    soNo: soNo,
+                    soDate: soDate,
+                    editMode1: editMode1,
+                    editIndex: editIndex,
+                    editLineId: editLineId,
+                    oldRow: JSON.stringify(parsedOldRow),              // 👈 stringify
+                    selectedItem: JSON.stringify(parsedSelectedItem),  // 👈 stringify
+                    selectedGrade: JSON.stringify(parsedSelectedGrade),// 👈 stringify
+
+                    selectedShade: JSON.stringify(                     // 👈 stringify
+                        finalShadeData.map(x => ({
+                            ShdCode: x?.ShdCode,
+                            ShdName: x?.ShdName || x?.ShadeName || '',
+                            Raw: x,
+                        }))
+                    ),
+
+                    workingRows: JSON.stringify(parsedWorkingRows),    // 👈 stringify
+                    party: JSON.stringify(finalParty),                 // 👈 stringify
+                    partyData: JSON.stringify(finalParty),
+                    selectedParty: JSON.stringify(finalParty),
+                    prpcode: prpcode,
+                    strcode: strcode,
+                    yearno: yearno,
+                    token: token,
+                }
+            });
         }
-
-        // navigation.navigate('SalesOrderDetails', {
-        //     mode,
-        //     uid,
-        //     soNo,
-        //     soDate,
-        //     editMode,
-        //     editIndex,
-        //     editLineId,
-        //     oldRow,
-        //     selectedItem,
-        //     selectedGrade,
-
-        //     selectedShade: finalShadeData.map(x => ({
-        //         ShdCode: x?.ShdCode,
-        //         ShdName: x?.ShdName || x?.ShadeName || '',
-        //         Raw: x,
-        //     })),
-
-        //     workingRows,
-        //     party: finalParty,
-        //     partyData: finalParty,
-        //     selectedParty: finalParty,
-        //     prpcode,
-        //     strcode,
-        //     yearno,
-        //     token,
-        // });
-
-        router.push({
-            pathname: '/SalesOrderDetails',
-            params: {
-                mode: mode,
-                uid: uid,
-                soNo: soNo,
-                soDate: soDate,
-                editMode: editMode,
-                editIndex: editIndex,
-                editLineId: editLineId,
-                oldRow: oldRow,
-                selectedItem: selectedItem,
-                selectedGrade: selectedGrade,
-
-                selectedShade: finalShadeData.map(x => ({
-                    ShdCode: x?.ShdCode,
-                    ShdName: x?.ShdName || x?.ShadeName || '',
-                    Raw: x,
-                })),
-
-                workingRows: workingRows,
-                party: finalParty,
-                partyData: finalParty,
-                selectedParty: finalParty,
-                prpcode: prpcode,
-                strcode: strcode,
-                yearno: yearno,
-                token: token,
-            }
-        });
     };
 
     const renderSkeleton = () => {
@@ -472,16 +591,14 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //     }
     // };
 
-    const handleShadeSelect = (item) => {
-        if (editMode) {
+    const handleShadeSelect = useCallback((item) => {
+        if (editMode1) {
             setSelectedShade([item]);
             return;
         }
-
         const alreadySelected = selectedShade?.some(
             x => String(x.ShdCode) === String(item.ShdCode)
         );
-
         if (alreadySelected) {
             setSelectedShade(prev =>
                 prev.filter(
@@ -491,7 +608,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         } else {
             setSelectedShade(prev => [...prev, item]);
         }
-    };
+    }, [editMode1, selectedShade]);
 
     const renderItem = ({ item }) => {
         const shdCode = item.ShdCode;
@@ -503,7 +620,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         );
 
         const isOld =
-            editMode && oldRow && String(oldRow.ShdCode) === String(shdCode);
+            editMode1 && parsedOldRow && String(parsedOldRow.ShdCode) === String(shdCode);
 
         return (
             <TouchableOpacity
@@ -541,7 +658,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 </TouchableOpacity>
 
                 <Text style={styles.headerTitle}>
-                    {editMode ? 'Modify Shade' : 'Select Shade'}
+                    {editMode1 ? 'Modify Shade' : 'Select Shade'}
                 </Text>
 
                 <View style={{ width: 22 }} />
@@ -551,23 +668,22 @@ const SalesOrderShadeList = ({ navigation, route }) => {
                 <View style={styles.itemBox}>
                     <Text style={styles.boxLabel}>Selected Item</Text>
                     <Text style={styles.boxTitle}>
-                        {selectedItem?.ItmCode} - {selectedItem?.ItmName}
+                        {parsedSelectedItem?.ItmCode} - {parsedSelectedItem?.ItmName}
                     </Text>
 
                     <Text style={[styles.boxLabel, { marginTop: 8 }]}>Selected Grade</Text>
                     <Text style={styles.boxTitle}>
-                        {selectedGrade?.GrdCode} - {selectedGrade?.GrdName}
+                        {parsedSelectedGrade?.GrdCode} - {parsedSelectedGrade?.GrdName}
                     </Text>
                 </View>
 
-                {editMode && oldRow && (
+                {editMode1 && parsedOldRow && (
                     <View style={styles.oldBox}>
-                        <Text style={styles.oldLabel}>Current Selected Shade</Text>
                         <Text style={styles.oldTitle}>
-                            {oldRow.ShdCode} - {oldRow.ShdName}
+                            {parsedOldRow.ShdCode} - {parsedOldRow.ShdName}
                         </Text>
                         <Text style={styles.oldSub}>
-                            Qty: {oldRow.Qty} | Pcs: {oldRow.Pcs} | Rate: ₹ {oldRow.Rate}
+                            Qty: {parsedOldRow.Qty} | Pcs: {parsedOldRow.Pcs} | Rate: ₹ {parsedOldRow.Rate}
                         </Text>
                     </View>
                 )}

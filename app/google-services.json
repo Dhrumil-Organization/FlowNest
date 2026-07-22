@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "268946997901",
+    "project_id": "flownest-65a7b",
+    "storage_bucket": "flownest-65a7b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:268946997901:android:1751a3caf8e64c11b618c4",
+        "android_client_info": {
+          "package_name": "com.anonymous.FlowNest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwAOxv2SdZklnkYMjbeoQwJU6-qRRRv7s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

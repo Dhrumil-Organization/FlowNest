@@ -123,28 +123,28 @@
 // });
 
 // screens/ContactScreen.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    View,
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Linking,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    ScrollView,
-    StyleSheet,
-    Dimensions,
-    Image,
-    StatusBar,
-    Animated,
-    Alert,
-    Linking,
-    KeyboardAvoidingView,
-    Platform,
+    View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import * as Haptics from 'expo-haptics';
-import theme from '@/components/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -218,36 +218,36 @@ const DEPARTMENTS = [
 
 const CONTACT_PERSONS: ContactPerson[] = [
     {
-        name: 'Mr. Ramesh Agarwal',
-        designation: 'Chairman & MD',
-        department: 'Leadership',
-        phone: '+91 9876500001',
-        email: 'ramesh@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200',
-    },
-    {
-        name: 'Mr. Suresh Agarwal',
-        designation: 'Joint MD',
-        department: 'Operations',
-        phone: '+91 9876500002',
-        email: 'suresh@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200',
-    },
-    {
-        name: 'Ms. Priya Sharma',
-        designation: 'Head - International Sales',
-        department: 'Export',
-        phone: '+91 9876500003',
-        email: 'priya@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200',
-    },
-    {
-        name: 'Mr. Anil Kumar',
-        designation: 'Customer Relations',
+        name: 'Mr. Yatiraj Mundra',
+        designation: 'Director',
         department: 'Support',
-        phone: '+91 9876500004',
-        email: 'anil@madhudangroup.com',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.03.30_REC-removebg-preview-300x292.png',
+    },
+    {
+        name: 'Mr. Sudarshan Mundra',
+        designation: 'Director',
+        department: 'Support',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.02.35_REC-removebg-preview-300x293.png',
+    },
+    {
+        name: 'Mr. Nikunj Mundra',
+        designation: 'Director',
+        department: 'Support',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/05/16.05.2023_18.20.36_REC-removebg-preview-300x298.png',
+    },
+    {
+        name: 'Mr. Saulabhya Mundra',
+        designation: 'Director',
+        department: 'Support',
+        phone: '',
+        email: '',
+        avatar: 'https://madhusudangroup.com/wp-content/uploads/2023/03/06.03.2023_19.05.06_REC-removebg-preview-300x295.png',
     },
 ];
 

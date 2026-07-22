@@ -2,7 +2,7 @@
   "expo": {
     "name": "FlowNest",
     "slug": "FlowNest",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/images/log_white.png",
     "scheme": "flownest",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "13",
+      "buildNumber": "14",
       "jsEngine": "jsc",
       "bundleIdentifier": "com.dhrumil.FlowNest",
       "infoPlist": {

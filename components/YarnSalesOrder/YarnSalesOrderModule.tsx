@@ -1,25 +1,26 @@
-import React from 'react';
-import { Platform, StatusBar, View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React from 'react';
+import { Platform, StatusBar, StyleSheet, View } from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import YarnSalesOrder from '.';
-import PartyListScreen from './PartyListScreen';
+// import YarnSalesOrder from '.';
 import OrderSummaryScreen from './OrderSummaryScreen';
+import PartyListScreen from './PartyListScreen';
+import YarnSalesOrder from './YarnSalesOrder';
 
-import { SalesOrderProvider } from './SalesOrderContext';
-import SalesOrderItemList from './SalesOrderItemList';
-import SalesOrderGradeList from './SalesOrderGradeList';
-import SalesOrderShadeList from './SalesOrderShadeList';
-import SalesOrderDetails from './SalesOrderDetails';
-import SalesOrderAddAnotherShade from './SalesOrderAddAnotherShade';
-import SalesOrderSaveSuccess from './SalesOrderSaveSuccess';
-import PdfViewerScreen from './PdfViewerScreen';
-import AddNewPartyScreen from './AddNewPartyScreen';
 import AddNewItemScreen from './AddNewItemScreen';
+import AddNewPartyScreen from './AddNewPartyScreen';
+import PdfViewerScreen from './PdfViewerScreen';
+import SalesOrderAddAnotherShade from './SalesOrderAddAnotherShade';
+import { SalesOrderProvider } from './SalesOrderContext';
+import SalesOrderDetails from './SalesOrderDetails';
+import SalesOrderGradeList from './SalesOrderGradeList';
+import SalesOrderItemList from './SalesOrderItemList';
+import SalesOrderSaveSuccess from './SalesOrderSaveSuccess';
+import SalesOrderShadeList from './SalesOrderShadeList';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +33,7 @@ const YarnSalesOrderModule = props => {
     token: props.token,
     isConnected: props.isConnected,
     username: props.username,
+    userid: props.userid
   };
 
   return (
@@ -126,6 +128,12 @@ const YarnSalesOrderModule = props => {
             <Stack.Screen name="AddNewItemScreen">
               {screenProps => (
                 <AddNewItemScreen {...screenProps} {...commonProps} />
+              )}
+            </Stack.Screen>
+
+            <Stack.Screen name="SalesOrderBrowse">
+              {screenProps => (
+                <YarnSalesOrder {...screenProps} {...commonProps} />
               )}
             </Stack.Screen>
           </Stack.Navigator>

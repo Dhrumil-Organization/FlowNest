@@ -463,7 +463,7 @@ export const crlimtreq_styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
-     cardSubHeaderText12: {
+    cardSubHeaderText12: {
         color: theme.BRAND_GRADIENT_END, // Purple theme
         fontSize: 14,
         fontWeight: '600',
@@ -1274,6 +1274,56 @@ export const crlimtreq_styles = StyleSheet.create({
     gridCardWrapper: {
         flex: 1,
         padding: 6,
+    },
+    partyContainer: {
+        marginTop: 10,
+        width: "100%",
+        borderWidth: 1,
+        borderColor: "#BEE3F8",
+        borderRadius: 10,
+        overflow: "hidden",
+        backgroundColor: "#fff",
+    },
+
+    partyHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        backgroundColor: "#F7FAFC",
+        borderBottomWidth: 1,
+        borderBottomColor: "#E2E8F0",
+    },
+
+    headerText: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: "#0F6C81",
+    },
+
+    partyRow: {
+        flexDirection: "row",
+        alignItems: "flex-start", // Important
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+    },
+
+    partyName1: {
+        flex: 1,
+        fontSize: 12,
+        color: "#222",
+        fontWeight: "500",
+        lineHeight: 22,
+        paddingRight: 10,
+        flexWrap: "wrap",
+    },
+
+    partyQty: {
+        width: 90,
+        textAlign: "right",
+        fontSize: 12,
+        fontWeight: "700",
+        color: "#111",
     },
     /**yarn purchase order sub card css end */
 });

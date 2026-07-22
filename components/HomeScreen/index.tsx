@@ -281,7 +281,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Sales Order', route: 'sales-order', icon: 'point-of-sale', color: '#20BEC1', category: 'Production' },
         { name: 'Employ Dashboard', route: 'employ-dashboard', icon: 'fact-check', color: '#5f338f', category: 'Production' },
         { name: 'Price List', route: 'price-list', icon: 'assessment', color: '#1E3A5F', category: 'Production' },
-        { name: 'Sales Order Dashborad', route: 'sales-order-dashboard', icon: 'dashboard', color: '#0B7285', category: 'Production' },
+        { name: 'Sales Order Dashboard', route: 'sales-order-dashboard', icon: 'dashboard', color: '#0B7285', category: 'Production' },
         { name: 'Sales Order Price List Auth', route: 'sales-order-price-list-auth', icon: 'receipt-long', color: '#740cea', category: 'Production' },
         // { name: 'Packing Automation', route: 'packing-automation', icon: 'table-view', color: 'rgb(194, 213, 52)', category: 'Production' },
         { name: 'Poy Rate Entry', route: 'PoyRateEntry', icon: 'price-change', color: '#6A1B9A', category: 'Production' },
@@ -292,6 +292,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Beam Close', route: 'beam-close', icon: 'assignment-turned-in', color: '#0ceebd', category: 'Production' },
         { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Inquiry Report', route: 'inquiry-report', icon: 'view-comfortable', color: '#69e3ad', category: 'Production' },
+         { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
         // { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
     ];
 
@@ -440,8 +441,19 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                         "href": "/"
                     //                     },
                     //                     {
-
                     //                         "title": "Packing Grade Auth",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order Dashboard",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Quarter Summary",
+                    //                         "href": "/"
+                    //                     },
+                    //                      {
+                    //                         "title": "Yarn Sales Order",
                     //                         "href": "/"
                     //                     },
                     //                 ]

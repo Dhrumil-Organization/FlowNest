@@ -395,38 +395,46 @@
 //         textAlign: 'center',
 //     },
 // });
-import React, { useEffect, useRef } from 'react';
-import {
-    ScrollView,
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    Dimensions,
-    Image,
-    Animated,
-} from 'react-native';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import theme from '@/components/theme';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Animated,
+    Dimensions,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import logo from '../../assets/images/logo.png';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.72;
 const CARD_SPACING = 14;
+type Nav = any;
 
 export default function LandingPage() {
+    const navigation = useNavigation<Nav>();
     const router = useRouter();
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollRef = useRef(null);
     const currentIndex = useRef(0);
+    const [lookupPlatform, setLookupPlatform] = useState<null>(null);
 
     useEffect(() => {
         const check = async () => {
             const token = await AsyncStorage.getItem('access_token');
-            if (token) {
+            const l = await AsyncStorage.getItem('LOOKUP_PLATFORM');
+            console.log('L:', l);
+            if (token && l === 'NEW') {
+                navigation.navigate('Main')
+            } else if (token && l !== 'NEW') {
                 router.replace('/');
             }
         };
@@ -544,7 +552,8 @@ export default function LandingPage() {
 
                 <TouchableOpacity
                     style={styles.primaryBtn}
-                    onPress={() => router.replace('/(auth)/login')}
+                    // onPress={() => router.replace('/(auth)/login')}
+                    onPress={() => router.push('/lookup-select')}
                 >
                     <Text style={styles.primaryText}>
                         Login
@@ -612,7 +621,7 @@ export default function LandingPage() {
                             key={index}
                             activeOpacity={0.85}
                             style={styles.featureCard}
-                            // onPress={() => router.replace('/(auth)/login')}
+                        // onPress={() => router.replace('/(auth)/login')}
                         >
                             <View style={styles.cardHeader}>
                                 <View style={styles.iconBox}>

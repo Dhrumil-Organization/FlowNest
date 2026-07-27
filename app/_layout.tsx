@@ -301,7 +301,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import AccessDeniedScreen from '../common/access-denied';
 import FullScreenLoader from '../components/FullScreenLoader';
 
@@ -350,9 +350,14 @@ export default function RootLayout() {
     });
   }, []);
 
-  initAPI();
-  initAPIForPrinterList();
-  initAPIForSticker();
+  // initAPI();
+  // initAPIForPrinterList();
+  // initAPIForSticker();
+  useEffect(() => {
+    initAPI();
+    initAPIForPrinterList();
+    initAPIForSticker();
+  }, []);
 
   const initializeDatabases = async () => {
     try {
@@ -365,7 +370,14 @@ export default function RootLayout() {
     }
   };
 
+  // useEffect(() => {
+  //   initializeDatabases();
+  // }, []);
   useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
     initializeDatabases();
   }, []);
 
@@ -380,9 +392,18 @@ export default function RootLayout() {
     }
   };
 
+  // useEffect(() => {
+  //   if (!token) return;
+  //   if (!getUsertype) return;
+  //   initializeDatabasesEvent();
+  // }, [token, getUsertype]);
+
   useEffect(() => {
+    if (Platform.OS === "web") return;
+
     if (!token) return;
     if (!getUsertype) return;
+
     initializeDatabasesEvent();
   }, [token, getUsertype]);
 

@@ -4,48 +4,56 @@
 // Login still stores token + app_session and opens dashboard directly.
 // ─────────────────────────────────────────────────────────────
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useMemo, useState } from 'react';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { AuthAPI } from '../../api/client';
-import { useAppSessionStore } from '../../stores/AppSessionStore';
-import { useAppStore } from '../../stores/AppStore';
+import { performLogin } from '../../core/authFlow';
+import { getBiometricLabel, isBiometricSupported } from '../../lib/biometricAuth';
 import { T } from '../../theme';
-import type { UserAccount } from '../../types';
 
-function makeLegacyUser(user: any): UserAccount {
-  const first = user?.first_name || user?.displayname || user?.name || 'User';
-  const isSuper = Number(user?.is_superadmin || 0) !== 0;
-
-  return {
-    role: isSuper ? 'owner' : 'designer',
-    name: first,
-    glyph: isSuper ? '♔' : '◳',
-    sub: isSuper ? 'Owner / Super Admin' : 'Sudamo User',
-  };
-}
+const COLORS = {
+  background: '#F6F4F1',
+  dark: '#111111',
+  white: '#FFFFFF',
+  primary: '#C87516',
+  primaryDark: '#A35F0F',
+  border: '#ECECEC',
+  text: '#202020',
+  subText: '#707070',
+  success: '#2BA84A',
+};
 
 export function RoleLoginScreen() {
-  const setSession = useAppSessionStore((s) => s.setLoggedIn);
-  const setBiometricEnabled = useAppSessionStore((s) => s.setBiometricEnabled);
-  const setLegacyUser = useAppStore((s) => s.setUser);
-
+  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [bioSupported, setBioSupported] = useState(false);
+  const [bioLabel, setBioLabel] = useState('screen lock');
+  const [rememberMe, setRememberMe] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supported = await isBiometricSupported();
+      setBioSupported(supported);
+      if (supported) setBioLabel(await getBiometricLabel());
+    })();
+  }, []);
 
   const canSubmit = useMemo(
     () => username.trim().length > 0 && password.trim().length > 0 && !loading,
@@ -56,53 +64,26 @@ export function RoleLoginScreen() {
     if (!canSubmit) return;
 
     setLoading(true);
-
     try {
-      const payload = {
-        name: username.trim(),
-        password: password.trim(),
-        noti_token: 'test',
-      };
-
-      const res = await AuthAPI.login(payload);
-      console.log('Login Response:', res);
-
-      if (!res.success) {
-        Alert.alert('Login failed', res.message || 'Invalid username or password.');
-        return;
+      const rememberAction = bioSupported && rememberMe ? 'save' : bioSupported ? 'clear' : undefined;
+      const outcome = await performLogin(username, password, rememberAction);
+      if (!outcome.success) {
+        Alert.alert('Login failed', outcome.message);
+      } else if (outcome.message) {
+        // e.g. "Remember me" was requested but the device lock confirm failed.
+        Alert.alert('Note', outcome.message);
       }
-
-      console.log('Login Response:', res);
-
-      const response = res.response || {};
-      const token = response.access_token;
-      const user = response.user;
-      const appSession = response?.app_session || {};
-
-      // if (!token || !user || !appSession) {
-      if (!token || !user) {
-        Alert.alert('Login error', 'Login response is missing token, user, or app_session.');
-        return;
-      }
-
-      await AsyncStorage.setItem('access_token', token);
-      await AsyncStorage.setItem('app_session', JSON.stringify(appSession));
-      await AsyncStorage.setItem('user_details', user?.first_name || user?.name || 'User');
-      await AsyncStorage.setItem('user_id', String(user?.id || 0));
-      await AsyncStorage.setItem(
-        'user_prptype',
-        response.userof || appSession.business_context?.prp_group || ''
-      );
-      await AsyncStorage.setItem('yno', appSession.business_context?.year_no || '');
-
-      setLegacyUser(makeLegacyUser(user));
-      setBiometricEnabled(false); // Biometric UI will be added cleanly in the next phase.
-      setSession({ token, user, appSession, rawLoginResponse: response });
-    } catch (e: any) {
-      Alert.alert('Server error', e?.message || 'Unable to login.');
+      // On success, AppSessionStore's token flips to truthy and the
+      // route watching it (app/new/role-login.tsx) redirects into the
+      // app automatically — no navigation call needed here.
     } finally {
       setLoading(false);
     }
+  };
+
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
   };
 
   return (
@@ -112,7 +93,33 @@ export function RoleLoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.hero}>
-          <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text>
+          {/* <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text> */}
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={goBack}
+              style={styles.backButton}
+            >
+              <Icon
+                name="arrow-back-ios-new"
+                size={18}
+                color={COLORS.white}
+              />
+
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={styles.brand}
+            >
+              MADHUSUDHAN FABRICS
+            </Text>
+
+            {/* Right Side Spacer */}
+            <View style={{ width: 70 }} />
+          </View>
           <Text style={styles.title}>Sign in</Text>
           <Text style={styles.sub}>
             Username and password only. Year, property, group and store are derived automatically from your ERP user defaults.
@@ -175,13 +182,22 @@ export function RoleLoginScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.bioBox}>
-            <Text style={styles.bioIcon}>◉</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bioTitle}>Quick login coming next</Text>
-              <Text style={styles.bioSub}>Face ID / Fingerprint will be enabled after the session core is stable.</Text>
+          {bioSupported && (
+            <View style={styles.bioBox}>
+              <Text style={styles.bioIcon}>◉</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bioTitle}>Remember me</Text>
+                <Text style={styles.bioSub}>
+                  We'll confirm with your {bioLabel} and save this login for next time.
+                </Text>
+              </View>
+              <Switch
+                value={rememberMe}
+                onValueChange={setRememberMe}
+                trackColor={{ true: T.copper }}
+              />
             </View>
-          </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -192,7 +208,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.nav },
   wrap: { flex: 1 },
   hero: { paddingHorizontal: 24, paddingTop: 34, paddingBottom: 26 },
-  brand: { fontSize: 10, color: '#6F91AD', fontWeight: '800', letterSpacing: 1.7, marginBottom: 8 },
+  brand: {
+    flex: 1,
+    textAlign: 'center',
+    color: '#B6B6B6',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 2,
+    paddingHorizontal: 10,
+  },
   title: { fontSize: 32, lineHeight: 38, fontWeight: '900', color: '#fff', marginBottom: 8 },
   sub: { fontSize: 13, color: '#A9C0D4', lineHeight: 19, maxWidth: 340 },
   panel: {
@@ -257,6 +281,24 @@ const styles = StyleSheet.create({
   bioIcon: { color: T.green, fontSize: 18, fontWeight: '900' },
   bioTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
   bioSub: { color: T.muted, fontSize: 11, marginTop: 2 },
-});
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 30,
+  },
 
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 70,
+  },
+
+  backText: {
+    color: COLORS.white,
+    fontSize: 15,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+});
 export default RoleLoginScreen;

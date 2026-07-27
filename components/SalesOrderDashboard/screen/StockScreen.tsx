@@ -3,14 +3,26 @@
 // GET /api/appgreyinstockdata logic (dptcode 'PR' = greige split,
 // item → design → sub-design → shade drill-down, sort, search).
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { API } from '@/common/API/dynamicAPI';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity,
-  TextInput, Modal, ActivityIndicator, RefreshControl, Alert, Platform,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios';
-import { API } from '@/common/API/dynamicAPI';
 
 // ── Helpers ───────────────────────────────────────────────────────
 const num = (v: any) => {
@@ -117,7 +129,7 @@ const sortGroups = (groups: any[], order: 'asc' | 'desc') =>
 
 // ── Screen ────────────────────────────────────────────────────────
 export default function StockScreen({ token }: any) {
-
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('fabric');
 
   // raw API rows
@@ -287,18 +299,26 @@ export default function StockScreen({ token }: any) {
         (a, r) => ({ qty: a.qty + num(r.QTY), val: a.val + rowValue(r) }),
         { qty: 0, val: 0 });
     return [
-      { label: 'Greige Yarn', tag: 'godown', 
+      {
+        label: 'Greige Yarn', tag: 'godown',
         // unit: 'kg', 
-        color: '#14532D', ...yrn(true) },
-      { label: 'Dyed Yarn', tag: 'godown', 
+        color: '#14532D', ...yrn(true)
+      },
+      {
+        label: 'Dyed Yarn', tag: 'godown',
         // unit: 'kg', 
-        color: '#C2823A', ...yrn(false) },
-      { label: 'Greige Fabric', tag: 'godown', 
+        color: '#C2823A', ...yrn(false)
+      },
+      {
+        label: 'Greige Fabric', tag: 'godown',
         // unit: 'm', 
-        color: '#1D4ED8', ...fab(true) },
-      { label: 'Finished Fabric', tag: 'ready stock', 
+        color: '#1D4ED8', ...fab(true)
+      },
+      {
+        label: 'Finished Fabric', tag: 'ready stock',
         // unit: 'm', 
-        color: '#7C3AED', ...fab(false) },
+        color: '#7C3AED', ...fab(false)
+      },
     ];
   }, [fabricRows, yarnRows]);
   const flowTotal = flow.reduce((s, f) => s + f.val, 0);
@@ -522,7 +542,15 @@ export default function StockScreen({ token }: any) {
       <View style={S.header}>
         <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
         <View style={S.headerRow}>
-          <Text style={S.headerTitle}>Stock</Text>
+          {/* <Text style={S.headerTitle}>Stock</Text> */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
+              <Icon name="arrow-back" size={22} color={'#fff'} />
+            </TouchableOpacity>
+            <View>
+              <Text style={S.headerTitle}>Stock</Text>
+            </View>
+          </View>
           <TouchableOpacity style={S.prpBtn} onPress={() => setShowPrpPicker(true)}>
             <Text style={S.prpBtnText}>
               {selectedPrps.length === prpList.length

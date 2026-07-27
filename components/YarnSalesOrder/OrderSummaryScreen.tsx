@@ -3,13 +3,13 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     FlatList,
     Modal,
+    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
@@ -17,7 +17,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from '../../common/API/dynamicAPI';
 import { useSalesOrder } from './SalesOrderContext';
 
@@ -300,7 +299,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 setRows(reSrNo(parsedPreservedRows)); // Use parsed preserved rows
             }
         }
-    }, []);
+        }, []);
     // }, [params?.selectedTempParty]);
 
     const [rows, setRows] = useState(() => reSrNo(normalizeRows(contextItems)));
@@ -2032,7 +2031,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 //     title: 'Sales Order Print',
                 // });
                 router.push({
-                    pathname: '/pdfscreen',
+                    pathname: '/pdf-view',
                     params: {
                         pdfUrl: pdfUrl,
                         title: 'Sales Order Print',
@@ -2292,9 +2291,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     console.log('prpcode', prpcode, 'yearno', yearno, 'soNo', soNo, 'uid', uid);
 
     return (
-        <>
-            <SafeAreaView style={styles.safe1} edges={['top']} />
-            <StatusBar style="light" backgroundColor="#00838f" />
+        <SafeAreaView style={styles.safe}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />
@@ -3105,11 +3102,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 </View>
             </Modal>
 
-            {/* </SafeAreaView> */}
-
-            <SafeAreaView style={styles.safe2} edges={['bottom']} />
-        </>
-
+        </SafeAreaView>
     );
 };
 
@@ -3117,8 +3110,6 @@ export default OrderSummaryScreen;
 
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#F5F7FB' },
-    safe1: { flex: 0, backgroundColor: '#13879A' },
-    safe2: { flex: 0, backgroundColor: '#F5F7FB' },
     header: {
         height: 56,
         backgroundColor: '#13879A',

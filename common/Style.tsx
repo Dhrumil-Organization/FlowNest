@@ -1402,29 +1402,26 @@ export const checkingScannerStyles = StyleSheet.create({
         marginTop: 10,
         fontWeight: "500"
     },
-
-
-
     input: {
-        paddingVertical: 0,
-        paddingHorizontal: 20,
-        color: '#000000',
+        height: 49,
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: "#000",
-        borderRadius: 6,
-        //padding: 10,
-        //marginTop: 5
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        paddingHorizontal: 18,
+        fontSize: 16,
+        color: '#111827',
+        marginTop: 5,
     },
     inputDisabled: {
-        backgroundColor: '#fff',
-        paddingVertical: 0,
-        paddingHorizontal: 20,
-        color: '#000000',
+        height: 49,
+        backgroundColor: '#F8FAFC',
         borderWidth: 1,
-        borderColor: "#000",
-        borderRadius: 6,
-        //padding: 10,
-        //marginTop: 5
+        borderColor: '#E2E8F0',
+        borderRadius: 10,
+        paddingHorizontal: 18,
+        color: '#111827',
+        marginTop: 5,
     },
 
     // dropdown: {
@@ -1452,14 +1449,21 @@ export const checkingScannerStyles = StyleSheet.create({
     },
 
     submitBtn1: {
-        flex: 1, // dono button same width
-        flexDirection: 'row',
-        backgroundColor: "#007EA7",
+        flex: 1,
+        height: 50,
         justifyContent: 'center',
-        alignItems: "center",
+        alignItems: 'center',
+        borderRadius: 12,
+        backgroundColor: '#007EA7',
+
+        // flex: 1, // dono button same width
+        flexDirection: 'row',
+        // backgroundColor: "#007EA7",
+        // justifyContent: 'center',
+        // alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 18,
-        borderRadius: 14,
+        // borderRadius: 14,
 
         // Shadow
         shadowColor: "#000",

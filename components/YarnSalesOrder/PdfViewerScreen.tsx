@@ -1,81 +1,61 @@
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as FileSystem from 'expo-file-system/legacy';
-import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import React from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
+    View,
     Text,
-    ToastAndroid,
+    StyleSheet,
     TouchableOpacity,
-    View
+    Share,
+    Alert,
+    Platform,
+    ActivityIndicator,
+    ToastAndroid,
 } from 'react-native';
-import RNFS from 'react-native-fs';
 import Pdf from 'react-native-pdf';
+import Icon from '@expo/vector-icons/MaterialIcons';
+// import Share from 'react-native-share';
+
+import ReactNativeBlobUtil from 'react-native-blob-util';
+// import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import RNFS from 'react-native-fs';
 
-type PdfViewerScreenProps = NativeStackScreenProps<any>;
-
-const PdfViewerScreen = ({
-    navigation,
-    route,
-    token,
-    username,
-    userid,
-    isConnected,
-}: PdfViewerScreenProps & {
-    token: any;
-    username: any;
-    userid: any;
-    isConnected: any;
-}) => {
-    // const route = useRouter();
-    // const params = useLocalSearchParams();
-
-    const router = useRouter();
-
-    const { pdfUrl = '', title = 'PDF Preview' } = route.params || {};
+const PdfViewerScreen = ({ navigation, route }) => {
+    const { pdfUrl = '', title = 'PDF Preview' } = route?.params || {};
     const [downloading, setDownloading] = React.useState(false);
 
-    console.log("PDF URL =>", pdfUrl);
-    console.log("Route Params =>", route.params);
 
+    const handleShare = async () => {
+        try {
+            if (!pdfUrl) {
+                Alert.alert('Error', 'PDF URL not found');
+                return;
+            }
 
-    // const handleShare = async () => {
-    //     try {
-    //         if (!pdfUrl) {
-    //             Alert.alert('Error', 'PDF URL not found');
-    //             return;
-    //         }
+            const { config, fs } = ReactNativeBlobUtil;
 
-    //         const { config, fs } = ReactNativeBlobUtil;
+            const fileName =
+                title.replace(/[^a-zA-Z0-9]/g, '_') +
+                '.pdf';
 
-    //         const fileName =
-    //             title.replace(/[^a-zA-Z0-9]/g, '_') +
-    //             '.pdf';
+            const path =
+                fs.dirs.CacheDir + '/' + fileName;
 
-    //         const path =
-    //             fs.dirs.CacheDir + '/' + fileName;
+            const res = await config({
+                fileCache: true,
+                path: path,
+            }).fetch('GET', pdfUrl);
+            await Share.open({
+                title: title,
+                url: 'file://' + res.path(),
+                type: 'application/pdf',
+                failOnCancel: false,
+                saveToFiles: true,
+            });
 
-    //         const res = await config({
-    //             fileCache: true,
-    //             path: path,
-    //         }).fetch('GET', pdfUrl);
-    //         await Sharing.open({
-    //             title: title,
-    //             url: 'file://' + res.path(),
-    //             type: 'application/pdf',
-    //             failOnCancel: false,
-    //             saveToFiles: true,
-    //         });
-
-    //     } catch (error) {
-    //         console.log('SHARE ERROR =>', error);
-    //     }
-    // };
+        } catch (error) {
+            console.log('SHARE ERROR =>', error);
+        }
+    };
 
     // const handleDownload = async () => {
     //     try {
@@ -131,56 +111,32 @@ const PdfViewerScreen = ({
     //     }
     // };
 
-    const handleShare = async () => {
+    const shareLocalFile = async (
+        localFileUri: string
+    ) => {
         try {
-            if (!pdfUrl) {
-                Alert.alert('Error', 'PDF URL not found');
-                return;
-            }
 
-            const fileName =
-                `${String(title).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+            const urlToShare =
+                localFileUri.startsWith('file://')
+                    ? localFileUri
+                    : `file://${localFileUri}`;
 
-            const fileUri =
-                FileSystem.cacheDirectory + fileName;
-
-            setDownloading(true);
-
-            await FileSystem.downloadAsync(
-                String(pdfUrl),
-                fileUri
-            );
-
-            setDownloading(false);
-
-            const canShare =
-                await Sharing.isAvailableAsync();
-
-            if (!canShare) {
-                Alert.alert(
-                    'Error',
-                    'Sharing is not available on this device.'
-                );
-                return;
-            }
-
-            await Sharing.shareAsync(fileUri, {
-                mimeType: 'application/pdf',
-                dialogTitle: String(title),
+            await Share.open({
+                url: urlToShare,
+                type: 'application/pdf',
+                failOnCancel: false,
             });
 
-        } catch (error) {
+        } catch (err: any) {
 
-            setDownloading(false);
-
-            console.log(
-                'SHARE ERROR =>',
-                error
+            console.warn(
+                'shareLocalFile error',
+                err
             );
 
             Alert.alert(
-                'Error',
-                'Unable to share PDF.'
+                'Share Failed',
+                err?.message || 'Unable to share PDF'
             );
         }
     };
@@ -286,7 +242,7 @@ const PdfViewerScreen = ({
 
                 {/* LEFT BACK BUTTON */}
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={() => navigation.goBack()}
                     style={styles.leftIcon}
                 >
                     <Icon

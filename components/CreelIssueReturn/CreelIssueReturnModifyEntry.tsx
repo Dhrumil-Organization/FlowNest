@@ -1,6 +1,7 @@
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from "axios";
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -13,6 +14,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from "../../common/API/dynamicAPI";
 // import CustomSearchableDropdown from "../Shared/CustomSearchableDropdown";
 
@@ -559,68 +561,78 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
         }
     };
     return (
-        <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Icon name="arrow-back" size={22} color="#fff" />
-                </TouchableOpacity>
+        <>
+            <StatusBar
+                style="light"
+                backgroundColor="#007EA7"
+                translucent={false}
+            />
+            <SafeAreaView
+                edges={['top']}
+                style={{ flex: 1, backgroundColor: "#0F6C7B" }}
+            >
+                <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => router.back()}>
+                            <Icon name="arrow-back" size={22} color="#fff" />
+                        </TouchableOpacity>
 
-                <Text style={styles.headerTitle}>Modify Entry..</Text>
-                <View style={{ width: 22 }} />
-            </View>
+                        <Text style={styles.headerTitle}>Modify Entry..</Text>
+                        <View style={{ width: 22 }} />
+                    </View>
 
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-                <View style={styles.card}>
-                    <View style={styles.rowBetween}>
-                        <View>
-                            <Text style={styles.sectionTitle}>Selected Creel</Text>
-                            <Text style={styles.creelText}>
-                                {selectedBatchNo || "No Creel Selected"}
-                            </Text>
+                    <ScrollView contentContainerStyle={{ padding: 16 }}>
+                        <View style={styles.card}>
+                            <View style={styles.rowBetween}>
+                                <View>
+                                    <Text style={styles.sectionTitle}>Selected Creel</Text>
+                                    <Text style={styles.creelText}>
+                                        {selectedBatchNo || "No Creel Selected"}
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.linkBtnSmall}
+                                    onPress={() => {
+                                        fetchCreelData();
+                                        setLinkModal(true);
+                                    }}
+                                >
+                                    <Icon name="link" size={16} color="#0F6C7B" />
+                                    <Text style={styles.linkBtnText}>Link Creel</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.linkBtnSmall}
-                            onPress={() => {
-                                fetchCreelData();
-                                setLinkModal(true);
-                            }}
-                        >
-                            <Icon name="link" size={16} color="#0F6C7B" />
-                            <Text style={styles.linkBtnText}>Link Creel</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                        <View style={[styles.card, { opacity: 0.6 }]}>
+                            <Text style={styles.sectionTitle}>Carton Type</Text>
 
-                <View style={[styles.card, { opacity: 0.6 }]}>
-                    <Text style={styles.sectionTitle}>Carton Type</Text>
+                            <ToggleSwitch
+                                options={["Single", "Mix"]}
+                                value={cartonType}
+                                onChange={() => { }} // disabled
+                            />
+                        </View>
 
-                    <ToggleSwitch
-                        options={["Single", "Mix"]}
-                        value={cartonType}
-                        onChange={() => { }} // disabled
-                    />
-                </View>
+                        <View style={styles.card}>
+                            <Text style={styles.label}>Carton No</Text>
 
-                <View style={styles.card}>
-                    <Text style={styles.label}>Carton No</Text>
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    {
+                                        backgroundColor: "#E5E7EB",
+                                        color: "#000",
+                                    }
+                                ]}
+                                value={d2Data?.[0]?.CartNo ? String(d2Data?.[0]?.CartNo) : ""}
+                                editable={false}
+                                placeholder="Carton No"
+                                placeholderTextColor="#000"
+                            />
+                        </View>
 
-                    <TextInput
-                        style={[
-                            styles.input,
-                            {
-                                backgroundColor: "#E5E7EB",
-                                color: "#000",
-                            }
-                        ]}
-                        value={d2Data?.[0]?.CartNo ? String(d2Data?.[0]?.CartNo) : ""}
-                        editable={false}
-                        placeholder="Carton No"
-                        placeholderTextColor="#000"
-                    />
-                </View>
-
-                {/* <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }}>
+                        {/* <View style={{ marginBottom: 10, opacity: isDisabled ? 0.5 : 1 }}>
                     <Text style={styles.label}>Select Item <Text style={{ color: "red" }}>*</Text></Text>
                     <CustomSearchableDropdown
                         data={getItemData}
@@ -698,96 +710,96 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     />
                 </View> */}
 
-                {savedResponse?.d1?.length > 0 && (
-                    <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Saved Item Detail</Text>
+                        {savedResponse?.d1?.length > 0 && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionTitle}>Saved Item Detail</Text>
 
-                        {savedResponse.d1.map((item, index) => (
-                            <View key={index} style={styles.savedCardNew}>
+                                {savedResponse.d1.map((item, index) => (
+                                    <View key={index} style={styles.savedCardNew}>
 
-                                {/* ROW 1 */}
-                                <View style={styles.row}>
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Item</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getItemData, "ItmCode", "ItmName", item.ItmCode)}
-                                        </Text>
+                                        {/* ROW 1 */}
+                                        <View style={styles.row}>
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Item</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getItemData, "ItmCode", "ItmName", item.ItmCode)}
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Merge</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getMergeData, "MerCode", "MerName", item.MerCode)}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* ROW 2 */}
+                                        <View style={styles.row}>
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Grade</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getGradeData, "GrdCode", "GrdName", item.GrdCode)}
+                                                </Text>
+                                            </View>
+
+                                            <View style={styles.col}>
+                                                <Text style={styles.labelNew}>Shade</Text>
+                                                <Text style={styles.valueNew}>
+                                                    {getName(getShadeData, "ShdCode", "ShdName", item.ShdCode)}
+                                                </Text>
+                                            </View>
+                                        </View>
+
                                     </View>
-
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Merge</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getMergeData, "MerCode", "MerName", item.MerCode)}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* ROW 2 */}
-                                <View style={styles.row}>
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Grade</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getGradeData, "GrdCode", "GrdName", item.GrdCode)}
-                                        </Text>
-                                    </View>
-
-                                    <View style={styles.col}>
-                                        <Text style={styles.labelNew}>Shade</Text>
-                                        <Text style={styles.valueNew}>
-                                            {getName(getShadeData, "ShdCode", "ShdName", item.ShdCode)}
-                                        </Text>
-                                    </View>
-                                </View>
-
+                                ))}
                             </View>
-                        ))}
-                    </View>
-                )}
+                        )}
 
-                <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
-                    <View style={[styles.card, { flex: 1 }]}>
-                        <Text style={styles.label}>Cheese</Text>
-                        <TextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={form.TotPcs}
-                            onChangeText={v => setForm(prev => ({ ...prev, TotPcs: v || "" }))}
-                            placeholder="Enter Cheese"
-                            placeholderTextColor="#000"
-                        />
-                    </View>
+                        <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                            <View style={[styles.card, { flex: 1 }]}>
+                                <Text style={styles.label}>Cheese</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    keyboardType="numeric"
+                                    value={form.TotPcs}
+                                    onChangeText={v => setForm(prev => ({ ...prev, TotPcs: v || "" }))}
+                                    placeholder="Enter Cheese"
+                                    placeholderTextColor="#000"
+                                />
+                            </View>
 
-                    <View style={[styles.card, { flex: 1 }]}>
-                        <Text style={styles.label}>Weight</Text>
-                        <TextInput
-                            style={styles.input}
-                            keyboardType="numeric"
-                            value={form.TotQty}
-                            onChangeText={v => setForm(prev => ({ ...prev, TotQty: v || "" }))}
-                            placeholder="Enter Weight"
-                            placeholderTextColor="#000"
-                        />
-                    </View>
+                            <View style={[styles.card, { flex: 1 }]}>
+                                <Text style={styles.label}>Weight</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    keyboardType="numeric"
+                                    value={form.TotQty}
+                                    onChangeText={v => setForm(prev => ({ ...prev, TotQty: v || "" }))}
+                                    placeholder="Enter Weight"
+                                    placeholderTextColor="#000"
+                                />
+                            </View>
 
-                </View>
+                        </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Status</Text>
-                    <ToggleSwitch
-                        options={["Open", "Close"]}
-                        value={status}
-                        onChange={setStatus}
-                    />
-                </View>
+                        <View style={styles.card}>
+                            <Text style={styles.sectionTitle}>Status</Text>
+                            <ToggleSwitch
+                                options={["Open", "Close"]}
+                                value={status}
+                                onChange={setStatus}
+                            />
+                        </View>
 
-                <TouchableOpacity
-                    style={styles.addD3Btn}
-                    onPress={handleAddD3Row}
-                >
-                    <Icon name="add-circle" size={20} color="#fff" />
-                    <Text style={styles.addD3BtnText}>Add Creel Return Detail</Text>
-                </TouchableOpacity>
-                {/* {savedResponse?.d1?.length > 0 && (
+                        <TouchableOpacity
+                            style={styles.addD3Btn}
+                            onPress={handleAddD3Row}
+                        >
+                            <Icon name="add-circle" size={20} color="#fff" />
+                            <Text style={styles.addD3BtnText}>Add Creel Return Detail</Text>
+                        </TouchableOpacity>
+                        {/* {savedResponse?.d1?.length > 0 && (
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>Saved Item Detail</Text>
 
@@ -810,7 +822,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     </View>
                 )} */}
 
-                {/* {d3Rows.length > 0 && (
+                        {/* {d3Rows.length > 0 && (
                     <View style={styles.card}>
                         <Text style={styles.sectionTitle}>Creel Return Detail</Text>
 
@@ -868,266 +880,268 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     </View>
                 )} */}
 
-                {d3Rows.length > 0 && (
-                    <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Creel Return Detail</Text>
+                        {d3Rows.length > 0 && (
+                            <View style={styles.card}>
+                                <Text style={styles.sectionTitle}>Creel Return Detail</Text>
 
-                        {d3Rows.map((row, index) => (
-                            <View key={index} style={styles.compactCard}>
+                                {d3Rows.map((row, index) => (
+                                    <View key={index} style={styles.compactCard}>
 
-                                {/* TOP ROW */}
+                                        {/* TOP ROW */}
+                                        <View style={styles.rowBetween}>
+                                            <Text style={styles.compactTitle}>
+                                                # {index + 1}  | UId: {row.IssUId}
+                                            </Text>
+
+                                            <TouchableOpacity
+                                                onPress={() => confirmDeleteD3Row(index)}
+                                            >
+                                                <Icon name="delete" size={18} color="#EF4444" />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        {/* SMALL INFO */}
+                                        <View style={styles.compactInfoRow}>
+                                            <Text style={styles.compactLabel}>SrNo: {row.IssSrNo}</Text>
+                                            <Text style={styles.compactLabel}>Qty: {row.IssQty}</Text>
+                                            <Text style={styles.compactLabel}>Cheese: {row.IssChees}</Text>
+                                        </View>
+
+                                        {/* INPUT ROW */}
+                                        <View style={styles.compactInputRow}>
+                                            <TextInput
+                                                style={styles.compactInput}
+                                                placeholder="Return Qty"
+                                                keyboardType="numeric"
+                                                value={String(row.IssRQty ?? "")}
+                                                onChangeText={v => updateD3Value(index, "IssRQty", v)}
+                                            />
+
+                                            <TextInput
+                                                style={styles.compactInput}
+                                                placeholder="Return Cheese"
+                                                keyboardType="numeric"
+                                                value={String(row.IssRChees ?? "")}
+                                                onChangeText={v => updateD3Value(index, "IssRChees", v)}
+                                            />
+                                        </View>
+
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.saveBtn, loading && { opacity: 0.7 }]}
+                            onPress={handleSaveModifyData}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={{ color: "#fff", fontWeight: "600" }}>Save Entry</Text>
+                            )}
+                        </TouchableOpacity>
+                    </ScrollView>
+
+                    <Modal transparent visible={linkModal} animationType="slide">
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.modalBox}>
                                 <View style={styles.rowBetween}>
-                                    <Text style={styles.compactTitle}>
-                                        # {index + 1}  | UId: {row.IssUId}
+                                    <Text style={{ fontSize: 16, fontWeight: "600", color: "#000" }}>
+                                        Select Creel
                                     </Text>
 
-                                    <TouchableOpacity
-                                        onPress={() => confirmDeleteD3Row(index)}
-                                    >
-                                        <Icon name="delete" size={18} color="#EF4444" />
+                                    <TouchableOpacity onPress={() => setLinkModal(false)}>
+                                        <Icon name="close" size={22} />
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* SMALL INFO */}
-                                <View style={styles.compactInfoRow}>
-                                    <Text style={styles.compactLabel}>SrNo: {row.IssSrNo}</Text>
-                                    <Text style={styles.compactLabel}>Qty: {row.IssQty}</Text>
-                                    <Text style={styles.compactLabel}>Cheese: {row.IssChees}</Text>
-                                </View>
+                                <TextInput
+                                    placeholder="Search..."
+                                    placeholderTextColor="#000"
+                                    value={searchText}
+                                    onChangeText={handleSearch}
+                                    style={styles.searchInput}
+                                />
 
-                                {/* INPUT ROW */}
-                                <View style={styles.compactInputRow}>
-                                    <TextInput
-                                        style={styles.compactInput}
-                                        placeholder="Return Qty"
-                                        keyboardType="numeric"
-                                        value={String(row.IssRQty ?? "")}
-                                        onChangeText={v => updateD3Value(index, "IssRQty", v)}
-                                    />
+                                <FlatList
+                                    data={filteredCreelData}
+                                    keyboardShouldPersistTaps="handled"
+                                    keyExtractor={(item, index) => index.toString()}
+                                    contentContainerStyle={{ paddingTop: 10 }}
 
-                                    <TextInput
-                                        style={styles.compactInput}
-                                        placeholder="Return Cheese"
-                                        keyboardType="numeric"
-                                        value={String(row.IssRChees ?? "")}
-                                        onChangeText={v => updateD3Value(index, "IssRChees", v)}
-                                    />
-                                </View>
+                                    renderItem={({ item }) => (
 
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.creelCardPro,
+                                                selectedCreel?.UId === item.UId &&
+                                                selectedCreel?.SrNo === item.SrNo &&
+                                                String(selectedCreel?.SubSr) === String(item.SubSr || item.IssSubSr || 1) &&
+                                                styles.selectedCardPro,
+                                            ]}
+                                            onPress={() => {
+                                                console.log("---- SELECTED CREEL:", item);
+                                                const selectedItem = getItemData.find(
+                                                    itm => String(itm.ItmCode) === String(item.ItmCode)
+                                                );
+                                                console.log("---- selectedItem", selectedItem)
+                                                setDenier(selectedItem?.Denier || "");
+                                                setSelectedCreel({
+                                                    UId: item.UId,
+                                                    SrNo: item.SrNo,
+                                                    SubSr: item.SubSr || item.IssSubSr || 1,
+                                                });
+                                                setSelectedBatchNo(item.BatchNo);
+
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    ItmCode: String(item.ItmCode),
+                                                    Denier: selectedItem?.Denier || "",
+                                                    MerCode: String(item.MerCode),
+                                                    GrdCode: String(item.GrdCode),
+                                                    ShdCode: String(item.ShdCode),
+                                                    IssUId: item.UId,
+                                                    IssSrNo: item.SrNo,
+                                                    IssSubSr: item.SubSr || item.IssSubSr || 1,
+                                                    IssChees: item.Pcs,
+                                                    IssQty: item.Qty,
+                                                    StkType: item.StkType,
+                                                }));
+
+                                                setLinkModal(false);
+                                            }}
+                                        >
+
+                                            {/* TOP ROW */}
+                                            <View style={styles.rowBetween}>
+                                                <Text style={styles.itemTitlePro} numberOfLines={1}>
+                                                    {item.ItmName}
+                                                </Text>
+
+                                                <View style={styles.batchBadgePro}>
+                                                    <Text style={styles.batchTextPro}>
+                                                        Creel No : {item.BatchNo}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* GRID */}
+                                            <View style={styles.gridRow}>
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Grade</Text>
+                                                    <Text style={styles.gridValue}>{item.GrdName}</Text>
+                                                </View>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Shade</Text>
+                                                    <Text style={styles.gridValue}>{item.ShdName}</Text>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.gridRow}>
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>Merge</Text>
+                                                    <Text style={styles.gridValue}>{item.MerName}</Text>
+                                                </View>
+
+                                                <View style={styles.gridCol}>
+                                                    <Text style={styles.gridLabel}>SubSr</Text>
+                                                    <Text style={styles.gridValue}>
+                                                        {item.SubSr || item.IssSubSr || 1}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* HIGHLIGHT ROW */}
+                                            <View style={styles.footerRow}>
+                                                <Text style={styles.qtyLabel}>Bal Qty</Text>
+                                                <Text style={styles.qtyValue}>{item.BalQty}</Text>
+                                            </View>
+
+                                        </TouchableOpacity>
+                                    )}
+                                />
                             </View>
-                        ))}
-                    </View>
-                )}
-
-                <TouchableOpacity
-                    style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                    onPress={handleSaveModifyData}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <Text style={{ color: "#fff", fontWeight: "600" }}>Save Entry</Text>
-                    )}
-                </TouchableOpacity>
-            </ScrollView>
-
-            <Modal transparent visible={linkModal} animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalBox}>
-                        <View style={styles.rowBetween}>
-                            <Text style={{ fontSize: 16, fontWeight: "600", color: "#000" }}>
-                                Select Creel
-                            </Text>
-
-                            <TouchableOpacity onPress={() => setLinkModal(false)}>
-                                <Icon name="close" size={22} />
-                            </TouchableOpacity>
                         </View>
+                    </Modal>
 
-                        <TextInput
-                            placeholder="Search..."
-                            placeholderTextColor="#000"
-                            value={searchText}
-                            onChangeText={handleSearch}
-                            style={styles.searchInput}
-                        />
+                    <Modal transparent visible={alertData.visible} animationType="fade">
+                        <View style={styles.alertOverlay}>
+                            <View style={styles.alertBox}>
+                                <Icon
+                                    name={
+                                        alertData.type === "success"
+                                            ? "check-circle"
+                                            : alertData.type === "error"
+                                                ? "error"
+                                                : "warning"
+                                    }
+                                    size={40}
+                                    color={
+                                        alertData.type === "success"
+                                            ? "#4CAF50"
+                                            : alertData.type === "error"
+                                                ? "#F44336"
+                                                : "#FFA000"
+                                    }
+                                />
 
-                        <FlatList
-                            data={filteredCreelData}
-                            keyboardShouldPersistTaps="handled"
-                            keyExtractor={(item, index) => index.toString()}
-                            contentContainerStyle={{ paddingTop: 10 }}
+                                <Text style={styles.alertTitle}>
+                                    {alertData.type === "success"
+                                        ? "Success"
+                                        : alertData.type === "error"
+                                            ? "Error"
+                                            : "Warning"}
+                                </Text>
 
-                            renderItem={({ item }) => (
+                                <Text style={styles.alertMessage}>{alertData.message}</Text>
 
                                 <TouchableOpacity
-                                    style={[
-                                        styles.creelCardPro,
-                                        selectedCreel?.UId === item.UId &&
-                                        selectedCreel?.SrNo === item.SrNo &&
-                                        String(selectedCreel?.SubSr) === String(item.SubSr || item.IssSubSr || 1) &&
-                                        styles.selectedCardPro,
-                                    ]}
-                                    onPress={() => {
-                                        console.log("---- SELECTED CREEL:", item);
-                                        const selectedItem = getItemData.find(
-                                            itm => String(itm.ItmCode) === String(item.ItmCode)
-                                        );
-                                        console.log("---- selectedItem", selectedItem)
-                                        setDenier(selectedItem?.Denier || "");
-                                        setSelectedCreel({
-                                            UId: item.UId,
-                                            SrNo: item.SrNo,
-                                            SubSr: item.SubSr || item.IssSubSr || 1,
-                                        });
-                                        setSelectedBatchNo(item.BatchNo);
-
-                                        setForm(prev => ({
-                                            ...prev,
-                                            ItmCode: String(item.ItmCode),
-                                            Denier: selectedItem?.Denier || "",
-                                            MerCode: String(item.MerCode),
-                                            GrdCode: String(item.GrdCode),
-                                            ShdCode: String(item.ShdCode),
-                                            IssUId: item.UId,
-                                            IssSrNo: item.SrNo,
-                                            IssSubSr: item.SubSr || item.IssSubSr || 1,
-                                            IssChees: item.Pcs,
-                                            IssQty: item.Qty,
-                                            StkType: item.StkType,
-                                        }));
-
-                                        setLinkModal(false);
-                                    }}
+                                    onPress={() => setAlertData({ visible: false, message: "", type: "warning" })}
+                                    style={styles.alertBtn}
                                 >
-
-                                    {/* TOP ROW */}
-                                    <View style={styles.rowBetween}>
-                                        <Text style={styles.itemTitlePro} numberOfLines={1}>
-                                            {item.ItmName}
-                                        </Text>
-
-                                        <View style={styles.batchBadgePro}>
-                                            <Text style={styles.batchTextPro}>
-                                                Creel No : {item.BatchNo}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* GRID */}
-                                    <View style={styles.gridRow}>
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Grade</Text>
-                                            <Text style={styles.gridValue}>{item.GrdName}</Text>
-                                        </View>
-
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Shade</Text>
-                                            <Text style={styles.gridValue}>{item.ShdName}</Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.gridRow}>
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>Merge</Text>
-                                            <Text style={styles.gridValue}>{item.MerName}</Text>
-                                        </View>
-
-                                        <View style={styles.gridCol}>
-                                            <Text style={styles.gridLabel}>SubSr</Text>
-                                            <Text style={styles.gridValue}>
-                                                {item.SubSr || item.IssSubSr || 1}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* HIGHLIGHT ROW */}
-                                    <View style={styles.footerRow}>
-                                        <Text style={styles.qtyLabel}>Bal Qty</Text>
-                                        <Text style={styles.qtyValue}>{item.BalQty}</Text>
-                                    </View>
-
+                                    <Text style={{ color: "#fff", fontWeight: "600" }}>OK</Text>
                                 </TouchableOpacity>
-                            )}
-                        />
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal transparent visible={alertData.visible} animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertBox}>
-                        <Icon
-                            name={
-                                alertData.type === "success"
-                                    ? "check-circle"
-                                    : alertData.type === "error"
-                                        ? "error"
-                                        : "warning"
-                            }
-                            size={40}
-                            color={
-                                alertData.type === "success"
-                                    ? "#4CAF50"
-                                    : alertData.type === "error"
-                                        ? "#F44336"
-                                        : "#FFA000"
-                            }
-                        />
-
-                        <Text style={styles.alertTitle}>
-                            {alertData.type === "success"
-                                ? "Success"
-                                : alertData.type === "error"
-                                    ? "Error"
-                                    : "Warning"}
-                        </Text>
-
-                        <Text style={styles.alertMessage}>{alertData.message}</Text>
-
-                        <TouchableOpacity
-                            onPress={() => setAlertData({ visible: false, message: "", type: "warning" })}
-                            style={styles.alertBtn}
-                        >
-                            <Text style={{ color: "#fff", fontWeight: "600" }}>OK</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-            <Modal transparent visible={deleteModal} animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertBox}>
-                        <Icon name="delete" size={42} color="#F44336" />
-
-                        <Text style={styles.alertTitle}>Delete Row?</Text>
-
-                        <Text style={styles.alertMessage}>
-                            Are you sure you want to remove this creel return detail?
-                        </Text>
-
-                        <View style={styles.confirmRow}>
-                            <TouchableOpacity
-                                style={[styles.confirmBtn, { backgroundColor: "#999" }]}
-                                onPress={() => {
-                                    setDeleteModal(false);
-                                    setDeleteIndex(null);
-                                }}
-                            >
-                                <Text style={styles.confirmBtnText}>No</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.confirmBtn, { backgroundColor: "#F44336" }]}
-                                onPress={deleteD3Row}
-                            >
-                                <Text style={styles.confirmBtnText}>Yes</Text>
-                            </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
+                    </Modal>
+                    <Modal transparent visible={deleteModal} animationType="fade">
+                        <View style={styles.alertOverlay}>
+                            <View style={styles.alertBox}>
+                                <Icon name="delete" size={42} color="#F44336" />
+
+                                <Text style={styles.alertTitle}>Delete Row?</Text>
+
+                                <Text style={styles.alertMessage}>
+                                    Are you sure you want to remove this creel return detail?
+                                </Text>
+
+                                <View style={styles.confirmRow}>
+                                    <TouchableOpacity
+                                        style={[styles.confirmBtn, { backgroundColor: "#999" }]}
+                                        onPress={() => {
+                                            setDeleteModal(false);
+                                            setDeleteIndex(null);
+                                        }}
+                                    >
+                                        <Text style={styles.confirmBtnText}>No</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.confirmBtn, { backgroundColor: "#F44336" }]}
+                                        onPress={deleteD3Row}
+                                    >
+                                        <Text style={styles.confirmBtnText}>Yes</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
                 </View>
-            </Modal>
-        </View>
+            </SafeAreaView>
+        </>
     );
 };
 

@@ -938,6 +938,7 @@ const CheckingScanner: React.FC<Props> = ({
     });
 
     const printStickerForData = async (rowData) => {
+        console.log("here..")
         const printerName = printer || "";
 
         if (!printerName) {
@@ -3282,7 +3283,7 @@ const CheckingScanner: React.FC<Props> = ({
                                                     fontSize: 15,
                                                 }}
                                             >
-                                                {printer ? `Print on ${printer}` : "Select printer to print"}
+                                                {printer ? `Print on... ${printer}` : "Select printer to print"}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>

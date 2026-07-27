@@ -292,7 +292,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Beam Close', route: 'beam-close', icon: 'assignment-turned-in', color: '#0ceebd', category: 'Production' },
         { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Inquiry Report', route: 'inquiry-report', icon: 'view-comfortable', color: '#69e3ad', category: 'Production' },
-         { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
+        { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
         // { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
     ];
 
@@ -452,8 +452,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                         "title": "Quarter Summary",
                     //                         "href": "/"
                     //                     },
-                    //                      {
+                    //                     {
                     //                         "title": "Yarn Sales Order",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Creel Issue Return",
                     //                         "href": "/"
                     //                     },
                     //                 ]

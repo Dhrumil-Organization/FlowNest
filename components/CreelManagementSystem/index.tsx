@@ -26,6 +26,7 @@ import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../..
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import SearchableDropdown from '@/Shared/SearchableDropdown';
+import { StatusBar } from 'expo-status-bar';
 
 interface Props {
     token: string;
@@ -143,6 +144,37 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             backgroundColor: '#f5f7fb',
             borderRadius: 15,
             overflow: 'hidden'
+        },
+        modalHeader: {
+            height: 70,
+            backgroundColor: '#007EA7',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+        },
+
+        headerBackBtn: {
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+
+        modalHeaderTitle: {
+            color: '#fff',
+            fontSize: 20,
+            fontWeight: '700',
+        },
+
+        modalBody: {
+            flex: 1,
+            backgroundColor: '#F5F7FB',
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingTop: 12,
         },
         container: {
             flex: 1,
@@ -2604,167 +2636,199 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                             backgroundColor: '#fff'
                         }}
                     >
-                        <View style={styles.container}>
-                            <FlatList
-                                data={[1]}
-                                keyExtractor={(item, index) => index.toString()}
-                                showsVerticalScrollIndicator={false}
-                                contentContainerStyle={{ padding: 12, paddingBottom: 30 }}
+                        {/* <View style={styles.container}> */}
+                        <View style={{ flex: 1, backgroundColor: '#007EA7' }}>
 
-                                ListHeaderComponent={
-                                    <View style={styles.card}>
+                            <StatusBar
+                                style="light"
+                                backgroundColor="#007EA7"
+                            />
 
-                                        <Text style={styles.title}>
+                            {/* Header */}
+                            <View style={styles.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setIsCreelModalVisible(false);
+                                        resetAllFields();
+                                    }}
+                                    style={styles.headerBackBtn}
+                                >
+                                    <Icon
+                                        name="arrow-back"
+                                        size={24}
+                                        color="#fff"
+                                    />
+                                </TouchableOpacity>
+
+                                <Text style={styles.modalHeaderTitle}>
+                                    Create New Creel
+                                </Text>
+
+                                <View style={{ width: 40 }} />
+                            </View>
+
+                            {/* Body */}
+                            <View style={styles.modalBody}>
+                                <FlatList
+                                    data={[1]}
+                                    keyExtractor={(item, index) => index.toString()}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={{ padding: 12, paddingBottom: 30 }}
+
+                                    ListHeaderComponent={
+                                        <View style={styles.card}>
+
+                                            {/* <Text style={styles.title}>
                                             Create New Creel
-                                        </Text>
+                                        </Text> */}
 
-                                        <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Property <Text style={{ color: 'red' }}> *</Text></Text>
-                                            <SearchableDropdown
-                                                key={FormState.values.PrpCode}
-                                                data={getAllPropertyData || []}
-                                                labelKey="LngName"
-                                                valueKey="PrpCode"
-                                                placeholder="Choose property..."
-                                                pageSize={10}
-                                                initialValue={selectedProperty}
-                                                onSelect={(item) => {
-                                                    setFormState(prev => ({
-                                                        ...prev,
-                                                        values: {
-                                                            ...prev.values,
-                                                            PrpCode: item?.PrpCode || '',
-                                                            LngName: item?.LngName || ''
-                                                        }
-                                                    }));
-                                                }}
-                                                multiple={false}
-                                                emptyMessage="No properties available"
-                                            />
-                                        </View>
-
-                                        <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Year No <Text style={{ color: 'red' }}> *</Text></Text>
-                                            <SearchableDropdown
-                                                key={FormState.values.YearNo}
-                                                data={getAllYearData || []}
-                                                labelKey="YearName"
-                                                valueKey="YearNo"
-                                                placeholder="Choose year..."
-                                                pageSize={10}
-                                                initialValue={selectedYearObj}
-                                                onSelect={(item) => {
-                                                    setFormState(prev => ({
-                                                        ...prev,
-                                                        values: {
-                                                            ...prev.values,
-                                                            YearNo: item?.YearNo || '',
-                                                            YearName: item?.YearName || ''
-                                                        }
-                                                    }));
-                                                }}
-                                                multiple={false}
-                                                emptyMessage="No years data available"
-                                            />
-                                        </View>
-
-                                        {/* Creel ID */}
-                                        <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Creel ID <Text style={{ color: 'red' }}> *</Text></Text>
-                                            <TextInput
-                                                style={styles.input}
-                                                value={creelId}
-                                                onChangeText={setCreelId}
-                                                placeholder="Enter Creel ID"
-                                                placeholderTextColor="#888"
-                                            />
-                                        </View>
-
-                                        {/* DATE + SHIFT */}
-                                        <View style={styles.row}>
-
-                                            <View style={styles.col}>
-                                                <Text style={styles.label}>Setup Date <Text style={{ color: 'red' }}> *</Text></Text>
-                                                <TouchableOpacity
-                                                    style={styles.input}
-                                                    onPress={() => setShowPicker(true)}
-                                                >
-                                                    <Text style={{ color: '#000' }}>
-                                                        {setupDate ? setupDate.toLocaleDateString() : 'Select Date'}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                                {showPicker && (
-                                                    <DateTimePicker
-                                                        value={setupDate || new Date()}
-                                                        mode="date"
-                                                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                                        onChange={onChange}
-                                                    />
-                                                )}
-                                            </View>
-
-                                            <View style={styles.col}>
-                                                <Text style={styles.label}>Shift <Text style={{ color: 'red' }}> *</Text></Text>
-                                                <View style={{ flex: 1 }}>
-                                                    <PartyDropdown
-                                                        data={getShiftData}
-                                                        placeholder="Choose shift..."
-                                                        labelKey={["ShfName", "ShfCode"]}
-                                                        valueKey="ShfCode"
-                                                        pageSize={10}
-                                                        initialValue={selectedstocktype ?? null}  // empty array pass ho raha hai
-
-                                                        selected={
-                                                            getShiftData?.find(x => x.ShfCode === shift) ?? null
-                                                        }
-                                                        type="shift"
-
-                                                        onSelect={(item) => {
-                                                            setShift(item.ShfCode);
-
-                                                            // agar FormState me bhi store karna ho
-                                                            setFormState(prev => ({
-                                                                ...prev,
-                                                                values: {
-                                                                    ...prev.values,
-                                                                    Shift: item.ShfCode,
-                                                                    ShiftName: item.ShfName
-                                                                }
-                                                            }));
-                                                        }}
-
-                                                        setSelected={(val) => {
-                                                            if (!val) {
-                                                                setShift('');
-
-                                                                setFormState(prev => ({
-                                                                    ...prev,
-                                                                    values: {
-                                                                        ...prev.values,
-                                                                        Shift: '',
-                                                                        ShiftName: ''
-                                                                    }
-                                                                }));
-                                                            } else {
-                                                                setShift(val.ShfCode);
-
-                                                                setFormState(prev => ({
-                                                                    ...prev,
-                                                                    values: {
-                                                                        ...prev.values,
-                                                                        Shift: val.ShfCode,
-                                                                        ShiftName: val.ShfName
-                                                                    }
-                                                                }));
+                                            <View style={styles.inputGroup}>
+                                                <Text style={styles.label}>Property <Text style={{ color: 'red' }}> *</Text></Text>
+                                                <SearchableDropdown
+                                                    key={FormState.values.PrpCode}
+                                                    data={getAllPropertyData || []}
+                                                    labelKey="LngName"
+                                                    valueKey="PrpCode"
+                                                    placeholder="Choose property..."
+                                                    pageSize={10}
+                                                    initialValue={selectedProperty}
+                                                    onSelect={(item) => {
+                                                        setFormState(prev => ({
+                                                            ...prev,
+                                                            values: {
+                                                                ...prev.values,
+                                                                PrpCode: item?.PrpCode || '',
+                                                                LngName: item?.LngName || ''
                                                             }
-                                                        }}
-                                                    />
-                                                </View>
+                                                        }));
+                                                    }}
+                                                    multiple={false}
+                                                    emptyMessage="No properties available"
+                                                />
                                             </View>
 
-                                        </View>
+                                            <View style={styles.inputGroup}>
+                                                <Text style={styles.label}>Year No <Text style={{ color: 'red' }}> *</Text></Text>
+                                                <SearchableDropdown
+                                                    key={FormState.values.YearNo}
+                                                    data={getAllYearData || []}
+                                                    labelKey="YearName"
+                                                    valueKey="YearNo"
+                                                    placeholder="Choose year..."
+                                                    pageSize={10}
+                                                    initialValue={selectedYearObj}
+                                                    onSelect={(item) => {
+                                                        setFormState(prev => ({
+                                                            ...prev,
+                                                            values: {
+                                                                ...prev.values,
+                                                                YearNo: item?.YearNo || '',
+                                                                YearName: item?.YearName || ''
+                                                            }
+                                                        }));
+                                                    }}
+                                                    multiple={false}
+                                                    emptyMessage="No years data available"
+                                                />
+                                            </View>
 
-                                        {/* <View style={styles.field}>
+                                            {/* Creel ID */}
+                                            <View style={styles.inputGroup}>
+                                                <Text style={styles.label}>Creel ID <Text style={{ color: 'red' }}> *</Text></Text>
+                                                <TextInput
+                                                    style={styles.input}
+                                                    value={creelId}
+                                                    onChangeText={setCreelId}
+                                                    placeholder="Enter Creel ID"
+                                                    placeholderTextColor="#888"
+                                                />
+                                            </View>
+
+                                            {/* DATE + SHIFT */}
+                                            <View style={styles.row}>
+
+                                                <View style={styles.col}>
+                                                    <Text style={styles.label}>Setup Date <Text style={{ color: 'red' }}> *</Text></Text>
+                                                    <TouchableOpacity
+                                                        style={styles.input}
+                                                        onPress={() => setShowPicker(true)}
+                                                    >
+                                                        <Text style={{ color: '#000' }}>
+                                                            {setupDate ? setupDate.toLocaleDateString() : 'Select Date'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                    {showPicker && (
+                                                        <DateTimePicker
+                                                            value={setupDate || new Date()}
+                                                            mode="date"
+                                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                            onChange={onChange}
+                                                        />
+                                                    )}
+                                                </View>
+
+                                                <View style={styles.col}>
+                                                    <Text style={styles.label}>Shift <Text style={{ color: 'red' }}> *</Text></Text>
+                                                    <View style={{ flex: 1 }}>
+                                                        <PartyDropdown
+                                                            data={getShiftData}
+                                                            placeholder="Choose shift..."
+                                                            labelKey={["ShfName", "ShfCode"]}
+                                                            valueKey="ShfCode"
+                                                            pageSize={10}
+                                                            initialValue={selectedstocktype ?? null}  // empty array pass ho raha hai
+
+                                                            selected={
+                                                                getShiftData?.find(x => x.ShfCode === shift) ?? null
+                                                            }
+                                                            type="shift"
+
+                                                            onSelect={(item) => {
+                                                                setShift(item.ShfCode);
+
+                                                                // agar FormState me bhi store karna ho
+                                                                setFormState(prev => ({
+                                                                    ...prev,
+                                                                    values: {
+                                                                        ...prev.values,
+                                                                        Shift: item.ShfCode,
+                                                                        ShiftName: item.ShfName
+                                                                    }
+                                                                }));
+                                                            }}
+
+                                                            setSelected={(val) => {
+                                                                if (!val) {
+                                                                    setShift('');
+
+                                                                    setFormState(prev => ({
+                                                                        ...prev,
+                                                                        values: {
+                                                                            ...prev.values,
+                                                                            Shift: '',
+                                                                            ShiftName: ''
+                                                                        }
+                                                                    }));
+                                                                } else {
+                                                                    setShift(val.ShfCode);
+
+                                                                    setFormState(prev => ({
+                                                                        ...prev,
+                                                                        values: {
+                                                                            ...prev.values,
+                                                                            Shift: val.ShfCode,
+                                                                            ShiftName: val.ShfName
+                                                                        }
+                                                                    }));
+                                                                }
+                                                            }}
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                            </View>
+
+                                            {/* <View style={styles.field}>
                                             <Text style={styles.label}>Stcok Type *</Text>
                                             <PartyDropdown
                                                 data={getStockTypes}
@@ -2787,183 +2851,185 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 }}
                                             />
                                         </View> */}
-                                        {/* REPLACE your PartyDropdown for Stock Type with this: */}
-                                        <View style={styles.field}>
-                                            <Text style={styles.label}>Stock Type *</Text>
-                                            <TouchableOpacity
-                                                style={styles.input}
-                                                onPress={() => setIsStockTypeOpen(true)}
-                                            >
-                                                <Text style={{ color: selectedstocktype ? '#000' : '#888' }}>
-                                                    {selectedstocktype
-                                                        ? `${selectedstocktype.stktypename} (${selectedstocktype.StkType})`
-                                                        : 'Select Stock Type'}
-                                                </Text>
-                                                <Icon
-                                                    name="arrow-drop-down"
-                                                    size={24}
-                                                    color="#007EA7"
-                                                    style={{ position: 'absolute', right: 10 }}
+                                            {/* REPLACE your PartyDropdown for Stock Type with this: */}
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Stock Type *</Text>
+                                                <TouchableOpacity
+                                                    style={styles.input}
+                                                    onPress={() => setIsStockTypeOpen(true)}
+                                                >
+                                                    <Text style={{ color: selectedstocktype ? '#000' : '#888' }}>
+                                                        {selectedstocktype
+                                                            ? `${selectedstocktype.stktypename} (${selectedstocktype.StkType})`
+                                                            : 'Select Stock Type'}
+                                                    </Text>
+                                                    <Icon
+                                                        name="arrow-drop-down"
+                                                        size={24}
+                                                        color="#007EA7"
+                                                        style={{ position: 'absolute', right: 10 }}
+                                                    />
+                                                </TouchableOpacity>
+
+                                                {/* Stock Type Modal */}
+                                                <Modal
+                                                    visible={isStockTypeOpen}
+                                                    transparent={true}
+                                                    animationType="fade"
+                                                    onRequestClose={() => setIsStockTypeOpen(false)}
+                                                >
+                                                    <TouchableOpacity
+                                                        activeOpacity={1}
+                                                        onPress={() => setIsStockTypeOpen(false)}
+                                                        style={{
+                                                            flex: 1,
+                                                            backgroundColor: 'rgba(0,0,0,0.5)',
+                                                            justifyContent: 'center',
+                                                            alignItems: 'center'
+                                                        }}
+                                                    >
+                                                        <View style={{
+                                                            width: '85%',
+                                                            backgroundColor: '#fff',
+                                                            borderRadius: 12,
+                                                            padding: 10,
+                                                            maxHeight: '60%'
+                                                        }}>
+                                                            <Text style={{
+                                                                fontSize: 16,
+                                                                fontWeight: 'bold',
+                                                                color: '#007EA7',
+                                                                padding: 10,
+                                                                borderBottomWidth: 1,
+                                                                borderColor: '#eee'
+                                                            }}>
+                                                                Select Stock Type
+                                                            </Text>
+
+                                                            <FlatList
+                                                                data={getStockTypes}
+                                                                keyExtractor={(item, index) => index.toString()}
+                                                                renderItem={({ item }) => (
+                                                                    <TouchableOpacity
+                                                                        style={{
+                                                                            padding: 15,
+                                                                            borderBottomWidth: 1,
+                                                                            borderColor: '#f0f0f0',
+                                                                            backgroundColor:
+                                                                                selectedstocktype?.StkType === item.StkType
+                                                                                    ? '#e6f7ff' : 'transparent'
+                                                                        }}
+                                                                        onPress={() => {
+                                                                            setselectedstocktype(item);
+                                                                            setFormState(prev => ({
+                                                                                ...prev,
+                                                                                values: {
+                                                                                    ...prev.values,
+                                                                                    StkType: item?.StkType
+                                                                                }
+                                                                            }));
+                                                                            setIsStockTypeOpen(false);
+                                                                        }}
+                                                                    >
+                                                                        <Text style={{
+                                                                            fontSize: 14,
+                                                                            fontWeight: '600',
+                                                                            color: '#000'
+                                                                        }}>
+                                                                            {item.stktypename}
+                                                                        </Text>
+                                                                        <Text style={{
+                                                                            fontSize: 12,
+                                                                            color: '#666',
+                                                                            marginTop: 2
+                                                                        }}>
+                                                                            Code: {item.StkType}
+                                                                        </Text>
+                                                                    </TouchableOpacity>
+                                                                )}
+                                                            />
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                </Modal>
+                                            </View>
+
+
+                                            <View style={styles.inputGroup}>
+                                                <Text style={styles.label}>Remark</Text>
+                                                <TextInput
+                                                    style={[styles.input, { height: 40 }]}
+                                                    value={Remark}
+                                                    onChangeText={setRemark}
+                                                    // multiline
+                                                    placeholder="Enter remark"
                                                 />
+                                            </View>
+
+                                        </View>
+                                    }
+
+                                    ListFooterComponent={
+                                        <View style={styles.footer}>
+                                            <TouchableOpacity
+                                                style={styles.saveBtn}
+                                                onPress={() => {
+                                                    if (!creelId?.trim()) {
+                                                        Alert.alert("Validation", "Enter Creel ID");
+                                                        return;
+                                                    }
+                                                    if (!setupDate) {
+                                                        Alert.alert("Validation", "Select Setup Date");
+                                                        return;
+                                                    }
+                                                    if (!shift) {
+                                                        Alert.alert("Validation", "Select Shift");
+                                                        return;
+                                                    }
+                                                    if (!selectedstocktype) {
+                                                        Alert.alert("Validation", "Select Stock Type");
+                                                        return;
+                                                    }
+                                                    const yearNo = FormState.values.YearNo;
+                                                    const startYear = "20" + (parseInt(yearNo) - 1);
+                                                    const endYear = "20" + yearNo;
+                                                    const selectedDate = setupDate.toISOString().split('T')[0];
+                                                    const fyStart = `${startYear}-04-01`;
+                                                    const fyEnd = `${endYear}-03-31`;
+                                                    if (selectedDate < fyStart || selectedDate > fyEnd) {
+                                                        Alert.alert(
+                                                            " ",
+                                                            "⚠️ Date could not be less than current financial year.",
+                                                            [
+                                                                {
+                                                                    text: "OK",
+                                                                    style: "default"
+                                                                }
+                                                            ],
+                                                            { cancelable: true }
+                                                        );
+                                                        return;
+                                                    }
+                                                    setIsCreelModalVisible(false);
+                                                    setIsScanModalVisible(true);
+                                                }}
+                                            >
+                                                <Text style={styles.btnText}>Save & Next</Text>
                                             </TouchableOpacity>
 
-                                            {/* Stock Type Modal */}
-                                            <Modal
-                                                visible={isStockTypeOpen}
-                                                transparent={true}
-                                                animationType="fade"
-                                                onRequestClose={() => setIsStockTypeOpen(false)}
+                                            <TouchableOpacity
+                                                style={styles.cancelBtn}
+                                                onPress={() => {
+                                                    setIsCreelModalVisible(false);
+                                                    resetAllFields();
+                                                }}
                                             >
-                                                <TouchableOpacity
-                                                    activeOpacity={1}
-                                                    onPress={() => setIsStockTypeOpen(false)}
-                                                    style={{
-                                                        flex: 1,
-                                                        backgroundColor: 'rgba(0,0,0,0.5)',
-                                                        justifyContent: 'center',
-                                                        alignItems: 'center'
-                                                    }}
-                                                >
-                                                    <View style={{
-                                                        width: '85%',
-                                                        backgroundColor: '#fff',
-                                                        borderRadius: 12,
-                                                        padding: 10,
-                                                        maxHeight: '60%'
-                                                    }}>
-                                                        <Text style={{
-                                                            fontSize: 16,
-                                                            fontWeight: 'bold',
-                                                            color: '#007EA7',
-                                                            padding: 10,
-                                                            borderBottomWidth: 1,
-                                                            borderColor: '#eee'
-                                                        }}>
-                                                            Select Stock Type
-                                                        </Text>
-
-                                                        <FlatList
-                                                            data={getStockTypes}
-                                                            keyExtractor={(item, index) => index.toString()}
-                                                            renderItem={({ item }) => (
-                                                                <TouchableOpacity
-                                                                    style={{
-                                                                        padding: 15,
-                                                                        borderBottomWidth: 1,
-                                                                        borderColor: '#f0f0f0',
-                                                                        backgroundColor:
-                                                                            selectedstocktype?.StkType === item.StkType
-                                                                                ? '#e6f7ff' : 'transparent'
-                                                                    }}
-                                                                    onPress={() => {
-                                                                        setselectedstocktype(item);
-                                                                        setFormState(prev => ({
-                                                                            ...prev,
-                                                                            values: {
-                                                                                ...prev.values,
-                                                                                StkType: item?.StkType
-                                                                            }
-                                                                        }));
-                                                                        setIsStockTypeOpen(false);
-                                                                    }}
-                                                                >
-                                                                    <Text style={{
-                                                                        fontSize: 14,
-                                                                        fontWeight: '600',
-                                                                        color: '#000'
-                                                                    }}>
-                                                                        {item.stktypename}
-                                                                    </Text>
-                                                                    <Text style={{
-                                                                        fontSize: 12,
-                                                                        color: '#666',
-                                                                        marginTop: 2
-                                                                    }}>
-                                                                        Code: {item.StkType}
-                                                                    </Text>
-                                                                </TouchableOpacity>
-                                                            )}
-                                                        />
-                                                    </View>
-                                                </TouchableOpacity>
-                                            </Modal>
+                                                <Text style={styles.cancelText}>Close</Text>
+                                            </TouchableOpacity>
                                         </View>
-
-
-                                        <View style={styles.inputGroup}>
-                                            <Text style={styles.label}>Remark</Text>
-                                            <TextInput
-                                                style={[styles.input, { height: 40 }]}
-                                                value={Remark}
-                                                onChangeText={setRemark}
-                                                // multiline
-                                                placeholder="Enter remark"
-                                            />
-                                        </View>
-
-                                    </View>
-                                }
-
-                                ListFooterComponent={
-                                    <View style={styles.footer}>
-                                        <TouchableOpacity
-                                            style={styles.saveBtn}
-                                            onPress={() => {
-                                                if (!creelId?.trim()) {
-                                                    Alert.alert("Validation", "Enter Creel ID");
-                                                    return;
-                                                }
-                                                if (!setupDate) {
-                                                    Alert.alert("Validation", "Select Setup Date");
-                                                    return;
-                                                }
-                                                if (!shift) {
-                                                    Alert.alert("Validation", "Select Shift");
-                                                    return;
-                                                }
-                                                if (!selectedstocktype) {
-                                                    Alert.alert("Validation", "Select Stock Type");
-                                                    return;
-                                                }
-                                                const yearNo = FormState.values.YearNo;
-                                                const startYear = "20" + (parseInt(yearNo) - 1);
-                                                const endYear = "20" + yearNo;
-                                                const selectedDate = setupDate.toISOString().split('T')[0];
-                                                const fyStart = `${startYear}-04-01`;
-                                                const fyEnd = `${endYear}-03-31`;
-                                                if (selectedDate < fyStart || selectedDate > fyEnd) {
-                                                    Alert.alert(
-                                                        " ",
-                                                        "⚠️ Date could not be less than current financial year.",
-                                                        [
-                                                            {
-                                                                text: "OK",
-                                                                style: "default"
-                                                            }
-                                                        ],
-                                                        { cancelable: true }
-                                                    );
-                                                    return;
-                                                }
-                                                setIsCreelModalVisible(false);
-                                                setIsScanModalVisible(true);
-                                            }}
-                                        >
-                                            <Text style={styles.btnText}>Save & Next</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            style={styles.cancelBtn}
-                                            onPress={() => {
-                                                setIsCreelModalVisible(false);
-                                                resetAllFields();
-                                            }}
-                                        >
-                                            <Text style={styles.cancelText}>Close</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                }
-                            />
+                                    }
+                                />
+                                {/* </View> */}
+                            </View>
                         </View>
                     </TouchableOpacity>
                 </TouchableOpacity>

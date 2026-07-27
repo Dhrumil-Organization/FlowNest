@@ -5,7 +5,9 @@ import React, { useEffect, useState } from 'react';
 // import GreyPurchaseOrder from '@/components/GreyPurchaseOrder';
 // import YarnPurchaseOrder from '@/components/YarnPurchaseOrder_old';
 
-import YarnSalesOrder from '@/components/YarnSalesOrder/YarnSalesOrder';
+// import YarnSalesOrder from '@/components/YarnSalesOrder/YarnSalesOrder';
+
+import YarnSalesOrder from '@/components/YarnSalesOrder';
 
 export default function CRLimit_Request_Container() {
     // const { token, username } = useAuth();

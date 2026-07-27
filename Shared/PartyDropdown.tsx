@@ -626,6 +626,25 @@ const PartyDropdown: React.FC<Props> = ({
         );
     };
 
+    const renderdesigndata = (item: chekingdesigndata, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.dsnname)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Design : {`${item.dsnname || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.dsncode || '—'}`}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
     return (
         <View>
             {/* If loading: show a disabled trigger with spinner */}
@@ -652,8 +671,30 @@ const PartyDropdown: React.FC<Props> = ({
                     initialValue={selected ?? initialValue}
                     multiple={multiple}
                     emptyMessage={type == 'bank' ? 'No banks!' : type == 'party' ? "No parties!" : type == 'branch' ? "No branches!" : type == 'payment' ? "No payments!" : type == 'adj' ? "No adjustments!" : 'No items'}
-                    renderRowContent={type == 'bank' ? renderRowContentBank : type == 'party' ? renderRowContent : type == 'branch' ? renderRowContentBranch : type == 'payment' ? renderRowContentPayment : type == 'adj' ? renderRowContentAdj : type == 'machine' ? renderRowContentMachine : type == 'design' ? renderRowContentDesign : type == 'checker' ? renderRowContentChecker : type == 'grd' ? renderRowContentGrd : type == 'shift' ? renderRowContentShift : type == 'item' ? renderRowContentItem : type == 'machine1' ? renderRowContentMachine1 : type == 'beam' ? renderRowContentBeamData : type == 'employee' ? renderRowContentperson : type == 'operator' ? renderRowContentoperator
-                        : type == 'supervisior' ? renderRowContentsupervisior : type == 'count' ? renderRowContentcount : type == 'ply' ? renderRowContentply : type == 'blend' ? renderRowContentblend : type == 'weftbeam' ? renderRowContentWeftBeamData : type == 'stocktype' ? renderRowContentStock : renderRowContentEmpty}
+                    renderRowContent={
+                        type == 'bank' ? renderRowContentBank
+                            : type == 'party' ? renderRowContent
+                                : type == 'branch' ? renderRowContentBranch
+                                    : type == 'payment' ? renderRowContentPayment
+                                        : type == 'adj' ? renderRowContentAdj
+                                            : type == 'machine' ? renderRowContentMachine
+                                                : type == 'design' ? renderRowContentDesign
+                                                    : type == 'checker' ? renderRowContentChecker
+                                                        : type == 'grd' ? renderRowContentGrd
+                                                            : type == 'shift' ? renderRowContentShift
+                                                                : type == 'item' ? renderRowContentItem
+                                                                    : type == 'machine1' ? renderRowContentMachine1
+                                                                        : type == 'beam' ? renderRowContentBeamData
+                                                                            : type == 'employee' ? renderRowContentperson
+                                                                                : type == 'operator' ? renderRowContentoperator
+                                                                                    : type == 'supervisior' ? renderRowContentsupervisior
+                                                                                        : type == 'count' ? renderRowContentcount
+                                                                                            : type == 'ply' ? renderRowContentply
+                                                                                                : type == 'blend' ? renderRowContentblend
+                                                                                                    : type == 'weftbeam' ? renderRowContentWeftBeamData
+                                                                                                        : type == 'stocktype' ? renderRowContentStock
+                                                                                                            : type == 'checkingdesigndata' ? renderdesigndata
+                                                                                                                : renderRowContentEmpty}
                 />
             )}
 

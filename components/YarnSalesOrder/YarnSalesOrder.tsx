@@ -1,31 +1,22 @@
-import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
-// import { StatusBar } from 'expo-status-bar';
-import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import axios from 'axios';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API } from "../../common/API/dynamicAPI";
-import { fetchPropertyData } from '../../common/API/Functions';
-import { useSalesOrder } from './SalesOrderContext';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 
-const API_BASE_URL = 'https://erp.sharpskillit.com/api';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+    View, Text, StyleSheet, TextInput,
+    TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
+    ScrollView, Modal, StatusBar,
+    Platform,
+} from 'react-native';
+import axios from 'axios';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { fetchPropertyData } from '../../common/API/Functions';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { API } from "../../common/API/dynamicAPI";
+import { useSalesOrder } from './SalesOrderContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
+
 
 const money = value => {
     return Number(value || 0).toLocaleString('en-IN', {
@@ -44,11 +35,14 @@ const todayYmd = () => {
 
 const HEADER_HEIGHT = 52;
 
-const YarnSalesOrder = (props: any) => {
-
-    const { token, username, userid, isConnected, navigation, route, } = props;
-
+const YarnSalesOrder = ({ token,
+    navigation,
+    route,
+    userid,
+    username,
+    isConnected }) => {
     const insets = useSafeAreaInsets();
+    console.log('User Id ', userid, username);
     const {
         loadDefaultPreference,
         savePreference,
@@ -62,8 +56,7 @@ const YarnSalesOrder = (props: any) => {
         token: token,
     });
 
-    const router = useRouter();
-    const params = useLocalSearchParams();
+
     const { startNewOrder, loadExistingOrder } = useSalesOrder();
     const [propertyPickerVisible, setPropertyPickerVisible] = useState(false);
     const [yearPickerVisible, setYearPickerVisible] = useState(false);
@@ -87,6 +80,8 @@ const YarnSalesOrder = (props: any) => {
         todate: todayYmd(),
         show_authorized: false,
     });
+
+    //const filtersRef = useRef(filters);
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [showFromPicker, setShowFromPicker] = useState(false);
@@ -98,8 +93,22 @@ const YarnSalesOrder = (props: any) => {
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [deleteSuccessVisible, setDeleteSuccessVisible] = useState(false);
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);
-    // const memoryLoadedRef = useRef(false);
-    const filtersRef = useRef(false);
+    const memoryLoadedRef = useRef(false);
+    const normalizeCriteria = (criteria: any) => {
+        return {
+            prpcode: criteria?.prpcode || criteria?.PrpCode || '',
+            yearno: criteria?.yearno || criteria?.YearNo || '',
+            strcode: criteria?.strcode || criteria?.StrCode || '002',
+            fromdate: criteria?.fromdate || criteria?.FromDate || todayYmd(),
+            todate: criteria?.todate || criteria?.ToDate || todayYmd(),
+            show_authorized:
+                criteria?.show_authorized ??
+                criteria?.ShowAuthorized ??
+                false,
+        };
+    };
+
+
     useFocusEffect(
         useCallback(() => {
             StatusBar.setTranslucent(false);
@@ -109,11 +118,6 @@ const YarnSalesOrder = (props: any) => {
             return () => { };
         }, [])
     );
-
-    console.log('User Id ', userid, username);
-
-    const { refreshAfterDelete, refreshKey, prpcode, yearno, strcode } = params;
-
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -124,31 +128,30 @@ const YarnSalesOrder = (props: any) => {
         params: props.params,
         cancelToken: cancelToken?.token,
     });
-
     useFocusEffect(
         useCallback(() => {
 
-            if (!refreshAfterDelete) {
+            if (!route?.params?.refreshAfterDelete) {
                 return;
             }
 
-            // const p = route?.params || {};
+            const p = route?.params || {};
 
             const nextFilters = {
                 ...filters,
 
                 prpcode:
-                    prpcode ||
+                    p.prpcode ||
                     filters.prpcode ||
                     '',
 
                 yearno:
-                    yearno ||
+                    p.yearno ||
                     filters.yearno ||
                     '',
 
                 strcode:
-                    strcode ||
+                    p.strcode ||
                     filters.strcode ||
                     '002',
             };
@@ -157,10 +160,10 @@ const YarnSalesOrder = (props: any) => {
 
             setFilters(nextFilters);
 
-            if (prpcode && propertyData?.length > 0) {
+            if (p.prpcode && propertyData?.length > 0) {
 
                 const matchedProperty = propertyData.find(
-                    x => String(x.PrpCode) === String(prpcode)
+                    x => String(x.PrpCode) === String(p.prpcode)
                 );
 
                 if (matchedProperty) {
@@ -174,14 +177,7 @@ const YarnSalesOrder = (props: any) => {
 
             loadOrders('', false, nextFilters);
 
-            // navigation.setParams({
-            //     refreshAfterDelete: undefined,
-            //     refreshKey: undefined,
-            //     prpcode: undefined,
-            //     yearno: undefined,
-            //     strcode: undefined,
-            // });
-            router.setParams({
+            navigation.setParams({
                 refreshAfterDelete: undefined,
                 refreshKey: undefined,
                 prpcode: undefined,
@@ -189,7 +185,7 @@ const YarnSalesOrder = (props: any) => {
                 strcode: undefined,
             });
 
-        }, [refreshKey])
+        }, [route?.params?.refreshKey])
     );
     // useEffect(() => {
     //     const load = async () => {
@@ -202,25 +198,9 @@ const YarnSalesOrder = (props: any) => {
     //     };
     //     load();
     // }, []);
-
-    useEffect(() => {
-        if (!token) return;
-        const load = async () => {
-            const data = await fetchPropertyData(token);
-
-            setPropertyData(data || []);
-
-            console.log("data ::", data);
-        };
-
-        load();
-    }, [token]);
-
-    const formatYmdToDateString = (ymd: string) => {
-        if (!ymd || ymd.length !== 8) return '';
-
-        return `${ymd.substring(0, 4)}-${ymd.substring(4, 6)}-${ymd.substring(6, 8)}`;
-    };
+    // useEffect(() => {
+    //     filtersRef.current = filters;
+    // }, [filters]);
 
     useEffect(() => {
         if (!userid || !token) return;
@@ -311,7 +291,6 @@ const YarnSalesOrder = (props: any) => {
         initScreen();
     }, [userid, token]);
 
-
     useEffect(() => {
         const y = new Date().getFullYear();
         const arr = [];
@@ -366,7 +345,6 @@ const YarnSalesOrder = (props: any) => {
             [key]: value,
         }));
     };
-
     const getShortYearNo = (yearValue: any) => {
         if (!yearValue) return '';
 
@@ -380,65 +358,6 @@ const YarnSalesOrder = (props: any) => {
 
         return y.slice(-2);
     };
-
-    // const loadOrders = async (text = '', isFilter = false, customFilters = null) => {
-    //     const userPtype = await AsyncStorage.getItem('user_prptype');
-    //     const activeFilters = customFilters || filters;
-
-    //     try {
-    //         if (isFilter) {
-    //             setFilterLoading(true);
-    //         } else {
-    //             setLoading(true);
-    //         }
-
-    //         const yearno =
-    //             activeFilters.yearno
-    //                 ? String(activeFilters.yearno).slice(-2)
-    //                 : selectedYear
-    //                     ? selectedYear.slice(-2)
-    //                     : '';
-
-    //         const payload = {
-    //             search: text,
-    //             prpcode: activeFilters.prpcode,
-    //             prptype: userPtype,
-    //             yearno: yearno,
-    //             strcode: '002',
-    //             fromdate: activeFilters.fromdate,
-    //             todate: activeFilters.todate,
-    //             isauth: activeFilters.show_authorized ? 1 : 0,
-    //             strtype: 'Y',
-    //             txntype: 'sales_order',
-    //             referrer: 'mob_yarn_sales_order',
-    //             // atype: 'B',
-    //             atype: activeFilters.show_authorized ? 'm' : 'b',
-    //         };
-
-    //         console.log("browse payload", payload);
-
-    //         const res = await axios.get(
-    //             `${API}/api/sosortbrowse`,
-    //             getRequestConfig({ params: { ...payload } }),
-    //         );
-    //         console.log("browse res", res)
-
-    //         if (res.data.success === true) {
-    //             setOrders(res.data.response.data || []);
-    //         } else {
-    //             setOrders([]);
-    //         }
-    //     } catch (error) {
-    //         console.log('ERROR ::', error?.response?.data || error.message);
-    //         setOrders([]);
-    //     } finally {
-    //         setLoading(false);
-    //         setFilterLoading(false);
-    //         setRefreshing(false);
-    //     }
-    // };
-
-
     const loadOrders = async (
         text = '',
         isFilter = false,
@@ -521,23 +440,7 @@ const YarnSalesOrder = (props: any) => {
 
                 if (userid) {
 
-                    // await savePreference({
-                    //     CriteriaName: 'Default',
-                    //     IsDefault: true,
-                    //     PreferenceJson: {
-                    //         criteria: {
-                    //             prpcode: finalPrpCode,
-                    //             yearno: finalYearNo,
-                    //             strcode: activeFilters.strcode || '002',
-                    //             fromdate: activeFilters.fromdate,
-                    //             todate: activeFilters.todate,
-                    //             show_authorized:
-                    //                 activeFilters.show_authorized,
-                    //         },
-                    //     },
-                    // });
-
-                    const response = await savePreference({
+                    await savePreference({
                         CriteriaName: 'Default',
                         IsDefault: true,
                         PreferenceJson: {
@@ -547,12 +450,12 @@ const YarnSalesOrder = (props: any) => {
                                 strcode: activeFilters.strcode || '002',
                                 fromdate: activeFilters.fromdate,
                                 todate: activeFilters.todate,
-                                show_authorized: activeFilters.show_authorized,
+                                show_authorized:
+                                    activeFilters.show_authorized,
                             },
                         },
                     });
 
-                    console.log('savePreference response =>', response);
                 }
 
             } else {
@@ -586,22 +489,21 @@ const YarnSalesOrder = (props: any) => {
         }
     };
 
+    // useEffect(() => {
 
-    useEffect(() => {
+    //     if (didInitialLoadRef.current) {
+    //         return;
+    //     }
 
-        if (didInitialLoadRef.current) {
-            return;
-        }
+    //     didInitialLoadRef.current = true;
 
-        didInitialLoadRef.current = true;
+    //     if (route?.params?.refreshAfterDelete) {
+    //         return;
+    //     }
 
-        if (refreshAfterDelete) {
-            return;
-        }
+    //     loadOrders('');
 
-        loadOrders('');
-
-    }, []);
+    // }, []);
 
 
     // =====================================================
@@ -638,14 +540,30 @@ const YarnSalesOrder = (props: any) => {
     const applyFilter = () => {
         const updatedFilters = {
             ...filters,
-            prpcode: selectedProperty?.PrpCode || '',
-            yearno: selectedYear || '',
+
+            prpcode:
+                selectedProperty?.PrpCode ||
+                filters.prpcode ||
+                '',
+
+            yearno:
+                selectedYear ||
+                filters.yearno ||
+                '',
+
+            strcode:
+                filters.strcode ||
+                '002',
+
             fromdate: fromDate
                 ? `${fromDate.getFullYear()}${String(fromDate.getMonth() + 1).padStart(2, '0')}${String(fromDate.getDate()).padStart(2, '0')}`
-                : '',
+                : filters.fromdate,
+
             todate: toDate
                 ? `${toDate.getFullYear()}${String(toDate.getMonth() + 1).padStart(2, '0')}${String(toDate.getDate()).padStart(2, '0')}`
-                : '',
+                : filters.todate,
+
+            show_authorized: filters.show_authorized,
         };
 
         setFilters(updatedFilters);
@@ -683,11 +601,7 @@ const YarnSalesOrder = (props: any) => {
         startNewOrder(params);
 
         // console.log("params", params);
-        // navigation.navigate('PartyListScreen', params);
-        router.push({
-            pathname: '/PartyListScreen',
-            params: { ...params }
-        });
+        navigation.navigate('PartyListScreen', params);
     };
 
     const openExistingOrder = order => {
@@ -704,11 +618,7 @@ const YarnSalesOrder = (props: any) => {
 
         loadExistingOrder(params);
 
-        // navigation.navigate('OrderSummaryScreen', params);
-        router.push({
-            pathname: '/OrderSummaryScreen',
-            params: { ...params }
-        });
+        navigation.navigate('OrderSummaryScreen', params);
     };
 
     const getSODate = item => {
@@ -891,11 +801,6 @@ const YarnSalesOrder = (props: any) => {
         );
     };
 
-    const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
-    };
-
     return (
         <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
             <StatusBar
@@ -907,7 +812,7 @@ const YarnSalesOrder = (props: any) => {
                 // style={styles.header}
                 style={[styles.header, { height: HEADER_HEIGHT }]}
             >
-                <TouchableOpacity onPress={goBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <Text style={styles.back}>‹</Text>
                 </TouchableOpacity>
 
@@ -1135,6 +1040,12 @@ const YarnSalesOrder = (props: any) => {
                                     style={styles.pickerItem}
                                     onPress={() => {
                                         setSelectedProperty(item);
+
+                                        setFilters(prev => ({
+                                            ...prev,
+                                            prpcode: item.PrpCode,
+                                        }));
+
                                         setPropertyPickerVisible(false);
                                         setPropertySearch("");
                                     }}

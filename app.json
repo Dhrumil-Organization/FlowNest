@@ -19,7 +19,8 @@
         "NSPhotoLibraryUsageDescription": "FlowNest accesses your photo library so users can upload property, collection, and cheque images as attachments in collection entries.",
         "NSPhotoLibraryAddUsageDescription": "FlowNest saves captured images to your photo library when users choose to store collection-related images.",
         "NSMicrophoneUsageDescription": "This app uses the microphone for voice input.",
-        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text."
+        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to convert voice into text.",
+        "NSFaceIDUsageDescription": "Use Face ID to log in quickly."
       }
     },
     "android": {
@@ -43,7 +44,7 @@
       "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "output": "static",
+      "bundler": "metro",
       "favicon": "./assets/images/logo.png"
     },
     "plugins": [
@@ -68,7 +69,8 @@
       ],
       "expo-mail-composer",
       "expo-sqlite",
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

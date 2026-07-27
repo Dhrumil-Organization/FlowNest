@@ -1,11 +1,22 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { CostingAPI, DesignAPI, type ComputeResult, type CostInputs, type Design } from '@/common/API/client';
+import { T } from '@/common/utils/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    View, Text, ScrollView, TextInput, TouchableOpacity,
-    StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TextInput, TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { T } from '@/common/utils/theme';
-import { CostingAPI, DesignAPI, type CostInputs, type ComputeResult, type Design, type SubDesign, type YarnMaster } from '@/common/API/client';
 
 // ── formatters ───────────────────────────────────────────────
 const r2 = (n: number) => `₹${n.toFixed(2)}`;
@@ -779,13 +790,22 @@ const v = StyleSheet.create({
 export function CostingScreen() {
     const [tab, setTab] = useState<Tab>('Costing');
     const [histRefreshKey, setHistRefreshKey] = useState(0);
+    const router = useRouter();
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
             {/* Header */}
             <View style={hdr.wrap}>
                 <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                <Text style={hdr.title}>Costing</Text>
+                {/* <Text style={hdr.title}>Costing</Text> */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
+                        <Icon name="arrow-back" size={22} color={'#fff'} />
+                    </TouchableOpacity>
+                    <View>
+                        <Text style={hdr.title}>Costing</Text>
+                    </View>
+                </View>
             </View>
 
             <TabBar active={tab} onChange={setTab} />

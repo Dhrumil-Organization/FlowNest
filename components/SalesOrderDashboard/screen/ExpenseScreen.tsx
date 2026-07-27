@@ -1,13 +1,20 @@
 // ExpenseScreen.jsx — Madhusudhan Fabrics (React Native)
 // Complete rebuild matching all 14 screenshots
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Dimensions,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useExpenseData } from '../useExpenseData';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -763,6 +770,7 @@ function ProductionBlock({ d }) {
 export default function ExpenseScreen({ token, apiBase }) {
   const { months, states, loadedCount, total, refresh, retryMonth } =
     useExpenseData({ token, apiBase });
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState(0);
   const [view, setView] = useState('report');
@@ -796,6 +804,14 @@ export default function ExpenseScreen({ token, apiBase }) {
         <View style={S.header}>
           <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
           <Text style={S.title}>Expense</Text>
+          {/* <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
+              <Icon name="arrow-back" size={22} color={'#fff'} />
+            </TouchableOpacity>
+            <View>
+              <Text style={S.title}>Expense</Text>
+            </View>
+          </View> */}
           {/* <Text style={S.sub}>Demo data</Text> */}
         </View>
         <ScrollView ref={scrollRef} style={S.body} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -811,7 +827,15 @@ export default function ExpenseScreen({ token, apiBase }) {
       <View style={S.header}>
         <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
         <View style={S.headerRow}>
-          <Text style={S.title}>Expense</Text>
+          {/* <Text style={S.title}>Expense</Text> */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
+              <Icon name="arrow-back" size={22} color={'#fff'} />
+            </TouchableOpacity>
+            <View>
+              <Text style={S.title}>Expense</Text>
+            </View>
+          </View>
           <TouchableOpacity onPress={refresh} style={S.refreshBtn} activeOpacity={0.7}>
             <Text style={S.refreshText}>↻</Text>
           </TouchableOpacity>
@@ -1004,7 +1028,7 @@ export default function ExpenseScreen({ token, apiBase }) {
             </View>
 
             {/* Production block */}
-            <Text style={[S.sectionLabel, { marginTop: 8 , color:'#000'}]}>PRODUCTION · FROM PRODUCTION SYSTEM</Text>
+            <Text style={[S.sectionLabel, { marginTop: 8, color: '#000' }]}>PRODUCTION · FROM PRODUCTION SYSTEM</Text>
             <ProductionBlock d={d} />
 
             {/* Month settings */}

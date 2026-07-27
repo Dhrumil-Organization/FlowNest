@@ -13,8 +13,26 @@
 //       PPI greige  = PPI(loom) + 2               (table pick)
 //       PPI finished= PPI greige ÷ (1 − finish shrink)
 // ═══════════════════════════════════════════════════════════════
-import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '@/common/API/client';
-import { T } from '@/common/utils/theme';
+// import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '@/common/API/client';
+// import { T } from '@/common/utils/theme';
+// import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+// import {
+//     ActivityIndicator,
+//     Alert,
+//     FlatList,
+//     Modal,
+//     RefreshControl,
+//     ScrollView,
+//     StyleSheet,
+//     Text,
+//     TextInput,
+//     TouchableOpacity,
+//     View,
+// } from 'react-native';
+// import { SafeAreaView } from 'react-native-safe-area-context';
+
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -30,6 +48,8 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
+import { T } from '../../../common/utils/theme';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -1120,13 +1140,15 @@ const ct = StyleSheet.create({
 const EMPTY_FORM = {
     code: '', category: '', type: 'YD',
     weave: '', reed_space: 0, greige_width: 0, warp_shrink: 0, gf_shrink: 0,
-    fin_width: 0, warp_wastage: 0, weft_wastage: 0,
+    fin_width: 58, warp_wastage: 0, weft_wastage: 0,
     warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
 };
 
 function DesignTab({ design, onRefresh, onCancelEdit }: {
     design: Design | null; onRefresh: () => void; onCancelEdit: () => void;
 }) {
+    const { prpcode, strcode, yearno } = useERP();
+
     const [saving, setSaving] = useState(false);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
@@ -1140,6 +1162,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             selvedge_yarns: (design as any).selvedge_yarns ?? [],
             warp_wastage: (design as any).warp_wastage ?? 0,
             weft_wastage: (design as any).weft_wastage ?? 6,
+            fin_width: (design as any).fin_width ?? 58,
         });
         else setForm({ ...EMPTY_FORM });
     }, [design?.id]);
@@ -1166,20 +1189,136 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
         set(`${type}_yarns`, (form[`${type}_yarns`] ?? []).filter((_: any, i: number) => i !== idx));
 
     const save = async () => {
+        if (!String(form.code || '').trim()) {
+            Alert.alert('Validation', 'Design code is required.');
+            return;
+        }
+
+        if (!String(form.category || '').trim()) {
+            Alert.alert('Validation', 'Category is required.');
+            return;
+        }
+
+        if (!Array.isArray(form.warp_yarns) || form.warp_yarns.length === 0) {
+            Alert.alert('Validation', 'At least one warp yarn is required.');
+            return;
+        }
+
+        if (!Array.isArray(form.weft_yarns) || form.weft_yarns.length === 0) {
+            Alert.alert('Validation', 'At least one weft yarn is required.');
+            return;
+        }
+
         setSaving(true);
+
         try {
-            // send both widths — backend resolves from width_basis
             const payload = {
                 ...form,
+
+                yearno,
+                YearNo: yearno,
+
+                prpcode,
+                PrpCode: prpcode,
+
+                strcode,
+                StrCode: strcode,
+
                 width_basis: 'reed',
-                reed_space: form.reed_space,
-                greige_width: autoGreige,
+                reed_space: Number(form.reed_space) || 0,
+                greige_width: Number(autoGreige) || 0,
+                warp_shrink: Number(form.warp_shrink) || 0,
+                warp_wastage: Number(form.warp_wastage) || 0,
+                weft_wastage: Number(form.weft_wastage) || 6,
+
+                warp_yarns: (form.warp_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    epi: Number(row.epi) || 0,
+                    sizing: Boolean(row.sizing),
+                })),
+
+                weft_yarns: (form.weft_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    ppi: Number(row.ppi) || 0,
+                })),
+
+                selvedge_yarns: (form.selvedge_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    ends: Number(row.ends) || 0,
+                })),
             };
-            if (design?.id) await DesignAPI.update(design.id, payload);
-            else await DesignAPI.create(payload);
-            Alert.alert('Saved', 'Design saved successfully'); onRefresh();
-        } catch (e: any) { Alert.alert('Error', e?.response?.data?.message || e?.message || 'Unable to save design'); }
-        finally { setSaving(false); }
+
+            console.log('DESIGN SAVE PAYLOAD', JSON.stringify(payload, null, 2));
+
+            const response = design?.id
+                ? await DesignAPI.update(design.id, payload)
+                : await DesignAPI.create(payload);
+
+            console.log('DESIGN SAVE FULL RESPONSE', {
+                status: response.status,
+                baseURL: response.config?.baseURL,
+                url: response.config?.url,
+                requestParams: response.config?.params,
+                responseData: response.data,
+            });
+
+            const saved = response?.data?.data;
+
+            if (
+                response?.data?.success !== true ||
+                !saved ||
+                !String(saved.id || '').trim()
+            ) {
+                throw new Error(
+                    'Server returned success without a saved engineering design ID.'
+                );
+            }
+
+            // Verify immediately by fetching the same record.
+            const verifyResponse = await DesignAPI.get(String(saved.id));
+            const verified = verifyResponse?.data?.data;
+
+            console.log('DESIGN SAVE VERIFY RESPONSE', {
+                id: saved.id,
+                responseData: verifyResponse.data,
+            });
+
+            if (!verified || String(verified.id) !== String(saved.id)) {
+                throw new Error(
+                    `Design ${saved.id} was returned by save but could not be read back.`
+                );
+            }
+
+            Alert.alert(
+                'Saved',
+                `Design saved successfully.\n\nID: ${saved.id}`
+            );
+
+            onRefresh();
+        } catch (e: any) {
+            console.log('DESIGN SAVE FINAL ERROR', {
+                message: e?.message,
+                status: e?.response?.status,
+                responseData: e?.response?.data,
+                baseURL: e?.config?.baseURL,
+                url: e?.config?.url,
+            });
+
+            Alert.alert(
+                'Design save failed',
+                String(
+                    e?.response?.data?.message ||
+                    e?.response?.data?.error ||
+                    e?.message ||
+                    'Unable to save design'
+                )
+            );
+        } finally {
+            setSaving(false);
+        }
     };
 
     const Chip = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
@@ -1936,58 +2075,111 @@ const dy = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 export function DesignsScreen() {
     const context = DEFAULT_ERP_CONTEXT;
+    const router = useRouter();
     const [tab, setTab] = useState<Tab>('Catalog');
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
+    const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
 
     const handleSelectDesign = async (d: Design) => {
-        setSelected(d); setDetail(d);
-        try {
-            const res = await DesignAPI.get(d.id); setDetail({ ...d, ...res.data.data });
-            console.log("design res", res);
-        } catch { }
-
-        setTab('Design');
-    };
-
-    const handleAddSubDesign = async (d: Design) => {
         setSelected(d);
+        setDetail(d);
+
         try {
             const res = await DesignAPI.get(d.id);
             setDetail({ ...d, ...res.data.data });
         } catch {
             setDetail(d);
         }
+
+        setTab('Design');
+    };
+
+    const handleAddSubDesign = async (d: Design) => {
+        setSelected(d);
+
+        try {
+            const res = await DesignAPI.get(d.id);
+            setDetail({ ...d, ...res.data.data });
+        } catch {
+            setDetail(d);
+        }
+
         setTab('Colourway');
     };
 
-    const handleCancelEdit = () => { setSelected(null); setDetail(null); };
+    const handleCancelEdit = () => {
+        setSelected(null);
+        setDetail(null);
+    };
+
+    const handleDesignSaved = () => {
+        setSelected(null);
+        setDetail(null);
+        setCatalogRefreshKey(value => value + 1);
+        setTab('Catalog');
+    };
 
     return (
         <ERPContext.Provider value={context}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
+            <SafeAreaView
+                style={{ flex: 1, backgroundColor: T.bg }}
+                edges={['top']}
+            >
                 <View style={hdr.wrap}>
+                    {/* <TouchableOpacity onPress={() => navigation.navigate('Home')}> */}
+
+
+
                     <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                    <Text style={hdr.title}>Designs</Text>
-                    {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
+                            <Icon name="arrow-back" size={22} color={'#fff'} />
+                        </TouchableOpacity>
+                        <View>
+                            <Text style={hdr.title}>Designs</Text>
+                        </View>
+                    </View>
+
+                    {selectedDesign && (
+                        <Text style={hdr.sub}>
+                            Selected: {selectedDesign.code}
+                        </Text>
+                    )}
                 </View>
+
                 <TabBar active={tab} onChange={setTab} />
+
                 <View style={{ flex: 1 }}>
-                    {tab === 'Catalog' && <CatalogTab onSelectDesign={handleAddSubDesign} onEditDesign={(design) => {
-                        handleSelectDesign(design);
-                    }}
-                    />
-                    }
+                    {tab === 'Catalog' && (
+                        <CatalogTab
+                            key={catalogRefreshKey}
+                            onSelectDesign={handleAddSubDesign}
+                            onEditDesign={handleSelectDesign}
+                        />
+                    )}
+
                     {tab === 'Design' && (
                         <DesignTab
                             design={detailDesign}
-                            onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
+                            onRefresh={handleDesignSaved}
                             onCancelEdit={handleCancelEdit}
                         />
                     )}
-                    {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
+
+                    {tab === 'Colourway' && (
+                        <ColourwayTab
+                            design={detailDesign}
+                            onNavigateToCatalog={() => setTab('Catalog')}
+                        />
+                    )}
+
                     {tab === 'Yarns' && <YarnsTab />}
-                    {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
+
+                    {tab === 'Dyeing' && (
+                        <DyeingTab design={detailDesign} />
+                    )}
                 </View>
             </SafeAreaView>
         </ERPContext.Provider>

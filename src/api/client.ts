@@ -5,12 +5,13 @@
 // ─────────────────────────────────────────────────────────────
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API } from '../../common/API/dynamicAPI';
+// import { API } from '../../common/API/dynamicAPI';
 
 //export const API_BASE_URL = 'https://apig.tms-webapp.com';
 // For local testing, replace above with your local Laravel API base:
-export const API_BASE_URL = API;
-// export const API_BASE_URL = 'https://apig.tms-webapp.com';
+// export const API_BASE_URL = API;
+export const API_BASE_URL = 'https://apig.tms-webapp.com';
+export const API = 'https://apig.tms-webapp.com';
 
 export type LoginPayload = {
   name: string;

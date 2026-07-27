@@ -1,73 +1,17 @@
-// // // import React from 'react';
-// // // import { RootNavigator } from '../../src/navigation/RootNavigator';
+// ─────────────────────────────────────────────────────────────
+// FILE: app/new/index.tsx
+// Replaces src/navigation/RootNavigator.tsx's token check.
+// Old: !token -> <Stack.Screen name="RoleLogin"/> else <Stack.Screen name="Main"/>
+// New: redirect to the matching expo-router route instead.
+// ─────────────────────────────────────────────────────────────
+import { Redirect } from 'expo-router';
+import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 
-// // // export default function NewProject() {
-// // //   return <RootNavigator />;
-// // // }
-// // // // import { Text, View } from 'react-native';
+export default function NewIndex() {
+  const token = useAppSessionStore((s) => s.token);
 
-// // // // export default function NewProject() {
-// // // //   return (
-// // // //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-// // // //       <Text>NEW PROJECT OPENED</Text>
-// // // //     </View>
-// // // //   );
-// // // // }
+  console.log('token =', token);
 
-// // import React, { useEffect } from 'react';
-// // import { ActivityIndicator, View } from 'react-native';
-// // import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-// // import { AppCoreProvider } from '../../src/core/AppCoreProvider';
-// // import { RootNavigator } from '../../src/navigation/RootNavigator';
-// // import { useAppSessionStore } from '../../src/stores/AppSessionStore';
-// // import { useAppStore } from '../../src/stores/AppStore';
-
-// // export default function NewProject() {
-// //   const loadLegacyStorage = useAppStore((s) => s.loadFromStorage);
-// //   const hydrateSession = useAppSessionStore((s) => s.hydrate);
-// //   const hydrated = useAppSessionStore((s) => s.hydrated);
-
-// //   useEffect(() => {
-// //     void Promise.all([
-// //       loadLegacyStorage(),
-// //       hydrateSession(),
-// //     ]);
-// //   }, []);
-
-// //   if (!hydrated) {
-// //     return (
-// //       <View
-// //         style={{
-// //           flex:1,
-// //           justifyContent:'center',
-// //           alignItems:'center'
-// //         }}
-// //       >
-// //         <ActivityIndicator />
-// //       </View>
-// //     );
-// //   }
-
-// //   return (
-// //     <SafeAreaProvider>
-// //       <AppCoreProvider>
-// //         <RootNavigator />
-// //       </AppCoreProvider>
-// //     </SafeAreaProvider>
-// //   );
-// // }
-
-// import React from 'react';
-// import { AppCoreProvider } from '../../src/core/AppCoreProvider';
-// import { RootNavigator } from '../../src/navigation/RootNavigator';
-
-// export default function NewProject() {
-//   console.log("Before RootNavigator");
-
-//   return (
-//     <AppCoreProvider>
-//       <RootNavigator />
-//     </AppCoreProvider>
-//   );
-// }
+  if (!token) return <Redirect href="/new/role-login" />;
+  return <Redirect href="/new/(tabs)" />;
+}

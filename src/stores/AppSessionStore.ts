@@ -15,6 +15,11 @@ type SessionState = {
   rawLoginResponse: any | null;
   biometricEnabled: boolean;
   hydrated: boolean;
+  // In-memory only (never persisted). True for the brief moment right
+  // after a manual login or a successful biometric auto-login in THIS
+  // app session, so the login route knows not to re-show the
+  // biometric gate it was just satisfied by. Reset on cold start.
+  freshLogin: boolean;
 
   setLoggedIn: (payload: {
     token: string;
@@ -44,6 +49,8 @@ const STORAGE_KEYS = [
   'yno',
   'user_login_role',
   'LOOKUP_PLATFORM',
+  'mobile_user',
+  'mobile_raw_login_response',
 ];
 
 function findScreen(appSession: AppSession | null, screenKey: string) {
@@ -59,9 +66,18 @@ export const useAppSessionStore = create<SessionState>((set, get) => ({
   rawLoginResponse: null,
   biometricEnabled: false,
   hydrated: false,
+  freshLogin: false,
 
   setLoggedIn: ({ token, user, appSession, rawLoginResponse }) => {
-    set({ token, user, appSession, rawLoginResponse: rawLoginResponse || null, hydrated: true });
+    // Persist the complete permission identity. Without this, a cold start only
+    // restores a minimal user and the tab registry incorrectly hides routes.
+    void AsyncStorage.multiSet([
+      ['access_token', token],
+      ['app_session', JSON.stringify(appSession)],
+      ['mobile_user', JSON.stringify(user || null)],
+      ['mobile_raw_login_response', JSON.stringify(rawLoginResponse || null)],
+    ]);
+    set({ token, user, appSession, rawLoginResponse: rawLoginResponse || null, hydrated: true, freshLogin: true });
   },
 
   setAppSession: async (appSession) => {
@@ -80,6 +96,8 @@ export const useAppSessionStore = create<SessionState>((set, get) => ({
     const biometricRaw = await AsyncStorage.getItem('biometric_enabled');
     const userId = await AsyncStorage.getItem('user_id');
     const userName = await AsyncStorage.getItem('user_details');
+    const persistedUserRaw = await AsyncStorage.getItem('mobile_user');
+    const persistedLoginRaw = await AsyncStorage.getItem('mobile_raw_login_response');
 
     let appSession: AppSession | null = null;
     try {
@@ -88,12 +106,19 @@ export const useAppSessionStore = create<SessionState>((set, get) => ({
       appSession = null;
     }
 
+    let persistedUser: any = null;
+    let persistedLogin: any = null;
+    try { persistedUser = persistedUserRaw ? JSON.parse(persistedUserRaw) : null; } catch { persistedUser = null; }
+    try { persistedLogin = persistedLoginRaw ? JSON.parse(persistedLoginRaw) : null; } catch { persistedLogin = null; }
+
     set({
       token,
       appSession,
-      user: token ? { id: userId, first_name: userName || 'User' } : null,
+      user: token ? (persistedUser || { id: userId, first_name: userName || 'User' }) : null,
+      rawLoginResponse: token ? persistedLogin : null,
       biometricEnabled: biometricRaw === '1',
       hydrated: true,
+      freshLogin: false, // cold start: gate must be offered if biometric is on
     });
   },
 
@@ -105,6 +130,7 @@ export const useAppSessionStore = create<SessionState>((set, get) => ({
       appSession: null,
       rawLoginResponse: null,
       hydrated: true,
+      freshLogin: false,
     });
     router.replace('/(all)/landing');
   },

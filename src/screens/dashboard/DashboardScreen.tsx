@@ -1,6 +1,7 @@
 import { DashboardAPI, DashboardCard, DashboardView } from '@/src/api/dashboard';
 import { DashboardSection, EmptyState, MetricCell, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
 import { usePermission } from '@/src/core/permissions';
+import EmployDashboardSection from '@/src/screens/dashboard/employ/screens/EmployDashboardSection';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
 import { useRouter } from 'expo-router';
@@ -77,6 +78,7 @@ export function DashboardScreen() {
   const { canAccess, isSuperAdmin } = usePermission();
   const appSession = useAppSessionStore((state) => state.appSession);
   const rawLoginResponse = useAppSessionStore((state) => state.rawLoginResponse);
+  const sessionUser = useAppSessionStore((state) => state.user);
   const logout = useAppSessionStore((state) => state.logout);
 
   const context = appSession?.business_context;
@@ -207,7 +209,17 @@ export function DashboardScreen() {
               <Text style={styles.reportChevron}>›</Text>
             </TouchableOpacity>
 
-            <DashboardSection title="SALES" tone="navy" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
+            {/* ─── Employee Dashboard (Owner / My View) ───
+                Merged in from the standalone Employ Dashboard app, with its
+                original API calls and drill-down navigation intact — see
+                @/src/screens/dashboard/employ for the full source. */}
+            <EmployDashboardSection
+              activeTab={view === 'owner' ? 'owner' : 'myview'}
+              username={sessionUser?.first_name || sessionUser?.name}
+              user={sessionUser}
+            />
+
+            {/* <DashboardSection title="SALES" tone="navy" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
               <View style={styles.metricRow}>
                 <MetricCell label="THIS MONTH" value={money(billing?.actual || 0)} />
                 <MetricCell label="SO BOOKED" value={money(salesOrder?.actual || 0)} />
@@ -225,7 +237,7 @@ export function DashboardScreen() {
                 <Text style={styles.achievementValue}>{(collection?.achievement_pct || 0).toFixed(2)}%</Text>
               </View>
               <ProgressBar value={collection?.achievement_pct || 0} tone="blue" />
-            </DashboardSection>
+            </DashboardSection> */}
           </>
         )}
       </ScrollView>

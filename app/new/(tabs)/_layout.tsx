@@ -1,156 +1,216 @@
-// ─────────────────────────────────────────────────────────────
-// FILE: app/new/(tabs)/_layout.tsx
-// Replaces src/navigation/MainTabs.tsx (createBottomTabNavigator).
-//
-// NOTE: The original MainTabs.tsx had only the "Home" tab active;
-// Designs/Costing/Orders/Reports/Permissions were commented out.
-// But DashboardScreen and other screens DO call navigation to
-// "Designs"/"Costing" etc, so those targets need to exist as real
-// routes to work at all. I've enabled them here, permission-gated
-// exactly like the commented-out code intended
-// (canAccess / canDo / isSuperAdmin). If you want ONLY the Home
-// tab visible (matching the literal current MainTabs), just remove
-// the extra <Tabs.Screen> blocks below.
-// ─────────────────────────────────────────────────────────────
+import { AppHeader } from '@/src/components/layout/AppHeader';
+import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
+import { APP_NAVIGATION } from '@/src/core/navigation';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, usePathname, useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// FIX: this is now the ONE place a header is rendered for every tab screen.
+// Previously DashboardScreen, DesignsScreen, PermissionManagerScreen and
+// OrdersScreen each rendered their own separate header component — which is
+// why switching tabs could show two stacked navy header blocks (a nav item's
+// previous screen staying mounted-but-hidden underneath, per Expo Router's
+// default tab behavior, plus the new screen's own header on top). With only
+// one AppHeader in the whole tree, that's now structurally impossible.
+//
+// The bottom-tab label from the UI registry (`item.title`, e.g. "Home") is
+// intentionally short for the tab bar icon caption. The main header wants a
+// longer, more descriptive title ("Business Dashboard") — kept here as a
+// small local map rather than a new registry field, since only these
+// screens need the distinction.
+const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
+  index: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Business Dashboard' },
+  designs: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Designs' },
+  costing: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Costing' },
+  orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
+  reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
+  'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
+  'beam-close/index': { eyebrow: 'PRODUCTION', title: 'Beam Close' },
+  'beam-gaiting/index': { eyebrow: 'PRODUCTION', title: 'Beam Gaiting' },
+};
+
+// FEATURE: bottom tab bar caps at this many real tabs; anything beyond it
+// (still permission-visible, just past the cap) collapses into a single
+// "More" tab that opens a grid sheet instead of navigating directly. As
+// more screens get registered in the UI registry over time, they
+// automatically flow into "More" rather than the tab bar getting
+// overcrowded — nothing here is hardcoded to today's specific screen list.
+const MAX_PRIMARY_TABS = 4;
 
 export default function TabsLayout() {
-  const { canAccess, canDo, isSuperAdmin } = usePermission();
+  const { canAccess, canDo } = usePermission();
   const hydrated = useAppSessionStore((state) => state.hydrated);
   const appSession = useAppSessionStore((state) => state.appSession);
-  const hasRuntimePermissions = Boolean(appSession?.permissions);
-  const ready = hydrated && hasRuntimePermissions;
-  const canAdmin = ready && (isSuperAdmin || canDo('administration.permission_manager', 'manage'));
-  const allow = (path: string) => ready && (isSuperAdmin || canAccess(path));
+  const pathname = usePathname();
+  const router = useRouter();
+  const ready = hydrated && Boolean(appSession);
+  const onDashboard = pathname === '/new' || pathname === '/new/' || pathname.endsWith('/new/(tabs)') || pathname.endsWith('/new/(tabs)/');
+
+  const activeRouteName = onDashboard
+    ? 'index'
+    : APP_NAVIGATION.map((item) => item.routeName).find(
+        (routeName) => routeName !== 'index' && pathname.includes(routeName.replace(/\/index$/, '')),
+      );
+  const header = (activeRouteName && HEADER_CONTENT[activeRouteName]) || HEADER_CONTENT.index;
+
+  const subtitle = useHeaderExtrasStore((state) => state.subtitle);
+  const right = useHeaderExtrasStore((state) => state.right);
+
+  // Permission-visible items, in registry order (APP_NAVIGATION is already
+  // sorted by `order` — see navigationRegistry.ts).
+  const visibleItems = useMemo(
+    () =>
+      APP_NAVIGATION.filter((item) => {
+        if (!ready) return false;
+        return item.action && item.action !== 'view' ? canDo(item.resource, item.action) : canAccess(item.resource);
+      }),
+    [ready, canAccess, canDo],
+  );
+
+  const primaryRouteNames = useMemo(
+    () => new Set(visibleItems.slice(0, MAX_PRIMARY_TABS).map((item) => item.routeName)),
+    [visibleItems],
+  );
+  const overflowItems = useMemo(() => visibleItems.slice(MAX_PRIMARY_TABS), [visibleItems]);
+  const hasOverflow = overflowItems.length > 0;
+
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // FIX: this used to push `/new/(tabs)/${routeName}` directly — for an
+  // item like Permissions, whose registry routeName is 'permissions/index'
+  // (matching the actual file path, which is what Tabs.Screen's `name`
+  // needs), that built '/new/(tabs)/permissions/index'. But Expo Router's
+  // *resolved URL* for an index.tsx file never includes a literal "index"
+  // segment (same reason the header-title matching needed this same fix
+  // earlier) — so that URL doesn't exist, producing the "Unmatched Route"
+  // screen. Stripping a trailing '/index' before building the push target
+  // fixes this for Permissions and any future route with the same shape.
+  const goTo = (routeName: string) => {
+    setMoreOpen(false);
+    const path = routeName === 'index' ? '' : routeName.replace(/\/index$/, '');
+    router.push((path ? `/new/(tabs)/${path}` : '/new/(tabs)') as any);
+  };
 
   return (
-    // <Tabs
-    //   screenOptions={{
-    //     headerShown: false,
-    //     tabBarActiveTintColor: T.copper,
-    //     tabBarInactiveTintColor: T.muted,
-    //     tabBarStyle: { height: 64, backgroundColor: T.surface, borderTopColor: T.border },
-    //     tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 7 },
-    //     tabBarIconStyle: { marginTop: 7 },
-    //   }}
-    // >
-    //   <Tabs.Screen
-    //     name="index"
-    //     options={{ title: 'Home', tabBarIcon: ({ color }) => <Text style={{ color }}>⌂</Text> }}
-    //   />
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.nav }}>
+      <AppHeader eyebrow={header.eyebrow} title={header.title} subtitle={subtitle || undefined} right={right || undefined} />
+      <View style={{ flex: 1, backgroundColor: T.bg }}>
+        <Tabs screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: T.copper,
+          tabBarInactiveTintColor: T.muted,
+          tabBarStyle: { height: 64, backgroundColor: T.surface, borderTopColor: T.border },
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 7 },
+          tabBarIconStyle: { marginTop: 7 },
+        }}>
+          {APP_NAVIGATION.map((item) => {
+            const isPrimary = primaryRouteNames.has(item.routeName);
+            return (
+              <Tabs.Screen
+                key={item.routeName}
+                name={item.routeName as any}
+                options={{
+                  title: item.title,
+                  // Hidden from the tab bar if either not permission-visible
+                  // (existing behavior) or visible-but-past the 4-tab cap
+                  // (new behavior) — either way the route itself stays
+                  // valid and reachable via router.push from the More sheet.
+                  href: isPrimary ? undefined : null,
+                  tabBarIcon: ({ color }) => (
+                    <Icon name={item.icon as any} size={24} color={color} />
+                  ),
+                }}
+              />
+            );
+          })}
+          {/* "More" is a real placeholder route (see more.tsx) purely so
+              Expo Router has something to attach this Tabs.Screen to.
+              Pressing it never navigates there — tabPress is intercepted
+              below to open the grid sheet instead. */}
+          <Tabs.Screen
+            name="more"
+            options={{
+              title: 'More',
+              href: hasOverflow ? undefined : null,
+              tabBarIcon: ({ color }) => (
+                <Icon name="more-horiz" size={24} color={color} />
+              ),
+            }}
+            listeners={{
+              tabPress: (e) => {
+                e.preventDefault();
+                setMoreOpen(true);
+              },
+            }}
+          />
+        </Tabs>
+      </View>
 
-    //   <Tabs.Screen
-    //     name="designs"
-    //     options={{
-    //       title: 'Designs',
-    //       tabBarIcon: ({ color }) => <Text style={{ color }}>□</Text>,
-    //       href: allow('designs') ? undefined : null,
-    //     }}
-    //   />
-
-    //   <Tabs.Screen
-    //     name="costing"
-    //     options={{
-    //       title: 'Costing',
-    //       tabBarIcon: ({ color }) => <Text style={{ color }}>₹</Text>,
-    //       href: allow('costing') ? undefined : null,
-    //     }}
-    //   />
-
-    //   <Tabs.Screen
-    //     name="orders"
-    //     options={{
-    //       title: 'Orders',
-    //       tabBarIcon: ({ color }) => <Text style={{ color }}>▤</Text>,
-    //       href: allow('orders') ? undefined : null,
-    //     }}
-    //   />
-
-    //   <Tabs.Screen
-    //     name="reports"
-    //     options={{
-    //       title: 'Reports',
-    //       tabBarIcon: ({ color }) => <Text style={{ color }}>◫</Text>,
-    //       href: allow('management.reports') ? undefined : null,
-    //     }}
-    //   />
-
-    //   <Tabs.Screen
-    //     name="permissions"
-    //     options={{
-    //       title: 'Permissions',
-    //       tabBarIcon: ({ color }) => <Text style={{ color }}>⚙</Text>,
-    //       href: canAdmin ? undefined : null,
-    //     }}
-    //   />
-    // </Tabs>
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: T.copper,
-        tabBarInactiveTintColor: T.muted,
-        tabBarStyle: { height: 64, backgroundColor: T.surface, borderTopColor: T.border },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 7 },
-        tabBarIconStyle: { marginTop: 7 },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <Icon name="home" size={24} color={color} />
-        }}
-      />
-
-      <Tabs.Screen
-        name="designs"
-        options={{
-          title: 'Designs',
-          tabBarIcon: ({ color }) => <Icon name="design-services" size={24} color={color} />,
-          href: allow('designs') ? undefined : null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="costing"
-        options={{
-          title: 'Costing',
-          tabBarIcon: ({ color }) => <Icon name="attach-money" size={24} color={color} />,
-          href: allow('costing') ? undefined : null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'Orders',
-          tabBarIcon: ({ color }) => <Icon name="shopping-cart" size={24} color={color} />,
-          href: allow('orders') ? undefined : null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="reports"
-        options={{
-          title: 'Reports',
-          tabBarIcon: ({ color }) => <Icon name="assessment" size={24} color={color} />,
-          href: allow('management.reports') ? undefined : null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="permissions"
-        options={{
-          title: 'Permissions',
-          tabBarIcon: ({ color }) => <Icon name="admin-panel-settings" size={24} color={color} />,
-          href: canAdmin ? undefined : null,
-        }}
-      />
-    </Tabs>
+      {/* FIX: this was originally built with the app's existing
+          BottomSheet component (@gorhom/bottom-sheet under the hood).
+          That library renders itself high in the tree — even while
+          "closed" — via its own internal Animated/Portal machinery. That
+          was fine everywhere else it's used (nested deep inside a single
+          screen's content), but placed here, as a sibling of the header
+          and the Tab navigator itself, it ended up clipping/hiding both
+          the header and the bottom tab bar entirely. Replaced with a
+          plain Modal — a real OS-level overlay that can't interfere with
+          sibling layout the way an in-tree animated sheet can. Same
+          pattern already used safely elsewhere in this app (the
+          SearchableDropdown component, and Permission Manager's
+          role/user picker). */}
+      <Modal visible={moreOpen} transparent animationType="slide" onRequestClose={() => setMoreOpen(false)}>
+        <View style={moreStyles.shade}>
+          <View style={moreStyles.sheet}>
+            <View style={moreStyles.handle} />
+            <View style={moreStyles.sheetHeader}>
+              <Text style={moreStyles.sheetTitle}>More</Text>
+              <TouchableOpacity onPress={() => setMoreOpen(false)}>
+                <Text style={moreStyles.closeX}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={moreStyles.grid}>
+              {overflowItems.map((item) => (
+                <TouchableOpacity key={item.routeName} style={moreStyles.cell} onPress={() => goTo(item.routeName)} activeOpacity={0.7}>
+                  <View style={moreStyles.iconWrap}>
+                    <Icon name={item.icon as any} size={22} color={T.copper} />
+                  </View>
+                  <Text style={moreStyles.label} numberOfLines={1}>{item.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
+
+const moreStyles = StyleSheet.create({
+  shade: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: T.surface, maxHeight: '75%',
+    borderTopLeftRadius: 18, borderTopRightRadius: 18,
+    paddingTop: 10, paddingBottom: 20,
+  },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: T.border, alignSelf: 'center', marginBottom: 10 },
+  sheetHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: T.border,
+  },
+  sheetTitle: { fontSize: 16, fontWeight: '900', color: T.nav },
+  closeX: { fontSize: 18, color: T.muted },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
+  cell: { width: '25%', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 4 },
+  iconWrap: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: T.sub, borderWidth: 1, borderColor: T.border,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+  },
+  label: { fontSize: 11, fontWeight: '700', color: T.ink, textAlign: 'center' },
+});

@@ -6,7 +6,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { T } from '../../theme';
-import { useAppStore } from '../../stores/AppStore';
+import { useAppSessionStore } from '../../stores/AppSessionStore';
 
 interface Props {
     backLabel: string;
@@ -14,14 +14,20 @@ interface Props {
 }
 
 export function SubScreenHeader({ backLabel, title }: Props) {
-    const router  = useRouter();
-    const insets  = useSafeAreaInsets();
-    const setUser = useAppStore(s => s.setUser);
+    const router = useRouter();
+    const insets = useSafeAreaInsets();
+    // FIX: this used to call useAppStore().setUser(null), a *different*
+    // store from the one every other sign-out button in the app uses
+    // (AppHeader, CommonLogoutButton both use AppSessionStore.logout).
+    // That meant signing out from a sub-screen could leave the real
+    // session/token in AppSessionStore intact while only clearing an
+    // unrelated store's user field. Now consistent with the rest of the app.
+    const logout = useAppSessionStore(s => s.logout);
 
     const signOut = () =>
         Alert.alert('Sign out', 'Are you sure?', [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: () => setUser(null) },
+            { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
         ]);
 
     return (

@@ -19,6 +19,24 @@ const normalize = (value: string) =>
 
 const screenFromPath = (resourcePath: string) => normalize(resourcePath).split('.')[0];
 
+const permissionFlag = (value: any, fallback = false): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'allow', 'allowed', 'yes'].includes(normalized)) return true;
+    if (['0', 'false', 'deny', 'denied', 'no', ''].includes(normalized)) return false;
+  }
+  if (value && typeof value === 'object') {
+    if ('allowed' in value) return permissionFlag(value.allowed, fallback);
+    if ('access' in value) return permissionFlag(value.access, fallback);
+    if ('can_view' in value) return permissionFlag(value.can_view, fallback);
+    if ('can_use' in value) return permissionFlag(value.can_use, fallback);
+    if ('value' in value) return permissionFlag(value.value, fallback);
+  }
+  return fallback;
+};
+
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
   const appSession = useAppSessionStore((state) => state.appSession);
   const user = useAppSessionStore((state) => state.user);
@@ -32,34 +50,52 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
   const runtimeGrants = useMemo(() => {
     const grants = new Map<string, boolean>();
-    const resourcePermissions = (appSession?.permissions as any)?.resources || [];
+    const permissionPayload = (appSession?.permissions as any) || {};
+    const resolvedGrantMap = permissionPayload.grants;
+
+    // V2 backend returns the resolved permission map in `grants` and the
+    // registry hierarchy separately in `resources`.
+    if (resolvedGrantMap && typeof resolvedGrantMap === 'object' && !Array.isArray(resolvedGrantMap)) {
+      for (const [resourcePathRaw, entry] of Object.entries(resolvedGrantMap as Record<string, any>)) {
+        const resourcePath = normalize(resourcePathRaw);
+        if (!resourcePath) continue;
+        grants.set(`resource:${resourcePath}`, permissionFlag(entry?.access));
+        for (const [key, allowed] of Object.entries(entry?.actions || {})) {
+          grants.set(`action:${resourcePath}:${normalize(key)}`, permissionFlag(allowed));
+        }
+      }
+      return grants;
+    }
+
+    // Compatibility with earlier payload shapes.
+    const resourcePermissions = permissionPayload.resources || [];
 
     if (Array.isArray(resourcePermissions)) {
       for (const item of resourcePermissions) {
         const resourcePath = normalize(item.resource_path || item.resourcePath || item.key || '');
         if (!resourcePath) continue;
-        grants.set(`resource:${resourcePath}`, Boolean(item.can_view ?? item.allowed ?? true));
+        grants.set(`resource:${resourcePath}`, permissionFlag(item.can_view ?? item.allowed, true));
 
         const actions = item.actions || {};
         if (Array.isArray(actions)) {
           for (const action of actions) {
             grants.set(
               `action:${resourcePath}:${normalize(action.action_key || action.key || '')}`,
-              Boolean(action.allowed ?? action.can_use ?? true),
+              permissionFlag(action.allowed ?? action.can_use, true),
             );
           }
         } else {
           for (const [key, allowed] of Object.entries(actions)) {
-            grants.set(`action:${resourcePath}:${normalize(key)}`, Boolean(allowed));
+            grants.set(`action:${resourcePath}:${normalize(key)}`, permissionFlag(allowed));
           }
         }
       }
     } else if (resourcePermissions && typeof resourcePermissions === 'object') {
       for (const [resourcePathRaw, entry] of Object.entries(resourcePermissions as Record<string, any>)) {
         const resourcePath = normalize(resourcePathRaw);
-        grants.set(`resource:${resourcePath}`, Boolean(entry?.access));
+        grants.set(`resource:${resourcePath}`, permissionFlag(entry?.access));
         for (const [key, allowed] of Object.entries(entry?.actions || {})) {
-          grants.set(`action:${resourcePath}:${normalize(key)}`, Boolean(allowed));
+          grants.set(`action:${resourcePath}:${normalize(key)}`, permissionFlag(allowed));
         }
       }
     }
@@ -68,12 +104,30 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
   const canAccess = useCallback(
     (resourcePath: string): boolean => {
-      if (isSuperAdmin) return true;
       const path = normalize(resourcePath);
       if (!path) return false;
 
+      // SuperAdmin is unconditional full access. New registry resources are
+      // automatically available immediately after session/registry refresh.
+      if (isSuperAdmin) return true;
+
       const exact = runtimeGrants.get(`resource:${path}`);
       if (exact !== undefined) return exact;
+
+      // A container (navigation item, screen, tab or section) must remain
+      // reachable when at least one explicitly allowed descendant is assigned.
+      // Example: allowing management.dashboard.monthly_target automatically
+      // exposes management.dashboard and its Home navigation entry.
+      const descendantPrefix = `resource:${path}.`;
+      for (const [grantKey, allowed] of runtimeGrants.entries()) {
+        if (allowed === true && grantKey.startsWith(descendantPrefix)) return true;
+      }
+
+      // An explicit deny still blocks a leaf resource. For containers, the
+      // descendant check above intentionally wins so assigned children remain usable.
+      if (exact === false) return false;
+
+      if (runtimeGrants.size > 0) return false;
 
       const parts = path.split('.');
       const screenKey = parts[0];
@@ -91,16 +145,26 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
 
   const canDo = useCallback(
     (resourcePath: string, actionKey: string): boolean => {
-      if (isSuperAdmin) return true;
       const path = normalize(resourcePath);
       const action = normalize(actionKey);
       if (!canAccess(path)) return false;
 
+      // SuperAdmin is unconditional full access.
+      if (isSuperAdmin) return true;
+
       const exact = runtimeGrants.get(`action:${path}:${action}`);
       if (exact !== undefined) return exact;
 
+      // Visibility is controlled by resource access. Some backend payloads omit a
+      // separate `view` action even when the resource itself is explicitly allowed.
+      // Treat resource ALLOW as view ALLOW, while keeping create/edit/delete/manage
+      // dependent on their explicit action grants.
+      if (action === 'view') return true;
+
       // Walk upward so a parent action can cover a nested dialog/card until backend
       // starts returning fully nested resource grants.
+      if (runtimeGrants.size > 0) return false;
+
       const parts = path.split('.');
       while (parts.length > 0) {
         const parentPath = parts.join('.');

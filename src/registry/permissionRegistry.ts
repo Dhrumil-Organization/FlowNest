@@ -166,12 +166,42 @@ export function findPermissionResource(resourcePath: string): FlattenedPermissio
   return flattenPermissionRegistry().find((item) => item.resourcePath === normalized);
 }
 
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function registryHash(value: unknown): string {
+  const input = stableStringify(value);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b9;
+  for (let i = 0; i < input.length; i += 1) {
+    const code = input.charCodeAt(i);
+    h1 ^= code;
+    h1 = Math.imul(h1, 0x01000193);
+    h2 ^= code + i;
+    h2 = Math.imul(h2, 0x85ebca6b);
+  }
+  return `${(h1 >>> 0).toString(16).padStart(8, '0')}${(h2 >>> 0)
+    .toString(16)
+    .padStart(8, '0')}`;
+}
+
 export function createPermissionRegistrySyncPayload(
-  clientVersion = 'sudamo-mobile-registry-v1',
-): PermissionRegistrySyncPayload {
+  clientVersion = 'sudamo-mobile-registry-v2',
+): PermissionRegistrySyncPayload & { registry_hash: string; full_snapshot: boolean } {
+  const registryAreas = getPermissionRegistry();
   return {
     client_version: clientVersion,
-    areas: getPermissionRegistry(),
+    registry_hash: registryHash(registryAreas),
+    full_snapshot: true,
+    areas: registryAreas,
   };
 }
 

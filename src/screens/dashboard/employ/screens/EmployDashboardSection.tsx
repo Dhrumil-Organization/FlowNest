@@ -23,13 +23,21 @@ import { COLORS } from '../components/SharedComponents';
 import OwnerDashboardScreen from './OwnerDashboardScreen';
 import SalesExecDashboardScreen from './SalesExecDashboardScreen';
 
+export type DashboardDetailVisibility = {
+  sales: boolean;
+  production: boolean;
+  collection: boolean;
+  outstanding: boolean;
+};
+
 type Props = {
   activeTab: 'owner' | 'myview';
   username?: string;
   user?: any;
+  visibleSections: DashboardDetailVisibility;
 };
 
-export default function EmployDashboardSection({ activeTab, username, user }: Props) {
+export default function EmployDashboardSection({ activeTab, username, user, visibleSections }: Props) {
   const router = useRouter();
   const [getUserPrptype, setUserPrptype] = useState('');
 
@@ -57,6 +65,8 @@ export default function EmployDashboardSection({ activeTab, username, user }: Pr
     goBack: () => router.back(),
   };
 
+  console.log('activeTab 111', activeTab);
+
   return (
     <View style={styles.wrap}>
       {/* ─── Content ───
@@ -69,6 +79,7 @@ export default function EmployDashboardSection({ activeTab, username, user }: Pr
           navigation={childNavigation}
           route={{ params: { user } }}
           getUserPrptype={getUserPrptype}
+          visibleSections={visibleSections}
         />
       )}
 
@@ -86,6 +97,7 @@ export default function EmployDashboardSection({ activeTab, username, user }: Pr
               username,
             },
           }}
+          visibleSections={visibleSections}
         />
       )}
     </View>

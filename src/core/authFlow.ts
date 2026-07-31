@@ -19,6 +19,7 @@ import {
 import { useAppSessionStore } from '../stores/AppSessionStore';
 import { useAppStore } from '../stores/AppStore';
 import type { UserAccount } from '../types';
+import { autoSyncPermissionRegistry } from './registry/registryAutoSync';
 
 function makeLegacyUser(user: any): UserAccount {
   const first = user?.first_name || user?.displayname || user?.name || 'User';
@@ -73,7 +74,17 @@ export async function performLogin(
     const response = res.response || {};
     const token = response.access_token;
     const user = response.user;
-    const appSession = response?.app_session || {};
+    const appSession = response?.app_session ?? {
+      business_context: {
+        year_no: String(response?.year?.YearNo ?? ''),
+        year_name: String(response?.year?.YearName ?? ''),
+        prp_code: String(response?.prpcode ?? response?.year?.PrpCode ?? ''),
+        prp_group: String(response?.userof ?? ''),
+        str_code: String(response?.strcode ?? ''),
+      },
+      permissions: { dashboards: [], screens: [], resources: [], grants: {} },
+      fallback_mode: true,
+    };
 
     if (!token || !user) {
       return { success: false, message: 'Login response is missing token or user.' };
@@ -87,7 +98,10 @@ export async function performLogin(
       'user_prptype',
       response.userof || appSession.business_context?.prp_group || ''
     );
-    await AsyncStorage.setItem('yno', appSession.business_context?.year_no || '');
+    await AsyncStorage.setItem(
+      'yno',
+      String(appSession.business_context?.year_no || response?.year?.YearNo || '')
+    );
 
     useAppStore.getState().setUser(makeLegacyUser(user));
 
@@ -118,6 +132,10 @@ export async function performLogin(
     // the gate is only for returning to the app later, not the
     // instant after you just typed your password (or just auto-logged in).
     useAppSessionStore.getState().setLoggedIn({ token, user, appSession, rawLoginResponse: response });
+
+    // Registry sync is additive and non-blocking. It runs only for a Platform Admin.
+    // A sync failure must never undo a successful legacy login.
+    void autoSyncPermissionRegistry(response);
 
     return {
       success: true,

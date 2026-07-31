@@ -154,6 +154,9 @@ export default function PartyDashboardSkeleton() {
 
         {/* Payment Status Section Skeleton */}
         <SectionSkeleton shimmerAnim={shimmerAnim} rowCount={3} />
+
+        {/* Invoices & Ageing Section Skeleton */}
+        <SectionSkeleton shimmerAnim={shimmerAnim} showChart={false} rowCount={4} />
       </ScrollView>
     </SafeAreaView>
   );

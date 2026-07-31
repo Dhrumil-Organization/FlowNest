@@ -1,36 +1,37 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
-    Platform
+    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, FlatList, ActivityIndicator, StyleSheet, Dimensions,
+    Platform, Modal
 } from 'react-native';
-// import LinearGradient from 'react-native-linear-gradient';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import { checkingScannerStyles, yarnmanagementsystemstyle } from '@/common/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
-// ✅ EXPO CAMERA (replaces react-native-vision-camera)
-import { Camera, useCameraDevice, BarcodeScanningResult } from '@/Shared/expoScannerHelper';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-// or directly: import { CameraView as Camera, useCameraPermissions as useCameraPermission, BarcodeScanningResult } from 'expo-camera';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import HeaderBarwithBack from '@/components/Header';
-// import { Picker } from '@react-native-picker/picker';
+import Header from '../Header';
+import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView } from 'react-native';
-// import Snackbar from 'react-native-snackbar';
-import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
+import Snackbar from '../Snackbar';
 import { Switch } from 'react-native';
 import CustomDrawer from './CustomDrawer';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
+import { fetchPropertyData } from '../../common/API/Functions';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import SearchableDropdown from '@/Shared/SearchableDropdown';
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-
 interface Props {
     token: string;
+    navigation: any;
+    isConnected: boolean | null;
     username: string;
+    userid: number | string;
 }
 
 type GridItem = {
@@ -39,14 +40,24 @@ type GridItem = {
     design: string;
 };
 
-const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
-
-    // ✅ EXPO CAMERA HOOKS (unchanged API names)
-    const device = useCameraDevice('back');
+const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected, username, userid }) => {
+    // const device = useCameraDevice('back');
+    const {
+        loadDefaultPreference,
+        savePreference,
+        loadPreferenceList,
+    } = useMobileUserPreference({
+        UserId: userid || 0,
+        ModuleCode: 'CREEL',
+        ModuleName: 'Creel',
+        ScreenCode: 'CREEL_BROWSER',
+        ScreenName: 'Creel Management Browser',
+        token: token,
+    });
+    console.log("User ID =>", userid);
     const scanLock = useRef(false);
     const [isScanning, setIsScanning] = useState(false);
-    // const { hasPermission, requestPermission } = useCameraPermissions();
-    const [hasPermission, requestPermission] = useCameraPermissions();
+    const [permission, requestPermission] = useCameraPermissions();
     const [scannedValue, setScannedValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [getData, setData] = useState([]);
@@ -63,11 +74,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         { stktypename: 'In house', StkType: 'I' },
         { stktypename: 'Process house', StkType: 'P' }
     ]);
-    // Component ke andar state add karo
-    const [isStockTypeOpen, setIsStockTypeOpen] = useState(false);
-
-    const [selectedstocktype, setselectedstocktype] = useState(null);  // ✅ null
-
     const [getDataSaved, setDataSaved] = useState(false)
     const [isCreelModalVisible, setIsCreelModalVisible] = useState(false);
     const [setupDate, setSetupDate] = useState(new Date());
@@ -100,31 +106,91 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             status: 'P',
             LngName: '',
             YearName: '',
-            StkType: ''
+            StkType: '',
+            MacCode: ''
         }
     })
     const [getAllYearData, setAllYearData] = useState([]);
-    // const [selectedstocktype, setselectedstocktype] = useState([]);
+    const [selectedstocktype, setselectedstocktype] = useState([]);
     const [activeCreels, setActiveCreels] = useState([]);
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [selectedCreel, setSelectedCreel] = useState(null);
     const [mainUId, setMainUId] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [propertydata, setpropertydata] = useState([]);
+    const [propertyData, setPropertyData] = useState([]);
+    const [selectedProperty, setSelectedProperty] = useState(null);
+    // const [propertydata, setpropertydata] = useState<ExeData[]>([]);
     const [filteredData, setFilteredData] = useState([]);   // 🔥 filtered data
     const screenWidth = Dimensions.get('window').width;
-    const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
+    // const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const [showList, setShowList] = useState(false);
+    const [getMachineData, setMachineData] = useState([]);
+    const [selectedmachine, setselectedmachine] = useState([]);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDelete, setIsDelete] = useState(false);
+    const normalizeCriteria = (criteria: any) => {
+        return {
+            PrpCode: criteria?.PrpCode || '',
+            YearNo: criteria?.YearNo || '',
+            fromdate: criteria?.fromdate || formatDate(firstDay),
+            todate: criteria?.todate || formatDate(today),
+            status: criteria?.status || 'P',
+            StkType: criteria?.StkType || '',
+        };
+    };
 
-    console.log("getchees", getchees);
+    console.log("getMachineData", getMachineData);
 
-    const stockdata = [
-        { stktypename: 'In house', StkType: 'I' },
-        { stktypename: 'Process house', StkType: 'P' }
-    ]
+
 
     const styles = StyleSheet.create({
+        scannerCard: {
+            marginHorizontal: 14,
+            marginTop: 10,
+            backgroundColor: "#EEF7FF",
+            borderRadius: 22,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: "#D8EAF6"
+        },
+
+        scanIconBox: {
+            width: 72,
+            height: 60,
+            borderRadius: 18,
+            backgroundColor: "#D9ECFF",
+            justifyContent: "center",
+            alignItems: "center"
+        },
+
+        scanTitle: {
+            fontSize: 14,
+            fontWeight: "700",
+            color: "#111"
+        },
+
+        scanSubTitle: {
+            marginTop: 4,
+            color: "#000",
+            fontSize: 12
+        },
+
+        scanButton: {
+            backgroundColor: "#0B8BC2",
+            height: 52,
+            paddingHorizontal: 22,
+            borderRadius: 14,
+            flexDirection: "row",
+            alignItems: "center"
+        },
+
+        scanButtonText: {
+            color: "#fff",
+            fontWeight: "700",
+            marginLeft: 8,
+            fontSize: 12
+        },
         field: {
             marginBottom: 12
         },
@@ -145,41 +211,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             borderRadius: 15,
             overflow: 'hidden'
         },
-        modalHeader: {
-            height: 70,
-            backgroundColor: '#007EA7',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-        },
-
-        headerBackBtn: {
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: 'rgba(255,255,255,0.15)',
-            justifyContent: 'center',
-            alignItems: 'center',
-        },
-
-        modalHeaderTitle: {
-            color: '#fff',
-            fontSize: 20,
-            fontWeight: '700',
-        },
-
-        modalBody: {
-            flex: 1,
-            backgroundColor: '#F5F7FB',
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            paddingTop: 12,
-        },
         container: {
             flex: 1,
-            backgroundColor: '#f5f7fb',
-            marginTop: 40
+            backgroundColor: '#f5f7fb'
         },
 
         headerBox: {
@@ -239,27 +273,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
         inputGroup: {
             marginBottom: 12
-        },
-
-        label: {
-            fontSize: 13,
-            marginBottom: 5,
-            fontWeight: 'bold',
-            color: '#000'
-        },
-
-        input: {
-            backgroundColor: '#f1f3f6',
-            borderRadius: 8,
-            paddingHorizontal: 10,
-            justifyContent: 'center',
-            height: 45,
-            color: '#000'
-        },
-
-        row: {
-            flexDirection: 'row',
-            gap: 10
         },
 
         col: {
@@ -341,21 +354,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             right: 5,
             top: 10,
         },
-        sectionHeader: {
-            backgroundColor: '#E3F2FD',
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 6,
-            marginBottom: 0,
-            marginTop: 15
-        },
-
-        sectionTitle: {
-            fontSize: 15,
-            fontWeight: 'bold',
-            color: '#007EA7',
-        },
-
         smallInput: {
             width: '30%',
         },
@@ -363,7 +361,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         largeInput: {
             width: '68%',
         },
-
         summaryCard: {
             margin: 0,
             padding: 12,
@@ -372,19 +369,16 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             elevation: 3,
             width: '100%'
         },
-
         summaryTitle: {
             fontSize: 16,
             fontWeight: '700',
             color: '#000'
         },
-
         summarySub: {
             fontSize: 12,
             color: '#666',
             marginBottom: 8
         },
-
         cardRow: {
             flexDirection: 'row',
             justifyContent: 'space-between',
@@ -393,42 +387,35 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             borderBottomWidth: 1,
             borderColor: '#eee'
         },
-
         leftBox: {
             flex: 1,
             paddingRight: 10
         },
-
         cartonNo: {
             fontSize: 13,
             fontWeight: '700',
             color: '#007EA7'
         },
-
         itemText: {
             fontSize: 13,
             color: '#000',
             marginTop: 2
         },
-
         subText: {
             fontSize: 11,
             color: '#777',
             marginTop: 2
         },
-
         rightBox: {
             alignItems: 'flex-end',
             justifyContent: 'center',
             gap: 2
         },
-
         qtyText: {
             fontSize: 14,
             fontWeight: '700',
             color: '#000'
         },
-
         cheesText: {
             fontSize: 12,
             color: '#555'
@@ -487,25 +474,21 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             justifyContent: 'space-between',
             alignItems: 'center',
         },
-
         creelTitle: {
             fontSize: 14,
             fontWeight: 'bold', // 🔥 keep bold
             color: '#000',
         },
-
         labelSmall: {
             fontSize: 12,
             color: '#555',
             fontWeight: '600',
         },
-
         valueSmall: {
             fontSize: 12,
             fontWeight: 'bold',
             color: '#222',
         },
-
         qtyBig: {
             fontSize: 11,
             fontWeight: 'bold',
@@ -538,14 +521,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             marginBottom: 2,
             paddingVertical: 4,
         },
-
         infoLabel: {
             fontSize: 13,
-            color: '#555',
+            // color: '#555',
             fontWeight: '600',
             color: '#000'
         },
-
         infoValue: {
             fontSize: 13,
             color: '#000',
@@ -614,6 +595,18 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             margin: 4,
             gap: 10
         },
+        activeCard: {
+            backgroundColor: '#007EA7',
+            borderColor: '#007EA7',
+        },
+        activeCardShadow: {
+            elevation: 8,
+            shadowColor: '#007EA7',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.35,
+            shadowRadius: 6,
+            transform: [{ scale: 1.02 }],
+        },
         switchCard: {
             flex: 1,
             flexDirection: 'row',
@@ -622,21 +615,16 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             gap: 8,
             paddingVertical: 12,
             borderRadius: 12,
-            borderWidth: 1,
+            borderWidth: 1.5,
             borderColor: '#007EA7',
             backgroundColor: '#fff',
-            elevation: 3
+            elevation: 3,
         },
-        activeCard: {
-            backgroundColor: '#007EA7'
-        },
-
         switchText: {
             fontSize: 14,
             fontWeight: '600',
             color: '#007EA7'
         },
-
         activeText: {
             color: '#fff'
         },
@@ -647,17 +635,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             padding: 12,
             elevation: 5
         },
-
-        searchInput: {
-            flex: 1,
-            borderWidth: 1,
-            borderColor: '#ccc',
-            borderRadius: 8,
-            paddingHorizontal: 10,
-            height: 40,
-            color: '#000'
-        },
-
         searchBtn: {
             backgroundColor: '#007EA7',
             height: 40,
@@ -666,46 +643,23 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             justifyContent: 'center',
             alignItems: 'center'
         },
-
         resultItem: {
             padding: 8,
             borderBottomWidth: 1,
             borderColor: '#eee'
         },
-
         selectedItem: {
             backgroundColor: '#e6f7ff'
         },
-
         cartNo: {
             fontSize: 13,
             fontWeight: 'bold',
             color: '#000'
         },
-
         cartDetail: {
             fontSize: 11,
             color: '#000'
         },
-        scannerCard: {
-            margin: 6,
-            paddingVertical: 10,
-            paddingHorizontal: 12,
-            borderRadius: 12,
-            backgroundColor: '#fff',
-            alignItems: 'center',
-            justifyContent: 'center',
-            elevation: 3,
-            minHeight: 80
-        },
-
-        scanTitle: {
-            fontSize: 16,
-            fontWeight: '600',
-            color: '#000',
-            marginVertical: 4
-        },
-
         scanBtn: {
             backgroundColor: '#007EA7',
             paddingVertical: 8,     // 👈 chhota button
@@ -733,16 +687,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             fontWeight: '600'
         },
 
-        /* Camera */
-        // cameraContainer: {
-        //     height: 250,
-        //     margin: 12,
-        //     borderRadius: 12,
-        //     overflow: 'hidden'
-        // },
-        // camera: {
-        //     flex: 1
-        // },
         overlay: {
             position: 'absolute',
             top: 0,
@@ -801,14 +745,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             paddingVertical: 8,
             overflow: 'scroll'
         },
-
-        header: {
-            color: '#fff',
-            fontWeight: 'bold',
-            fontSize: 13,
-            textAlign: 'center',
-        },
-
         row1: {
             flexDirection: 'row',
             borderBottomWidth: 1,
@@ -874,13 +810,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         middleRow: {
             marginTop: 8
         },
-
-        // label: {
-        //     fontSize: 13,
-        //     color: '#64748b',
-        //     marginTop: 2
-        // },
-
         bottomRow: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -1007,11 +936,58 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         },
         cardTitle: { fontWeight: '700', marginBottom: 10, color: '#000' },
         bottomBar: {
-            flexDirection: 'row',
-            padding: 15,
-            backgroundColor: '#fff',
+            flexDirection: "row",
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            backgroundColor: "#fff",
             borderTopWidth: 1,
-            borderColor: '#eee',
+            borderTopColor: "#E8ECF3",
+            gap: 12,
+        },
+
+        closeButton: {
+            flex: 1,
+            height: 48,
+            borderRadius: 16,
+            backgroundColor: "#F2F4F7",
+            justifyContent: "center",
+            alignItems: "center",
+            flexDirection: "row",
+
+            borderWidth: 1,
+            borderColor: "#D8DEE8",
+        },
+
+        submitButton: {
+            flex: 1,
+            height: 48,
+            borderRadius: 16,
+            backgroundColor: "#0A88C8",
+            justifyContent: "center",
+            alignItems: "center",
+            flexDirection: "row",
+
+            shadowColor: "#0A88C8",
+            shadowOpacity: 0.25,
+            shadowRadius: 10,
+            shadowOffset: {
+                width: 0,
+                height: 5,
+            },
+
+            elevation: 8,
+        },
+
+        closeButtonText: {
+            fontSize: 16,
+            fontWeight: "700",
+            color: "#555",
+        },
+
+        submitButtonText: {
+            fontSize: 16,
+            fontWeight: "700",
+            color: "#fff",
         },
         primaryText: { color: '#fff', fontWeight: '700' },
         secondaryText: { color: '#000', fontWeight: '600' },
@@ -1071,15 +1047,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             flexDirection: 'row',
             justifyContent: 'space-between'
         },
-        // listCard: {
-        //     flexDirection: 'row',
-        //     justifyContent: 'space-between',
-        //     backgroundColor: '#fff',
-        //     padding: 14,
-        //     borderRadius: 14,
-        //     marginBottom: 12,
-        //     elevation: 3
-        // },
         listCard: {
             flexDirection: 'row',
             justifyContent: 'space-between',
@@ -1091,10 +1058,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             marginHorizontal: 6,
             elevation: 3
         },
-        // leftSection: {
-        //     flexDirection: 'row',
-        //     alignItems: 'center'
-        // },
         leftSection: {
             flexDirection: 'row',
             alignItems: 'flex-start',
@@ -1148,6 +1111,128 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             color: '#fff',
             fontWeight: '600'
         },
+        header: {
+            backgroundColor: '#007EA7',
+            paddingTop: 10,
+            paddingBottom: 20,
+            paddingHorizontal: 18,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            flexDirection: 'row',
+            alignItems: 'center',
+            elevation: 8,
+        },
+        headerSubTitle: {
+            color: '#D9F6FF',
+            marginTop: 2,
+            fontSize: 13,
+        },
+
+        headerIcon: {
+            width: 45,
+            height: 45,
+            borderRadius: 23,
+            backgroundColor: 'rgba(255,255,255,.15)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        sectionCard: {
+            marginHorizontal: 16,
+            marginTop: 18,
+            backgroundColor: "#FFFFFF",
+            borderRadius: 22,
+            padding: 18,
+            shadowColor: "#000",
+            shadowOpacity: 0.08,
+            shadowRadius: 12,
+            shadowOffset: {
+                width: 0,
+                height: 5,
+            },
+            elevation: 5,
+        },
+
+        sectionHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 20,
+        },
+
+        sectionBar: {
+            width: 5,
+            height: 20,
+            borderRadius: 10,
+            backgroundColor: "#0A88C8",
+            marginRight: 10,
+        },
+
+        sectionTitle: {
+            fontSize: 18,
+            fontWeight: "500",
+            color: "#000",
+        },
+
+        fieldContainer: {
+            marginBottom: 18,
+        },
+
+        halfField: {
+            flex: 1,
+        },
+
+        label: {
+            fontSize: 12,
+            fontWeight: "700",
+            color: "#000",
+            marginBottom: 8,
+        },
+
+        inputWrapper: {
+            height: 45,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: "#D9E2EC",
+            backgroundColor: "#FBFCFE",
+            paddingHorizontal: 16,
+            flexDirection: "row",
+            alignItems: "center",
+        },
+
+        input: {
+            flex: 1,
+            color: "#000",
+            fontSize: 12,
+            paddingVertical: 0,
+        },
+
+        row: {
+            flexDirection: "row",
+            marginBottom: 18,
+        },
+
+        modalInput: {
+            height: 50,
+            borderWidth: 1,
+            borderColor: "#D7DFEA",
+            backgroundColor: "#F8FAFD",
+            borderRadius: 14,
+            paddingHorizontal: 15,
+            color: "#000",
+            fontSize: 14,
+            justifyContent: "center",
+        },
+        loaderOverlay: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999999,
+            elevation: 999999,
+        },
     });
 
     let cancelToken: any;
@@ -1157,43 +1242,33 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     // console.log("status", FormState.values.status);
     // console.log("status...", FormState.values);
     // console.log("Stock Types:", getStockTypes);
-    console.log("prptype", propertydata);
+    // console.log("prptype", propertydata);
     console.log("stocktype", FormState.values.StkType);
 
-    // const getRequestConfig = (props: any) => ({
-    //     headers: {
-    //         Authorization: `Bearer ${token}`,
-    //         'Content-Type': 'application/json',
-    //         Accept: 'application/json',
-    //     },
-    //     params: props.params,
-    //     cancelToken: cancelToken?.token,
-    // });
+    useEffect(() => {
+        const loadPreferenceData = async () => {
 
-    // useEffect(() => {
-    //     const loadProperty = async () => {
-    //         const allprpdata = await fetchAllPropertyData(token);
-    //         setAllPropertyData(allprpdata);
-    //     };
-    //     loadProperty();
-    // }, []);
+            if (!token) return;
 
-    // useEffect(() => {
-    //     if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
-    //         const testFinct = async () => {
-    //             const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
-    //             setAllYearData(allyeardata)
-    //         }
-    //         testFinct();
-    //     }
-    // }, [FormState.values.PrpCode])
+            const saved = await loadDefaultPreference();
 
-    // const openDrawer = () => setIsDrawerVisible(true);
-    // const closeDrawer = () => setIsDrawerVisible(false);
+            if (saved?.criteria) {
 
-    // useEffect(() => {
-    //     requestPermission();
-    // }, []);
+                const criteria = normalizeCriteria(saved.criteria);
+
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        ...criteria,
+                    }
+                }));
+            }
+        };
+
+        loadPreferenceData();
+    }, []);
+
     const getRequestConfig = (props: any) => ({
         headers: {
             Authorization: `Bearer ${token}`,
@@ -1204,25 +1279,62 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         cancelToken: cancelToken?.token,
     });
 
-    useEffect(() => {
-        if (!token) return;
-        const loadProperty = async () => {
-            const allprpdata = await fetchAllPropertyData(token);
-            setAllPropertyData(allprpdata);
-        };
-        loadProperty();
-    }, [token]);
+    // useEffect(() => {
+    //     const loadProperty = async () => {
+    //         const allprpdata = await fetchAllPropertyData(token);
+    //         setAllPropertyData(allprpdata);
+    //     };
+    //     loadProperty();
+    // }, []);
+
+    // useEffect(() => {
+    //     console.log("Property useEffect");
+    //     console.log("Token =", token);
+
+    //     if (!token) return;
+
+    //     const loadProperty = async () => {
+    //         console.log("Calling Property API...");
+    //         const allprpdata = await fetchAllPropertyData(token);
+    //         console.log("Response =", allprpdata);
+    //         setAllPropertyData(allprpdata);
+    //     };
+
+    //     loadProperty();
+    // }, [token]);
 
     useEffect(() => {
         if (!token) return;
+
+        const load = async () => {
+            const data = await fetchPropertyData(token);
+
+            setPropertyData(data || []);
+
+            if (data?.length) {
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        PrpCode: data[0].PrpCode,
+                        LngName: data[0].LngName,
+                    }
+                }));
+            }
+        };
+
+        load();
+    }, [token]);
+
+    useEffect(() => {
         if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
             const testFinct = async () => {
-                const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode);
-                setAllYearData(allyeardata);
-            };
+                const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
+                setAllYearData(allyeardata)
+            }
             testFinct();
         }
-    }, [FormState.values.PrpCode, token]);
+    }, [FormState.values.PrpCode])
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -1318,7 +1430,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 prptype: userPtype,
                 strcode: '002',
                 txntype: 'creel_yarn_issue',
-                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                // yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                yearno: getCurrentFinancialYear(),
                 // yearno: '26',
                 fromdate: FormState.values.fromdate || '',
                 todate: FormState.values.todate || '',
@@ -1332,6 +1445,22 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             console.log("browse payload", params)
 
             const apiData = response?.data?.response?.data || [];
+            if (userid) {
+                await savePreference({
+                    CriteriaName: 'Default',
+                    IsDefault: true,
+                    PreferenceJson: {
+                        criteria: {
+                            PrpCode: FormState.values.PrpCode,
+                            YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
+                            fromdate: FormState.values.fromdate,
+                            todate: FormState.values.todate,
+                            status: FormState.values.status,
+                            StkType: FormState.values.StkType,
+                        },
+                    },
+                });
+            }
             if (response?.data?.success) {
                 let finalData = apiData || [];
                 if (FormState.values.status === 'C') {
@@ -1395,7 +1524,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 uid: item.UId,
                 prpcode: FormState.values.PrpCode,
                 strcode: '002',
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
             };
             console.log("show Payload:", payload);
@@ -1457,7 +1586,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                             Denier: d1Item.Denier || '',
                             d1SrNo: String(d1Item.SrNo || ''),
                             UId: d1Item.UId || '',
-                            yearNo: FormState.values.YearNo || ''
+                            yearNo: FormState.values.YearNo || getCurrentFinancialYear() || ''
                         };
                     });
 
@@ -1578,9 +1707,89 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     //     },
     // });
 
-    // ✅ REPLACED: useCodeScanner → plain function
-    const handleBarCodeScanned = (result: BarcodeScanningResult) => {
-        // Prevent multiple scans (debounce 2s)
+
+    // const scanLock = useRef(false);
+
+    // const handleBarcodeScanned = ({ data }: { data: string }) => {
+    //     if (scanLock.current) return;
+    //     scanLock.current = true;
+    //     setTimeout(() => (scanLock.current = false), 2000);
+
+    //     // Reset old data
+    //     setScannedValue('');
+
+    //     console.log("📦 Raw QR Value 👉", data);
+
+    //     setScannedValue(data);
+
+    //     try {
+    //         const parts = data.split("~");
+    //         console.log("Parts Length:", parts.length);
+    //         let parsed: any = {};
+
+    //         if (parts.length >= 13) {
+    //             // Full QR
+    //             parsed = {
+    //                 PrpCode: parts[0] || '',
+    //                 PUId: parts[1] || '',
+    //                 PSrNo: parts[2] || '',
+    //                 PSubSr: parts[3] || '',
+    //                 TranType: parts[4] || '',
+    //                 CartNo: parts[5] || '',
+    //                 ItmCode: parts[6] || '',
+    //                 MerCode: parts[7] || '',
+    //                 GrdCode: parts[8] || '',
+    //                 ShdCode: parts[9] || '',
+    //                 Denier: parts[10] || '',
+    //                 Wt: parts[11] || '',
+    //                 Chees: parts[12] || '',
+    //                 Rate: parts[13] || '',
+    //                 yearNo: parts[14] || ''
+    //             };
+    //         } else if (parts.length >= 11) {
+    //             // Short QR
+    //             parsed = {
+    //                 PUId: parts[0] || '',
+    //                 PSrNo: parts[1] || '',
+    //                 PSubSr: parts[2] || '',
+    //                 TranType: parts[3] || '',
+    //                 CartNo: parts[4] || '',
+    //                 ItmCode: parts[5] || '',
+    //                 MerCode: parts[6] || '',
+    //                 GrdCode: parts[7] || '',
+    //                 ShdCode: parts[8] || '',
+    //                 Denier: parts[9] || '',
+    //                 Wt: parts[10] || '',
+    //                 Chees: '',
+    //                 yearNo: parts[11] || ''
+    //             };
+    //         } else {
+    //             throw new Error("Invalid QR");
+    //         }
+
+    //         console.log("✅ Parsed QR 👉", parsed);
+
+    //         setScannedObj(parsed);
+    //         setCartonNo(parsed.CartNo || '');
+    //         setYearNo(parsed.yearNo || '');
+    //         setchees(parsed.Chees || '');
+    //         setavgwt(parsed.Wt || '');
+
+    //         // API Calls
+    //         fetchitmgrdshdname(parsed);
+    //         sendScannedValue(data);
+
+    //     } catch (err) {
+    //         // resetScanFields();
+    //         Alert.alert("Invalid QR", "QR format not valid");
+    //     }
+
+    //     setIsScanning(false);
+    // };
+
+
+    const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+        // Prevent multiple scans
         if (scanLock.current) return;
         scanLock.current = true;
         setTimeout(() => (scanLock.current = false), 2000);
@@ -1590,9 +1799,31 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
         try {
             const parts = value.split("~");
-            let parsed: any = {};
+            let parsed = {};
 
-            if (parts.length >= 13) {
+            if (parts.length === 16) {
+                parsed = {
+                    PUId: parts[0] || '',
+                    PSrNo: parts[1] || '',
+                    PSubSr: parts[2] || '',
+                    TranType: parts[3] || '',
+                    CartNo: parts[4] || '',
+                    ItmCode: parts[5] || '',
+                    ItmName: parts[6] || '',
+                    MerCode: parts[7] || '',
+                    MerName: parts[8] || '',
+                    GrdCode: parts[9] || '',
+                    GrdName: parts[10] || '',
+                    ShdCode: parts[11] || '',
+                    ShdName: parts[12] || '',
+                    Wt: parts[13] || 0,
+                    Chees: parts[14] || 0,
+                    yearNo: parts[15] || ''
+                };
+
+                console.log("✅ Parsed New Format 👉", parsed);
+            } else if (parts.length >= 13) {
+                // Full format
                 parsed = {
                     PrpCode: parts[0] || '',
                     PUId: parts[1] || '',
@@ -1612,6 +1843,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 };
                 console.log("✅ Parsed 1111 👉", parsed);
             } else if (parts.length >= 11) {
+                // Short format (without Chees)
                 parsed = {
                     PUId: parts[0] || '',
                     PSrNo: parts[1] || '',
@@ -1631,6 +1863,26 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             } else {
                 throw new Error("Invalid format");
             }
+            // const parsed = {}
+            // if (parts.length < 13) {
+            //     throw new Error("Invalid format");
+            // } else
+            //     parsed = {
+            //         PUId: parts[0],
+            //         PSrNo: parts[1],
+            //         PSubSr: parts[2],
+            //         TranType: parts[3],
+            //         CartNo: parts[4],
+            //         ItmCode: parts[5],
+            //         MerCode: parts[6],
+            //         GrdCode: parts[7],
+            //         ShdCode: parts[8],
+            //         Denier: parts[9],
+            //         Wt: parts[10],
+            //         Chees: parts[11],
+            //         yearNo: parts[12]
+            //     };
+
 
             setScannedObj(parsed);
             setCartonNo(parsed.CartNo || '');
@@ -1639,13 +1891,13 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             setavgwt(parsed.Wt || '');
 
             fetchitmgrdshdname(parsed);
+
             sendScannedValue(value);
         } catch (err) {
             Alert.alert("Invalid QR", "QR format not valid");
         }
         setIsScanning(false);
     };
-
 
     const handleSearch = async () => {
         if (!searchText) {
@@ -1659,7 +1911,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
             const yno = await AsyncStorage.getItem('yno');
             const payload = {
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 strcode: '002',
                 searchcarton: searchText.trim()
             };
@@ -1789,7 +2041,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     {
-        (!device || !hasPermission) && (
+        (!permission?.granted) && (
             <View style={{ alignItems: 'center', marginTop: 20 }}>
                 <Text>No camera permission or device not available</Text>
             </View>
@@ -1811,21 +2063,21 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         return token;
     };
 
-    const getShifts = async () => {
+    const getShifts = async (prpCode: string) => {
 
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
-
+            const userPtype = await AsyncStorage.getItem('user_prptype');
             const historyPayload = {
                 // text: parcode,
                 txntype: 'creel_yarn_issue',
-                // referrer: 'dashboard',
+                prptype: userPtype,
                 fetch: 'shift',
-                prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo
+                prpcode: prpCode || FormState.values.PrpCode,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear()
 
             };
             console.log("historyPayload", historyPayload);
@@ -1836,7 +2088,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                     }
                 )
             );
-            console.log("response", response);
+            console.log("shift response", response);
             if (response.data.success && response.data.response.data.length > 0) {
                 setShiftData(response.data.response.data);
             } else {
@@ -1849,66 +2101,104 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         }
     }
 
-    // const fetchitmgrdshdname = async (parsedData) => {
+    const getMachine = async (prpCode: string) => {
 
-    //     if (cancelToken?.cancel) cancelToken.cancel();
-    //     cancelToken = axios.CancelToken.source();
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
 
-    //     try {
-    //         let yno = await AsyncStorage.getItem('yno');
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const userPtype = await AsyncStorage.getItem('user_prptype');
+            const historyPayload = {
+                txntype: 'creel_yarn_issue',
+                prptype: userPtype,
+                fetch: 'machine',
+                prpcode: prpCode || FormState.values.PrpCode,
+                yearno: getCurrentFinancialYear(),
+                strcode: '002',
+                macgrp: "WRP"
+            };
+            console.log("historyPayload", historyPayload);
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+            console.log("machine response", response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                setMachineData(response.data.response.data);
+            } else {
+                setMachineData([]);
+            }
+        } catch (error) {
+            // console.log("API getshifts error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
-    //         const payload = {
-    //             // text: parcode,
-    //             // txntype: 'creel_yarn_issue',
-    //             prpcode: FormState.values.PrpCode,
-    //             yearno: FormState.values.YearNo,
-    //             strcode: '002',
-    //             itmcode: parsedData?.ItmCode,
-    //             mercode: parsedData?.MerCode,
-    //             grdcode: parsedData?.GrdCode,
-    //             shdcode: parsedData?.ShdCode,
-    //         };
-    //        // console.log("get_item_detail_from_carton historyPayload", historyPayload);
-    //         // const response = await axios.get(
-    //         //     `${API}/api/get_criterion`, getRequestConfig(
-    //         //         {
-    //         //             params: { ...historyPayload }
-    //         //         }
-    //         //     )
-    //         // );
-    //         const headers = {
-    //             Authorization: `Bearer ${getToken()}`,
-    //             'Content-Type': 'application/json',
-    //             'X-Requested-with': 'XMLHttpRequest',
-    //         };
-    //         const response = await axios.post(`${API}/api/get_item_detail_from_carton`,
-    //             payload, { headers });
+    const getcreelid = async (macCode) => {
 
-    //         console.log("response", response);
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
 
-    //         if (response.data.success && response.data.response.data.length > 0) {
-    //             // setShiftData(response.data.response.data);
-    //         } else {
-    //             // setShiftData([]);
-    //         }
-    //     } catch (error) {
-    //         // console.log("API getshifts error:", error);
-    //     } finally {
-    //         setIsLoading(false);
-    //     }
-    // }
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const userPtype = await AsyncStorage.getItem('user_prptype');
+
+            const Payload = {
+                txntype: 'creel_yarn_issue',
+                prpcode: FormState.values.PrpCode,
+                yearno: getCurrentFinancialYear(),
+                strcode: '002',
+                maccode: macCode,
+                fetch: "get_creelid",
+                prptype: userPtype
+            };
+
+            console.log("creel id payload", Payload);
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...Payload }
+                    }
+                )
+            );
+
+            console.log("creelid response", response);
+
+            if (response.data.success) {
+
+                const data = response.data.response.data;
+
+                setCreelId(data?.batch_no || "");
+
+            } else {
+
+                setCreelId("");
+
+            }
+        } catch (error) {
+            // console.log("API getshifts error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
     const fetchitmgrdshdname = async (parsedData) => {
         setIsLoading(true); // ✅ start loader
         try {
             const payload = {
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 strcode: '002',
                 itmcode: parsedData?.ItmCode,
                 mercode: parsedData?.MerCode,
                 grdcode: parsedData?.GrdCode,
                 shdcode: parsedData?.ShdCode,
-
             };
 
             console.log("payload", payload);
@@ -1943,21 +2233,21 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     useEffect(() => {
-        if (!token) return;
         const { PrpCode, YearNo } = FormState.values;
         if (PrpCode && YearNo) {
-            getShifts();
+            // getShifts();
+            // getMachine();
         }
-    }, [FormState.values.PrpCode, FormState.values.YearNo, token]);
+    }, [FormState.values.PrpCode, FormState.values.YearNo || getCurrentFinancialYear()]);
 
 
     useEffect(() => {
-        if (!token) return;
         if (isCreelModalVisible) {
-            getShifts();
+            // getShifts();
+            // getMachine();
             // getdesign();
         }
-    }, [isCreelModalVisible, token]);
+    }, [isCreelModalVisible]);
 
     const handleAdd = () => {
         if (!design) {
@@ -2021,12 +2311,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     const handleSubmitScan = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
+        setIsSaving(true);
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
                 PrpCode: FormState.values.PrpCode,
-                YearNo: FormState.values.YearNo,
+                YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
                 CreelId: creelId,
                 BeamNo: 0,
@@ -2091,37 +2381,32 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 setShowSuccess(true);
             }
             else if (response.data.success === false) {
-                setIsLoading(false);
+                setIsSaving(false);
                 setDataSaved(false);
-                // Snackbar.show({
-                //     text: response.data.message,
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: '#000',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: 'yellow' },
-                // });
-                showError(`${response.data.message}}`, {
-                    text: 'OK',
-                    onPress: () => { },
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'yellow' },
                 });
             } else {
-                setIsLoading(false);
+                setIsSaving(false);
                 setDataSaved(false);
-                // Snackbar.show({
-                //     text: response.data.message,
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: '#000',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: 'red' },
-                // });
-                Alert.alert(`${response.data.message}`)
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
             }
         } catch (error) {
             setDataSaved(false);
-            setIsLoading(false);
+            setIsSaving(false);
             console.log("API handleSubmitScan error:", error);
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
 
     }
@@ -2129,12 +2414,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     const handleaddCreel = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
+        setIsSaving(true);
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
                 PrpCode: FormState.values.PrpCode,
-                YearNo: FormState.values.YearNo,
+                YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
                 CreelId: creelId,
                 BeamNo: 0,
@@ -2147,6 +2432,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 uid: mainUId || '',
                 RecipeUId: '1',
                 DsnCode: 0,
+                IssTo: FormState.values.MacCode,
                 Cartons: cartonSummary.map(item => ({
                     uid: item.UId || mainUId || '',
                     PrpCode: item.PrpCode || '',
@@ -2201,37 +2487,32 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
             }
             else if (response.data.success === false) {
-                setIsLoading(false);
+                setIsSaving(false);
                 setDataSaved(false);
-                // Snackbar.show({
-                //     text: response.data.message,
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: '#000',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: 'yellow' },
-                // });
-                showError(`${response.data.message}}`, {
-                    text: 'OK',
-                    onPress: () => { },
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'yellow' },
                 });
             } else {
-                setIsLoading(false);
+                setIsSaving(false);
                 setDataSaved(false);
-                // Snackbar.show({
-                //     text: response.data.message,
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: '#000',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: 'red' },
-                // });
-                Alert.alert(`${response.data.message}`)
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
+                });
             }
         } catch (error) {
             setDataSaved(false);
-            setIsLoading(false);
+            setIsSaving(false);
             console.log("API handleSubmitScan error:", error);
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
 
     }
@@ -2239,12 +2520,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     const handledeletedata = async (item) => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
+        setIsDelete(true);
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 // txntype: 'creel_yarn_issue',
                 uid: item.UId,
             };
@@ -2268,26 +2549,22 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
             }
             else {
-                setIsLoading(false);
+                setIsDelete(false);
                 setDataSaved(false);
-                // Snackbar.show({
-                //     text: response.data.message,
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: '#000',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: 'red' },
-                // });
-                showError(`${response.data.message}}`, {
-                    text: 'OK',
-                    onPress: () => { },
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
                 });
             }
         } catch (error) {
             setDataSaved(false);
-            setIsLoading(false);
+            setIsDelete(false);
             console.log("API handleSubmitScan error:", error);
         } finally {
-            setIsLoading(false);
+            setIsDelete(false);
         }
 
     }
@@ -2295,7 +2572,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
     const handledeletecarton = async (item) => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
+        setIsDelete(true);
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
@@ -2304,7 +2581,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 subsrno: item.SubSrNo,
                 uid: item.UId,
                 prpcode: FormState.values.PrpCode,
-                yearno: FormState.values.YearNo,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
                 txntype: 'creel_yarn_issue',
             };
             console.log("delete payload", payloadObj);
@@ -2327,26 +2604,22 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
             }
             else {
-                setIsLoading(false);
+                setIsDelete(false);
                 setDataSaved(false);
-                // Snackbar.show({
-                //     text: response.data.message,
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: '#000',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: 'red' },
-                // });
-                showError(`${response.data.message}}`, {
-                    text: 'OK',
-                    onPress: () => { },
+                Snackbar.show({
+                    text: response.data.message,
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: 'red' },
                 });
             }
         } catch (error) {
             setDataSaved(false);
-            setIsLoading(false);
+            setIsDelete(false);
             console.log("API handleSubmitScan error:", error);
         } finally {
-            setIsLoading(false);
+            setIsDelete(false);
         }
 
     }
@@ -2384,6 +2657,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
         setRemark('');
         setShowPicker(false);
         // setSetupDate(null);
+        setselectedmachine(null);
 
         setFormState(prev => ({
             ...prev,
@@ -2493,12 +2767,49 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+
+            <StatusBar
+                style="light"
+                backgroundColor="#007EA7"
+                translucent={false}
+            />
+            <SafeAreaView
+                edges={['top']}
+                style={{ flex: 0, backgroundColor: '#007EA7' }}
+            />
+            {/* {isLoading && <FullScreenLoader />} */}
+            {isLoading && (
+                <View
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: "rgba(255,255,255,0.3)",
+                        zIndex: 999,
+                    }}
+                >
+                    <ActivityIndicator size="large" color="#007EA7" />
+                </View>
+            )}
+
+            {/* <HeaderBarwithBack
+                userName={username}
+                header={'Creel Managment System'}
+                subHeader={'Create and manage creel entries for production'}
+            /> */}
+
             <HeaderBarwithBack
                 userName={username}
                 header={'Creel Managment System'}
                 subHeader={'Create and manage creel entries for production'}
+                breadcrumb={'Creel Managment System'}
+                SearchBar={false}
             />
+
             <View style={styles.searchWrapper}>
 
                 <View style={styles.searchContainer}>
@@ -2519,24 +2830,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 </TouchableOpacity>
 
             </View>
-            {/* <View style={checkingScannerStyles.flexContainer}> */}
-            {/* <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: '#ffffff',
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: 6,
-                        marginTop: 0,
-                    }}
-                >
-                    <Text style={{ color: '#070000', fontWeight: 'bold' }}>
-                        Active Creels
-                    </Text>
-                </TouchableOpacity> */}
-            {/* </View> */}
+
             <View style={{ paddingHorizontal: 10, flex: 1 }}>
                 <FlatList
                     data={filteredData}
@@ -2636,39 +2930,19 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                             backgroundColor: '#fff'
                         }}
                     >
-                        {/* <View style={styles.container}> */}
-                        <View style={{ flex: 1, backgroundColor: '#007EA7' }}>
+                        <SafeAreaView
+                            edges={['top']}
+                            style={{
+                                flex: 1,
+                                backgroundColor: '#fff'
+                            }}
+                        >
 
                             <StatusBar
-                                style="light"
-                                backgroundColor="#007EA7"
+                                style="dark"
+                                backgroundColor="#ffffff"
                             />
-
-                            {/* Header */}
-                            <View style={styles.modalHeader}>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setIsCreelModalVisible(false);
-                                        resetAllFields();
-                                    }}
-                                    style={styles.headerBackBtn}
-                                >
-                                    <Icon
-                                        name="arrow-back"
-                                        size={24}
-                                        color="#fff"
-                                    />
-                                </TouchableOpacity>
-
-                                <Text style={styles.modalHeaderTitle}>
-                                    Create New Creel
-                                </Text>
-
-                                <View style={{ width: 40 }} />
-                            </View>
-
-                            {/* Body */}
-                            <View style={styles.modalBody}>
+                            <View style={styles.container}>
                                 <FlatList
                                     data={[1]}
                                     keyExtractor={(item, index) => index.toString()}
@@ -2678,57 +2952,60 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                     ListHeaderComponent={
                                         <View style={styles.card}>
 
-                                            {/* <Text style={styles.title}>
-                                            Create New Creel
-                                        </Text> */}
+                                            <Text style={styles.title}>
+                                                Create New Creel
+                                            </Text>
 
                                             <View style={styles.inputGroup}>
                                                 <Text style={styles.label}>Property <Text style={{ color: 'red' }}> *</Text></Text>
                                                 <SearchableDropdown
-                                                    key={FormState.values.PrpCode}
-                                                    data={getAllPropertyData || []}
+                                                    data={propertyData}
                                                     labelKey="LngName"
                                                     valueKey="PrpCode"
+                                                    initialValue={selectedProperty}
                                                     placeholder="Choose property..."
                                                     pageSize={10}
-                                                    initialValue={selectedProperty}
+                                                    multiple={false}
+                                                    emptyMessage="No properties available"
                                                     onSelect={(item) => {
                                                         setFormState(prev => ({
                                                             ...prev,
                                                             values: {
                                                                 ...prev.values,
-                                                                PrpCode: item?.PrpCode || '',
-                                                                LngName: item?.LngName || ''
+                                                                PrpCode: item.PrpCode,
+                                                                LngName: item.LngName,
                                                             }
                                                         }));
+
+                                                        getMachine(item.PrpCode);
+                                                        getShifts(item.PrpCode);
                                                     }}
-                                                    multiple={false}
-                                                    emptyMessage="No properties available"
                                                 />
                                             </View>
 
-                                            <View style={styles.inputGroup}>
-                                                <Text style={styles.label}>Year No <Text style={{ color: 'red' }}> *</Text></Text>
-                                                <SearchableDropdown
-                                                    key={FormState.values.YearNo}
-                                                    data={getAllYearData || []}
-                                                    labelKey="YearName"
-                                                    valueKey="YearNo"
-                                                    placeholder="Choose year..."
-                                                    pageSize={10}
-                                                    initialValue={selectedYearObj}
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Machine <Text style={{ color: 'red' }}> *</Text></Text>
+                                                <PartyDropdown
+                                                    data={getMachineData}
+                                                    placeholder="Select Machine"
+                                                    labelKey={["MacName"]}
+                                                    valueKey="MacCode"
+                                                    pageSize={12}
+                                                    initialValue={selectedmachine ?? null}
+                                                    selected={selectedmachine ?? null}
+                                                    type="machine"
                                                     onSelect={(item) => {
+                                                        setselectedmachine(item);
                                                         setFormState(prev => ({
                                                             ...prev,
                                                             values: {
                                                                 ...prev.values,
-                                                                YearNo: item?.YearNo || '',
-                                                                YearName: item?.YearName || ''
+                                                                MacCode: item?.MacCode
                                                             }
                                                         }));
+
+                                                        getcreelid(item?.MacCode);
                                                     }}
-                                                    multiple={false}
-                                                    emptyMessage="No years data available"
                                                 />
                                             </View>
 
@@ -2736,11 +3013,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                             <View style={styles.inputGroup}>
                                                 <Text style={styles.label}>Creel ID <Text style={{ color: 'red' }}> *</Text></Text>
                                                 <TextInput
-                                                    style={styles.input}
+                                                    style={styles.modalInput}
                                                     value={creelId}
                                                     onChangeText={setCreelId}
                                                     placeholder="Enter Creel ID"
                                                     placeholderTextColor="#888"
+                                                    readOnly
                                                 />
                                             </View>
 
@@ -2750,7 +3028,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 <View style={styles.col}>
                                                     <Text style={styles.label}>Setup Date <Text style={{ color: 'red' }}> *</Text></Text>
                                                     <TouchableOpacity
-                                                        style={styles.input}
+                                                        style={styles.modalInput}
                                                         onPress={() => setShowPicker(true)}
                                                     >
                                                         <Text style={{ color: '#000' }}>
@@ -2776,8 +3054,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                             labelKey={["ShfName", "ShfCode"]}
                                                             valueKey="ShfCode"
                                                             pageSize={10}
-                                                            initialValue={selectedstocktype ?? null}  // empty array pass ho raha hai
-
+                                                            initialValue={
+                                                                getShiftData?.find(x => x.ShfCode === shift) ?? null
+                                                            }
                                                             selected={
                                                                 getShiftData?.find(x => x.ShfCode === shift) ?? null
                                                             }
@@ -2785,8 +3064,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                                                             onSelect={(item) => {
                                                                 setShift(item.ShfCode);
-
-                                                                // agar FormState me bhi store karna ho
                                                                 setFormState(prev => ({
                                                                     ...prev,
                                                                     values: {
@@ -2828,136 +3105,34 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                                             </View>
 
-                                            {/* <View style={styles.field}>
-                                            <Text style={styles.label}>Stcok Type *</Text>
-                                            <PartyDropdown
-                                                data={getStockTypes}
-                                                placeholder="Select Stock Type"
-                                                labelKey={["StkType", "stktypename"]}
-                                                valueKey="StkType"
-                                                pageSize={12}
-                                                initialValue={selectedstocktype ?? null}
-                                                selected={selectedstocktype ?? null}
-                                                type="stocktype"
-                                                onSelect={(item) => {
-                                                    setselectedstocktype(item);
-                                                    setFormState(prev => ({
-                                                        ...prev,
-                                                        values: {
-                                                            ...prev.values,
-                                                            StkType: item?.StkType
-                                                        }
-                                                    }));
-                                                }}
-                                            />
-                                        </View> */}
-                                            {/* REPLACE your PartyDropdown for Stock Type with this: */}
                                             <View style={styles.field}>
-                                                <Text style={styles.label}>Stock Type *</Text>
-                                                <TouchableOpacity
-                                                    style={styles.input}
-                                                    onPress={() => setIsStockTypeOpen(true)}
-                                                >
-                                                    <Text style={{ color: selectedstocktype ? '#000' : '#888' }}>
-                                                        {selectedstocktype
-                                                            ? `${selectedstocktype.stktypename} (${selectedstocktype.StkType})`
-                                                            : 'Select Stock Type'}
-                                                    </Text>
-                                                    <Icon
-                                                        name="arrow-drop-down"
-                                                        size={24}
-                                                        color="#007EA7"
-                                                        style={{ position: 'absolute', right: 10 }}
-                                                    />
-                                                </TouchableOpacity>
-
-                                                {/* Stock Type Modal */}
-                                                <Modal
-                                                    visible={isStockTypeOpen}
-                                                    transparent={true}
-                                                    animationType="fade"
-                                                    onRequestClose={() => setIsStockTypeOpen(false)}
-                                                >
-                                                    <TouchableOpacity
-                                                        activeOpacity={1}
-                                                        onPress={() => setIsStockTypeOpen(false)}
-                                                        style={{
-                                                            flex: 1,
-                                                            backgroundColor: 'rgba(0,0,0,0.5)',
-                                                            justifyContent: 'center',
-                                                            alignItems: 'center'
-                                                        }}
-                                                    >
-                                                        <View style={{
-                                                            width: '85%',
-                                                            backgroundColor: '#fff',
-                                                            borderRadius: 12,
-                                                            padding: 10,
-                                                            maxHeight: '60%'
-                                                        }}>
-                                                            <Text style={{
-                                                                fontSize: 16,
-                                                                fontWeight: 'bold',
-                                                                color: '#007EA7',
-                                                                padding: 10,
-                                                                borderBottomWidth: 1,
-                                                                borderColor: '#eee'
-                                                            }}>
-                                                                Select Stock Type
-                                                            </Text>
-
-                                                            <FlatList
-                                                                data={getStockTypes}
-                                                                keyExtractor={(item, index) => index.toString()}
-                                                                renderItem={({ item }) => (
-                                                                    <TouchableOpacity
-                                                                        style={{
-                                                                            padding: 15,
-                                                                            borderBottomWidth: 1,
-                                                                            borderColor: '#f0f0f0',
-                                                                            backgroundColor:
-                                                                                selectedstocktype?.StkType === item.StkType
-                                                                                    ? '#e6f7ff' : 'transparent'
-                                                                        }}
-                                                                        onPress={() => {
-                                                                            setselectedstocktype(item);
-                                                                            setFormState(prev => ({
-                                                                                ...prev,
-                                                                                values: {
-                                                                                    ...prev.values,
-                                                                                    StkType: item?.StkType
-                                                                                }
-                                                                            }));
-                                                                            setIsStockTypeOpen(false);
-                                                                        }}
-                                                                    >
-                                                                        <Text style={{
-                                                                            fontSize: 14,
-                                                                            fontWeight: '600',
-                                                                            color: '#000'
-                                                                        }}>
-                                                                            {item.stktypename}
-                                                                        </Text>
-                                                                        <Text style={{
-                                                                            fontSize: 12,
-                                                                            color: '#666',
-                                                                            marginTop: 2
-                                                                        }}>
-                                                                            Code: {item.StkType}
-                                                                        </Text>
-                                                                    </TouchableOpacity>
-                                                                )}
-                                                            />
-                                                        </View>
-                                                    </TouchableOpacity>
-                                                </Modal>
+                                                <Text style={styles.label}>Stock Type <Text style={{ color: 'red' }}> *</Text></Text>
+                                                <PartyDropdown
+                                                    data={getStockTypes}
+                                                    placeholder="Select Stock Type"
+                                                    labelKey={["StkType", "stktypename"]}
+                                                    valueKey="StkType"
+                                                    pageSize={12}
+                                                    initialValue={selectedstocktype ?? null}
+                                                    selected={selectedstocktype ?? null}
+                                                    type="stocktype"
+                                                    onSelect={(item) => {
+                                                        setselectedstocktype(item);
+                                                        setFormState(prev => ({
+                                                            ...prev,
+                                                            values: {
+                                                                ...prev.values,
+                                                                StkType: item?.StkType
+                                                            }
+                                                        }));
+                                                    }}
+                                                />
                                             </View>
-
 
                                             <View style={styles.inputGroup}>
                                                 <Text style={styles.label}>Remark</Text>
                                                 <TextInput
-                                                    style={[styles.input, { height: 40 }]}
+                                                    style={[styles.modalInput, { height: 45 }]}
                                                     value={Remark}
                                                     onChangeText={setRemark}
                                                     // multiline
@@ -2973,6 +3148,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                             <TouchableOpacity
                                                 style={styles.saveBtn}
                                                 onPress={() => {
+                                                    if (!selectedmachine) {
+                                                        Alert.alert("Validation", "Select Machine");
+                                                        return;
+                                                    }
                                                     if (!creelId?.trim()) {
                                                         Alert.alert("Validation", "Enter Creel ID");
                                                         return;
@@ -2989,7 +3168,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                         Alert.alert("Validation", "Select Stock Type");
                                                         return;
                                                     }
-                                                    const yearNo = FormState.values.YearNo;
+                                                    const yearNo = FormState.values.YearNo || getCurrentFinancialYear();
                                                     const startYear = "20" + (parseInt(yearNo) - 1);
                                                     const endYear = "20" + yearNo;
                                                     const selectedDate = setupDate.toISOString().split('T')[0];
@@ -3028,9 +3207,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                         </View>
                                     }
                                 />
-                                {/* </View> */}
                             </View>
-                        </View>
+                        </SafeAreaView>
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal >
@@ -3043,155 +3221,282 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 transparent={false}
                 onRequestClose={() => setIsScanModalVisible(false)}
             >
-                <View style={styles.modalContainer}>
-                    <View style={styles.container}>
+                <SafeAreaView
+                    edges={['top']}
+                    style={{
+                        flex: 1,
+                        backgroundColor: '#007EA7'
+                    }}
+                >
 
-                        {/* 🔥 HEADER */}
-                        <HeaderBarwithBack
+                    <StatusBar
+                        style="light"
+                        backgroundColor="#007EA7"
+                    />
+                    <View style={styles.modalContainer}>
+
+
+                        <View style={styles.header}>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setIsScanModalVisible(false);
+                                    setIsCreelModalVisible(true);
+                                }}
+                            >
+                                <Icon
+                                    name="arrow-back"
+                                    size={26}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+
+                            <View style={{ flex: 1, marginLeft: 15 }}>
+                                <Text style={styles.headerTitle}>
+                                    Issue Yarn
+                                </Text>
+
+                                <Text style={styles.headerSubTitle}>
+                                    Scan carton or search manually
+                                </Text>
+                            </View>
+
+                            <View style={styles.headerIcon}>
+                                <Icon
+                                    name="inventory"
+                                    size={24}
+                                    color="#fff"
+                                />
+                            </View>
+
+                        </View>
+
+                        <View style={styles.container}>
+                            {isSaving && (
+                                <View style={styles.loaderOverlay}>
+                                    <ActivityIndicator size="large" color="#fff" />
+                                </View>
+                            )}
+
+                            {isDelete && (
+                                <View style={styles.loaderOverlay}>
+                                    <ActivityIndicator size="large" color="#fff" />                                   
+                                </View>
+                            )}
+
+                            {/* 🔥 HEADER */}
+                            {/* <HeaderBarwithBack
                             userName={username}
                             header={'Issue Yarn'}
                             subHeader={`Scan Cartons and issue yarn for Creel ${creelId}`}
-                        />
+                        /> */}
 
-                        {/* 🔥 MAIN SWITCH */}
-                        {!showList ? (
-                            <>
-                                <View style={styles.topSwitchContainer}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.switchCard,
-                                            showManualSearch === false && styles.activeCard
-                                        ]}
-                                        // onPress={() => setShowManualSearch(false)
-                                        // }
-                                        onPress={() => {
-                                            setShowManualSearch(false);
-                                            setIsScanning(true); // 🔥 direct camera open
-                                        }}
-                                    >
-                                        <Icon name="camera" size={22} color={showManualSearch === false ? "#fff" : "#007EA7"} />
-                                        <Text style={[
-                                            styles.switchText,
-                                            showManualSearch === false && styles.activeText
-                                        ]}>
-                                            Scan Carton
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.switchCard,
-                                            showManualSearch === true && styles.activeCard
-                                        ]}
-                                        onPress={() => setShowManualSearch(true)}
-                                    >
-                                        <Icon name="search" size={20} color={showManualSearch === true ? "#fff" : "#007EA7"} />
-                                        <Text style={[
-                                            styles.switchText,
-                                            showManualSearch === true && styles.activeText
-                                        ]}>
-                                            Manual Search
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                </View>
-                                {showManualSearch === true && (
-                                    <View style={styles.manualCard}>
-
-                                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                                            <TextInput
-                                                placeholder="Enter Carton No"
-                                                value={searchText}
-                                                onChangeText={setSearchText}
-                                                style={styles.searchInput}
+                            {/* 🔥 MAIN SWITCH */}
+                            {!showList ? (
+                                <>
+                                    <View style={styles.topSwitchContainer}>
+                                        {/* <TouchableOpacity
+                                            style={[
+                                                styles.switchCard,
+                                                showManualSearch === false && styles.activeCard
+                                            ]}
+                                            onPress={() => {
+                                                setShowManualSearch(false);
+                                                setIsScanning(true); 
+                                            }}
+                                        >
+                                            <Icon name="camera" size={22} color={showManualSearch === false ? "#fff" : "#007EA7"} />
+                                            <Text style={[
+                                                styles.switchText,
+                                                showManualSearch === false && styles.activeText
+                                            ]}>
+                                                Scan Carton
+                                            </Text>
+                                        </TouchableOpacity> */}
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.switchCard,
+                                                !showManualSearch && styles.activeCard,
+                                                !showManualSearch && styles.activeCardShadow,
+                                            ]}
+                                            onPress={() => {
+                                                setShowManualSearch(false);
+                                                setIsScanning(true);
+                                            }}
+                                        >
+                                            <Icon
+                                                name="camera"
+                                                size={22}
+                                                color={!showManualSearch ? "#fff" : "#007EA7"}
                                             />
-                                            <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-                                                <Icon name="search" size={20} color="#fff" />
-                                            </TouchableOpacity>
-                                        </View>
 
-                                        <FlatList
-                                            data={searchResults}
-                                            keyExtractor={(item, index) => index.toString()}
-                                            style={{ marginTop: 10, maxHeight: 150 }}
-                                            renderItem={({ item }) => (
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.resultItem,
-                                                        selectedItem?.CartNo === item.CartNo && styles.selectedItem
-                                                    ]}
-                                                    onPress={() => setSelectedItem(item)}
-                                                >
-                                                    <Text style={styles.cartNo}>{item.CartNo}</Text>
-                                                    <Text style={styles.cartDetail}>
-                                                        {item.ItmName} / {item.MerName} / {item.ShdName}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        />
-
-                                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                                            <TouchableOpacity
-                                                style={[styles.okBtn, { flex: 1 }]}
-                                                onPress={() => {
-                                                    if (!selectedItem) {
-                                                        Alert.alert("Select carton first");
-                                                        return;
-                                                    }
-
-                                                    const data = {
-                                                        CartNo: selectedItem.CartNo,
-                                                        ItmName: selectedItem.ItmName,
-                                                        MerName: selectedItem.MerName,
-                                                        ShdName: selectedItem.ShdName,
-                                                        GrdName: selectedItem.GrdName,
-                                                        Chees: selectedItem.Chees,
-                                                        Wt: selectedItem.Wt,
-                                                        PUId: selectedItem.PUId,
-                                                        PSrNo: selectedItem.PSrNo,
-                                                        PSubSr: selectedItem.PSubSr,
-                                                        TranType: selectedItem.TranType,
-                                                        ItmCode: selectedItem.ItmCode,
-                                                        MerCode: selectedItem.MerCode,
-                                                        GrdCode: selectedItem.GrdCode,
-                                                        ShdCode: selectedItem.ShdCode,
-                                                        Denier: selectedItem.Denier,
-                                                        yearNo: selectedItem.yearno,
-                                                        SrNo: selectedItem.SrNo,
-                                                        PrpCode: selectedItem.PrpCode,
-                                                        Rate: selectedItem.Rate
-                                                    };
-
-                                                    setCartonNo(data.CartNo || '');
-                                                    setchees(data.Chees || '');
-                                                    setavgwt(data.Wt || '');
-                                                    setScannedObj(data);
-
-                                                    setShowManualSearch(null);
-                                                    setSearchText('');
-                                                    setSearchResults([]);
-                                                    setSelectedItem(null);
-                                                }}
-
+                                            <Text
+                                                style={[
+                                                    styles.switchText,
+                                                    !showManualSearch && styles.activeText,
+                                                ]}
                                             >
-                                                <Text style={styles.btnTextWhite}>OK</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={[styles.cancelBtn2, { flex: 1 }]}
-                                                onPress={() => {
-                                                    setShowManualSearch(null);
-                                                    setSearchText('');
-                                                    setSearchResults([]);
-                                                    setSelectedItem(null);
-                                                }}
-                                            >
-                                                <Text style={styles.btnTextWhite}>Close</Text>
-                                            </TouchableOpacity>
-                                        </View>
+                                                Scan Carton
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.switchCard,
+                                                showManualSearch === true && styles.activeCard
+                                            ]}
+                                            onPress={() => setShowManualSearch(true)}
+                                        >
+                                            <Icon name="search" size={20} color={showManualSearch === true ? "#fff" : "#007EA7"} />
+                                            <Text style={[
+                                                styles.switchText,
+                                                showManualSearch === true && styles.activeText
+                                            ]}>
+                                                Manual Search
+                                            </Text>
+                                        </TouchableOpacity>
 
                                     </View>
-                                )}
-                                {/* {showManualSearch === false && (
+                                    {!showManualSearch && !isScanning && (
+                                        <View style={styles.scannerCard}>
+
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                                                <View style={styles.scanIconBox}>
+                                                    <Icon
+                                                        name="qr-code-scanner"
+                                                        size={34}
+                                                        color="#0B8BC2"
+                                                    />
+                                                </View>
+
+                                                <View style={{ flex: 1, marginLeft: 15 }}>
+                                                    <Text style={styles.scanTitle}>
+                                                        QR Scanner
+                                                    </Text>
+
+                                                    <Text style={styles.scanSubTitle}>
+                                                        Point camera to QR code
+                                                    </Text>
+                                                </View>
+
+                                                <TouchableOpacity
+                                                    style={styles.scanButton}
+                                                    onPress={() => setIsScanning(true)}
+                                                >
+                                                    <Icon
+                                                        name="photo-camera"
+                                                        size={18}
+                                                        color="#fff"
+                                                    />
+
+                                                    <Text style={styles.scanButtonText}>
+                                                        START
+                                                    </Text>
+
+                                                </TouchableOpacity>
+
+                                            </View>
+
+                                        </View>
+                                    )}
+                                    {showManualSearch === true && (
+                                        <View style={styles.manualCard}>
+
+                                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                                                <TextInput
+                                                    placeholder="Enter Carton No"
+                                                    value={searchText}
+                                                    onChangeText={setSearchText}
+                                                    style={styles.searchInput}
+                                                />
+                                                <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                                                    <Icon name="search" size={20} color="#fff" />
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <FlatList
+                                                data={searchResults}
+                                                keyExtractor={(item, index) => index.toString()}
+                                                style={{ marginTop: 10, maxHeight: 150 }}
+                                                renderItem={({ item }) => (
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.resultItem,
+                                                            selectedItem?.CartNo === item.CartNo && styles.selectedItem
+                                                        ]}
+                                                        onPress={() => setSelectedItem(item)}
+                                                    >
+                                                        <Text style={styles.cartNo}>{item.CartNo}</Text>
+                                                        <Text style={styles.cartDetail}>
+                                                            {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            />
+
+                                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                                                <TouchableOpacity
+                                                    style={[styles.okBtn, { flex: 1 }]}
+                                                    onPress={() => {
+                                                        if (!selectedItem) {
+                                                            Alert.alert("Select carton first");
+                                                            return;
+                                                        }
+
+                                                        const data = {
+                                                            CartNo: selectedItem.CartNo,
+                                                            ItmName: selectedItem.ItmName,
+                                                            MerName: selectedItem.MerName,
+                                                            ShdName: selectedItem.ShdName,
+                                                            GrdName: selectedItem.GrdName,
+                                                            Chees: selectedItem.Chees,
+                                                            Wt: selectedItem.Wt,
+                                                            PUId: selectedItem.PUId,
+                                                            PSrNo: selectedItem.PSrNo,
+                                                            PSubSr: selectedItem.PSubSr,
+                                                            TranType: selectedItem.TranType,
+                                                            ItmCode: selectedItem.ItmCode,
+                                                            MerCode: selectedItem.MerCode,
+                                                            GrdCode: selectedItem.GrdCode,
+                                                            ShdCode: selectedItem.ShdCode,
+                                                            Denier: selectedItem.Denier,
+                                                            yearNo: selectedItem.yearno,
+                                                            SrNo: selectedItem.SrNo,
+                                                            PrpCode: selectedItem.PrpCode,
+                                                            Rate: selectedItem.Rate
+                                                        };
+
+                                                        setCartonNo(data.CartNo || '');
+                                                        setchees(data.Chees || '');
+                                                        setavgwt(data.Wt || '');
+                                                        setScannedObj(data);
+
+                                                        setShowManualSearch(null);
+                                                        setSearchText('');
+                                                        setSearchResults([]);
+                                                        setSelectedItem(null);
+                                                    }}
+
+                                                >
+                                                    <Text style={styles.btnTextWhite}>OK</Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    style={[styles.cancelBtn2, { flex: 1 }]}
+                                                    onPress={() => {
+                                                        setShowManualSearch(null);
+                                                        setSearchText('');
+                                                        setSearchResults([]);
+                                                        setSelectedItem(null);
+                                                    }}
+                                                >
+                                                    <Text style={styles.btnTextWhite}>Close</Text>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                        </View>
+                                    )}
+                                    {/* {showManualSearch === false && (
                                     <View style={styles.scannerCard}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <Icon name="camera" size={20} color="#007EA7" />
@@ -3207,7 +3512,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                         </TouchableOpacity>
                                     </View>
                                 )} */}
-                                {/* {isScanning && showManualSearch === false && (
+                                    {/* {isScanning && showManualSearch === false && (
                                     <View style={styles.cameraContainer}>
                                         {device && hasPermission && (
                                             <Camera
@@ -3222,197 +3527,420 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                         </View>
                                     </View>
                                 )} */}
-                                {/* {isScanning && (
-                                    <Modal animationType="fade">
-                                        <View style={{ flex: 1, backgroundColor: '#000' }}>
-                                            <View style={styles.cameraHeader}>
-                                                <Text style={styles.cameraTitle}>Scan QR Code</Text>
+                                    {isScanning && (
+                                        <Modal animationType="fade">
+                                            <View style={{ flex: 1, backgroundColor: '#000' }}>
+                                                <View style={styles.cameraHeader}>
+                                                    <Text style={styles.cameraTitle}>Scan QR Code</Text>
 
-                                                <View style={{ width: 26 }} />
-                                            </View>
-                                            <View style={styles.cameraContainer}>
-                                                {device && hasPermission && (
-                                                    <Camera
+                                                    <View style={{ width: 26 }} />
+                                                </View>
+                                                <View style={styles.cameraContainer}>
+                                                    {/* {device && hasPermission && (
+                                                    <CameraView
                                                         style={styles.camera}
                                                         device={device}
                                                         isActive={true}
                                                         codeScanner={codeScanner}
                                                     />
-                                                )}
-                                                <View style={styles.overlay}>
-                                                    <View style={styles.scanBox} />
+                                                )} */}
+                                                    {permission?.granted && (
+                                                        <CameraView
+                                                            style={styles.camera}
+                                                            facing="back"
+                                                            barcodeScannerSettings={{
+                                                                barcodeTypes: ['qr'],
+                                                            }}
+                                                            onBarcodeScanned={handleBarcodeScanned}
+                                                        />
+                                                    )}
+                                                    <View style={styles.overlay}>
+                                                        <View style={styles.scanBox} />
+                                                    </View>
+                                                </View>
+                                                <View style={styles.cameraFooter}>
+                                                    <TouchableOpacity
+                                                        style={styles.closeScanBtn}
+                                                        onPress={() => setIsScanning(false)}
+                                                    >
+                                                        <Text style={styles.closeScanText}>Close Scanner</Text>
+                                                    </TouchableOpacity>
                                                 </View>
                                             </View>
-                                            <View style={styles.cameraFooter}>
-                                                <TouchableOpacity
-                                                    style={styles.closeScanBtn}
-                                                    onPress={() => setIsScanning(false)}
-                                                >
-                                                    <Text style={styles.closeScanText}>Close Scanner</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    </Modal>
-                                )} */}
-                                {isScanning && (
-                                    <Modal animationType="fade">
-                                        <View style={{ flex: 1, backgroundColor: '#000' }}>
-                                            <View style={styles.cameraHeader}>
-                                                <Text style={styles.cameraTitle}>Scan QR Code</Text>
-                                                <View style={{ width: 26 }} />
+                                        </Modal>
+                                    )}
+                                    <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                                        {cartonSummary.length > 0 && (
+                                            <TouchableOpacity
+                                                style={styles.viewListBtn}
+                                                onPress={() => setShowList(true)}
+                                            >
+                                                <Text style={styles.viewListText}>
+                                                    📋 View Cartons ({cartonSummary.length})
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
+
+                                        {/* <Text style={styles.cardTitle}>Carton Details</Text> */}
+
+                                        {/* <View style={styles.card}>
+
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Carton Number</Text>
+                                                <TextInput
+                                                    style={styles.inputDisabled}
+                                                    value={CartonNo}
+                                                    editable={false}
+                                                />
                                             </View>
 
-                                            {/* ✅ EXPO CAMERA (replaces vision-camera <Camera>) */}
-                                            <View style={styles.cameraContainer}>
-                                                {hasPermission && (
-                                                    <Camera
-                                                        style={styles.camera}
-                                                        facing="back"
-                                                        onBarcodeScanned={handleBarCodeScanned}
-                                                        barcodeScannerSettings={{
-                                                            barcodeTypes: ['qr'],
-                                                        }}
+                                            <View style={styles.row}>
+                                                <View style={styles.fieldHalf}>
+                                                    <Text style={styles.label}>Chees</Text>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        value={getchees}
+                                                        onChangeText={setchees}
+                                                        keyboardType="numeric"
                                                     />
-                                                )}
-                                                <View style={styles.overlay}>
-                                                    <View style={styles.scanBox} />
+                                                </View>
+
+                                                <View style={styles.fieldHalf}>
+                                                    <Text style={styles.label}>Quantity</Text>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        value={getavgwt}
+                                                        onChangeText={setavgwt}
+                                                        keyboardType="numeric"
+                                                    />
                                                 </View>
                                             </View>
 
-                                            <View style={styles.cameraFooter}>
-                                                <TouchableOpacity
-                                                    style={styles.closeScanBtn}
-                                                    onPress={() => setIsScanning(false)}
-                                                >
-                                                    <Text style={styles.closeScanText}>Close Scanner</Text>
-                                                </TouchableOpacity>
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Item</Text>
+                                                <TextInput
+                                                    style={styles.inputDisabled}
+                                                    value={getScannedObj?.ItmName || ''}
+                                                    editable={false}
+                                                />
                                             </View>
+
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Merge</Text>
+                                                <TextInput
+                                                    style={styles.inputDisabled}
+                                                    value={getScannedObj?.MerName || ''}
+                                                    editable={false}
+                                                />
+                                            </View>
+
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Shade</Text>
+                                                <TextInput
+                                                    style={styles.inputDisabled}
+                                                    value={getScannedObj?.ShdName || ''}
+                                                    editable={false}
+                                                />
+                                            </View>
+
+                                            <View style={styles.field}>
+                                                <Text style={styles.label}>Grade</Text>
+                                                <TextInput
+                                                    style={styles.inputDisabled}
+                                                    value={getScannedObj?.GrdName || ''}
+                                                    editable={false}
+                                                />
+                                            </View>
+
+                                        </View> */}
+
+                                        <View style={styles.sectionCard}>
+
+                                            <View style={styles.sectionHeader}>
+
+                                                <View style={styles.sectionBar} />
+
+                                                <Text style={styles.sectionTitle}>
+                                                    Carton Details
+                                                </Text>
+
+                                            </View>
+
+                                            {/* Carton Number */}
+
+                                            <View style={styles.fieldContainer}>
+
+                                                <Text style={styles.label}>
+                                                    Carton Number
+                                                </Text>
+
+                                                <View style={styles.inputWrapper}>
+
+                                                    <TextInput
+                                                        value={CartonNo}
+                                                        editable={false}
+                                                        style={styles.input}
+                                                        placeholder="Scan Carton Number"
+                                                        placeholderTextColor="#A0A8B8"
+                                                    />
+
+                                                    {/* <Icon
+                                                        name="qr-code-scanner"
+                                                        size={22}
+                                                        color="#0A88C8"
+                                                    /> */}
+
+                                                </View>
+
+                                            </View>
+
+                                            {/* Chees + Quantity */}
+
+                                            <View style={styles.row}>
+
+                                                <View style={styles.halfField}>
+
+                                                    <Text style={styles.label}>
+                                                        Chees
+                                                    </Text>
+
+                                                    <View style={styles.inputWrapper}>
+
+                                                        <TextInput
+                                                            value={getchees}
+                                                            onChangeText={setchees}
+                                                            keyboardType="numeric"
+                                                            style={styles.input}
+                                                            placeholder="0"
+                                                        />
+
+                                                        {/* <Icon
+                                                            name="inventory-2"
+                                                            size={20}
+                                                            color="#0A88C8"
+                                                        /> */}
+
+                                                    </View>
+
+                                                </View>
+
+                                                <View style={{ width: 14 }} />
+
+                                                <View style={styles.halfField}>
+
+                                                    <Text style={styles.label}>
+                                                        Quantity
+                                                    </Text>
+
+                                                    <View style={styles.inputWrapper}>
+
+                                                        <TextInput
+                                                            value={getavgwt}
+                                                            onChangeText={setavgwt}
+                                                            keyboardType="numeric"
+                                                            style={styles.input}
+                                                            placeholder="0.000"
+                                                        />
+
+                                                        {/* <Icon
+                                                            name="scale"
+                                                            size={20}
+                                                            color="#0A88C8"
+                                                        /> */}
+
+                                                    </View>
+
+                                                </View>
+
+                                            </View>
+
+                                            {/* Item */}
+
+                                            <View style={styles.fieldContainer}>
+
+                                                <Text style={styles.label}>
+                                                    Item
+                                                </Text>
+
+                                                <View style={styles.inputWrapper}>
+
+                                                    <TextInput
+                                                        editable={false}
+                                                        value={getScannedObj?.ItmName || ""}
+                                                        style={styles.input}
+                                                    />
+
+                                                    {/* <Icon
+                                                        name="inventory"
+                                                        size={20}
+                                                        color="#0A88C8"
+                                                    /> */}
+
+                                                </View>
+
+                                            </View>
+
+                                            {/* Merge */}
+
+                                            <View style={styles.fieldContainer}>
+
+                                                <Text style={styles.label}>
+                                                    Merge
+                                                </Text>
+
+                                                <View style={styles.inputWrapper}>
+
+                                                    <TextInput
+                                                        editable={false}
+                                                        value={getScannedObj?.MerName || ""}
+                                                        style={styles.input}
+                                                    />
+
+                                                    {/* <Icon
+                                                        name="merge-type"
+                                                        size={20}
+                                                        color="#0A88C8"
+                                                    /> */}
+
+                                                </View>
+
+                                            </View>
+
+                                            {/* Shade */}
+
+                                            <View style={styles.fieldContainer}>
+
+                                                <Text style={styles.label}>
+                                                    Shade
+                                                </Text>
+
+                                                <View style={styles.inputWrapper}>
+
+                                                    <TextInput
+                                                        editable={false}
+                                                        value={getScannedObj?.ShdName || ""}
+                                                        style={styles.input}
+                                                    />
+
+                                                    {/* <Icon
+                                                        name="palette"
+                                                        size={20}
+                                                        color="#0A88C8"
+                                                    /> */}
+
+                                                </View>
+
+                                            </View>
+
+                                            {/* Grade */}
+
+                                            <View style={styles.fieldContainer}>
+
+                                                <Text style={styles.label}>
+                                                    Grade
+                                                </Text>
+
+                                                <View style={styles.inputWrapper}>
+
+                                                    <TextInput
+                                                        editable={false}
+                                                        value={getScannedObj?.GrdName || ""}
+                                                        style={styles.input}
+                                                    />
+
+                                                    {/* <Icon
+                                                        name="verified"
+                                                        size={20}
+                                                        color="#0A88C8"
+                                                    /> */}
+
+                                                </View>
+
+                                            </View>
+
                                         </View>
-                                    </Modal>
-                                )}
-                                <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-                                    {cartonSummary.length > 0 && (
+
+                                    </ScrollView>
+
+                                    {/* 🔥 BUTTONS */}
+                                    {/* <View style={styles.bottomBar}>
                                         <TouchableOpacity
-                                            style={styles.viewListBtn}
-                                            onPress={() => setShowList(true)}
+                                            style={styles.secondaryBtn}
+                                            // onPress={() => {
+                                            //     setIsScanModalVisible(false);
+                                            //     resetAllFields();
+                                            // }}
+                                            onPress={() => {
+                                                setIsScanModalVisible(false);
+                                                setIsCreelModalVisible(true);
+
+                                                // resetAllFields();              
+                                            }}
                                         >
-                                            <Text style={styles.viewListText}>
-                                                📋 View Cartons ({cartonSummary.length})
+                                            <Text style={styles.secondaryText}>Close</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.primaryBtn}
+                                            onPress={() => {
+                                                handleAddCarton();
+                                                setShowList(true);
+                                            }}
+                                        >
+                                            <Text style={styles.primaryText}>Submit</Text>
+                                        </TouchableOpacity>
+                                    </View> */}
+                                    <View style={styles.bottomBar}>
+
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={styles.closeButton}
+                                            onPress={() => {
+                                                setIsScanModalVisible(false);
+                                                setIsCreelModalVisible(true);
+                                            }}
+                                        >
+                                            <Icon
+                                                name="close"
+                                                size={20}
+                                                color="#666"
+                                                style={{ marginRight: 8 }}
+                                            />
+
+                                            <Text style={styles.closeButtonText}>
+                                                Close
                                             </Text>
                                         </TouchableOpacity>
-                                    )}
 
-                                    <Text style={styles.cardTitle}>Carton Details</Text>
-
-                                    <View style={styles.card}>
-
-                                        <View style={styles.field}>
-                                            <Text style={styles.label}>Carton Number</Text>
-                                            <TextInput
-                                                style={styles.inputDisabled}
-                                                value={CartonNo}
-                                                editable={false}
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={styles.submitButton}
+                                            onPress={() => {
+                                                handleAddCarton();
+                                                setShowList(true);
+                                            }}
+                                        >
+                                            <Icon
+                                                name="check-circle"
+                                                size={20}
+                                                color="#fff"
+                                                style={{ marginRight: 8 }}
                                             />
-                                        </View>
 
-                                        <View style={styles.row}>
-                                            <View style={styles.fieldHalf}>
-                                                <Text style={styles.label}>Chees</Text>
-                                                <TextInput
-                                                    style={styles.input}
-                                                    value={getchees}
-                                                    onChangeText={setchees}
-                                                    keyboardType="numeric"
-                                                />
-                                            </View>
-
-                                            <View style={styles.fieldHalf}>
-                                                <Text style={styles.label}>Quantity</Text>
-                                                <TextInput
-                                                    style={styles.input}
-                                                    value={getavgwt}
-                                                    onChangeText={setavgwt}
-                                                    keyboardType="numeric"
-                                                />
-                                            </View>
-                                        </View>
-
-                                        <View style={styles.field}>
-                                            <Text style={styles.label}>Item</Text>
-                                            <TextInput
-                                                style={styles.inputDisabled}
-                                                value={getScannedObj?.ItmName || ''}
-                                                editable={false}
-                                            />
-                                        </View>
-
-                                        <View style={styles.field}>
-                                            <Text style={styles.label}>Merge</Text>
-                                            <TextInput
-                                                style={styles.inputDisabled}
-                                                value={getScannedObj?.MerName || ''}
-                                                editable={false}
-                                            />
-                                        </View>
-
-                                        <View style={styles.field}>
-                                            <Text style={styles.label}>Shade</Text>
-                                            <TextInput
-                                                style={styles.inputDisabled}
-                                                value={getScannedObj?.ShdName || ''}
-                                                editable={false}
-                                            />
-                                        </View>
-
-                                        <View style={styles.field}>
-                                            <Text style={styles.label}>Grade</Text>
-                                            <TextInput
-                                                style={styles.inputDisabled}
-                                                value={getScannedObj?.GrdName || ''}
-                                                editable={false}
-                                            />
-                                        </View>
+                                            <Text style={styles.submitButtonText}>
+                                                Submit
+                                            </Text>
+                                        </TouchableOpacity>
 
                                     </View>
+                                </>
 
-                                </ScrollView>
-
-                                {/* 🔥 BUTTONS */}
-                                <View style={styles.bottomBar}>
-                                    <TouchableOpacity
-                                        style={styles.secondaryBtn}
-                                        // onPress={() => {
-                                        //     setIsScanModalVisible(false);
-                                        //     resetAllFields();
-                                        // }}
-                                        onPress={() => {
-                                            setIsScanModalVisible(false);
-                                            setIsCreelModalVisible(true);
-
-                                            // resetAllFields();              
-                                        }}
-                                    >
-                                        <Text style={styles.secondaryText}>Close</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={styles.primaryBtn}
-                                        onPress={() => {
-                                            handleAddCarton();
-                                            setShowList(true);
-                                        }}
-                                    >
-                                        <Text style={styles.primaryText}>Submit</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </>
-
-                        ) : (
-                            <View style={styles.card}>
-                                <Text style={styles.cardTitle}>
-                                    Yarn Issuance Summary ({cartonSummary.length})
-                                </Text>
-                                {/* <FlatList
+                            ) : (
+                                <View style={styles.card}>
+                                    <Text style={styles.cardTitle}>
+                                        Yarn Issuance Summary ({cartonSummary.length})
+                                    </Text>
+                                    {/* <FlatList
                                     data={cartonSummary}
                                     keyExtractor={(item, index) => index.toString()}
                                     contentContainerStyle={{ paddingBottom: 10 }}
@@ -3457,114 +3985,120 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                                     )}
                                 /> */}
 
-                                {/* <ScrollView contentContainerStyle={{ paddingBottom: 10 }}> */}
-                                <ScrollView
-                                    style={{ maxHeight: 450 }}   // 🔥 IMPORTANT (adjust as needed)
-                                    contentContainerStyle={{ paddingBottom: 10 }}
-                                    showsVerticalScrollIndicator={false}
-                                >
-                                    {cartonSummary.map((item, index) => (
-                                        <View key={index} style={styles.listCard}>
+                                    {/* <ScrollView contentContainerStyle={{ paddingBottom: 10 }}> */}
+                                    <ScrollView
+                                        style={{ maxHeight: 450 }}   // 🔥 IMPORTANT (adjust as needed)
+                                        contentContainerStyle={{ paddingBottom: 10 }}
+                                        showsVerticalScrollIndicator={false}
+                                    >
+                                        {cartonSummary.map((item, index) => (
+                                            <View key={index} style={styles.listCard}>
 
-                                            {/* LEFT SIDE */}
-                                            <View style={styles.leftSection}>
-                                                <View style={styles.indexCircle}>
-                                                    <Text style={styles.indexText}>{index + 1}</Text>
+                                                {/* LEFT SIDE */}
+                                                <View style={styles.leftSection}>
+                                                    <View style={styles.indexCircle}>
+                                                        <Text style={styles.indexText}>{index + 1}</Text>
+                                                    </View>
+
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.cartonNo}>
+                                                            {item.cartonNo}
+                                                        </Text>
+
+                                                        <Text style={styles.subText} numberOfLines={2}>
+                                                            {item.ItmName}/{item.MerName}
+                                                        </Text>
+                                                        <Text style={styles.subText}>
+                                                            {item.MerName}
+                                                        </Text>
+
+                                                        <Text style={styles.subText}>
+                                                            {item.ShdName} / {item.GrdName}
+                                                        </Text>
+                                                    </View>
                                                 </View>
 
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={styles.cartonNo}>
-                                                        {item.cartonNo}
+                                                {/* RIGHT SIDE */}
+                                                <View style={styles.rightSection}>
+                                                    <TouchableOpacity
+                                                        style={styles.deleteIcon}
+                                                        // onPress={() => confirmcartondelete(item)}
+                                                        onPress={() => {
+                                                            if (item?.UId) {
+                                                                confirmcartondelete(item);
+                                                            } else {
+                                                                handleDelete(index);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                                    </TouchableOpacity>
+
+                                                    <Text style={styles.qtyText}>
+                                                        Qty: {item.qty}
                                                     </Text>
 
-                                                    <Text style={styles.subText} numberOfLines={2}>
-                                                        {item.ItmName}/{item.MerName}
-                                                    </Text>
-                                                    <Text style={styles.subText}>
-                                                        {item.MerName}
-                                                    </Text>
-
-                                                    <Text style={styles.subText}>
-                                                        {item.ShdName} / {item.GrdName}
+                                                    <Text style={styles.cheesText}>
+                                                        Chees: {item.chees}
                                                     </Text>
                                                 </View>
+
                                             </View>
+                                        ))}
+                                    </ScrollView>
 
-                                            {/* RIGHT SIDE */}
-                                            <View style={styles.rightSection}>
-                                                <TouchableOpacity
-                                                    style={styles.deleteIcon}
-                                                    // onPress={() => confirmcartondelete(item)}
-                                                    onPress={() => {
-                                                        if (item?.UId) {
-                                                            confirmcartondelete(item);
-                                                        } else {
-                                                            handleDelete(index);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Text style={{ fontSize: 16 }}>🗑️</Text>
-                                                </TouchableOpacity>
-
-                                                <Text style={styles.qtyText}>
-                                                    Qty: {item.qty}
-                                                </Text>
-
-                                                <Text style={styles.cheesText}>
-                                                    Chees: {item.chees}
-                                                </Text>
-                                            </View>
-
+                                    <View style={styles.summaryBar}>
+                                        <View style={styles.summaryItem}>
+                                            <Text style={styles.summaryLabel}>Items</Text>
+                                            <Text style={styles.summaryValue}>
+                                                {cartonSummary.length}
+                                            </Text>
                                         </View>
-                                    ))}
-                                </ScrollView>
 
-                                <View style={styles.summaryBar}>
-                                    <View style={styles.summaryItem}>
-                                        <Text style={styles.summaryLabel}>Items</Text>
-                                        <Text style={styles.summaryValue}>
-                                            {cartonSummary.length}
-                                        </Text>
+                                        <View style={styles.divider} />
+                                        <View style={styles.summaryItem}>
+                                            <Text style={styles.summaryLabel}>Total Qty</Text>
+                                            <Text style={styles.summaryValue}>
+                                                {cartonSummary
+                                                    .reduce((sum, item) => sum + Number(item.qty || 0), 0)
+                                                    .toFixed(3)
+                                                }
+                                            </Text>
+                                        </View>
+
                                     </View>
-
-                                    <View style={styles.divider} />
-                                    <View style={styles.summaryItem}>
-                                        <Text style={styles.summaryLabel}>Total Qty</Text>
-                                        <Text style={styles.summaryValue}>
-                                            {cartonSummary
-                                                .reduce((sum, item) => sum + Number(item.qty || 0), 0)
-                                                .toFixed(3)
-                                            }
-                                        </Text>
+                                    <View style={styles.bottomRow}>
+                                        <TouchableOpacity
+                                            style={styles.backBtn1}
+                                            onPress={() => setShowList(false)}
+                                        >
+                                            <Text style={styles.backText}>＋ Add More</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.submitBtn}
+                                            onPress={handleFinalSubmit}
+                                        >
+                                            <Text style={styles.submitText}>✈ Submit All</Text>
+                                        </TouchableOpacity>
                                     </View>
 
                                 </View>
-                                <View style={styles.bottomRow}>
-                                    <TouchableOpacity
-                                        style={styles.backBtn1}
-                                        onPress={() => setShowList(false)}
-                                    >
-                                        <Text style={styles.backText}>＋ Add More</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={styles.submitBtn}
-                                        onPress={handleFinalSubmit}
-                                    >
-                                        <Text style={styles.submitText}>✈ Submit All</Text>
-                                    </TouchableOpacity>
-                                </View>
 
-                            </View>
+                            )}
 
-                        )}
-
+                        </View>
                     </View>
-                </View>
+                </SafeAreaView>
             </Modal >
 
             <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
                 onPress={() => {
-                    setIsCreelModalVisible(true);
                     resetAllFields();
+
+                    setShowList(false);
+                    setCartonSummary([]);
+                    setIsScanModalVisible(false);
+
+                    setIsCreelModalVisible(true);
                 }}
             >
                 <Icon name="add" size={20} color="#fff" />
@@ -3641,7 +4175,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 onLoadPress={handleLoadPress}
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
+                getAllPropertyData={propertyData}
                 setAllPropertyData={setAllPropertyData}
                 FormState={FormState}
                 setFormState={setFormState}
@@ -3649,7 +4183,6 @@ const CreelManagementSystem: React.FC<Props> = ({ token, username }) => {
                 setAllYearData={setAllYearData}
                 token={token}
             />
-
 
         </>
     );

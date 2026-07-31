@@ -69,9 +69,11 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const [getCheckerData, setCheckerData] = useState<any[]>([]);
     const [grade, setGrade] = useState('');
     const [checker, setChecker] = useState('');
+    const [operator, setOperator] = useState('');
     const [getScannedObj, setScannedObj] = useState<any>({});
     const [shift, setShift] = useState('');
     const [getShiftData, setShiftData] = useState<any[]>([]);
+    const [getOperatorData, setOperatorData] = useState<any[]>([]);
 
     const [getDataSaved, setDataSaved] = useState(false);
     const [getSavedData, setSavedData] = useState<any>({});
@@ -89,6 +91,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const [selecteddesign, setselecteddesign] = useState<any>(null);
     const [selectedGrade, setSelectedGrade] = useState<any>(null);
     const [selectedChecker, setSelectedChecker] = useState<any>(null);
+    const [selectedOperator, setSelectedOperator] = useState<any>(null);
 
     const [showManual, setShowManual] = useState(false);
     const [FormState, setFormState] = useState<{ values: Record<string, any> }>({ values: {} });
@@ -115,6 +118,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const [selectedDeleteItem, setSelectedDeleteItem] = useState<any>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [manualSaveLoading, setManualSaveLoading] = useState(false);
+
+    const [manualOperatorData, setManualOperatorData] = useState<any[]>([]);
+    const [selectedManualOperator, setSelectedManualOperator] = useState<any>(null);
 
     let cancelToken: any;
 
@@ -186,6 +192,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             getGrades(parsed);
             getCheckers(parsed);
             getShifts(parsed);
+            getOperator(parsed);
             sendScannedValue(value);
         } catch {
             resetScanFields();
@@ -288,6 +295,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         cancelToken = axios.CancelToken.source();
         try {
             const yno = await AsyncStorage.getItem('yno');
+            const userPtype = await AsyncStorage.getItem('user_prptype');
             const response = await axios.get(
                 `${API}/api/get_criterion`,
                 getRequestConfig({
@@ -297,6 +305,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                         fetch: 'shift',
                         prpcode: qrValue.prpcode,
                         yearno: yno,
+                        prptype: userPtype
                     },
                 })
             );
@@ -310,6 +319,42 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             console.log('API getshifts error:', error);
+        }
+    };
+
+    const getOperator = async (qrValue: any) => {
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        try {
+            const yno = await AsyncStorage.getItem('yno');
+            const response = await axios.get(
+                `${API}/api/get_criterion`,
+                getRequestConfig({
+                    params: {
+                        txntype: 'chekingScanner',
+                        fetch: 'operator',
+                        prpcode: qrValue.prpcode,
+                        yearno: yno,
+                        prptype: userPtype
+                    },
+                })
+            );
+
+            console.log('operator response:', response);
+
+            if (response?.data?.success && response.data.response?.data?.length > 0) {
+                const operatorList = response.data.response.data.map((x: any) => ({
+                    ...x,
+                    OprCode: x.EmpCode,
+                    OprName: x.EmpName,
+                }));
+                setOperatorData(operatorList);
+            } else {
+                setOperatorData([]);
+            }
+        } catch (error) {
+            console.log('API getoperator error:', error);
         }
     };
 
@@ -438,6 +483,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         if (!checker) return Alert.alert('Checker can not be blank.');
         if (!shift) return Alert.alert('Shift can not be blank.');
         if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
+        if (!operator) return Alert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -462,7 +508,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 Wt: kgs,
                 AvgWt: getavgWt,
                 txntype: 'chekingScanner',
-                ShfCode: shift,
+                ShfCode: shift || '1',
                 SrNo: '0',
                 islasttaka: getScannedObj.islasttaka,
                 isfirsttaka: getScannedObj.isfirsttaka,
@@ -492,6 +538,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 IsAuth: d.IsAuth,
                 PrpCode: d.PrpCode,
                 EMode: 'S',
+                OprCode: operator
             };
 
             console.log('handleSubmitScan payloadObj:', payloadObj);
@@ -587,11 +634,11 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         console.log("rowdata", rowData, printerName);
         setIsLoading(true);
         try {
-            console.log("buildStickerParams",buildStickerParams);
+            console.log("buildStickerParams", buildStickerParams);
             const response = await postPrintSticker(buildStickerParams(rowData, printerName));
             const res = response.data || {};
 
-            console.log("response",response);
+            console.log("response", response);
             if (res.success) {
                 showSuccess(`✅ ${res.printed || 1} label(s) sent to printer.`, { text: 'OK', onPress: () => { } });
                 setPrinterModalVisible(false);
@@ -913,12 +960,12 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         }
     };
 
-    const fetchManualGradeCheckerShift = async () => {
+    const fetchManualGradeCheckerOperatorShift = async () => {
         try {
             const yno = await AsyncStorage.getItem('yno');
             const userPtype = await AsyncStorage.getItem('user_prptype');
             const base = { referrer: 'dashboard', prpcode: '', yearno: yno, prptype: userPtype };
-            const [gradeRes, checkerRes, shiftRes] = await Promise.all([
+            const [gradeRes, checkerRes, operatorRes, shiftRes] = await Promise.all([
                 axios.get(
                     `${API}/api/get_criterion`,
                     getRequestConfig({ params: { ...base, txntype: 'manual_checking', fetch: 'grd' } })
@@ -929,13 +976,20 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 ),
                 axios.get(
                     `${API}/api/get_criterion`,
+                    getRequestConfig({ params: { ...base, txntype: "manual_checking", fetch: "operator", }, })
+                ),
+                axios.get(
+                    `${API}/api/get_criterion`,
                     getRequestConfig({ params: { ...base, txntype: 'manual_checking', fetch: 'shift' } })
                 ),
             ]);
 
-            console.log('fetchManualGradeCheckerShift gradeRes response:', gradeRes);
-            console.log('fetchManualGradeCheckerShift checkerRes response:', checkerRes);
-            console.log('fetchManualGradeCheckerShift shiftRes response:', shiftRes);
+            console.log('fetchManualGradeCheckerOperatorShift gradeRes response:', gradeRes);
+            console.log('fetchManualGradeCheckerOperatorShift checkerRes response:', checkerRes);
+            console.log('fetchManualGradeCheckerOperatorShift shiftRes response:', shiftRes);
+
+            console.log('fetchManualGradeCheckerOperatorShift operatorRes payload:', getRequestConfig({ params: { ...base, txntype: 'manual_checking', fetch: 'shift' } }));
+            console.log('fetchManualGradeCheckerOperatorShift operatorRes response:', operatorRes);
 
             if (gradeRes?.data?.success && gradeRes.data.response?.data?.length > 0) {
                 setManualGradeData(gradeRes.data.response.data);
@@ -961,8 +1015,20 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             if (shiftRes?.data?.success && shiftRes.data.response?.data?.length > 0) {
                 setManualShiftData(shiftRes.data.response.data);
             } else setManualShiftData([]);
+
+            if (operatorRes?.data?.success && operatorRes.data.response?.data?.length > 0) {
+                const operatorList = operatorRes.data.response.data.map((x: any) => ({
+                    ...x,
+                    OprCode: x.EmpCode,
+                    OprName: x.EmpName,
+                }));
+                setManualOperatorData(operatorList);
+            } else {
+                setManualOperatorData([]);
+            }
+
         } catch (error) {
-            console.log('fetchManualGradeCheckerShift error:', error);
+            console.log('fetchManualGradeCheckerOperatorShift error:', error);
         }
     };
 
@@ -989,7 +1055,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             if (response?.data?.success && newMain.length > 0) {
                 setFormState((prev) => ({ ...prev, values: { ...newMain[0] } }));
                 fetchdesign();
-                fetchManualGradeCheckerShift();
+                fetchManualGradeCheckerOperatorShift();
             } else {
                 Alert.alert('No Data Found');
             }
@@ -1115,6 +1181,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             setManualSaveLoading(false);
         }
     };
+
+
 
     const handleScannerList = async (mode = 'S') => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
@@ -1546,6 +1614,22 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
+                                    <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
+                                    <PartyDropdown
+                                        data={getOperatorData}
+                                        placeholder="Choose Operator..."
+                                        labelKey={["OprName", "OprCode"]}
+                                        valueKey="OprCode"
+                                        pageSize={12}
+                                        selected={selectedOperator}
+                                        loading={false}
+                                        type="operator"
+                                        onSelect={(item) => {
+                                            setSelectedOperator(item);
+                                            setOperator(item.OprCode);
+                                        }}
+                                    />
+
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(getShiftData, shift, (val) => setShift(val))}
 
@@ -1797,6 +1881,30 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
+                                    <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
+                                    <PartyDropdown
+                                        data={manualOperatorData}
+                                        placeholder="Choose operator."
+                                        labelKey={["OprName", "OprCode"]}
+                                        valueKey="OprCode"
+                                        pageSize={12}
+                                        selected={selectedManualOperator}
+                                        loading={false}
+                                        type="operator"
+                                        onSelect={(item) => {
+                                            setSelectedManualOperator(item);
+
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: {
+                                                    ...prev.values,
+                                                    OprCode: item?.OprCode,
+                                                    OprName: item?.OprName,
+                                                },
+                                            }));
+                                        }}
+                                    />
+
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(manualShiftData, manualShift, (val) => {
                                         setManualShift(val);
@@ -2012,6 +2120,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
                                                 <Text style={checkingScannerStyles.subText}>
                                                     Linked Order No : {item.LinkedOrderNo}
+                                                </Text>
+                                                 <Text style={checkingScannerStyles.subText}>
+                                                    Operator : {item.OprName}
                                                 </Text>
                                             </View>
                                             <View>

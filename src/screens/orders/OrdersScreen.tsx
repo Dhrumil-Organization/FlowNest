@@ -1,10 +1,9 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 // FILE: src/screens/orders/OrdersScreen.tsx
 // Replaces OrderListScreen — single screen with 5 tabs matching web artifact:
 // New Order · Auth · Tracking · All Orders · Summary
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { T } from '../../theme';
 import { NewOrderTab } from './NewOrderTab';
 import { useAppStore, autoSave } from '../../stores/AppStore';
@@ -14,7 +13,8 @@ import { Button } from '../../components/ui/Button';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { CUSTOMERS } from '../../data/seeds';
 import type { SalesOrder, OrderColor } from '../../types';
-import { ScreenHeader } from '../../components/layout/ScreenHeader';
+import { useFocusEffect } from '@react-navigation/native';
+import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
 
 // ─── helpers ─────────────────────────────────────────────────
 const fmt   = (n: number) => Math.round(n).toLocaleString('en-IN');
@@ -597,14 +597,23 @@ export function OrdersScreen() {
         { key: 'summary',  label: 'Summary' },
     ];
 
-    return (
-        <SafeAreaView style={s.safe}>
-            <ScreenHeader
-                brand="MADHUSUDHAN FABRICS"
-                title="Orders"
-                right={<Text style={s.sub}>{user?.name ?? ''} · {user?.role ?? ''}</Text>}
-            />
+    // FIX: this screen used to render its own ScreenHeader (which itself
+    // renders AppHeader) — that was a second full navy header stacking
+    // under the Orders tab, same bug as Dashboard/Designs/Permission
+    // Manager. The header is now rendered once, in
+    // app/new/(tabs)/_layout.tsx; only the "name · role" text still needs
+    // to reach it, via the shared extras store.
+    const setHeaderExtras = useHeaderExtrasStore(state => state.setHeaderExtras);
+    const clearHeaderExtras = useHeaderExtrasStore(state => state.clearHeaderExtras);
+    useFocusEffect(
+        useCallback(() => {
+            setHeaderExtras({ right: <Text style={s.sub}>{user?.name ?? ''} · {user?.role ?? ''}</Text> });
+            return () => clearHeaderExtras();
+        }, [user?.name, user?.role, setHeaderExtras, clearHeaderExtras]),
+    );
 
+    return (
+        <View style={s.safe}>
             {/* Tab bar */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar}>
                 <View style={{ flexDirection: 'row' }}>
@@ -625,7 +634,7 @@ export function OrdersScreen() {
                 {tab === 'all'      && <AllOrdersTab />}
                 {tab === 'summary'  && <SummaryTab />}
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 

@@ -1,3 +1,4 @@
+import './ui-registry';
 import React from 'react';
 import { BusinessContextProvider } from './business';
 import { PermissionProvider } from './permissions';

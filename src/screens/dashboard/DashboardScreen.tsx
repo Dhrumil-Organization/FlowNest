@@ -1,316 +1,287 @@
-// ─────────────────────────────────────────────────────────────
-// FILE: src/screens/dashboard/DashboardScreen.tsx
-// Permission-aware dashboard + proper logout cleanup.
-// ─────────────────────────────────────────────────────────────
-
-// import React from 'react';
-// import {
-//   StyleSheet,
-//   Text,
-//   View
-// } from 'react-native';
-// import { T } from '../../theme';
-
+import { DashboardAPI, DashboardCard, DashboardView } from '@/src/api/dashboard';
+import { DashboardSection, EmptyState, MetricCell, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
+import { S, T } from '@/src/theme';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
-import { T } from '../../theme';
 
-type Nav = any;
+function money(value: number) {
+  const abs = Math.abs(Number(value || 0));
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(2)} Cr`;
+  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(2)} L`;
+  return `${sign}₹${abs.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+}
 
-function StatCard() {
+function cardByKey(cards: DashboardCard[], key: DashboardCard['key']) {
+  return cards.find((card) => card.key === key);
+}
+
+function TargetSummary({ cards, label, onOpen }: { cards: DashboardCard[]; label: string; onOpen: () => void }) {
+  const so = cardByKey(cards, 'SALES_ORDER');
+  const billing = cardByKey(cards, 'BILLING');
+  const collection = cardByKey(cards, 'COLLECTION');
+  // Manual Sales/Billing targets may be intentionally unconfigured. The dashboard ring
+  // represents billed conversion, so use Billing Actual ÷ Sales Order Actual.
+  const salesActual = Number(so?.actual || 0);
+  const billingActual = Number(billing?.actual || 0);
+  const billedPct = salesActual > 0 ? (billingActual / salesActual) * 100 : 0;
+
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHead}>
-        <Text style={styles.cardLabel}>THIS MONTH · PRODUCTION COST</Text>
-        <Text style={styles.link}>Full report ›</Text>
+    <TouchableOpacity activeOpacity={0.92} onPress={onOpen} style={styles.targetCard}>
+      <View style={styles.targetHeader}>
+        <View>
+          <Text style={styles.targetTitle}>{label}</Text>
+          <Text style={styles.targetSub}>Tap for target breakdown</Text>
+        </View>
+        <Text style={styles.targetArrow}>›</Text>
       </View>
-      <View style={styles.costRow}>
-        <View style={styles.ring}>
-          <Text style={styles.ringVal}>₹13.52</Text>
-          <Text style={styles.ringSub}>L</Text>
-          <Text style={styles.ringSub}>Jun '26</Text>
+
+      <View style={styles.targetBody}>
+        <View style={styles.ringOuter}>
+          <View style={styles.ringInner}>
+            <Text style={styles.ringValue}>{Math.round(Math.min(999, billedPct))}%</Text>
+            <Text style={styles.ringLabel}>billed</Text>
+          </View>
         </View>
-        <View style={styles.metricCol}>
-          <Text style={styles.metricLabel}>COST / PICK</Text>
-          <Text style={styles.metricOrange}>₹0.337</Text>
-          <Text style={styles.metricLabel}>PRODUCTION</Text>
-          <Text style={styles.metricVal}>58.5 K m</Text>
-        </View>
-        <View style={styles.metricCol}>
-          <Text style={styles.metricLabel}>AVG PICKS</Text>
-          <Text style={styles.metricVal}>68.5</Text>
-          <Text style={styles.metricLabel}>COST / MC-DAY</Text>
-          <Text style={styles.metricVal}>₹2,682</Text>
+
+        <View style={styles.targetMetrics}>
+          <Text style={styles.darkKicker}>SALES</Text>
+          <Text style={styles.darkLine}>SO booked <Text style={styles.copper}>{money(so?.actual || 0)}</Text></Text>
+          <Text style={styles.darkLine}>Billed <Text style={styles.blueText}>{money(billing?.actual || 0)}</Text></Text>
+          <Text style={[styles.darkKicker, { marginTop: 12 }]}>COLLECTION</Text>
+          <ProgressBar value={collection?.achievement_pct || 0} />
+          <Text style={styles.collectionLine}>
+            {money(collection?.actual || 0)} / {money(collection?.target || 0)}
+          </Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-function TargetCard() {
-  return (
-    <View style={styles.darkCard}>
-      <Text style={styles.darkTitle}>May '26 Target</Text>
-      <Text style={styles.darkSub}>3 days remaining</Text>
-      <View style={styles.targetRow}>
-        <View style={styles.darkRing}>
-          <Text style={styles.darkRingVal}>77%</Text>
-          <Text style={styles.darkRingSub}>billed</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.darkLabel}>SALES</Text>
-          <Text style={styles.darkText}>SO booked <Text style={styles.orange}>₹1.32 Cr</Text></Text>
-          <Text style={styles.darkText}>Billed <Text style={styles.orange}>₹1.16 Cr</Text></Text>
-          <Text style={[styles.darkLabel, { marginTop: 11 }]}>COLLECTION</Text>
-          <View style={styles.progressTrack}><View style={styles.progressFill} /></View>
-          <Text style={styles.darkText}>₹71.50 L / ₹85.00 L</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// export function DashboardScreen() {
-//   const navigation = useNavigation<Nav>();
-//   const logout = useAppSessionStore((s) => s.logout);
-//   const appSession = useAppSessionStore((s) => s.appSession);
-//   const allowedScreens = useAppSessionStore((s) => s.allowedScreens());
-
-//   const context = appSession?.business_context;
-
-//   const handleLogout = () => {
-//     Alert.alert('Sign out?', 'Your local session will be cleared on this device.', [
-//       { text: 'Cancel', style: 'cancel' },
-//       {
-//         text: 'Sign out',
-//         style: 'destructive',
-//         onPress: async () => {
-//           await logout();
-//         },
-//       },
-//     ]);
-//   };
-
-//   return (
-//     <SafeAreaView style={styles.safe} edges={['top']}>
-//       <View style={styles.header}>
-//         <View>
-//           <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text>
-//           <Text style={styles.title}>Dashboard</Text>
-//           <Text style={styles.contextText}>
-//             {context?.prp_code || '—'} · FY {context?.year_no || '—'} · Store {context?.str_code || '—'}
-//           </Text>
-//         </View>
-//         <TouchableOpacity onPress={handleLogout} style={styles.signOutBtn}>
-//           <Text style={styles.signOutText}>Sign out</Text>
-//         </TouchableOpacity>
-//       </View>
-
-//       <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 90 }}>
-//         <View style={styles.segment}>
-//           <View style={styles.segmentActive}><Text style={styles.segmentActiveText}>Company View</Text></View>
-//           <View style={styles.segmentIdle}><Text style={styles.segmentIdleText}>My View</Text></View>
-//         </View>
-
-//         <StatCard />
-//         <TargetCard />
-
-//         <TouchableOpacity style={styles.reportCard} activeOpacity={0.8}>
-//           <View style={styles.reportIcon}><Text style={{ fontSize: 24 }}>📊</Text></View>
-//           <View style={{ flex: 1 }}>
-//             <Text style={styles.reportTitle}>Monthly Report</Text>
-//             <Text style={styles.reportSub}>Target vs actual · by month</Text>
-//           </View>
-//           <Text style={styles.chev}>›</Text>
-//         </TouchableOpacity>
-
-//         <View style={styles.permissionsCard}>
-//           <Text style={styles.permissionsTitle}>Allowed Modules</Text>
-//           <Text style={styles.permissionsSub}>Generated from app_session permissions</Text>
-//           <View style={styles.moduleGrid}>
-//             {allowedScreens.length === 0 ? (
-//               <Text style={styles.emptyText}>No module permission found.</Text>
-//             ) : (
-//               allowedScreens.map((s) => (
-//                 <TouchableOpacity
-//                   key={s.screen_key}
-//                   style={styles.moduleTile}
-//                   activeOpacity={0.85}
-//                   onPress={() => {
-//                     if (s.screen_key === 'designs') navigation.navigate('Designs');
-//                   }}
-//                 >
-//                   <Text style={styles.moduleIcon}>□</Text>
-//                   <Text style={styles.moduleName}>{s.screen_name}</Text>
-//                   <Text style={styles.moduleMeta}>{s.tabs?.length || 0} tabs</Text>
-//                 </TouchableOpacity>
-//               ))
-//             )}
-//           </View>
-//         </View>
-//       </ScrollView>
-//     </SafeAreaView>
-//   );
-// }
 export function DashboardScreen() {
   const router = useRouter();
-  const logout = useAppSessionStore((s) => s.logout);
-  // const appSession = useAppSessionStore((s) => s.appSession);
-  // const allowedScreens = useAppSessionStore((s) => s.allowedScreens());
-  const appSession = useAppSessionStore((s) => s.appSession);
+  const { canAccess, isSuperAdmin } = usePermission();
+  const appSession = useAppSessionStore((state) => state.appSession);
+  const rawLoginResponse = useAppSessionStore((state) => state.rawLoginResponse);
+  const logout = useAppSessionStore((state) => state.logout);
 
-  const allowedScreens =
-    appSession?.permissions?.screens?.filter((s) => s.can_view) ?? [];
   const context = appSession?.business_context;
+  const [view, setView] = useState<DashboardView>(isSuperAdmin ? 'owner' : 'my');
+  const [cards, setCards] = useState<DashboardCard[]>([]);
+  const [periodLabel, setPeriodLabel] = useState('Monthly Target');
+  const [scopeMessage, setScopeMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogout = () => {
-    Alert.alert('Sign out?', 'Your local session will be cleared on this device.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-        },
-      },
-    ]);
-  };
+  const now = new Date();
+  const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
+  const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
+  const monthno = now.getMonth() + 1;
+  const ownerAllowed = isSuperAdmin || canAccess('management.dashboard.owner_view') || canAccess('dashboard.owner_view');
 
-  // return (
-  //   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-  //     <Text>Dashboard</Text>
-  //   </View>
-  // );
+  const load = useCallback(async (showRefresh = false) => {
+    if (!yearno || !prptype) {
+      setError('Business context is incomplete. Please sign in again and select Year and Property Group.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
-      return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text>
-            <Text style={styles.title}>Dashboard</Text>
-            <Text style={styles.contextText}>
-              {context?.prp_code || '—'} · FY {context?.year_no || '—'} · Store {context?.str_code || '—'}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.signOutBtn}>
-            <Text style={styles.signOutText}>Sign out</Text>
+    showRefresh ? setRefreshing(true) : setLoading(true);
+    setError('');
+    try {
+      const result = await DashboardAPI.targetCard({ prptype, yearno, monthno, view });
+      const payload = result.response;
+      setCards(payload.cards || []);
+      setPeriodLabel(payload.period?.label || payload.period?.month_name || 'Monthly Target');
+      setScopeMessage(payload.scope?.message || payload.message || '');
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load dashboard.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [monthno, prptype, view, yearno]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const collection = useMemo(() => cardByKey(cards, 'COLLECTION'), [cards]);
+  const billing = useMemo(() => cardByKey(cards, 'BILLING'), [cards]);
+  const salesOrder = useMemo(() => cardByKey(cards, 'SALES_ORDER'), [cards]);
+
+  const confirmLogout = () => Alert.alert('Sign out?', 'This will clear the mobile session on this device.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Sign out', style: 'destructive', onPress: logout },
+  ]);
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.topBar}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.brand}>SUDAMO TEXTILE ERP</Text>
+          <Text style={styles.heading}>Business Dashboard</Text>
+          <Text style={styles.context} numberOfLines={1}>
+            {context?.prp_code || '—'} · FY {context?.year_name || yearno || '—'} · Store {context?.str_code || '—'}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.logoutButton} onPress={confirmLogout}>
+          <Text style={styles.logoutText}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.copper} />}
+      >
+        <View style={styles.segment}>
+          <TouchableOpacity
+            disabled={!ownerAllowed}
+            onPress={() => ownerAllowed && setView('owner')}
+            style={[styles.segmentButton, view === 'owner' && styles.segmentActive, !ownerAllowed && styles.segmentDisabled]}
+          >
+            <Text style={[styles.segmentText, view === 'owner' && styles.segmentTextActive]}>Owner</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setView('my')}
+            style={[styles.segmentButton, view === 'my' && styles.segmentActive]}
+          >
+            <Text style={[styles.segmentText, view === 'my' && styles.segmentTextActive]}>My View</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 90 }}>
-          <View style={styles.segment}>
-            <View style={styles.segmentActive}><Text style={styles.segmentActiveText}>Company View</Text></View>
-            <View style={styles.segmentIdle}><Text style={styles.segmentIdleText}>My View</Text></View>
+        {loading ? (
+          <View style={styles.loadingCard}><ActivityIndicator color={T.copper} /><Text style={styles.loadingText}>Loading dashboard…</Text></View>
+        ) : error ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>Dashboard unavailable</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => load()}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
           </View>
+        ) : cards.length === 0 ? (
+          <EmptyState message={scopeMessage || 'No target cards are configured for the current scope.'} />
+        ) : (
+          <>
+            <DashboardSection title="THIS MONTH · BUSINESS PULSE" tone="orange" action="Refresh" onAction={() => load(true)}>
+              <View style={styles.metricRow}>
+                <MetricCell label="SALES ORDER" value={money(salesOrder?.actual || 0)} />
+                <MetricCell label="BILLING" value={money(billing?.actual || 0)} />
+              </View>
+              <View style={[styles.metricRow, { marginTop: 15 }]}>
+                <MetricCell label="COLLECTION" value={money(collection?.actual || 0)} accent />
+                <MetricCell label="OUTSTANDING" value={money(collection?.remaining || 0)} />
+              </View>
+            </DashboardSection>
 
-          <StatCard />
-          <TargetCard />
+            <TargetSummary
+              cards={cards}
+              label={periodLabel}
+              onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}
+            />
 
-          <TouchableOpacity style={styles.reportCard} activeOpacity={0.8}>
-            <View style={styles.reportIcon}><Text style={{ fontSize: 24 }}>📊</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reportTitle}>Monthly Report</Text>
-              <Text style={styles.reportSub}>Target vs actual · by month</Text>
-            </View>
-            <Text style={styles.chev}>›</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reportLink}
+              activeOpacity={0.88}
+              onPress={() => router.push({ pathname: '/new/(tabs)/reports/monthly-report', params: { view } } as any)}
+            >
+              <View style={styles.reportIcon}><Text style={styles.reportEmoji}>📈</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reportTitle}>Monthly Report</Text>
+                <Text style={styles.reportSub}>Target vs actual · executive and category analysis</Text>
+              </View>
+              <Text style={styles.reportChevron}>›</Text>
+            </TouchableOpacity>
 
-          <View style={styles.permissionsCard}>
-            <Text style={styles.permissionsTitle}>Allowed Modules</Text>
-            <Text style={styles.permissionsSub}>Generated from app_session permissions</Text>
-            <View style={styles.moduleGrid}>
-              {allowedScreens.length === 0 ? (
-                <Text style={styles.emptyText}>No module permission found.</Text>
-              ) : (
-                allowedScreens.map((s) => (
-                  <TouchableOpacity
-                    key={s.screen_key}
-                    style={styles.moduleTile}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      if (s.screen_key === 'designs') router.push('/new/(tabs)/designs');
-                    }}
-                  >
-                    <Text style={styles.moduleIcon}>□</Text>
-                    <Text style={styles.moduleName}>{s.screen_name}</Text>
-                    <Text style={styles.moduleMeta}>{s.tabs?.length || 0} tabs</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
+            <DashboardSection title="SALES" tone="navy" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
+              <View style={styles.metricRow}>
+                <MetricCell label="THIS MONTH" value={money(billing?.actual || 0)} />
+                <MetricCell label="SO BOOKED" value={money(salesOrder?.actual || 0)} />
+              </View>
+              <View style={styles.miniTrend}><View style={styles.miniTrendLine} /></View>
+            </DashboardSection>
+
+            <DashboardSection title="PAYMENT COLLECTION" tone="blue" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
+              <View style={styles.metricRow}>
+                <MetricCell label="COLLECTED" value={money(collection?.actual || 0)} />
+                <MetricCell label="TARGET" value={money(collection?.target || 0)} />
+              </View>
+              <View style={styles.achievementRow}>
+                <Text style={styles.achievementLabel}>Achievement</Text>
+                <Text style={styles.achievementValue}>{(collection?.achievement_pct || 0).toFixed(2)}%</Text>
+              </View>
+              <ProgressBar value={collection?.achievement_pct || 0} tone="blue" />
+            </DashboardSection>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: T.bg },
-  header: {
-    backgroundColor: T.nav,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  brand: { fontSize: 10, color: '#6F91AD', fontWeight: '900', letterSpacing: 1.4 },
-  title: { color: '#fff', fontSize: 25, fontWeight: '900', marginTop: 2 },
-  contextText: { color: '#7FA0BA', fontSize: 11, marginTop: 2, fontWeight: '700' },
-  signOutBtn: { borderWidth: 1, borderColor: '#29445C', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 10 },
-  signOutText: { color: '#DCEAF5', fontSize: 13, fontWeight: '900' },
-  body: { flex: 1, padding: 14 },
-  segment: { flexDirection: 'row', backgroundColor: T.surface, borderRadius: 14, borderWidth: 1, borderColor: T.border, overflow: 'hidden', marginBottom: 14 },
-  segmentActive: { flex: 1, backgroundColor: T.nav, paddingVertical: 14, alignItems: 'center' },
-  segmentIdle: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  segmentActiveText: { color: '#fff', fontWeight: '900' },
-  segmentIdleText: { color: T.muted, fontWeight: '900' },
-  card: { backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 16, marginBottom: 14 },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
-  cardLabel: { color: T.muted, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  link: { color: T.copper, fontSize: 12, fontWeight: '900' },
-  costRow: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  ring: { width: 76, height: 76, borderRadius: 38, borderWidth: 10, borderColor: T.copper, alignItems: 'center', justifyContent: 'center' },
-  ringVal: { fontSize: 17, fontWeight: '900', color: T.ink },
-  ringSub: { fontSize: 8, color: T.muted },
-  metricCol: { flex: 1 },
-  metricLabel: { color: T.muted, fontSize: 9, fontWeight: '900', marginTop: 4 },
-  metricVal: { color: T.ink, fontSize: 15, fontWeight: '900' },
-  metricOrange: { color: T.copper, fontSize: 15, fontWeight: '900' },
-  darkCard: { backgroundColor: T.nav, borderRadius: 16, padding: 16, marginBottom: 14 },
-  darkTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
-  darkSub: { color: '#92A9BE', fontSize: 12, marginTop: 2 },
-  targetRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 22 },
-  darkRing: { width: 90, height: 90, borderRadius: 45, borderWidth: 10, borderColor: T.copper, alignItems: 'center', justifyContent: 'center' },
-  darkRingVal: { color: '#fff', fontSize: 23, fontWeight: '900' },
-  darkRingSub: { color: '#9DB2C5', fontSize: 11 },
-  darkLabel: { color: '#7892AA', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  darkText: { color: '#D9E7F2', fontSize: 13, fontWeight: '700', marginTop: 5 },
-  orange: { color: T.copper, fontWeight: '900' },
-  progressTrack: { height: 7, borderRadius: 5, backgroundColor: '#2A4054', marginTop: 8, marginBottom: 4 },
-  progressFill: { height: 7, borderRadius: 5, width: '77%', backgroundColor: '#3F8B5A' },
-  reportCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 15, marginBottom: 14, gap: 12 },
-  reportIcon: { width: 44, height: 44, backgroundColor: T.sub, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  reportTitle: { color: T.ink, fontSize: 15, fontWeight: '900' },
-  reportSub: { color: T.muted, fontSize: 12, marginTop: 2 },
-  chev: { color: T.muted, fontSize: 24 },
-  permissionsCard: { backgroundColor: T.surface, borderRadius: 16, borderWidth: 1, borderColor: T.border, padding: 15 },
-  permissionsTitle: { color: T.ink, fontSize: 16, fontWeight: '900' },
-  permissionsSub: { color: T.muted, fontSize: 12, marginTop: 2, marginBottom: 12 },
-  moduleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  moduleTile: { width: '48%', backgroundColor: T.sub, borderRadius: 14, padding: 14, minHeight: 94, justifyContent: 'center' },
-  moduleIcon: { color: T.copper, fontSize: 22, fontWeight: '900' },
-  moduleName: { color: T.ink, fontSize: 13, fontWeight: '900', marginTop: 8 },
-  moduleMeta: { color: T.muted, fontSize: 11, marginTop: 2 },
-  emptyText: { color: T.muted, fontSize: 13 },
+  topBar: { backgroundColor: T.nav, paddingHorizontal: 17, paddingTop: 46, paddingBottom: 15, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  brand: { color: '#7F9AB2', fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  heading: { color: '#fff', fontSize: 23, fontWeight: '900', marginTop: 2 },
+  context: { color: '#8EA5B8', fontSize: 11, fontWeight: '700', marginTop: 3 },
+  logoutButton: { borderWidth: 1, borderColor: '#294155', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  logoutText: { color: '#E5EEF5', fontWeight: '800', fontSize: 11 },
+  scroll: { flex: 1 },
+  content: { padding: 14, paddingBottom: 100 },
+  segment: { flexDirection: 'row', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 13, overflow: 'hidden', marginBottom: 14 },
+  segmentButton: { flex: 1, paddingVertical: 13, alignItems: 'center' },
+  segmentActive: { backgroundColor: T.nav },
+  segmentDisabled: { opacity: 0.35 },
+  segmentText: { color: T.muted, fontSize: 12, fontWeight: '900' },
+  segmentTextActive: { color: '#fff' },
+  loadingCard: { minHeight: 160, backgroundColor: T.surface, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border, gap: 10 },
+  loadingText: { color: T.muted, fontSize: 12, fontWeight: '700' },
+  errorCard: { backgroundColor: '#FFF7F4', borderWidth: 1, borderColor: '#F0C7BB', borderRadius: 16, padding: 18 },
+  errorTitle: { color: T.red, fontSize: 16, fontWeight: '900' },
+  errorText: { color: '#80554B', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  retryButton: { alignSelf: 'flex-start', backgroundColor: T.nav, borderRadius: 9, paddingHorizontal: 15, paddingVertical: 10, marginTop: 14 },
+  retryText: { color: '#fff', fontWeight: '900', fontSize: 12 },
+  metricRow: { flexDirection: 'row', gap: 16 },
+  targetCard: { backgroundColor: T.nav, borderRadius: 16, marginBottom: 14, overflow: 'hidden', ...S.card },
+  targetHeader: { paddingHorizontal: 15, paddingTop: 14, paddingBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#21394C' },
+  targetTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  targetSub: { color: '#92A8BA', fontSize: 10, marginTop: 2 },
+  targetArrow: { color: '#fff', fontSize: 25 },
+  targetBody: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 18 },
+  ringOuter: { width: 92, height: 92, borderRadius: 46, borderWidth: 9, borderColor: T.copper, alignItems: 'center', justifyContent: 'center' },
+  ringInner: { width: 64, height: 64, borderRadius: 32, borderWidth: 6, borderColor: T.blue, alignItems: 'center', justifyContent: 'center' },
+  ringValue: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  ringLabel: { color: '#8EA5B8', fontSize: 9, marginTop: -1 },
+  targetMetrics: { flex: 1 },
+  darkKicker: { color: '#7590A6', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  darkLine: { color: '#E8F0F5', fontSize: 12, fontWeight: '700', marginTop: 4 },
+  copper: { color: T.copper, fontWeight: '900' },
+  blueText: { color: '#8DB4E6', fontWeight: '900' },
+  collectionLine: { color: '#ABC0D0', fontSize: 10, marginTop: 5, fontWeight: '700' },
+  reportLink: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 15, padding: 14, gap: 12, marginBottom: 14, ...S.card },
+  reportIcon: { width: 43, height: 43, borderRadius: 11, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
+  reportEmoji: { fontSize: 21 },
+  reportTitle: { color: T.ink, fontSize: 14, fontWeight: '900' },
+  reportSub: { color: T.muted, fontSize: 10, lineHeight: 15, marginTop: 2 },
+  reportChevron: { color: T.muted, fontSize: 25 },
+  miniTrend: { height: 32, marginTop: 15, justifyContent: 'center' },
+  miniTrendLine: { height: 2, borderRadius: 2, backgroundColor: T.nav, transform: [{ rotate: '-1deg' }] },
+  achievementRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, marginBottom: 6 },
+  achievementLabel: { color: T.muted, fontSize: 10, fontWeight: '800' },
+  achievementValue: { color: T.green, fontSize: 12, fontWeight: '900' },
 });

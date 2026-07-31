@@ -293,6 +293,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Inquiry Report', route: 'inquiry-report', icon: 'view-comfortable', color: '#69e3ad', category: 'Production' },
         { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
+        { name: 'Weft Issue Return', route: 'weft-issue-return', icon: 'published-with-changes', color: '#4169E1', category: 'Production' },
         // { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
     ];
 
@@ -458,6 +459,14 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                     },
                     //                     {
                     //                         "title": "Creel Issue Return",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Weft Issue Return",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Sales Order Entry",
                     //                         "href": "/"
                     //                     },
                     //                 ]

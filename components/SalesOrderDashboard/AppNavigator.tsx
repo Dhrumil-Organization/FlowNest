@@ -12,9 +12,9 @@ import CostingScreen from './screen/CostingScreen';
 // import OrdersScreen from './screen/OrdersScreen';
 import StockScreen from './screen/StockScreen';
 import ExpenseScreen from './screen/ExpenseScreen';
+// import MonthlySalesTargetScreen from './screen/MonthlySalesTarget';
 import ManufacturingControlTower from './screen/ManufacturingControlTower';
 import RealCostingReferenceDashboard from './screen/RealCostingReferenceDashboard';
-import { SafeAreaProvider } from "react-native-safe-area-context";
 // import ProdScreen from './screen//ProdScreen';
 
 const TABS = [
@@ -26,6 +26,7 @@ const TABS = [
   // { id: 'orders', label: 'Orders', Screen: OrdersScreen },
   { id: 'stock', label: 'Stock', Screen: StockScreen },
   { id: 'expense', label: 'Expense', Screen: ExpenseScreen },
+  // { id: 'monthlysalestarget', label: 'MonthlySalesTarget', Screen: MonthlySalesTargetScreen },
   // { id: 'prod', label: 'Prod', Screen: ProdScreen },
 ];
 
@@ -50,56 +51,54 @@ export default function AppNavigator({ token, apiBase }) {
     TABS.find(t => t.id === activeTab)?.Screen || ExpenseScreen;
 
   return (
-    <SafeAreaProvider>
-      <View style={styles.root}>
-        {/* Screen Area */}
-        <View style={styles.screenArea}>
-          <ActiveScreen
-            token={token}
-            apiBase={apiBase}
-            isActive={true}
-          />
-        </View>
-
-        {/* Bottom Navigation */}
-        <View style={styles.navbar}>
-          {TABS.map(tab => {
-            const isActive = activeTab === tab.id;
-
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                style={styles.navItem}
-                onPress={() => setActiveTab(tab.id)}
-              >
-                {isActive && <View style={styles.activeDot} />}
-
-                <TabIcon
-                  label={tab.label}
-                  active={isActive}
-                />
-
-                <Text
-                  style={[
-                    styles.navLabel,
-                    {
-                      color: isActive
-                        ? '#c2823a'
-                        : '#9ca3af',
-                      fontWeight: isActive
-                        ? '700'
-                        : '400',
-                    },
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+    <View style={styles.root}>
+      {/* Screen Area */}
+      <View style={styles.screenArea}>
+        <ActiveScreen
+          token={token}
+          apiBase={apiBase}
+          isActive={true}
+        />
       </View>
-    </SafeAreaProvider>
+
+      {/* Bottom Navigation */}
+      <View style={styles.navbar}>
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.id;
+
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={styles.navItem}
+              onPress={() => setActiveTab(tab.id)}
+            >
+              {isActive && <View style={styles.activeDot} />}
+
+              <TabIcon
+                label={tab.label}
+                active={isActive}
+              />
+
+              <Text
+                style={[
+                  styles.navLabel,
+                  {
+                    color: isActive
+                      ? '#c2823a'
+                      : '#9ca3af',
+                    fontWeight: isActive
+                      ? '700'
+                      : '400',
+                  },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 

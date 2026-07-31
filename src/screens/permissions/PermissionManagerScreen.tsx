@@ -404,8 +404,14 @@ export function PermissionManagerScreen() {
         await AppAccessAPI.syncRegistry(registryPayload);
         const boot = await AppAccessAPI.bootstrap();
         const data = boot?.response || boot?.data?.response || boot?.data || boot || {};
-        const roles = data.roles || [];
-        const users = data.users || [];
+        const roles = Array.isArray(data.roles) ? data.roles
+          : Array.isArray(data.app_roles) ? data.app_roles
+          : Array.isArray(data.role_list) ? data.role_list
+          : [];
+        const users = Array.isArray(data.users) ? data.users
+          : Array.isArray(data.app_users) ? data.app_users
+          : Array.isArray(data.user_list) ? data.user_list
+          : [];
         const role = roles.find((r: any) =>
           String(r.role_name || '').toLowerCase().includes(isSuperAdmin ? 'owner' : String(currentRole).toLowerCase())
         ) || roles[0];
@@ -589,7 +595,7 @@ export function PermissionManagerScreen() {
 
   const saveChanges = async () => {
     if (mode === "role" && !selectedRoleId) {
-      Alert.alert("Role required", "No app role is available. Run the SQL Server setup script first.");
+      Alert.alert("Select a role", "The role list has not finished loading or no role is selected. Refresh this screen and select a role before saving.");
       return;
     }
     if (mode === "user" && !selectedUserId) {

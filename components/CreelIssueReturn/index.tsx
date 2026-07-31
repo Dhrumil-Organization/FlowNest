@@ -14,7 +14,8 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from "../../common/API/dynamicAPI";
@@ -638,76 +639,86 @@ const CreelIssueReturn = ({ token, navigation }) => {
                     </Modal>
                     {/* PROPERTY PICKER */}
                     <Modal visible={propertyPickerVisible} animationType="slide">
-                        <View style={{ flex: 1, backgroundColor: "#fff" }}>
+                        <SafeAreaView
+                            edges={['top']}
+                            style={{ flex: 1, backgroundColor: "#fff" }}
+                        >
+                            <View style={{ flex: 1, backgroundColor: "#fff" }}>
 
-                            <View style={styles.pickerHeader}>
-                                <TouchableOpacity onPress={() => {
-                                    setPropertyPickerVisible(false);
-                                    setPropertySearch(""); // ✅ CLEAR SEARCH
-                                }}>
-                                    <Icon name="arrow-back-ios" size={20} color="#000000" />
-                                </TouchableOpacity>
+                                <View style={styles.pickerHeader}>
+                                    <TouchableOpacity onPress={() => {
+                                        setPropertyPickerVisible(false);
+                                        setPropertySearch(""); // ✅ CLEAR SEARCH
+                                    }}>
+                                        <Icon name="arrow-back-ios" size={20} color="#000000" />
+                                    </TouchableOpacity>
 
-                                <Text style={styles.pickerTitle}>Select Property</Text>
-                                <View style={{ width: 20 }} />
-                            </View>
+                                    <Text style={styles.pickerTitle}>Select Property</Text>
+                                    <View style={{ width: 20 }} />
+                                </View>
 
-                            <View style={styles.pickerSearch}>
-                                <Icon name="search" size={18} color="#000000" />
-                                <TextInput
-                                    placeholder="Search property..."
-                                    placeholderTextColor="#000"
-                                    value={propertySearch}
-                                    onChangeText={setPropertySearch}
-                                    style={{ flex: 1 }}
+                                <View style={styles.pickerSearch}>
+                                    <Icon name="search" size={18} color="#000000" />
+                                    <TextInput
+                                        placeholder="Search property..."
+                                        placeholderTextColor="#000"
+                                        value={propertySearch}
+                                        onChangeText={setPropertySearch}
+                                        style={{ flex: 1 }}
+                                    />
+                                </View>
+
+                                <FlatList
+                                    data={propertyData.filter(p =>
+                                        p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
+                                    )}
+                                    keyExtractor={(i) => i.PrpCode}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity style={styles.pickerItem}
+                                            onPress={() => {
+                                                setSelectedProperty(item);
+                                                setPropertyPickerVisible(false);
+                                                setPropertySearch(""); // ✅ CLEAR SEARCH
+                                            }}>
+                                            <Text style={{ color: '#000' }}>{item.LngName}</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 />
                             </View>
-
-                            <FlatList
-                                data={propertyData.filter(p =>
-                                    p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
-                                )}
-                                keyExtractor={(i) => i.PrpCode}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity style={styles.pickerItem}
-                                        onPress={() => {
-                                            setSelectedProperty(item);
-                                            setPropertyPickerVisible(false);
-                                            setPropertySearch(""); // ✅ CLEAR SEARCH
-                                        }}>
-                                        <Text style={{ color: '#000' }}>{item.LngName}</Text>
-                                    </TouchableOpacity>
-                                )}
-                            />
-                        </View>
+                        </SafeAreaView>
                     </Modal >
 
                     {/* YEAR PICKER */}
                     < Modal visible={yearPickerVisible} animationType="slide" >
-                        <View style={{ flex: 1, backgroundColor: "#fff" }}>
+                        <SafeAreaView
+                            edges={['top']}
+                            style={{ flex: 1, backgroundColor: "#fff" }}
+                        >
+                            <View style={{ flex: 1, backgroundColor: "#fff" }}>
 
-                            <View style={styles.pickerHeader}>
-                                <TouchableOpacity onPress={() => setYearPickerVisible(false)}>
-                                    <Icon name="arrow-back-ios" size={20} color="#000000" />
-                                </TouchableOpacity>
-
-                                <Text style={styles.pickerTitle}>Select Year</Text>
-                                <View style={{ width: 20 }} />
-                            </View>
-
-                            <FlatList
-                                data={yearOptions}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity style={styles.pickerItem}
-                                        onPress={() => {
-                                            setSelectedYear(item);
-                                            setYearPickerVisible(false);
-                                        }}>
-                                        <Text style={{ color: '#000' }}>{item}</Text>
+                                <View style={styles.pickerHeader}>
+                                    <TouchableOpacity onPress={() => setYearPickerVisible(false)}>
+                                        <Icon name="arrow-back-ios" size={20} color="#000000" />
                                     </TouchableOpacity>
-                                )}
-                            />
-                        </View>
+
+                                    <Text style={styles.pickerTitle}>Select Year</Text>
+                                    <View style={{ width: 20 }} />
+                                </View>
+
+                                <FlatList
+                                    data={yearOptions}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity style={styles.pickerItem}
+                                            onPress={() => {
+                                                setSelectedYear(item);
+                                                setYearPickerVisible(false);
+                                            }}>
+                                            <Text style={{ color: '#000' }}>{item}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        </SafeAreaView>
                     </Modal >
                     {/* 🔥 DATA LIST */}
                     <FlatList
@@ -715,7 +726,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
                         keyExtractor={(item) => item.UId.toString()}
                         contentContainerStyle={{
                             paddingHorizontal: isTablet ? 30 : 16,
-                            paddingBottom: 120
+                            paddingBottom: 180
                         }}
 
                         renderItem={({ item }) => {
@@ -811,29 +822,31 @@ const CreelIssueReturn = ({ token, navigation }) => {
                         }}
                     />
                     {/* 🔥 FLOATING ADD BUTTON */}
-                    <TouchableOpacity
-                        style={styles.fab}
-                        onPress={() =>
-                            // navigation.navigate("CreelIssueReturnEntry", {
-                            //     creelData: null,
-                            //     token: token,
-                            //     selectedProperty: selectedProperty,   // ✅ ADD THIS
-                            //     selectedYear: selectedYear           // ✅ ADD THIS
-                            // })
-                            router.push({
-                                pathname: '/CreelIssueReturnEntry',
-                                params: {
-                                    creelData: null,
-                                    token: token,
-                                    selectedProperty: JSON.stringify(selectedProperty),   // ✅ ADD THIS
-                                    selectedYear: selectedYear
-                                }
-                            })
-                        }
+                    <View style={styles.fabContainer}>
+                        <TouchableOpacity
+                            style={styles.fab}
+                            onPress={() =>
+                                // navigation.navigate("CreelIssueReturnEntry", {
+                                //     creelData: null,
+                                //     token: token,
+                                //     selectedProperty: selectedProperty,   // ✅ ADD THIS
+                                //     selectedYear: selectedYear           // ✅ ADD THIS
+                                // })
+                                router.push({
+                                    pathname: '/CreelIssueReturnEntry',
+                                    params: {
+                                        creelData: null,
+                                        token: token,
+                                        selectedProperty: JSON.stringify(selectedProperty),   // ✅ ADD THIS
+                                        selectedYear: selectedYear
+                                    }
+                                })
+                            }
 
-                    >
-                        <Icon name="add" size={26} color="#fff" />
-                    </TouchableOpacity>
+                        >
+                            <Icon name="add" size={26} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
 
                     <Modal transparent visible={deleteModal} animationType="fade">
                         <View style={styles.alertOverlay}>
@@ -1201,17 +1214,40 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 12,
     },
-    fab: {
+    // fab: {
+    //     position: "absolute",
+    //     backgroundColor: "#13879A",
+    //     width: isTablet ? 76 : 60,
+    //     height: isTablet ? 76 : 60,
+    //     borderRadius: isTablet ? 38 : 30,
+    //     bottom: isTablet ? 35 : 22,
+    //     right: isTablet ? 35 : 22,
+    //     justifyContent: "center",
+    //     alignItems: "center",
+    //     elevation: 5,
+    // },
+    fabContainer: {
         position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+
+        alignItems: "flex-end",
+
+        paddingHorizontal: 20,
+        paddingBottom: Platform.OS === "ios" ? 34 : 20,
+
+        pointerEvents: "box-none",
+    },
+
+    fab: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: "#13879A",
-        width: isTablet ? 76 : 60,
-        height: isTablet ? 76 : 60,
-        borderRadius: isTablet ? 38 : 30,
-        bottom: isTablet ? 35 : 22,
-        right: isTablet ? 35 : 22,
         justifyContent: "center",
         alignItems: "center",
-        elevation: 5,
+        elevation: 10,
     },
     ledgerCard: {
         backgroundColor: "#fff",

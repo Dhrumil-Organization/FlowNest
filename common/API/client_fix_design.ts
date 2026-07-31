@@ -113,6 +113,19 @@ export interface Design {
     tag?: string;
 }
 
+
+export interface Alias {
+    id: string; // or index
+    name: string;
+  }
+  
+  // Props for AliasesTab
+  export interface AliasesTabProps {
+    design: Design | null;
+    // onNavigateToCatalog: () => void;
+  }
+  
+
 export interface SubDesign {
     id: string;
     md_id: string;

@@ -3,11 +3,12 @@
  * Adding a new screen requires:
  * 1. Create its *.permission.ts file.
  * 2. Import that file here.
- * 3. Run Registry Sync from Access Control.
+ * 3. The registry auto-sync runs on the next Platform Admin login/app startup.
  */
 import './modules/dashboard.permission';
 import './modules/designs.permission';
 import './modules/creel.permission';
+import './modules/beam.permission';
 import './modules/costing.permission';
 import './modules/orders.permission';
 import './modules/administration.permission';

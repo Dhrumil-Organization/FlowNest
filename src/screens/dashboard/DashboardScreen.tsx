@@ -1,22 +1,30 @@
-import { DashboardAPI, DashboardCard, DashboardView } from '@/src/api/dashboard';
-import { DashboardSection, EmptyState, MetricCell, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { DashboardAPI, DashboardCard, DashboardView, ExpenseDashboardData } from '@/src/api/dashboard';
+import { EmptyState, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { usePermission } from '@/src/core/permissions';
+import { RegistryRenderer } from '@/src/core/ui-registry';
 import EmployDashboardSection from '@/src/screens/dashboard/employ/screens/EmployDashboardSection';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+// FIX: the header is now rendered once, in app/new/(tabs)/_layout.tsx —
+// this screen no longer renders its own AppHeader (that was the second
+// "Business Dashboard" header stacking on top of whichever tab you
+// actually navigated to). This screen no longer needs its own top-inset
+// SafeAreaView either, since the tabs layout's one SafeAreaView + header
+// already accounts for it — reverted to a plain View.
 
 function money(value: number) {
   const abs = Math.abs(Number(value || 0));
@@ -89,12 +97,55 @@ export function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [expenseData, setExpenseData] = useState<ExpenseDashboardData | null>(null);
+  const [expenseLoading, setExpenseLoading] = useState(true);
+  const [expenseError, setExpenseError] = useState('');
 
   const now = new Date();
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
   const monthno = now.getMonth() + 1;
-  const ownerAllowed = isSuperAdmin || canAccess('management.dashboard.owner_view') || canAccess('dashboard.owner_view');
+  const ownerAllowed = isSuperAdmin || canAccess('dashboard.owner_view');
+
+  // Pushes this screen's subtitle into the one shared header (see
+  // headerExtras.ts). useFocusEffect (not useEffect) so it's cleared when
+  // you navigate away, not just on unmount — Expo Router's Tabs keep this
+  // screen mounted-but-hidden on other tabs rather than unmounting it.
+  const setHeaderExtras = useHeaderExtrasStore((state) => state.setHeaderExtras);
+  const clearHeaderExtras = useHeaderExtrasStore((state) => state.clearHeaderExtras);
+  useFocusEffect(
+    useCallback(() => {
+      setHeaderExtras({
+        subtitle: `${context?.prp_code || '—'} · FY ${context?.year_name || yearno || '—'} · Store ${context?.str_code || '—'}`,
+      });
+      return () => clearHeaderExtras();
+    }, [context?.prp_code, context?.year_name, context?.str_code, yearno, setHeaderExtras, clearHeaderExtras]),
+  );
+
+  const loadExpense = useCallback(async (forceRefresh = false) => {
+    if (!yearno || !prptype) {
+      setExpenseLoading(false);
+      return;
+    }
+
+    setExpenseLoading(true);
+    setExpenseError('');
+
+    try {
+      const result = await DashboardAPI.expenseCard({
+        prptype,
+        yearno,
+        monthno,
+        refresh: forceRefresh ? 1 : 0,
+      });
+
+      setExpenseData(result.response?.data || null);
+    } catch (e: any) {
+      setExpenseError(e?.message || 'Unable to load production cost.');
+    } finally {
+      setExpenseLoading(false);
+    }
+  }, [monthno, prptype, yearno]);
 
   const load = useCallback(async (showRefresh = false) => {
     if (!yearno || !prptype) {
@@ -120,11 +171,21 @@ export function DashboardScreen() {
     }
   }, [monthno, prptype, view, yearno]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    loadExpense(false);
+  }, [load, loadExpense]);
 
   const collection = useMemo(() => cardByKey(cards, 'COLLECTION'), [cards]);
   const billing = useMemo(() => cardByKey(cards, 'BILLING'), [cards]);
   const salesOrder = useMemo(() => cardByKey(cards, 'SALES_ORDER'), [cards]);
+
+  const detailVisibility = useMemo(() => ({
+    sales: canAccess('dashboard.sales_detail'),
+    production: canAccess('dashboard.production_detail'),
+    collection: canAccess('dashboard.collection_detail'),
+    outstanding: canAccess('dashboard.outstanding_detail'),
+  }), [canAccess]);
 
   const confirmLogout = () => Alert.alert('Sign out?', 'This will clear the mobile session on this device.', [
     { text: 'Cancel', style: 'cancel' },
@@ -132,24 +193,11 @@ export function DashboardScreen() {
   ]);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.brand}>SUDAMO TEXTILE ERP</Text>
-          <Text style={styles.heading}>Business Dashboard</Text>
-          <Text style={styles.context} numberOfLines={1}>
-            {context?.prp_code || '—'} · FY {context?.year_name || yearno || '—'} · Store {context?.str_code || '—'}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={confirmLogout}>
-          <Text style={styles.logoutText}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
-
+    <View style={styles.safe}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.copper} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { load(true); loadExpense(true); }} tintColor={T.copper} />}
       >
         <View style={styles.segment}>
           <TouchableOpacity
@@ -175,48 +223,52 @@ export function DashboardScreen() {
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => load()}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
           </View>
-        ) : cards.length === 0 ? (
-          <EmptyState message={scopeMessage || 'No target cards are configured for the current scope.'} />
         ) : (
           <>
-            <DashboardSection title="THIS MONTH · BUSINESS PULSE" tone="orange" action="Refresh" onAction={() => load(true)}>
-              <View style={styles.metricRow}>
-                <MetricCell label="SALES ORDER" value={money(salesOrder?.actual || 0)} />
-                <MetricCell label="BILLING" value={money(billing?.actual || 0)} />
-              </View>
-              <View style={[styles.metricRow, { marginTop: 15 }]}>
-                <MetricCell label="COLLECTION" value={money(collection?.actual || 0)} accent />
-                <MetricCell label="OUTSTANDING" value={money(collection?.remaining || 0)} />
-              </View>
-            </DashboardSection>
+            {/* {view !== 'my' && ( */}
+              {/* <DashboardSection title="THIS MONTH · BUSINESS PULSE" tone="orange" action="Refresh" onAction={() => load(true)}>
+                <View style={styles.metricRow}>
+                  <MetricCell label="SALES ORDER" value={money(salesOrder?.actual || 0)} />
+                  <MetricCell label="BILLING" value={money(billing?.actual || 0)} />
+                </View>
+                <View style={[styles.metricRow, { marginTop: 15 }]}>
+                  <MetricCell label="COLLECTION" value={money(collection?.actual || 0)} accent />
+                  <MetricCell label="OUTSTANDING" value={money(collection?.remaining || 0)} />
+                </View>
+              </DashboardSection> */}
+            {/* )} */}
 
-            <TargetSummary
-              cards={cards}
-              label={periodLabel}
-              onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}
-            />
-
-            <TouchableOpacity
-              style={styles.reportLink}
-              activeOpacity={0.88}
-              onPress={() => router.push({ pathname: '/new/(tabs)/reports/monthly-report', params: { view } } as any)}
-            >
-              <View style={styles.reportIcon}><Text style={styles.reportEmoji}>📈</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.reportTitle}>Monthly Report</Text>
-                <Text style={styles.reportSub}>Target vs actual · executive and category analysis</Text>
-              </View>
-              <Text style={styles.reportChevron}>›</Text>
-            </TouchableOpacity>
-
-            {/* ─── Employee Dashboard (Owner / My View) ───
-                Merged in from the standalone Employ Dashboard app, with its
-                original API calls and drill-down navigation intact — see
-                @/src/screens/dashboard/employ for the full source. */}
-            <EmployDashboardSection
-              activeTab={view === 'owner' ? 'owner' : 'myview'}
-              username={sessionUser?.first_name || sessionUser?.name}
-              user={sessionUser}
+            <RegistryRenderer
+              kind="dashboard-card"
+              parentId="screen.dashboard"
+              context={{
+                expenseData,
+                expenseLoading,
+                expenseError,
+                cards,
+                periodLabel,
+                view,
+                sessionUser,
+              }}
+              renderers={{
+                'dashboard.monthly_target': () => (
+                  <TargetSummary
+                    cards={cards}
+                    label={periodLabel}
+                    onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}
+                  />
+                ),
+                //
+                'dashboard.operational_details': () => (
+                  <EmployDashboardSection
+                    activeTab={view === 'owner' ? 'owner' : 'myview'}
+                    username={sessionUser?.first_name || sessionUser?.name}
+                    user={sessionUser}
+                    visibleSections={detailVisibility}
+                  />
+                ),
+              }}
+              empty={<EmptyState message="No dashboard cards are assigned to this user." />}
             />
 
             {/* <DashboardSection title="SALES" tone="navy" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
@@ -241,7 +293,7 @@ export function DashboardScreen() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -196,6 +196,72 @@ export type AnalyticsPartiesResponse = {
   message: string;
 };
 
+
+export type ExpenseDashboardPeriod = {
+  yearno: number;
+  monthno: string;
+  month_start_ymd: number;
+  upto_date_ymd: number;
+  label: string;
+  working_days: number;
+  ongoing: boolean;
+};
+
+export type ExpenseDashboardSummary = {
+  total_cost: number;
+  cost_per_pick: number;
+  avg_picks: number;
+  production_mtr: number;
+  cost_per_machine_day: number;
+  units: number;
+  unit_rate: number;
+  costing_looms: number;
+  producing_looms_diagnostic: number;
+  machine_days: number;
+};
+
+export type ExpenseDashboardComposition = {
+  electricity: number;
+  salary: number;
+  stores: number;
+  total: number;
+};
+
+export type ExpenseDashboardProduction = {
+  mw_rapier_mtr: number;
+  sip_rapier_mtr: number;
+  sip_waterjet_mtr: number;
+  rapier_total_mtr: number;
+  total_mtr: number;
+};
+
+export type ExpenseDashboardData = {
+  period: ExpenseDashboardPeriod;
+  summary: ExpenseDashboardSummary;
+  composition: ExpenseDashboardComposition;
+  production: ExpenseDashboardProduction;
+  unit_reconciliation: Record<string, unknown>;
+  division: Record<string, unknown>;
+  picks: Record<string, unknown>;
+  meta: Record<string, unknown>;
+};
+
+export type ExpenseDashboardCardResponse = {
+  success: boolean;
+  response: {
+    data: ExpenseDashboardData;
+  };
+  message: string;
+};
+
+export type ExpenseDashboardCardParams = {
+  prptype: string;
+  yearno: string | number;
+  monthno: string | number;
+  date?: string;
+  refresh?: 0 | 1;
+};
+
 export type TargetCardParams = {
   prptype: string;
   yearno: string | number;
@@ -235,6 +301,13 @@ export const DashboardAPI = {
   targetCard(params: TargetCardParams) {
     return ApiClient.get<TargetCardResponse>(
       `/api/mobile-dashboard/target-card?${query(params)}`,
+    );
+  },
+
+
+  expenseCard(params: ExpenseDashboardCardParams) {
+    return ApiClient.get<ExpenseDashboardCardResponse>(
+      `/api/mobile-dashboard/expense-card?${query(params)}`,
     );
   },
 

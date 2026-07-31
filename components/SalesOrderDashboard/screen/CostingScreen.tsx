@@ -1,27 +1,64 @@
-import { CostingAPI, DesignAPI, type ComputeResult, type CostInputs, type Design } from '@/common/API/client';
-import { T } from '@/common/utils/theme';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TextInput, TouchableOpacity,
-    View,
+    View, Text, ScrollView, TextInput, TouchableOpacity,
+    StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { useRoute } from '@react-navigation/native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { T } from '@/common/utils/theme';
+import { CostingAPI, DesignAPI, type CostInputs, type ComputeResult, type Design, type SubDesign, type YarnMaster, type CostingTierCode } from '@/common/API/client';
+import { StatusBar } from 'expo-status-bar';
 // ── formatters ───────────────────────────────────────────────
-const r2 = (n: number) => `₹${n.toFixed(2)}`;
-const r0 = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
-const pct = (n: number) => `${Math.round(n)}%`;
+const num = (value: unknown, fallback = 0): number => {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+const r2 = (n: unknown) => `₹${num(n).toFixed(2)}`;
+const r0 = (n: unknown) => `₹${Math.round(num(n)).toLocaleString('en-IN')}`;
+const pct = (n: unknown) => `${Math.round(num(n))}%`;
+
+const normalizeComputeResult = (payload: any): ComputeResult => {
+    const raw = payload?.data?.result ?? payload?.result ?? payload?.data ?? payload ?? {};
+    const n = (key: string, ...fallbackKeys: string[]) => {
+        for (const k of [key, ...fallbackKeys]) {
+            if (raw[k] !== undefined && raw[k] !== null && raw[k] !== '') return num(raw[k]);
+        }
+        return 0;
+    };
+
+    return {
+        ...raw,
+        warp_rows: Array.isArray(raw.warp_rows) ? raw.warp_rows : [],
+        weft_rows: Array.isArray(raw.weft_rows) ? raw.weft_rows : [],
+        selvedge_rows: Array.isArray(raw.selvedge_rows) ? raw.selvedge_rows : [],
+        snap_rm: n('snap_rm', 'rm'),
+        snap_weaving_cost: n('snap_weaving_cost', 'weaving_cost'),
+        snap_greige_mfg: n('snap_greige_mfg', 'greige_mfg'),
+        snap_greige_brok_amt: n('snap_greige_brok_amt', 'greige_brok_amt'),
+        snap_greige_price: n('snap_greige_price', 'greige_price'),
+        snap_greige_kg: n('snap_greige_kg', 'greige_kg'),
+        snap_greige_glm: n('snap_greige_glm', 'greige_glm'),
+        snap_has_fin: Boolean(raw.snap_has_fin ?? raw.has_fin),
+        snap_finished_price: n('snap_finished_price', 'finished_price'),
+        snap_finished_kg: n('snap_finished_kg', 'finished_kg'),
+        snap_final_cost: n('snap_final_cost', 'final_cost'),
+        snap_ppi_loom: n('snap_ppi_loom', 'ppi_loom'),
+        snap_ppi_table: n('snap_ppi_table', 'ppi_table'),
+        snap_prod_day: n('snap_prod_day', 'prod_day'),
+        snap_per_day_conversion: n('snap_per_day_conversion', 'per_day_conversion'),
+        snap_rm_pct: n('snap_rm_pct', 'rm_pct'),
+        snap_weave_pct: n('snap_weave_pct', 'weave_pct'),
+        greige_width: n('greige_width', 'snap_greige_width'),
+        shrink_impact: n('shrink_impact', 'snap_shrink_impact'),
+        dye_proc_amount: n('dye_proc_amount', 'snap_dye_proc_amount'),
+        fin_brok_amt: n('fin_brok_amt', 'snap_fin_brok_amt'),
+        cut_pack: n('cut_pack', 'snap_cut_pack'),
+        fin_glm: n('fin_glm', 'snap_fin_glm'),
+        per_day_conversion: n('per_day_conversion', 'snap_per_day_conversion'),
+    } as ComputeResult;
+};
 
 // ── Tab bar ──────────────────────────────────────────────────
 const TABS = ['Costing', 'History', 'Variance'] as const;
@@ -134,7 +171,7 @@ function Inp({ value, onChange, suffix }: { value: string; onChange: (v: string)
     );
 }
 const inp = StyleSheet.create({
-    wrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 9, borderWidth: 1.5, borderColor: T.border, paddingHorizontal: 12, paddingVertical: 11 },
+    wrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 9, borderWidth: 1.5, borderColor: T.border, paddingHorizontal: 12 },
     field: { flex: 1, fontSize: 15, color: T.ink },
     suffix: { fontSize: 11, color: T.muted, marginLeft: 4 },
 });
@@ -149,6 +186,107 @@ function ResRow({ label, value, highlight }: { label: string; value: string; hig
     );
 }
 
+
+
+const esc = (value: unknown) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+function buildCostSheetHtml(design: Design, result: ComputeResult): string {
+    const dateLabel = new Date().toLocaleDateString('en-GB');
+    const gsm = Math.round((Number(result.snap_greige_glm || 0) / Math.max(Number(result.greige_width || 0), 1)) * 100);
+
+    const money = (n: unknown) => `₹${Number(n || 0).toFixed(2)}`;
+    const yarnRows = (rows: any[], measure: 'epi' | 'ppi' | 'ends') => (rows || []).map((r: any) => `
+        <tr>
+            <td>${esc(r.name || r.mi_id)}</td>
+            <td class="num">${esc(Math.round(Number(r.cnt || 0)))}${String(r.sys || '').toUpperCase().startsWith('DEN') ? 'D' : esc(r.sys || '')}</td>
+            <td class="num">${esc(r[measure] ?? '')}</td>
+            <td class="num">${Number(r.grams_per_metre || 0).toFixed(2)}</td>
+            <td class="num">${money(r.rate)}</td>
+            <td class="num strong">${money(r.cost)}</td>
+        </tr>`).join('');
+
+    const section = (title: string, rows: any[], measure: 'epi' | 'ppi' | 'ends', measureLabel: string) => {
+        if (!rows?.length) return '';
+        return `
+            <section>
+                <h3>${esc(title)}</h3>
+                <table>
+                    <thead><tr><th>Yarn</th><th>Count/Den</th><th>${esc(measureLabel)}</th><th>g/m</th><th>Rate</th><th>Cost</th></tr></thead>
+                    <tbody>${yarnRows(rows, measure)}</tbody>
+                </table>
+            </section>`;
+    };
+
+    const buildRow = (label: string, value: unknown, strong = false) => `
+        <div class="build-row ${strong ? 'strong' : ''}"><span>${esc(label)}</span><span>${esc(value)}</span></div>`;
+
+    return `<!doctype html>
+<html><head><meta charset="utf-8" />
+<style>
+@page { size: A4; margin: 22px; }
+* { box-sizing: border-box; }
+body { font-family: Arial, Helvetica, sans-serif; color: #151515; font-size: 10px; margin: 0; }
+.sheet { width: 100%; }
+h1 { text-align: center; font-size: 18px; margin: 0 0 13px; letter-spacing: .3px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; border-bottom: 2px solid #202020; padding-bottom: 10px; margin-bottom: 13px; }
+.meta span { white-space: nowrap; }
+h3 { color: #9a5a2a; font-size: 10px; margin: 11px 0 6px; text-transform: uppercase; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+th { background: #eeeae5; color: #5f5f5f; font-size: 8px; text-align: right; padding: 5px; border: 1px solid #ddd7d0; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 5px; border: 1px solid #e3ded8; text-align: right; }
+.num { text-align: right; }
+.strong { font-weight: 700; }
+.build { border-top: 1px solid #bbb; margin-top: 8px; padding-top: 7px; }
+.build-row { display: flex; justify-content: space-between; padding: 3px 4px; }
+.build-row.strong { font-weight: 700; }
+.cards { display: flex; gap: 9px; margin-top: 12px; }
+.card { flex: 1; border: 1px solid #d8d8d8; border-radius: 5px; padding: 9px; }
+.card-title { color: #6d6d6d; font-size: 8px; font-weight: 700; margin-bottom: 5px; }
+.footer { text-align: center; color: #888; font-size: 7px; margin-top: 10px; }
+</style></head><body><div class="sheet">
+<h1>ESTIMATED FABRIC COST</h1>
+<div class="meta">
+<span><b>Design:</b> ${esc(design.code)}</span>
+<span><b>Type:</b> ${design.type === 'PD' ? 'Piece-dyed' : 'Yarn-dyed'}</span>
+<span><b>Date:</b> ${esc(dateLabel)}</span>
+<span><b>GSM:</b> ${gsm}</span>
+<span><b>Greige width:</b> ${Number(result.greige_width || 0).toFixed(1)}&quot;</span>
+${design.weave ? `<span><b>Weave:</b> ${esc(design.weave)}</span>` : ''}
+</div>
+${section(`WARP · Reed ${design.reed_space} · EPI ${Number(result.warp_rows?.reduce((a: number, r: any) => a + Number(r.epi || 0), 0) || 0).toFixed(2)}`, result.warp_rows || [], 'epi', 'EPI')}
+${section(`WEFT · PPI loom ${result.snap_ppi_loom} / fabric ${result.snap_ppi_table}`, result.weft_rows || [], 'ppi', 'PPI')}
+${section('SELVEDGE · total ends', result.selvedge_rows || [], 'ends', 'Ends')}
+<div class="build">
+<h3>BUILD-UP · per metre</h3>
+${buildRow('Warp yarn cost', money(result.snap_warp_cost))}
+${buildRow('Weft yarn cost', money(result.snap_weft_cost))}
+${Number(result.snap_selvedge_cost || 0) ? buildRow('Selvedge', money(result.snap_selvedge_cost)) : ''}
+${Number(result.snap_warp_waste_cost || 0) ? buildRow(`Warp wastage (${result.snap_warp_wastage}%)`, money(result.snap_warp_waste_cost)) : ''}
+${Number(result.snap_weft_waste_cost || 0) ? buildRow(`Weft wastage (${result.snap_weft_wastage}%)`, money(result.snap_weft_waste_cost)) : ''}
+${buildRow('Total raw material', money(result.snap_rm), true)}
+${buildRow(`Weaving (${result.snap_ppi_table} picks)`, money(result.snap_weaving_cost))}
+${buildRow('Greige manufacturing cost', money(result.snap_greige_mfg), true)}
+${buildRow('Greige brokerage', money(result.snap_greige_brok_amt))}
+${buildRow('Greige price /m', money(result.snap_greige_price), true)}
+${result.snap_has_fin ? buildRow('Shrinkage impact', money(result.shrink_impact)) : ''}
+${result.snap_has_fin ? buildRow('Dyeing / processing', money(result.dye_proc_amount)) : ''}
+${result.snap_has_fin ? buildRow('Finished brokerage', money(result.fin_brok_amt)) : ''}
+${result.snap_has_fin ? buildRow('Cutting / packing', money(result.cut_pack)) : ''}
+${result.snap_has_fin ? buildRow('Finished price /m', money(result.snap_final_cost), true) : ''}
+</div>
+<div class="cards">
+<div class="card"><div class="card-title">DAILY CONVERSION</div><div>Production / day: <b>${Number(result.snap_prod_day || 0).toFixed(0)} m</b></div><div>Conversion / day: <b>${money(result.snap_per_day_conversion)}</b></div></div>
+<div class="card"><div class="card-title">CONTRIBUTION</div><div>RM: <b>${Math.round(Number(result.snap_rm_pct || 0))}%</b></div><div>Weaving: <b>${Math.round(Number(result.snap_weave_pct || 0))}%</b></div></div>
+</div>
+<div class="footer">Madhusudhan Fabrics · estimated cost · wastage &amp; selvedge rules as configured</div>
+</div></body></html>`;
+}
 
 
 function CostSheetPreviewModal({
@@ -166,6 +304,8 @@ function CostSheetPreviewModal({
     onSave: () => void;
     saving: boolean;
 }) {
+    const [exporting, setExporting] = useState(false);
+
     if (!design || !result) return null;
 
     const today = new Date();
@@ -176,18 +316,57 @@ function CostSheetPreviewModal({
         `Design: ${design.code}`,
         `Type: ${design.type}`,
         `GSM: ${gsm}`,
-        `Greige width: ${result.greige_width?.toFixed(1)}\"`,
+        `Greige width: ${num(result.greige_width).toFixed(1)}\"`,
         `Raw material: ${r2(result.snap_rm)}`,
         `Weaving: ${r2(result.snap_weaving_cost)}`,
         `Greige price/m: ${r2(result.snap_greige_price)}`,
         `Finished price/m: ${r2(result.snap_final_cost)}`,
     ].join('\n');
 
-    const doShare = async () => {
+    const createPdf = async () => {
+        const html = buildCostSheetHtml(design, result);
+        return Print.printToFileAsync({ html, base64: false });
+    };
+
+    const doSavePdf = async () => {
+        if (exporting) return;
+        setExporting(true);
         try {
-            await Share.share({ message: shareText });
+            const file = await createPdf();
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(file.uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: `Save ${design.code} costing PDF`,
+                    UTI: 'com.adobe.pdf',
+                });
+            } else {
+                Alert.alert('PDF Created', file.uri);
+            }
+        } catch (e: any) {
+            Alert.alert('PDF Error', e?.message || 'Unable to create costing PDF');
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const doShare = async () => {
+        if (exporting) return;
+        setExporting(true);
+        try {
+            const file = await createPdf();
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(file.uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: `Share ${design.code} costing`,
+                    UTI: 'com.adobe.pdf',
+                });
+            } else {
+                await Share.share({ message: shareText });
+            }
         } catch (e: any) {
             Alert.alert('Share Error', e?.message || 'Unable to share costing');
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -228,17 +407,23 @@ function CostSheetPreviewModal({
                         <View style={pm.metaRow}>
                             <Text style={pm.meta}>Date: <Text style={pm.bold}>{dateLabel}</Text></Text>
                             <Text style={pm.meta}>GSM: <Text style={pm.bold}>{gsm}</Text></Text>
-                            <Text style={pm.meta}>Greige width: <Text style={pm.bold}>{result.greige_width?.toFixed(1)}\"</Text></Text>
+                            <Text style={pm.meta}>Greige width: <Text style={pm.bold}>{num(result.greige_width).toFixed(1)}\"</Text></Text>
                         </View>
                         {!!design.weave && <Text style={pm.meta}>Weave: <Text style={pm.bold}>{design.weave}</Text></Text>}
 
                         <View style={pm.line} />
                         <YarnTable title={`WARP · Reed ${design.reed_space} · EPI ${result.warp_rows?.[0]?.epi ?? ''}`} rows={result.warp_rows || []} />
                         <YarnTable title={`WEFT · PPI loom ${result.snap_ppi_loom} / fabric ${result.snap_ppi_table}`} rows={result.weft_rows || []} />
+                        {(result.selvedge_rows || []).length > 0 && <YarnTable title="SELVEDGE · total ends" rows={result.selvedge_rows || []} />}
 
                         <View style={pm.block}>
                             <Text style={pm.blockTitle}>BUILD-UP · per metre</Text>
-                            <PreviewRow label="Total yarn cost" value={r2(result.snap_rm)} strong />
+                            <PreviewRow label="Warp yarn" value={r2(result.snap_warp_cost)} />
+                            <PreviewRow label="Weft yarn" value={r2(result.snap_weft_cost)} />
+                            {!!result.snap_selvedge_cost && <PreviewRow label="Selvedge" value={r2(result.snap_selvedge_cost)} />}
+                            {!!result.snap_warp_waste_cost && <PreviewRow label={`Warp wastage (${result.snap_warp_wastage}%)`} value={r2(result.snap_warp_waste_cost)} />}
+                            {!!result.snap_weft_waste_cost && <PreviewRow label={`Weft wastage (${result.snap_weft_wastage}%)`} value={r2(result.snap_weft_waste_cost)} />}
+                            <PreviewRow label="Total raw material" value={r2(result.snap_rm)} strong />
                             <PreviewRow label={`Weaving (${result.snap_ppi_table} picks)`} value={r2(result.snap_weaving_cost)} />
                             <PreviewRow label="Greige mfg cost" value={r2(result.snap_greige_mfg)} strong />
                             <PreviewRow label="Greige brokerage" value={r2(result.snap_greige_brok_amt)} />
@@ -257,8 +442,8 @@ function CostSheetPreviewModal({
                         <View style={pm.twoCards}>
                             <View style={pm.smallCard}>
                                 <Text style={pm.smallLabel}>DAILY CONVERSION</Text>
-                                <Text style={pm.smallText}>Prod / day: <Text style={pm.bold}>{result.snap_prod_day?.toFixed(0)} m</Text></Text>
-                                <Text style={pm.smallText}>Conversion / day: <Text style={pm.bold}>{r0(result.snap_prod_day * result.snap_final_cost)}</Text></Text>
+                                <Text style={pm.smallText}>Prod / day: <Text style={pm.bold}>{num(result.snap_prod_day).toFixed(0)} m</Text></Text>
+                                <Text style={pm.smallText}>Conversion / day: <Text style={pm.bold}>{r0(result.snap_per_day_conversion)}</Text></Text>
                             </View>
                             <View style={pm.smallCard}>
                                 <Text style={pm.smallLabel}>CONTRIBUTION</Text>
@@ -271,9 +456,16 @@ function CostSheetPreviewModal({
                     </ScrollView>
 
                     <View style={pm.actions}>
-                        <TouchableOpacity style={pm.closeBtn} onPress={onClose}><Text style={pm.closeTxt}>Close</Text></TouchableOpacity>
-                        <TouchableOpacity style={pm.shareBtn} onPress={doShare}><Text style={pm.actionTxt}>WhatsApp</Text></TouchableOpacity>
-                        <TouchableOpacity style={[pm.saveBtn, saving && { opacity: 0.55 }]} onPress={onSave} disabled={saving}>
+                        <TouchableOpacity style={pm.closeBtn} onPress={onClose} disabled={exporting}>
+                            <Text style={pm.closeTxt}>Close</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[pm.pdfBtn, exporting && pm.disabledBtn]} onPress={doSavePdf} disabled={exporting}>
+                            <Text style={pm.actionTxt}>{exporting ? 'Preparing…' : 'Save as PDF'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[pm.shareBtn, exporting && pm.disabledBtn]} onPress={doShare} disabled={exporting}>
+                            <Text style={pm.actionTxt}>WhatsApp</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[pm.saveBtn, saving && pm.disabledBtn]} onPress={onSave} disabled={saving || exporting}>
                             <Text style={pm.actionTxt}>{saving ? 'Saving…' : 'Save costing'}</Text>
                         </TouchableOpacity>
                     </View>
@@ -315,35 +507,82 @@ const pm = StyleSheet.create({
     smallLabel: { fontSize: 8.5, color: T.muted, fontWeight: '900', marginBottom: 5 },
     smallText: { fontSize: 10, color: T.ink, marginTop: 2 },
     footer: { fontSize: 8.5, color: T.muted, textAlign: 'center', marginTop: 7 },
-    actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
-    closeBtn: { flex: 0.8, backgroundColor: T.sub, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-    shareBtn: { flex: 1, backgroundColor: T.green, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
-    saveBtn: { flex: 1.2, backgroundColor: T.copper, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+    closeBtn: { flexGrow: 1, minWidth: '22%', backgroundColor: T.sub, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+    pdfBtn: { flexGrow: 1, minWidth: '22%', backgroundColor: T.amber || '#D88A20', borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+    shareBtn: { flexGrow: 1, minWidth: '22%', backgroundColor: T.green, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
+    saveBtn: { flexGrow: 1, minWidth: '22%', backgroundColor: T.copper, borderRadius: 9, paddingVertical: 11, alignItems: 'center' },
     closeTxt: { color: T.ink, fontSize: 12, fontWeight: '900' },
     actionTxt: { color: '#fff', fontSize: 12, fontWeight: '900' },
+    disabledBtn: { opacity: 0.55 },
 });
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 1 — COSTING
 // ═══════════════════════════════════════════════════════════════
-const DEFAULT_P: Omit<CostInputs, 'price_map' | 'dye_map'> = {
+const COSTING_TIERS: { code: CostingTierCode; name: string; hint: string }[] = [
+    { code: 'LOW', name: 'Value', hint: 'Lowest commercially valid rates' },
+    { code: 'MID', name: 'Standard', hint: 'Normal working costing' },
+    { code: 'HIGH', name: 'Premium', hint: 'Higher shade / supplier risk buffer' },
+];
+
+type TierSnapshot = {
+    priceMap: Record<string, number>;
+    dyeMap: Record<string, number>;
+    sizingMap: Record<string, number>;
+    params: typeof DEFAULT_P;
+};
+
+const DEFAULT_P: Omit<CostInputs, 'price_map' | 'dye_map' | 'sizing_map'> = {
     weaving_rate: 0.45, rpm: 400, eff: 85,
     greige_brok: 2, dyeing_proc: 40, finished_brok: 3, cut_pack: 10,
 };
 
-function CostingTab({ onSaved }: { onSaved: () => void }) {
+function CostingTab({ onSaved, reopenId, onReopenLoaded }: { onSaved: () => void; reopenId?: string | null; onReopenLoaded: () => void }) {
     const [mdId, setMdId] = useState('');
     const [design, setDesign] = useState<Design | null>(null);
     const [priceMap, setPriceMap] = useState<Record<string, number>>({});
     const [dyeMap, setDyeMap] = useState<Record<string, number>>({});
+    const [sizingMap, setSizingMap] = useState<Record<string, number>>({});
     const [params, setParams] = useState({ ...DEFAULT_P });
     const [result, setResult] = useState<ComputeResult | null>(null);
     const [computing, setComputing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [colourways, setColourways] = useState<SubDesign[]>([]);
+    const [subDesignId, setSubDesignId] = useState<string | null>(null);
+    const [tierCode, setTierCode] = useState<CostingTierCode>('MID');
+    const [scenarioGroupId, setScenarioGroupId] = useState('');
+    const [tierSnapshots, setTierSnapshots] = useState<Record<string, TierSnapshot>>({});
 
     // build yarn key
     const yKey = (miId: string, br: string | null) => `${miId}|${br ?? ''}`;
+    const lineKey = (kind: 'W' | 'F' | 'S', y: any, index: number) => y.line_key || `${kind}${y.id ?? index}:${yKey(y.mi_id, y.blend_ratio)}`;
+
+    const selectedColourway = useMemo(
+        () => colourways.find(cw => cw.id === subDesignId) || null,
+        [colourways, subDesignId]
+    );
+    const scenarioKey = (cwId: string | null, tier: CostingTierCode) => `${cwId || 'BASE'}::${tier}`;
+    const cloneMap = (m: Record<string, number>) => ({ ...m });
+    const currentSnapshot = (): TierSnapshot => ({
+        priceMap: cloneMap(priceMap), dyeMap: cloneMap(dyeMap), sizingMap: cloneMap(sizingMap), params: { ...params },
+    });
+    const switchScenario = (nextCwId: string | null, nextTier: CostingTierCode) => {
+        const currentKey = scenarioKey(subDesignId, tierCode);
+        const nextKey = scenarioKey(nextCwId, nextTier);
+        const saved = tierSnapshots[nextKey];
+        setTierSnapshots(prev => ({ ...prev, [currentKey]: currentSnapshot() }));
+        if (saved) {
+            setPriceMap(cloneMap(saved.priceMap));
+            setDyeMap(cloneMap(saved.dyeMap));
+            setSizingMap(cloneMap(saved.sizingMap));
+            setParams({ ...saved.params });
+        }
+        setSubDesignId(nextCwId);
+        setTierCode(nextTier);
+        setResult(null);
+    };
 
     // load design details + init price map
     const handleSelectDesign = async (d: Design) => {
@@ -353,16 +592,41 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
             setDesign(full);
             setMdId(full.id);
             setResult(null);
+            setSubDesignId(null);
+            setTierCode('MID');
+            setScenarioGroupId(`SC${Date.now().toString(36).toUpperCase()}`);
+            setTierSnapshots({});
+            try {
+                const cwRes = await DesignAPI.colourways(full.id);
+                setColourways(cwRes.data.data || []);
+            } catch {
+                setColourways([]);
+            }
 
-            // init price map from base prices
+            // Initialise every physical yarn line independently. General yarn keys remain
+            // supported by the backend as a compatibility fallback.
             const pm: Record<string, number> = {};
             const dm: Record<string, number> = {};
-            [...full.warp_yarns, ...full.weft_yarns].forEach(y => {
-                const k = yKey(y.mi_id, y.blend_ratio);
-                if (!(k in pm)) { pm[k] = y.base_price; dm[k] = 0; }
+            const sm: Record<string, number> = {};
+            (full.warp_yarns || []).forEach((y: any, i: number) => {
+                const k = lineKey('W', y, i);
+                pm[k] = Number(y.base_price || 0);
+                dm[k] = 0;
+                if (y.sizing) sm[k] = 0;
+            });
+            (full.weft_yarns || []).forEach((y: any, i: number) => {
+                const k = lineKey('F', y, i);
+                pm[k] = Number(y.base_price || 0);
+                dm[k] = 0;
+            });
+            (full.selvedge_yarns || []).forEach((y: any, i: number) => {
+                const k = lineKey('S', y, i);
+                pm[k] = Number(y.base_price || 0);
+                dm[k] = 0;
             });
             setPriceMap(pm);
             setDyeMap(dm);
+            setSizingMap(sm);
         } catch (e: any) {
             Alert.alert('Error', e.message);
         }
@@ -374,28 +638,42 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
         setComputing(true);
         try {
             const res = await CostingAPI.compute({
-                md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params,
+                md_id: mdId,
+                sub_design_id: subDesignId,
+                colourway_code: selectedColourway?.code || null,
+                tier_code: tierCode,
+                tier_name: COSTING_TIERS.find(t => t.code === tierCode)?.name || tierCode,
+                scenario_group_id: scenarioGroupId || null,
+                price_map: priceMap, dye_map: dyeMap, sizing_map: sizingMap, ...params,
             });
-            setResult(res.data.data);
+            setResult(normalizeComputeResult(res.data));
         } catch (e: any) {
             Alert.alert('Compute Error', e.message);
         } finally {
             setComputing(false);
         }
-    }, [mdId, priceMap, dyeMap, params]);
+    }, [mdId, subDesignId, selectedColourway?.code, tierCode, scenarioGroupId, priceMap, dyeMap, sizingMap, params]);
 
     // debounce compute on input changes
     useEffect(() => {
         if (!mdId) return;
         const t = setTimeout(compute, 600);
         return () => clearTimeout(t);
-    }, [mdId, priceMap, dyeMap, params]);
+    }, [mdId, subDesignId, selectedColourway?.code, tierCode, scenarioGroupId, priceMap, dyeMap, sizingMap, params]);
 
     const save = async () => {
         if (!result) { Alert.alert('Compute first'); return; }
         setSaving(true);
         try {
-            await CostingAPI.save({ md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params });
+            await CostingAPI.save({
+                md_id: mdId,
+                sub_design_id: subDesignId,
+                colourway_code: selectedColourway?.code || null,
+                tier_code: tierCode,
+                tier_name: COSTING_TIERS.find(t => t.code === tierCode)?.name || tierCode,
+                scenario_group_id: scenarioGroupId || null,
+                price_map: priceMap, dye_map: dyeMap, sizing_map: sizingMap, ...params
+            });
             Alert.alert('Saved ✓', 'Costing record saved to history');
             onSaved();
         } catch (e: any) {
@@ -405,17 +683,53 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
         }
     };
 
-    // unique yarn keys for price inputs
-    const yarnKeys = useMemo(() => {
-        if (!design) return [];
-        const all = [...design.warp_yarns, ...design.weft_yarns];
-        const seen = new Set<string>();
-        return all.filter(y => {
-            const k = yKey(y.mi_id, y.blend_ratio);
-            if (seen.has(k)) return false;
-            seen.add(k); return true;
-        });
+    // Every design line is priced independently. This prevents the same yarn used in
+    // warp/weft or multiple positions from overwriting another line's commercial rate.
+    const yarnLines = useMemo(() => {
+        if (!design) return [] as any[];
+        return [
+            ...(design.warp_yarns || []).map((y: any, i: number) => ({ ...y, section: 'warp', key: lineKey('W', y, i) })),
+            ...(design.weft_yarns || []).map((y: any, i: number) => ({ ...y, section: 'weft', key: lineKey('F', y, i) })),
+            ...(design.selvedge_yarns || []).map((y: any, i: number) => ({ ...y, section: 'selvedge', key: lineKey('S', y, i) })),
+        ];
     }, [design]);
+
+    useEffect(() => {
+        if (!reopenId) return;
+        let alive = true;
+        (async () => {
+            try {
+                const recRes = await CostingAPI.get(reopenId);
+                const rec = recRes.data.data;
+                const designRes = await DesignAPI.get(rec.md_id);
+                if (!alive) return;
+                setDesign(designRes.data.data);
+                setMdId(rec.md_id);
+                try { const cwRes = await DesignAPI.colourways(rec.md_id); if (alive) setColourways(cwRes.data.data || []); } catch { if (alive) setColourways([]); }
+                setSubDesignId((rec as any).sub_design_id || null);
+                setTierCode(((rec as any).tier_code || 'MID') as CostingTierCode);
+                setScenarioGroupId((rec as any).scenario_group_id || `SC${Date.now().toString(36).toUpperCase()}`);
+                setPriceMap(rec.inputs.price_map || {});
+                setDyeMap(rec.inputs.dye_map || {});
+                setSizingMap(rec.inputs.sizing_map || {});
+                setParams({
+                    weaving_rate: Number(rec.inputs.weaving_rate || 0),
+                    rpm: Number(rec.inputs.rpm || 0),
+                    eff: Number(rec.inputs.eff || 0),
+                    greige_brok: Number(rec.inputs.greige_brok || 0),
+                    dyeing_proc: Number(rec.inputs.dyeing_proc || 0),
+                    finished_brok: Number(rec.inputs.finished_brok || 0),
+                    cut_pack: Number(rec.inputs.cut_pack || 0),
+                });
+                setResult(null);
+                onReopenLoaded();
+            } catch (e: any) {
+                Alert.alert('Reopen Error', e?.response?.data?.message || e.message || 'Unable to reopen costing');
+                onReopenLoaded();
+            }
+        })();
+        return () => { alive = false; };
+    }, [reopenId]);
 
     const setP = (key: string, v: string) =>
         setParams(p => ({ ...p, [key]: parseFloat(v) || 0 }));
@@ -429,15 +743,40 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
 
             {design && (
                 <>
+                    <View style={c.section}>
+                        <Text style={c.sHdr}>COLOURWAY · COSTING TIER</Text>
+                        <Text style={c.helpText}>Each colourway and tier keeps an independent per-row yarn, dyeing and sizing rate set.</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={c.chipRow}>
+                            <TouchableOpacity onPress={() => switchScenario(null, tierCode)} style={[c.cwChip, subDesignId === null && c.cwChipActive]}>
+                                <Text style={[c.cwChipText, subDesignId === null && c.cwChipTextActive]}>Base design</Text>
+                            </TouchableOpacity>
+                            {colourways.map(cw => (
+                                <TouchableOpacity key={cw.id} onPress={() => switchScenario(cw.id, tierCode)} style={[c.cwChip, subDesignId === cw.id && c.cwChipActive]}>
+                                    <Text style={[c.cwChipText, subDesignId === cw.id && c.cwChipTextActive]}>{cw.code}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <View style={c.tierRow}>
+                            {COSTING_TIERS.map(t => (
+                                <TouchableOpacity key={t.code} onPress={() => switchScenario(subDesignId, t.code)} style={[c.tierBtn, tierCode === t.code && c.tierBtnActive]}>
+                                    <Text style={[c.tierCode, tierCode === t.code && c.tierTextActive]}>{t.code === 'LOW' ? 'L' : t.code === 'MID' ? 'M' : 'H'}</Text>
+                                    <Text style={[c.tierName, tierCode === t.code && c.tierTextActive]}>{t.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <Text style={c.activeScenario}>Active: {selectedColourway?.code || 'Base design'} · {COSTING_TIERS.find(t => t.code === tierCode)?.name}</Text>
+                    </View>
+
                     {/* Yarn prices */}
                     <View style={c.section}>
-                        <Text style={c.sHdr}>YARN PRICES · ₹/kg + yarn dyeing</Text>
-                        {yarnKeys.map(y => {
-                            const k = yKey(y.mi_id, y.blend_ratio);
+                        <Text style={c.sHdr}>YARN PRICES · ₹/kg PER ROW + YARN DYEING</Text>
+                        <Text style={c.helpText}>{selectedColourway?.code || 'Base design'} · {COSTING_TIERS.find(t => t.code === tierCode)?.name} tier</Text>
+                        {yarnLines.map((y: any) => {
+                            const k = y.key;
                             return (
                                 <View key={k} style={c.yarnRow}>
                                     <Text style={c.yarnLabel}>
-                                        {y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}
+                                        {y.section === 'warp' ? 'WARP' : y.section === 'weft' ? 'WEFT' : 'SELV'} · {y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}
                                     </Text>
                                     <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
                                         <View style={{ flex: 1 }}>
@@ -452,6 +791,15 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
                                                     value={String(dyeMap[k] ?? '')}
                                                     onChange={v => setDyeMap(p => ({ ...p, [k]: parseFloat(v) || 0 }))}
                                                     suffix="dye"
+                                                />
+                                            </View>
+                                        )}
+                                        {y.section === 'warp' && y.sizing && (
+                                            <View style={{ flex: 0.6 }}>
+                                                <Inp
+                                                    value={String(sizingMap[k] ?? '')}
+                                                    onChange={v => setSizingMap(p => ({ ...p, [k]: parseFloat(v) || 0 }))}
+                                                    suffix="size"
                                                 />
                                             </View>
                                         )}
@@ -520,14 +868,14 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
                             {/* Warp/Weft breakdown */}
                             <View style={c.resultCard}>
                                 <Text style={c.sHdr}>YARN BREAKDOWN</Text>
-                                {[...result.warp_rows, ...result.weft_rows].map((row, i) => (
+                                {[...(result.warp_rows || []), ...(result.weft_rows || []), ...(result.selvedge_rows || [])].map((row, i) => (
                                     <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: T.border }}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ fontSize: 11, color: T.ink, fontWeight: '600' }}>
-                                                {row.yarn_type === 'warp' ? '↕' : '↔'} {row.mi_id}{row.blend_ratio ? ` ${row.blend_ratio}` : ''}
+                                                {row.yarn_type === 'warp' ? '↕' : row.yarn_type === 'weft' ? '↔' : '║'} {row.mi_id}{row.blend_ratio ? ` ${row.blend_ratio}` : ''}
                                             </Text>
                                             <Text style={{ fontSize: 10, color: T.muted }}>
-                                                {row.grams_per_metre?.toFixed(2)}g/m · ₹{row.price}+{row.dye_cost} = ₹{row.rate}/kg
+                                                {num(row.grams_per_metre).toFixed(2)}g/m · ₹{row.price}+{row.dye_cost}{row.sizing_cost ? `+${row.sizing_cost}` : ''} = ₹{row.rate}/kg
                                             </Text>
                                         </View>
                                         <Text style={{ fontSize: 12, fontWeight: '700', color: T.ink }}>
@@ -542,9 +890,9 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
                                 <Text style={c.sHdr}>PRODUCTION</Text>
                                 <ResRow label="PPI (loom)" value={`${result.snap_ppi_loom}`} />
                                 <ResRow label="PPI (table)" value={`${result.snap_ppi_table}`} />
-                                <ResRow label="Greige Width" value={`${result.greige_width?.toFixed(1)}″`} />
+                                <ResRow label="Greige Width" value={`${num(result.greige_width).toFixed(1)}″`} />
                                 <ResRow label="GSM (greige)" value={`${Math.round((result.snap_greige_glm / (result.greige_width || 1)) * 100)}`} />
-                                <ResRow label="Prod/Day" value={`${result.snap_prod_day?.toFixed(1)} m`} />
+                                <ResRow label="Prod/Day" value={`${num(result.snap_prod_day).toFixed(1)} m`} />
                             </View>
 
                             {/* Finished section */}
@@ -599,19 +947,32 @@ const c = StyleSheet.create({
     sHdr: { fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
     subHdr: { fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginBottom: 6 },
     yarnRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-    yarnLabel: { fontSize: 12, fontWeight: '600', color: T.ink, width: 110 },
+    yarnLabel: { fontSize: 12, fontWeight: '600', color: T.ink, width: 170 },
     resultCard: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 10 },
     divider: { height: 1, backgroundColor: T.border, marginVertical: 8 },
     previewBtn: { backgroundColor: T.copper, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8, marginBottom: 8 },
     previewTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
     saveBtn: { backgroundColor: T.ink, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 0 },
     saveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    helpText: { fontSize: 10.5, color: T.muted, lineHeight: 15, marginBottom: 10 },
+    chipRow: { gap: 8, paddingBottom: 8 },
+    cwChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border },
+    cwChipActive: { backgroundColor: T.ink, borderColor: T.ink },
+    cwChipText: { fontSize: 11, fontWeight: '700', color: T.muted },
+    cwChipTextActive: { color: '#fff' },
+    tierRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+    tierBtn: { flex: 1, borderRadius: 9, borderWidth: 1, borderColor: T.border, backgroundColor: T.surface, paddingVertical: 9, alignItems: 'center' },
+    tierBtnActive: { backgroundColor: T.copper, borderColor: T.copper },
+    tierCode: { fontSize: 13, fontWeight: '900', color: T.ink },
+    tierName: { fontSize: 9, fontWeight: '700', color: T.muted, marginTop: 1 },
+    tierTextActive: { color: '#fff' },
+    activeScenario: { marginTop: 9, fontSize: 10.5, color: T.copper, fontWeight: '800' },
 });
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 2 — HISTORY
 // ═══════════════════════════════════════════════════════════════
-function HistoryTab({ refreshKey }: { refreshKey: number }) {
+function HistoryTab({ refreshKey, onReopen }: { refreshKey: number; onReopen: (id: string) => void }) {
     const [groups, setGroups] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -664,6 +1025,9 @@ function HistoryTab({ refreshKey }: { refreshKey: number }) {
                                     {r.snap_has_fin ? 'FIN' : 'GRG'}
                                 </Text>
                             </View>
+                            <TouchableOpacity onPress={() => onReopen(r.id)} style={h.reopenBtn}>
+                                <Text style={h.reopenTxt}>Reopen</Text>
+                            </TouchableOpacity>
                         </View>
                     ))}
                 </View>
@@ -683,6 +1047,8 @@ const h = StyleSheet.create({
     recDate: { flex: 1, fontSize: 11, color: T.muted },
     recAmt: { fontSize: 12.5, fontWeight: '700', color: T.ink },
     typeBadge: { marginLeft: 8, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
+    reopenBtn: { marginLeft: 8, backgroundColor: T.copper + '18', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+    reopenTxt: { fontSize: 9.5, fontWeight: '800', color: T.copper },
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -788,32 +1154,79 @@ const v = StyleSheet.create({
 });
 
 export function CostingScreen() {
+    const route = useRoute<any>();
     const [tab, setTab] = useState<Tab>('Costing');
     const [histRefreshKey, setHistRefreshKey] = useState(0);
-    const router = useRouter();
+    const [reopenId, setReopenId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const incomingId = route.params?.costingId || route.params?.costing_id || null;
+        if (incomingId) {
+            setReopenId(String(incomingId));
+            setTab('Costing');
+        }
+    }, [route.params?.costingId, route.params?.costing_id]);
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-            {/* Header */}
+        //     <SafeAreaView style={{ flex: 1, backgroundColor: T.nav }} edges={['top']}>
+        //         <StatusBar style="light" />
+        //         {/* Header */}
+        //         <View style={hdr.wrap}>
+        //             <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
+        //             <Text style={hdr.title}>Costing</Text>
+        //         </View>
+
+        //         <TabBar active={tab} onChange={setTab} />
+
+        //         <View style={{ flex: 1 }}>
+        //             {tab === 'Costing' && <CostingTab onSaved={() => setHistRefreshKey(k => k + 1)} reopenId={reopenId} onReopenLoaded={() => setReopenId(null)} />}
+        //             {tab === 'History' && <HistoryTab refreshKey={histRefreshKey} onReopen={(id) => { setReopenId(id); setTab('Costing'); }} />}
+        //             {tab === 'Variance' && <VarianceTab />}
+        //         </View>
+        //     </SafeAreaView>
+        // );
+        <SafeAreaView style={{ flex: 1, backgroundColor: T.nav }} edges={['top']}>
+            <StatusBar style="light" />
+           {/* Header */}
             <View style={hdr.wrap}>
                 <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                {/* <Text style={hdr.title}>Costing</Text> */}
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
-                        <Icon name="arrow-back" size={22} color={'#fff'} />
-                    </TouchableOpacity>
-                    <View>
-                        <Text style={hdr.title}>Costing</Text>
-                    </View>
-                </View>
+                <Text style={hdr.title}>Costing</Text>
             </View>
 
-            <TabBar active={tab} onChange={setTab} />
+            {/* Tabs */}
+            <TabBar
+                active={tab}
+                onChange={setTab}
+            />
 
-            <View style={{ flex: 1 }}>
-                {tab === 'Costing' && <CostingTab onSaved={() => setHistRefreshKey(k => k + 1)} />}
-                {tab === 'History' && <HistoryTab refreshKey={histRefreshKey} />}
-                {tab === 'Variance' && <VarianceTab />}
+            {/* Screen Content */}
+            <View
+                style={{
+                    flex: 1,
+                    backgroundColor: T.bg,
+                }}
+            >
+                {tab === 'Costing' && (
+                    <CostingTab
+                        onSaved={() => setHistRefreshKey(k => k + 1)}
+                        reopenId={reopenId}
+                        onReopenLoaded={() => setReopenId(null)}
+                    />
+                )}
+
+                {tab === 'History' && (
+                    <HistoryTab
+                        refreshKey={histRefreshKey}
+                        onReopen={(id) => {
+                            setReopenId(id);
+                            setTab('Costing');
+                        }}
+                    />
+                )}
+
+                {tab === 'Variance' && (
+                    <VarianceTab />
+                )}
             </View>
         </SafeAreaView>
     );

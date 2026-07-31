@@ -1,5 +1,5 @@
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import { API_BASE_URL } from './client';
 
 export type YarnMaster = any;
@@ -12,6 +12,7 @@ export type ComputeResult = any;
 const client = axios.create({ baseURL: `${API_BASE_URL}/api` });
 client.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('access_token');
+  console.log("New Token: ", token);
   config.headers = config.headers || {};
   config.headers.Accept = 'application/json';
   config.headers['Content-Type'] = 'application/json';

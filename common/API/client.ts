@@ -379,10 +379,9 @@
 
 // export default client;
 
-
 // src/api/client.ts  (or common/API/client.ts — match your path)
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API, initAPI } from './dynamicAPI';
 
 const cleanBase = (value?: string | null) => {
@@ -458,10 +457,12 @@ export interface Design {
     category: string;
     type: 'YD' | 'PD';
     weave?: string;
+    reed_count?: number;
     reed_space: number;
     greige_width?: number;
     width_basis?: 'reed' | 'greige';
     warp_shrink: number;
+    weft_shrink?: number;
     fin_width?: number;
     gf_shrink: number;
     warp_wastage?: number;
@@ -506,6 +507,8 @@ export interface YarnMaster {
     mi_id: string;
     itm_code?: string;
     m_itm_code?: string;
+    main_yarn_code?: string;
+    is_main_yarn_item?: boolean;
     prp_code?: string;
     str_code?: string;
     name: string;

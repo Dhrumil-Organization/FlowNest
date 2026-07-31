@@ -126,7 +126,7 @@ const ProfileCardSkeleton = ({ shimmerAnim }) => (
 );
 
 // ─── Main Skeleton ────────────────────────────────────────────────────────────
-export default function SalesExecDashboardSkeleton() {
+export default function SalesExecDashboardSkeleton({ showProfile = true }) {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -148,16 +148,23 @@ export default function SalesExecDashboardSkeleton() {
         contentContainerStyle={styles.content}
         scrollEnabled={false}
       >
-        {/* Breadcrumb Skeleton */}
-        <View style={styles.breadcrumb}>
-          <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbText} />
-          <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbSep} />
-          <ShimmerBone shimmerAnim={shimmerAnim} style={[styles.breadcrumbText, styles.breadcrumbActive]} />
-          <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbHelp} />
-        </View>
+        {showProfile && (
+          <>
+            {/* Breadcrumb Skeleton */}
+            <View style={styles.breadcrumb}>
+              <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbText} />
+              <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbSep} />
+              <ShimmerBone
+                shimmerAnim={shimmerAnim}
+                style={[styles.breadcrumbText, styles.breadcrumbActive]}
+              />
+              <ShimmerBone shimmerAnim={shimmerAnim} style={styles.breadcrumbHelp} />
+            </View>
 
-        {/* Profile Card Skeleton */}
-        <ProfileCardSkeleton shimmerAnim={shimmerAnim} />
+            {/* Profile Card Skeleton */}
+            <ProfileCardSkeleton shimmerAnim={shimmerAnim} />
+          </>
+        )}
 
         {/* Sales Section Skeleton */}
         <SectionSkeleton shimmerAnim={shimmerAnim} rowCount={4} showChart={true} />

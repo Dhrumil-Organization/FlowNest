@@ -3,7 +3,8 @@ import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
     StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// SafeAreaView import removed — no longer used, the tabs layout now owns
+// the top safe-area inset for every tab screen (see (tabs)/_layout.tsx).
 import { T } from '../../theme';
 import { CostingAPI, DesignAPI, type CostInputs, type ComputeResult, type Design, type SubDesign, type YarnMaster } from '../../api/legacyClient';
 
@@ -780,14 +781,12 @@ export function CostingScreen() {
     const [tab, setTab] = useState<Tab>('Costing');
     const [histRefreshKey, setHistRefreshKey] = useState(0);
 
+    // FIX: this screen used to render its own hand-rolled header (same bug
+    // as Designs/Orders/Permission Manager — see app/new/(tabs)/_layout.tsx).
+    // No subtitle/right-side content needed here, so nothing further to wire
+    // through headerExtras — just removing the duplicate.
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-            {/* Header */}
-            <View style={hdr.wrap}>
-                <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                <Text style={hdr.title}>Costing</Text>
-            </View>
-
+        <View style={{ flex: 1, backgroundColor: T.bg }}>
             <TabBar active={tab} onChange={setTab} />
 
             <View style={{ flex: 1 }}>
@@ -795,7 +794,7 @@ export function CostingScreen() {
                 {tab === 'History' && <HistoryTab refreshKey={histRefreshKey} />}
                 {tab === 'Variance' && <VarianceTab />}
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 

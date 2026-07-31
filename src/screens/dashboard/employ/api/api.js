@@ -3,8 +3,8 @@
 // Reuses the same API base + auth pattern already used by the rest of the app
 // (see @/src/api/client.ts) instead of the old '../../../../common/API/dynamicAPI'
 // path, which does not exist inside this project.
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL as API } from '@/src/api/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = `${API}/api`; // ← change here if the Employ Dashboard endpoints live elsewhere
 
@@ -21,7 +21,7 @@ const fetchJSON = async (url) => {
         Authorization: `Bearer ${token}`,
       },
     });
-    console.log(response);
+    console.log('APi respnse:', response);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } catch (err) {

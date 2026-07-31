@@ -1,11 +1,11 @@
 // components/SharedComponents.js
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   ActivityIndicator,
+  StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
 
 export const COLORS = {

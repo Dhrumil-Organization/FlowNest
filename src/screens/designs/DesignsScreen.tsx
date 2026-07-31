@@ -23,8 +23,10 @@ import {
     View,
     findNodeHandle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
 import { T } from '../../theme';
+import { usePermission } from '../../core/permissions';
 // ✅ CHANGED: import from the new lightweight client instead of legacyClient
 // import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
 import client, { Alias, AliasesTabProps, DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
@@ -34,8 +36,17 @@ const SHORT = (c: string) =>
 const r0 = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 const f1 = (n: number) => n > 0 ? n.toFixed(1) : '—';
 
-const TABS = ['Aliases', 'Catalog', 'Design', 'Colourway', 'Yarns', 'Dyeing'] as const;
-type Tab = typeof TABS[number];
+const DESIGN_TABS = [
+    { key: 'Aliases', label: 'Aliases', resource: 'designs.aliases' },
+    { key: 'Catalog', label: 'Catalog', resource: 'designs.catalog' },
+    { key: 'Design', label: 'Design', resource: 'designs.design' },
+    { key: 'Colourway', label: 'Colourway', resource: 'designs.colourway' },
+    { key: 'Yarns', label: 'Yarns', resource: 'designs.yarns' },
+    { key: 'Dyeing', label: 'Dyeing', resource: 'designs.dyeing' },
+] as const;
+
+type DesignTabDefinition = typeof DESIGN_TABS[number];
+type Tab = DesignTabDefinition['key'];
 
 const getCurrentFinancialYear = () => {
     const currentDate = new Date();
@@ -164,14 +175,25 @@ const BLEND_COLORS: Record<string, string> = {
 };
 
 // ── TabBar ────────────────────────────────────────────────────
-function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+function TabBar({
+    active,
+    tabs,
+    onChange,
+}: {
+    active: Tab | null;
+    tabs: readonly DesignTabDefinition[];
+    onChange: (t: Tab) => void;
+}) {
     return (
         <View style={tb.bar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tb.inner}>
-                {TABS.map(t => (
-                    <TouchableOpacity key={t} onPress={() => onChange(t)}
-                        style={[tb.tab, active === t && tb.tabActive]}>
-                        <Text style={[tb.label, active === t && tb.labelActive]}>{t}</Text>
+                {tabs.map(item => (
+                    <TouchableOpacity
+                        key={item.key}
+                        onPress={() => onChange(item.key)}
+                        style={[tb.tab, active === item.key && tb.tabActive]}
+                    >
+                        <Text style={[tb.label, active === item.key && tb.labelActive]}>{item.label}</Text>
                     </TouchableOpacity>
                 ))}
             </ScrollView>
@@ -2658,19 +2680,68 @@ const dy = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 export function DesignsScreen() {
     const context = DEFAULT_ERP_CONTEXT;
-    const [tab, setTab] = useState<Tab>('Catalog');
+    const { canAccess } = usePermission();
+    const setHeaderExtras = useHeaderExtrasStore((state) => state.setHeaderExtras);
+    const clearHeaderExtras = useHeaderExtrasStore((state) => state.clearHeaderExtras);
+    const [tab, setTab] = useState<Tab | null>('Catalog');
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
     const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
 
+    // One permission-aware source drives the tab header and tab content.
+    // A developer only adds a tab to DESIGN_TABS and the registry definition.
+    const visibleTabs = useMemo(
+        () => DESIGN_TABS.filter(item => canAccess(item.resource)),
+        [canAccess],
+    );
+
+    const firstAllowedTab = visibleTabs[0]?.key ?? null;
+
+    // FIX: this screen used to render its own hand-rolled header ("MADHUSUDHAN
+    // FABRICS" / "Designs" / "Selected: ...") completely separately from
+    // AppHeader — that was the second navy header block stacking under the
+    // Designs tab. The header is now rendered once, in
+    // app/new/(tabs)/_layout.tsx; only the "Selected: code" subtitle still
+    // needs to reach it, via the shared extras store.
+    useFocusEffect(
+        useCallback(() => {
+            setHeaderExtras({ subtitle: selectedDesign ? `Selected: ${selectedDesign.code}` : null });
+            return () => clearHeaderExtras();
+        }, [selectedDesign, setHeaderExtras, clearHeaderExtras]),
+    );
+
+    const openTab = useCallback((nextTab: Tab) => {
+        const definition = DESIGN_TABS.find(item => item.key === nextTab);
+        if (definition && canAccess(definition.resource)) {
+            setTab(nextTab);
+            return true;
+        }
+        setTab(firstAllowedTab);
+        return false;
+    }, [canAccess, firstAllowedTab]);
+
+    // Live permission changes are applied without logout. If the active tab is
+    // denied, move to the first allowed tab and never render denied content.
+    useEffect(() => {
+        if (visibleTabs.length === 0) {
+            if (tab !== null) setTab(null);
+            return;
+        }
+
+        const activeIsAllowed = tab !== null && visibleTabs.some(item => item.key === tab);
+        if (!activeIsAllowed) setTab(firstAllowedTab);
+    }, [firstAllowedTab, tab, visibleTabs]);
+
     const handleSelectDesign = async (d: Design) => {
-        setSelected(d); setDetail(d);
+        setSelected(d);
+        setDetail(d);
         try {
-            const res = await DesignAPI.get(d.id); setDetail({ ...d, ...res.data.data });
-            console.log("design res", res);
+            const res = await DesignAPI.get(d.id);
+            setDetail({ ...d, ...res.data.data });
+            console.log('design res', res);
         } catch { }
 
-        setTab('Design');
+        openTab('Design');
     };
 
     const handleAddSubDesign = async (d: Design) => {
@@ -2681,50 +2752,59 @@ export function DesignsScreen() {
         } catch {
             setDetail(d);
         }
-        setTab('Colourway');
+        openTab('Colourway');
     };
 
-    const handleCancelEdit = () => { setSelected(null); setDetail(null); };
+    const handleCancelEdit = () => {
+        setSelected(null);
+        setDetail(null);
+    };
 
-    // ✅ after a successful design save: clear selection, bump the
-    // catalog key (forces CatalogTab to remount + reload), go to Catalog.
     const handleDesignSaved = () => {
         setSelected(null);
         setDetail(null);
         setCatalogRefreshKey(v => v + 1);
-        setTab('Catalog');
+        openTab('Catalog');
     };
 
     return (
         <ERPContext.Provider value={context}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-                <View style={hdr.wrap}>
-                    <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                    <Text style={hdr.title}>Designs</Text>
-                    {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
-                </View>
-                <TabBar active={tab} onChange={setTab} />
-                <View style={{ flex: 1 }}>
-                    {tab === 'Aliases' && <AliasesTab design={detailDesign} />}
-                    {tab === 'Catalog' && (
-                        <CatalogTab
-                            key={catalogRefreshKey}
-                            onSelectDesign={handleAddSubDesign}
-                            onEditDesign={handleSelectDesign}
-                        />
-                    )}
-                    {tab === 'Design' && (
-                        <DesignTab
-                            design={detailDesign}
-                            onRefresh={handleDesignSaved}
-                            onCancelEdit={handleCancelEdit}
-                        />
-                    )}
-                    {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
-                    {tab === 'Yarns' && <YarnsTab />}
-                    {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
-                </View>
-            </SafeAreaView>
+            <View style={{ flex: 1, backgroundColor: T.bg }}>
+                {visibleTabs.length > 0 ? (
+                    <>
+                        <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
+                        <View style={{ flex: 1 }}>
+                            {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
+                            {tab === 'Catalog' && canAccess('designs.catalog') && (
+                                <CatalogTab
+                                    key={catalogRefreshKey}
+                                    onSelectDesign={handleAddSubDesign}
+                                    onEditDesign={handleSelectDesign}
+                                />
+                            )}
+                            {tab === 'Design' && canAccess('designs.design') && (
+                                <DesignTab
+                                    design={detailDesign}
+                                    onRefresh={handleDesignSaved}
+                                    onCancelEdit={handleCancelEdit}
+                                />
+                            )}
+                            {tab === 'Colourway' && canAccess('designs.colourway') && (
+                                <ColourwayTab
+                                    design={detailDesign}
+                                    onNavigateToCatalog={() => openTab('Catalog')}
+                                />
+                            )}
+                            {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
+                            {tab === 'Dyeing' && canAccess('designs.dyeing') && <DyeingTab design={detailDesign} />}
+                        </View>
+                    </>
+                ) : (
+                    <View style={s.center}>
+                        <Text style={s.empty}>You do not have access to any Design tab.</Text>
+                    </View>
+                )}
+            </View>
         </ERPContext.Provider>
     );
 }

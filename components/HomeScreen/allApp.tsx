@@ -193,5 +193,18 @@ const APP_SECTIONS = [
             { id: '40', name: 'Price List', screen: 'Price List', icon: 'assessment', iconColor: '#1E3A5F' },
         ],
     },
+    {
+        title: 'Y',
+        data: [
+            { id: '41', name: 'Quarter Summary', screen: 'Quarter Summary', icon: 'swap-horiz', iconColor: '#5E35B1' },
+        ],
+    },
+     {
+        title: 'Y',
+        data: [
+            { id: '42', name: 'Weft Issue Return', screen: 'Weft Issue Return', icon: 'precision-manufacturing', iconColor: '#991070' },
+        ],
+    },
+
 
 ];

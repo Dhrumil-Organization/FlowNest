@@ -1,9 +1,9 @@
 // ExpenseScreen.jsx — Madhusudhan Fabrics (React Native)
 // Complete rebuild matching all 14 screenshots
 
-import Icon from '@expo/vector-icons/MaterialIcons';
+import { T } from '@/common/utils/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -770,7 +770,6 @@ function ProductionBlock({ d }) {
 export default function ExpenseScreen({ token, apiBase }) {
   const { months, states, loadedCount, total, refresh, retryMonth } =
     useExpenseData({ token, apiBase });
-  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState(0);
   const [view, setView] = useState('report');
@@ -804,14 +803,6 @@ export default function ExpenseScreen({ token, apiBase }) {
         <View style={S.header}>
           <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
           <Text style={S.title}>Expense</Text>
-          {/* <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
-              <Icon name="arrow-back" size={22} color={'#fff'} />
-            </TouchableOpacity>
-            <View>
-              <Text style={S.title}>Expense</Text>
-            </View>
-          </View> */}
           {/* <Text style={S.sub}>Demo data</Text> */}
         </View>
         <ScrollView ref={scrollRef} style={S.body} contentContainerStyle={{ paddingBottom: 32 }}>
@@ -823,19 +814,14 @@ export default function ExpenseScreen({ token, apiBase }) {
 
   // ── Main report ───────────────────────────────────────────────
   return (
-    <SafeAreaView style={S.safe} edges={['top']}>
+    <>
+      {/* <SafeAreaView style={S.safe} edges={['top']}> */}
+      <SafeAreaView style={{ flex: 0, backgroundColor: T.nav }} edges={['top']} />
+      <StatusBar style="light" backgroundColor={T.nav} />
       <View style={S.header}>
         <Text style={S.eyebrow}>MADHUSUDHAN FABRICS</Text>
         <View style={S.headerRow}>
-          {/* <Text style={S.title}>Expense</Text> */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity style={{ marginRight: 10 }} onPress={() => router.push('/')}>
-              <Icon name="arrow-back" size={22} color={'#fff'} />
-            </TouchableOpacity>
-            <View>
-              <Text style={S.title}>Expense</Text>
-            </View>
-          </View>
+          <Text style={S.title}>Expense</Text>
           <TouchableOpacity onPress={refresh} style={S.refreshBtn} activeOpacity={0.7}>
             <Text style={S.refreshText}>↻</Text>
           </TouchableOpacity>
@@ -1079,13 +1065,16 @@ export default function ExpenseScreen({ token, apiBase }) {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      <SafeAreaView edges={['bottom']} style={{ flex: 0, backgroundColor: '#fff' }} />
+      {/* </SafeAreaView> */}
+    </>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f8f7f4' },
+  safe: { flex: 1, backgroundColor: '#13879A', },
   header: { backgroundColor: '#13879A', padding: 16, paddingBottom: 18, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   eyebrow: { fontSize: 10, color: '#fff', letterSpacing: 1, marginBottom: 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

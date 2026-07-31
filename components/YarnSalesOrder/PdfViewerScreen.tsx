@@ -4,15 +4,16 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    // Share,
+    Share,
     Alert,
     Platform,
     ActivityIndicator,
     ToastAndroid,
 } from 'react-native';
 import Pdf from 'react-native-pdf';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import Share from 'react-native-share';
+import Icon from '@expo/vector-icons/MaterialIcons';
+// import Share from 'react-native-share';
+
 import ReactNativeBlobUtil from 'react-native-blob-util';
 // import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';

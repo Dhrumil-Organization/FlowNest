@@ -657,7 +657,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { SubScreenHeader } from "../../../../components/layout/SubScreenHeader";
 import {
   RefreshControl,
   SafeAreaView,
@@ -667,6 +666,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SubScreenHeader } from "../../../../components/layout/SubScreenHeader";
 import { api, formatAmount } from "../api/api";
 import MiniLineChart from "../components/MiniLineChart";
 import SalesExecDashboardSkeleton from "../components/SalesExecDashboardSkeleton";
@@ -786,6 +786,8 @@ export default function SalesExecDashboardScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [showTour, setShowTour] = useState(false);
+
+  console.log('Sales activeTab: ', activeTab);
 
   useEffect(() => {
     let mounted = true;
@@ -988,7 +990,9 @@ export default function SalesExecDashboardScreen({
           sign-out button. Replaced with SubScreenHeader, the component
           already built for exactly this case (sub-screen + back button). */}
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+        {activeTab !== "myview" && (
         <SubScreenHeader backLabel="Back" title={exec_info.name || execName || "Executive"} />
+        )}
         {/* Dead code below kept commented for reference; no longer used.
         <View style={styles.header}>
           <TouchableOpacity

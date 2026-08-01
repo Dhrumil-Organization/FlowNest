@@ -265,7 +265,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Packing Grade Auth', route: 'packing-grade-auth', icon: 'admin-panel-settings', color: '#3a70a3c9', category: 'Production' },
         { name: 'Production Merge Auth', route: 'production-merge-auth', icon: 'merge-type', color: '#8b55d1', category: 'Production' },
         { name: 'Creel Management System', route: 'creel-management-system', icon: 'settings-system-daydream', color: '#008080', category: 'Production' },
-        // { name: 'Beam Gaiting', route: 'beam-gaiting', icon: 'edit', color: '#142af5', category: 'Production' },
+        { name: 'Beam Gaiting', route: 'beam-gaiting', icon: 'edit', color: '#142af5', category: 'Production' },
         { name: 'Yarn Management System', route: 'yarn-management-system', icon: 'inventory', color: '#4B0082', category: 'Production' },
         { name: 'Weft Issue', route: 'weft-issue', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Party Dashboard', route: 'party-dashboard', icon: 'precision-manufacturing', color: '#4169E1', category: 'Finance' },
@@ -274,7 +274,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Yarn Manufacturing', route: 'yarn-manufacturing', icon: 'touch-app', color: '#008080', category: 'details' },
         { name: 'Profile', route: 'profile', icon: 'person-pin', color: '#000000', category: 'profile' },
         { name: 'Sales Order Entry', route: 'sales-order-entry', icon: 'shopping-cart-checkout', color: '#48cbef', category: 'Production' },
-        // { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1' },
+        { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1' },
         { name: 'Doff Entry', route: 'doff-entry', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Yarn Sales Order', route: 'yarn-sales-order', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
         { name: 'Event', route: 'event', icon: 'event', color: '#923070', category: 'Production' },
@@ -289,12 +289,12 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Purchase Import Auth', route: 'purchase-import-auth', icon: 'task-alt', color: '#991070', category: 'Production' },
         { name: 'Purchase Transport Auth', route: 'purchase-transport-auth', icon: 'route', color: '#7a2a49', category: 'Production' },
         { name: 'Warehouse', route: 'warehouse', icon: 'warehouse', color: '#991070', category: 'Production' },
-        // { name: 'Beam Close', route: 'beam-close', icon: 'assignment-turned-in', color: '#0ceebd', category: 'Production' },
+        { name: 'Beam Close', route: 'beam-close', icon: 'assignment-turned-in', color: '#0ceebd', category: 'Production' },
         { name: 'Creel Issue Return', route: 'creel-issue-return', icon: 'precision-manufacturing', color: '#4169E1', category: 'Production' },
         { name: 'Inquiry Report', route: 'inquiry-report', icon: 'view-comfortable', color: '#69e3ad', category: 'Production' },
         { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
         { name: 'Weft Issue Return', route: 'weft-issue-return', icon: 'published-with-changes', color: '#4169E1', category: 'Production' },
-        // { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
+        { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
     ];
 
     useEffect(() => {

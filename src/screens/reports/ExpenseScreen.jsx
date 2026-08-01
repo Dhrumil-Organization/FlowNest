@@ -2,9 +2,8 @@
 // Complete rebuild matching all 14 screenshots
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useCallback, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { useHeaderExtrasStore } from "../../core/layout/headerExtras";
+import React, { useCallback, useRef, useState } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useHeaderExtrasStore } from "../../core/layout/headerExtras";
 // SafeAreaView import removed — no longer used, the tabs layout now owns
 // the top safe-area inset for every tab screen (see (tabs)/_layout.tsx).
 import { useExpenseData } from "../../hooks/useExpenseData";
@@ -1553,7 +1553,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               title="Utilities / units consumed"
               sub={`${fN(d.kwh_total)} kWh @ ₹${d.unit_rate}`}
               amt={`${fLn(d.elec_total)} L`}
-              editLabel="Edit ›"
+              // editLabel="Edit ›"
               onEdit={() => setView("daily-units")}
             >
               {[
@@ -1588,7 +1588,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               title="Salaries / wages"
               sub="Rapier + Waterjet"
               amt={`${fLn(d.sal_total)} L`}
-              editLabel="Edit ›"
+              // editLabel="Edit ›"
               // onEdit={() => setView('daily-salary')}
               onEdit={() => {
                 setView("daily-salary");
@@ -1656,7 +1656,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               title="Maintenance"
               sub="Rapier · Waterjet · common (½½)"
               amt="₹0"
-              editLabel="Edit ›"
+              // editLabel="Edit ›"
               onEdit={() => setView("daily-maint")}
             >
               {[
@@ -1683,7 +1683,7 @@ export default function ExpenseScreen({ token, apiBase }) {
               title="Other expenses"
               sub="Direct / indirect"
               amt="₹0"
-              editLabel="Edit ›"
+              // editLabel="Edit ›"
               onEdit={() => setView("daily-other")}
             >
               {[

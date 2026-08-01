@@ -1,5 +1,7 @@
+import { getCurrentFinancialYear } from '@/common/commonfunction';
 import { DashboardAPI, DashboardCard, DashboardView, ExpenseDashboardData } from '@/src/api/dashboard';
 import { EmptyState, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import ExpenseDashboardCard from '@/src/components/dashboard/ExpenseDashboardCard';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { usePermission } from '@/src/core/permissions';
 import { RegistryRenderer } from '@/src/core/ui-registry';
@@ -81,7 +83,7 @@ function TargetSummary({ cards, label, onOpen }: { cards: DashboardCard[]; label
   );
 }
 
-export function DashboardScreen() {
+export function DashboardScreen(token: any, getUserPrptype: any) {
   const router = useRouter();
   const { canAccess, isSuperAdmin } = usePermission();
   const appSession = useAppSessionStore((state) => state.appSession);
@@ -100,12 +102,45 @@ export function DashboardScreen() {
   const [expenseData, setExpenseData] = useState<ExpenseDashboardData | null>(null);
   const [expenseLoading, setExpenseLoading] = useState(true);
   const [expenseError, setExpenseError] = useState('');
+  // const [token, setToken] = useState('');
+  const [username, setUsername] = useState('');
+  const [getToken, setToken] = useState('');
+  const [getPrp, setPrp] = useState('');
 
   const now = new Date();
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
   const monthno = now.getMonth() + 1;
   const ownerAllowed = isSuperAdmin || canAccess('dashboard.owner_view');
+
+  // useEffect(() => {
+  //   // if (!token) return
+  //   const load = async () => {
+  //     const t = await AsyncStorage.getItem('access_token');
+  //     const u = await AsyncStorage.getItem('user_details');
+
+  //     setToken(t || '');
+  //     setUsername(u || 'User');
+  //   };
+  //   load();
+  // }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    setToken(token);
+    return;
+
+  }, [token]);
+
+  useEffect(() => {
+    if (!getUserPrptype) return;
+    setPrp(getUserPrptype);
+    return;
+
+  }, [getUserPrptype]);
+
+  console.log('aaa token', token)
+
 
   // Pushes this screen's subtitle into the one shared header (see
   // headerExtras.ts). useFocusEffect (not useEffect) so it's cleared when
@@ -226,7 +261,7 @@ export function DashboardScreen() {
         ) : (
           <>
             {/* {view !== 'my' && ( */}
-              {/* <DashboardSection title="THIS MONTH · BUSINESS PULSE" tone="orange" action="Refresh" onAction={() => load(true)}>
+            {/* <DashboardSection title="THIS MONTH · BUSINESS PULSE" tone="orange" action="Refresh" onAction={() => load(true)}>
                 <View style={styles.metricRow}>
                   <MetricCell label="SALES ORDER" value={money(salesOrder?.actual || 0)} />
                   <MetricCell label="BILLING" value={money(billing?.actual || 0)} />
@@ -237,6 +272,17 @@ export function DashboardScreen() {
                 </View>
               </DashboardSection> */}
             {/* )} */}
+            <ExpenseDashboardCard
+              token={getToken?.token || ''}
+              prptype={getToken?.getUserPrptype || ''}
+              yearno={getCurrentFinancialYear()}
+              monthno={new Date().getMonth() + 1}
+              isConnected={true}
+              onPress={expenseData => {
+                // Optional future detail navigation:
+                // navigation.navigate('Expense Dashboard', { initialData: expenseData });
+              }}
+            />
 
             <RegistryRenderer
               kind="dashboard-card"
@@ -251,6 +297,14 @@ export function DashboardScreen() {
                 sessionUser,
               }}
               renderers={{
+                // 'dashboard.monthly_target': () => (
+                //   <ExpenseDashboardCard
+                //     token={token}
+                //     cards={cards}
+                //     periodLabel={periodLabel}
+                //     onOpen={() => router.push({ pathname: '/new/(tabs)/reports/expense', params: { view } } as any)}
+                //   />
+                // ),
                 'dashboard.monthly_target': () => (
                   <TargetSummary
                     cards={cards}

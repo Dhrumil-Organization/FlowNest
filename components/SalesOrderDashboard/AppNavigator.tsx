@@ -12,7 +12,7 @@ import CostingScreen from './screen/CostingScreen';
 // import OrdersScreen from './screen/OrdersScreen';
 import StockScreen from './screen/StockScreen';
 import ExpenseScreen from './screen/ExpenseScreen';
-// import MonthlySalesTargetScreen from './screen/MonthlySalesTarget';
+import MonthlySalesTargetScreen from './screen/MonthlySalesTarget';
 import ManufacturingControlTower from './screen/ManufacturingControlTower';
 import RealCostingReferenceDashboard from './screen/RealCostingReferenceDashboard';
 // import ProdScreen from './screen//ProdScreen';

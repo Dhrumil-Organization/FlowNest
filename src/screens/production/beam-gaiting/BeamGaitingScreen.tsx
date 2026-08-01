@@ -1,18 +1,22 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import {
-    View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, Modal,
-    TextInput as RNTextInput, TextInput
-} from 'react-native';
-import { useWindowDimensions } from 'react-native';
+import { API } from '@/src/api/client';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Dimensions,
+    FlatList,
+    TextInput as RNTextInput,
+    ScrollView,
+    StyleSheet,
+    Text, TouchableOpacity,
+    useWindowDimensions,
+    View
+} from 'react-native';
+import AddBeamGaiting from './AddBeamGaiting';
+import CustomDrawer from './CustomDrawer';
 // import HeaderBar from '../HeaderBar/HeaderBar';
 const theme = { BRAND_GRADIENT_START: '#1D4ED8', BRAND_GRADIENT_END: '#0F766E' };     
-import axios from 'axios';
-import { API } from '@/src/api/client';
-import CustomDrawer from './CustomDrawer';
-import AddBeamGaiting from './AddBeamGaiting';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import { fetchAllYeardata } from '@/src/api/legacyFunctions';
 
@@ -346,12 +350,12 @@ export const BeamGaitingScreen: React.FC<{ token: string, username?: string }> =
     //     return {};
     // };
 
-    const toggleFilter = (key) => {
-        setFilters(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
-    };
+    // const toggleFilter = (key) => {
+    //     setFilters(prev => ({
+    //         ...prev,
+    //         [key]: !prev[key]
+    //     }));
+    // };
 
     return (
         <>
@@ -917,4 +921,4 @@ const styles = StyleSheet.create({
 
 
 
-export default React.memo(BeamGaiting);
+export default React.memo(BeamGaitingScreen);

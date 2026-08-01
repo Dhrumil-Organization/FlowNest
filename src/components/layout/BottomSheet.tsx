@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import GorhomBottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet'
-import { T } from '@/constants/theme'
+import GorhomBottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// import { T } from '@/constants/theme'
+import { T } from '../../theme';
 
 interface Props {
   open: boolean

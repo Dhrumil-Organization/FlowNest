@@ -1,6 +1,6 @@
-import React from 'react'
-import { View, ViewProps, StyleSheet } from 'react-native'
-import { T } from '@/constants/theme'
+import React from 'react';
+import { StyleSheet, View, ViewProps } from 'react-native';
+import { T } from '../../theme';
 
 export function Card({ style, ...rest }: ViewProps) {
   return <View style={[s.card, style]} {...rest} />

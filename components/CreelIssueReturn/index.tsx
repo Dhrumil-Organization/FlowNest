@@ -3,16 +3,24 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
+    Dimensions,
     FlatList,
     Modal,
+    PixelRatio,
     StyleSheet,
-    Text, TextInput, TouchableOpacity,
-    View
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from "../../common/API/dynamicAPI";
 import { fetchPropertyData } from '../../common/API/Functions';
+
 const CreelIssueReturn = ({ token, navigation }) => {
     const router = useRouter();
     const [search, setSearch] = useState("");
@@ -145,7 +153,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
     }, []);
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
 
         if (selectedYear) {
             getFinancialYearDates(selectedYear);
@@ -154,7 +162,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
     }, [token, selectedYear]);
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         const load = async () => {
             const data = await fetchPropertyData(token);
             setPropertyData(data || []);
@@ -367,594 +375,649 @@ const CreelIssueReturn = ({ token, navigation }) => {
 
 
     return (
-        <View style={{ flex: 1, backgroundColor: "#F5F7FB" }}>
+        <>
+            <StatusBar
+                style="light"
+                backgroundColor="#007EA7"
+                translucent={false}
+            />
+            <SafeAreaView
+                edges={['top']}
+                style={{ flex: 1, backgroundColor: "#0F6C7B" }}
+            >
 
-            {/* HEADER */}
-            <LinearGradient colors={['#0F6C7B', '#13879A']} style={styles.header}>
-                <TouchableOpacity onPress={goBack} style={styles.backBtn}>
-                    <Icon name="arrow-back-ios-new" size={18} color="#fff" />
-                </TouchableOpacity>
+                <View style={{ flex: 1, backgroundColor: "#F5F7FB" }}>
 
-                <Text style={styles.headerTitle}>Creel Issue Return</Text>
+                    {/* HEADER */}
+                    <LinearGradient colors={['#0F6C7B', '#13879A']} style={styles.header}>
+                        <TouchableOpacity onPress={goBack} style={styles.backBtn}>
+                            <Icon name="arrow-back-ios-new" size={18} color="#fff" />
+                        </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => setFilterVisible(true)}>
-                    <Icon name="tune" size={22} color="#fff" />
-                </TouchableOpacity>
-            </LinearGradient>
+                        <Text style={styles.headerTitle}>Creel Issue Return</Text>
 
-            {/* SEARCH */}
-            <View style={styles.searchBox}>
-                <Icon name="search" size={20} color="#000" />
-                <TextInput
-                    placeholder="Search..."
-                    placeholderTextColor="#000"
-                    value={search}
-                    onChangeText={setSearch}
-                    style={styles.searchInput}
-                />
-                {/* 🔥 FUNNEL ICON */}
-                <TouchableOpacity onPress={() => setInternalFilterVisible(true)}>
-                    <Icon name="filter-list" size={22} color="#0F6C7B" />
-                </TouchableOpacity>
-            </View>
+                        <TouchableOpacity onPress={() => setFilterVisible(true)}>
+                            <Icon name="tune" size={22} color="#fff" />
+                        </TouchableOpacity>
+                    </LinearGradient>
 
-            {/* 🔥 SELECTED FILTERS */}
-            <View style={styles.chipContainer}>
-
-                {/* PROPERTY */}
-                <TouchableOpacity
-                    style={styles.chip}
-                    onPress={() => setFilterVisible(true)}
-                >
-                    <Icon name="business" size={14} color="#0F6C7B" />
-                    <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-                        {selectedProperty?.LngName || "Select Property"}
-                    </Text>
-                    <Icon name="edit" size={14} color="#0F6C7B" />
-                </TouchableOpacity>
-
-                {/* YEAR */}
-                <View style={styles.chip}>
-                    <Icon name="event" size={14} color="#0F6C7B" />
-                    <Text style={styles.chipText}>
-                        {selectedYear || "Year"}
-                    </Text>
-                </View>
-
-                {/* 🔥 DATE RANGE (CONDITIONAL) */}
-                {(fromDate || toDate) && (
-                    <View style={styles.chip}>
-                        <Icon name="date-range" size={14} color="#0F6C7B" />
-                        <Text style={styles.chipText}>
-                            {fromDate ? formatDate(fromDate) : "From"}
-                            {" - "}
-                            {toDate ? formatDate(toDate) : "To"}
-                        </Text>
+                    {/* SEARCH */}
+                    <View style={styles.searchBox}>
+                        <Icon name="search" size={20} color="#000" />
+                        <TextInput
+                            placeholder="Search..."
+                            placeholderTextColor="#000"
+                            value={search}
+                            onChangeText={setSearch}
+                            style={styles.searchInput}
+                        />
+                        {/* 🔥 FUNNEL ICON */}
+                        <TouchableOpacity onPress={() => setInternalFilterVisible(true)}>
+                            <Icon name="filter-list" size={22} color="#0F6C7B" />
+                        </TouchableOpacity>
                     </View>
-                )}
-            </View>
-            {/* FILTER MODAL */}
-            <Modal transparent visible={filterVisible} animationType="slide">
-                <View style={styles.overlay}>
-                    <View style={styles.sheet}>
 
-                        <View style={styles.dragBar} />
-
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.title}>Filter Records</Text>
-
-                            <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setSelectedProperty(null);
-                                        setSelectedYear(yearOptions[0]);
-                                        setFromDate(null);
-                                        setToDate(null);
-                                    }}
-                                    style={{ marginRight: 15 }}
-                                >
-                                    <Text style={styles.resetText}>Reset</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity onPress={() => setFilterVisible(false)}>
-                                    <Icon name="close" size={22} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
+                    {/* 🔥 SELECTED FILTERS */}
+                    <View style={styles.chipContainer}>
 
                         {/* PROPERTY */}
-                        <Text style={styles.label}>Property</Text>
-                        <TouchableOpacity style={styles.bigInput}
-                            onPress={() => setPropertyPickerVisible(true)}>
-                            <Text style={styles.inputText}>
-                                {selectedProperty?.LngName || "All"}
+                        <TouchableOpacity
+                            style={[styles.chip]}
+                            onPress={() => setFilterVisible(true)}
+                        >
+                            <Icon name="business" size={14} color="#0F6C7B" />
+                            <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+                                {selectedProperty?.LngName || "Select Property"}
                             </Text>
-                            <Icon name="keyboard-arrow-down" size={20} />
+                            <Icon name="edit" size={14} color="#0F6C7B" />
                         </TouchableOpacity>
 
                         {/* YEAR */}
-                        <Text style={styles.label}>Year</Text>
-                        <TouchableOpacity style={styles.bigInput}
-                            onPress={() => setYearPickerVisible(true)}>
-                            <Text style={styles.inputText}>
-                                {selectedYear || "All"}
+                        <View style={[styles.chip]}>
+                            <Icon name="event" size={14} color="#0F6C7B" />
+                            <Text style={styles.chipText}>
+                                {selectedYear || "Year"}
                             </Text>
-                            <Icon name="keyboard-arrow-down" size={20} />
-                        </TouchableOpacity>
-
-                        {/* DATE */}
-                        <Text style={styles.label}>Issue Date Range</Text>
-
-                        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                            <TouchableOpacity
-                                style={[styles.dateBox, { marginRight: 6 }]}
-                                onPress={() => setShowFromPicker(true)}
-                            >
-                                <Icon name="calendar-today" size={16} color="#666" />
-                                <Text style={styles.inputText}>
-                                    {formatDate(fromDate) || "From Date"}
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.dateBox, { marginLeft: 6 }]}
-                                onPress={() => setShowToPicker(true)}
-                            >
-                                <Icon name="calendar-today" size={16} color="#666" />
-                                <Text style={styles.inputText}>
-                                    {formatDate(toDate) || "To Date"}
-                                </Text>
-                            </TouchableOpacity>
                         </View>
 
-                        {/* APPLY */}
-                        <TouchableOpacity style={styles.applyBtnNew}
-                            onPress={() => {
-                                fetchCreelReturnData();
-                                setFilterVisible(false);
-                            }}>
-                            <Text style={styles.applyText}>Apply Filters</Text>
-                        </TouchableOpacity>
-
+                        {/* 🔥 DATE RANGE (CONDITIONAL) */}
+                        {(fromDate || toDate) && (
+                            <View style={[styles.chip]}>
+                                <Icon name="date-range" size={14} color="#0F6C7B" />
+                                <Text style={styles.chipText}>
+                                    {fromDate ? formatDate(fromDate) : "From"}
+                                    {" - "}
+                                    {toDate ? formatDate(toDate) : "To"}
+                                </Text>
+                            </View>
+                        )}
                     </View>
-                </View>
+                    {/* FILTER MODAL */}
+                    <Modal transparent visible={filterVisible} animationType="slide">
+                        <View style={styles.overlay}>
+                            <View style={styles.sheet}>
 
-                {/* DATE PICKERS */}
-                {showFromPicker && (
-                    <DateTimePicker
-                        value={fromDate || new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                            setShowFromPicker(false);
+                                <View style={styles.dragBar} />
 
-                            if (event.type === "set" && selectedDate) {
-                                setFromDate(selectedDate);
-                            }
-                        }}
-                    />
-                )}
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.title}>Filter Records</Text>
 
-                {showToPicker && (
-                    <DateTimePicker
-                        value={toDate || new Date()}
-                        mode="date"
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                            setShowToPicker(false);
+                                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                setSelectedProperty(null);
+                                                setSelectedYear(yearOptions[0]);
+                                                setFromDate(null);
+                                                setToDate(null);
+                                            }}
+                                            style={{ marginRight: 15 }}
+                                        >
+                                            <Text style={styles.resetText}>Reset</Text>
+                                        </TouchableOpacity>
 
-                            if (event.type === "set" && selectedDate) {
-                                setToDate(selectedDate);
-                            }
-                        }}
-                    />
-                )}
+                                        <TouchableOpacity onPress={() => setFilterVisible(false)}>
+                                            <Icon name="close" size={22} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
 
-            </Modal>
-            <Modal transparent visible={internalFilterVisible} animationType="slide">
-                <View style={styles.overlay}>
-                    <View style={styles.sheet}>
-
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.title}>Filter</Text>
-
-                            <TouchableOpacity onPress={() => setInternalFilterVisible(false)}>
-                                <Icon name="close" size={22} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* 🔥 CARTON TYPE */}
-                        <Text style={styles.label}>Carton Type</Text>
-                        <View style={styles.tabContainer}>
-                            {["All", "Single", "Mix"].map((item) => (
-                                <TouchableOpacity
-                                    key={item}
-                                    style={[
-                                        styles.tabBtn,
-                                        cartonType === item && styles.activeTab
-                                    ]}
-                                    onPress={() => setCartonType(item)}
-                                >
-                                    <Text style={[
-                                        styles.tabText,
-                                        cartonType === item && styles.activeText
-                                    ]}>
-                                        {item}
+                                {/* PROPERTY */}
+                                <Text style={styles.label}>Property</Text>
+                                <TouchableOpacity style={styles.bigInput}
+                                    onPress={() => setPropertyPickerVisible(true)}>
+                                    <Text style={styles.inputText}>
+                                        {selectedProperty?.LngName || "All"}
                                     </Text>
+                                    <Icon name="keyboard-arrow-down" size={20} />
                                 </TouchableOpacity>
-                            ))}
-                        </View>
 
-                        {/* 🔥 CARTON STATUS */}
-                        <Text style={styles.label}>Carton Status</Text>
-                        <View style={styles.tabContainer}>
-                            {["All", "Open", "Closed"].map((item) => (
-                                <TouchableOpacity
-                                    key={item}
-                                    style={[
-                                        styles.tabBtn,
-                                        cartonStatus === item && styles.activeTab
-                                    ]}
-                                    onPress={() => setCartonStatus(item)}
-                                >
-                                    <Text style={[
-                                        styles.tabText,
-                                        cartonStatus === item && styles.activeText
-                                    ]}>
-                                        {item}
+                                {/* YEAR */}
+                                <Text style={styles.label}>Year</Text>
+                                <TouchableOpacity style={styles.bigInput}
+                                    onPress={() => setYearPickerVisible(true)}>
+                                    <Text style={styles.inputText}>
+                                        {selectedYear || "All"}
                                     </Text>
+                                    <Icon name="keyboard-arrow-down" size={20} />
                                 </TouchableOpacity>
-                            ))}
+
+                                {/* DATE */}
+                                <Text style={styles.label}>Issue Date Range</Text>
+
+                                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                                    <TouchableOpacity
+                                        style={[styles.dateBox, { marginRight: 6 }]}
+                                        onPress={() => setShowFromPicker(true)}
+                                    >
+                                        <Icon name="calendar-today" size={16} color="#666" />
+                                        <Text style={styles.inputText}>
+                                            {formatDate(fromDate) || "From Date"}
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.dateBox, { marginLeft: 6 }]}
+                                        onPress={() => setShowToPicker(true)}
+                                    >
+                                        <Icon name="calendar-today" size={16} color="#666" />
+                                        <Text style={styles.inputText}>
+                                            {formatDate(toDate) || "To Date"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* APPLY */}
+                                <TouchableOpacity style={styles.applyBtnNew}
+                                    onPress={() => {
+                                        fetchCreelReturnData();
+                                        setFilterVisible(false);
+                                    }}>
+                                    <Text style={styles.applyText}>Apply Filters</Text>
+                                </TouchableOpacity>
+
+                            </View>
                         </View>
 
-                        {/* APPLY */}
-                        <TouchableOpacity
-                            style={styles.applyBtnNew}
-                            onPress={() => setInternalFilterVisible(false)}
+                        {/* DATE PICKERS */}
+                        {showFromPicker && (
+                            <DateTimePicker
+                                value={fromDate || new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowFromPicker(false);
+
+                                    if (event.type === "set" && selectedDate) {
+                                        setFromDate(selectedDate);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {showToPicker && (
+                            <DateTimePicker
+                                value={toDate || new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowToPicker(false);
+
+                                    if (event.type === "set" && selectedDate) {
+                                        setToDate(selectedDate);
+                                    }
+                                }}
+                            />
+                        )}
+
+                    </Modal>
+                    <Modal transparent visible={internalFilterVisible} animationType="slide">
+                        <View style={styles.overlay}>
+                            <View style={styles.sheet}>
+
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.title}>Filter</Text>
+
+                                    <TouchableOpacity onPress={() => setInternalFilterVisible(false)}>
+                                        <Icon name="close" size={22} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* 🔥 CARTON TYPE */}
+                                <Text style={styles.label}>Carton Type</Text>
+                                <View style={styles.tabContainer}>
+                                    {["All", "Single", "Mix"].map((item) => (
+                                        <TouchableOpacity
+                                            key={item}
+                                            style={[
+                                                styles.tabBtn,
+                                                cartonType === item && styles.activeTab
+                                            ]}
+                                            onPress={() => setCartonType(item)}
+                                        >
+                                            <Text style={[
+                                                styles.tabText,
+                                                cartonType === item && styles.activeText
+                                            ]}>
+                                                {item}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                {/* 🔥 CARTON STATUS */}
+                                <Text style={styles.label}>Carton Status</Text>
+                                <View style={styles.tabContainer}>
+                                    {["All", "Open", "Closed"].map((item) => (
+                                        <TouchableOpacity
+                                            key={item}
+                                            style={[
+                                                styles.tabBtn,
+                                                cartonStatus === item && styles.activeTab
+                                            ]}
+                                            onPress={() => setCartonStatus(item)}
+                                        >
+                                            <Text style={[
+                                                styles.tabText,
+                                                cartonStatus === item && styles.activeText
+                                            ]}>
+                                                {item}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                {/* APPLY */}
+                                <TouchableOpacity
+                                    style={styles.applyBtnNew}
+                                    onPress={() => setInternalFilterVisible(false)}
+                                >
+                                    <Text style={styles.applyText}>Apply</Text>
+                                </TouchableOpacity>
+
+                            </View>
+                        </View>
+                    </Modal>
+                    {/* PROPERTY PICKER */}
+                    <Modal visible={propertyPickerVisible} animationType="slide">
+                        <SafeAreaView
+                            edges={['top']}
+                            style={{ flex: 1, backgroundColor: "#fff" }}
                         >
-                            <Text style={styles.applyText}>Apply</Text>
-                        </TouchableOpacity>
+                            <View style={{ flex: 1, backgroundColor: "#fff" }}>
 
-                    </View>
-                </View>
-            </Modal>
-            {/* PROPERTY PICKER */}
-            <Modal visible={propertyPickerVisible} animationType="slide">
-                <View style={{ flex: 1, backgroundColor: "#fff" }}>
+                                <View style={styles.pickerHeader}>
+                                    <TouchableOpacity onPress={() => {
+                                        setPropertyPickerVisible(false);
+                                        setPropertySearch(""); // ✅ CLEAR SEARCH
+                                    }}>
+                                        <Icon name="arrow-back-ios" size={20} color="#000000" />
+                                    </TouchableOpacity>
 
-                    <View style={styles.pickerHeader}>
-                        <TouchableOpacity onPress={() => {
-                            setPropertyPickerVisible(false);
-                            setPropertySearch(""); // ✅ CLEAR SEARCH
-                        }}>
-                            <Icon name="arrow-back-ios" size={20} color="#000000" />
-                        </TouchableOpacity>
+                                    <Text style={styles.pickerTitle}>Select Property</Text>
+                                    <View style={{ width: 20 }} />
+                                </View>
 
-                        <Text style={styles.pickerTitle}>Select Property</Text>
-                        <View style={{ width: 20 }} />
-                    </View>
+                                <View style={styles.pickerSearch}>
+                                    <Icon name="search" size={18} color="#000000" />
+                                    <TextInput
+                                        placeholder="Search property..."
+                                        placeholderTextColor="#000"
+                                        value={propertySearch}
+                                        onChangeText={setPropertySearch}
+                                        style={{ flex: 1 }}
+                                    />
+                                </View>
 
-                    <View style={styles.pickerSearch}>
-                        <Icon name="search" size={18} color="#000000" />
-                        <TextInput
-                            placeholder="Search property..."
-                            placeholderTextColor="#000"
-                            value={propertySearch}
-                            onChangeText={setPropertySearch}
-                            style={{ flex: 1 }}
-                        />
-                    </View>
+                                <FlatList
+                                    data={propertyData.filter(p =>
+                                        p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
+                                    )}
+                                    keyExtractor={(i) => i.PrpCode}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity style={styles.pickerItem}
+                                            onPress={() => {
+                                                setSelectedProperty(item);
+                                                setPropertyPickerVisible(false);
+                                                setPropertySearch(""); // ✅ CLEAR SEARCH
+                                            }}>
+                                            <Text style={{ color: '#000' }}>{item.LngName}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        </SafeAreaView>
+                    </Modal >
 
+                    {/* YEAR PICKER */}
+                    < Modal visible={yearPickerVisible} animationType="slide" >
+                        <SafeAreaView
+                            edges={['top']}
+                            style={{ flex: 1, backgroundColor: "#fff" }}
+                        >
+                            <View style={{ flex: 1, backgroundColor: "#fff" }}>
+
+                                <View style={styles.pickerHeader}>
+                                    <TouchableOpacity onPress={() => setYearPickerVisible(false)}>
+                                        <Icon name="arrow-back-ios" size={20} color="#000000" />
+                                    </TouchableOpacity>
+
+                                    <Text style={styles.pickerTitle}>Select Year</Text>
+                                    <View style={{ width: 20 }} />
+                                </View>
+
+                                <FlatList
+                                    data={yearOptions}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity style={styles.pickerItem}
+                                            onPress={() => {
+                                                setSelectedYear(item);
+                                                setYearPickerVisible(false);
+                                            }}>
+                                            <Text style={{ color: '#000' }}>{item}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        </SafeAreaView>
+                    </Modal >
+                    {/* 🔥 DATA LIST */}
                     <FlatList
-                        data={propertyData.filter(p =>
-                            p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
-                        )}
-                        keyExtractor={(i) => i.PrpCode}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity style={styles.pickerItem}
-                                onPress={() => {
-                                    setSelectedProperty(item);
-                                    setPropertyPickerVisible(false);
-                                    setPropertySearch(""); // ✅ CLEAR SEARCH
-                                }}>
-                                <Text style={{ color: '#000' }}>{item.LngName}</Text>
-                            </TouchableOpacity>
-                        )}
+                        data={filteredCreelData}
+                        keyExtractor={(item) => item.UId.toString()}
+                        contentContainerStyle={{
+                            paddingHorizontal: isTablet ? 30 : 16,
+                            paddingBottom: 180
+                        }}
+
+                        renderItem={({ item }) => {
+
+                            const borderColor = "#13879A";
+
+                            return (
+                                <TouchableOpacity
+                                    style={[styles.ledgerCard, { borderLeftColor: borderColor }]}
+                                    onPress={() => {
+                                        // navigation.navigate("CreelIssueReturnModifyEntry", {
+                                        //     creelData: item,
+                                        //     token: token,
+                                        //     selectedProperty: selectedProperty,
+                                        //     selectedYear: selectedYear
+                                        // });
+
+                                        router.push({
+                                            pathname: '/CreelIssueReturnModifyEntry',
+                                            params: {
+                                                creelData: JSON.stringify(item),
+                                                token: token,
+                                                selectedProperty: JSON.stringify(selectedProperty),
+                                                selectedYear: selectedYear
+                                            }
+                                        });
+                                    }}
+                                >
+
+                                    {/* TOP SECTION */}
+                                    <View style={styles.rowBetween}>
+
+                                        {/* LEFT DATE */}
+                                        <Text style={styles.dateText}>
+                                            {item.IssRDate}
+                                        </Text>
+
+                                        {/* RIGHT SIDE */}
+                                        <View style={{ alignItems: "flex-end" }}>
+
+                                            {/* ISSR NO */}
+                                            <View style={styles.refBadge}>
+                                                <Text style={styles.refText}>
+                                                    {item.IssRNo}
+                                                </Text>
+                                            </View>
+
+                                        </View>
+
+                                    </View>
+
+                                    {/* TITLE */}
+                                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                        <Text style={styles.labelText}>Stock Type:</Text>
+                                        <Text style={styles.valueText}>{item.StkType}</Text>
+                                    </View>
+
+                                    {/* BOTTOM */}
+                                    <View style={styles.rowBetween}>
+                                        <View style={{ flexDirection: "row", gap: 20 }}>
+                                            <View>
+                                                <Text style={styles.smallLabel}>Qty</Text>
+                                                <Text style={[styles.amount, { color: "#13879A" }]}>
+                                                    {item.TotQty || 0}
+                                                </Text>
+                                            </View>
+
+                                            <View>
+                                                <Text style={styles.smallLabel}>Pcs</Text>
+                                                <Text style={[styles.amount, { color: "#13879A" }]}>
+                                                    {item.TotPcs || 0}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* DELETE ICON */}
+                                    {/* DELETE ICON */}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setSelectedDeleteItem(item);
+                                            setDeleteModal(true);
+                                        }}
+                                        style={styles.deleteBtn}
+                                    >
+                                        <Icon name="delete" size={18} color="#fff" />
+                                    </TouchableOpacity>
+
+                                </TouchableOpacity>
+
+
+                            );
+                        }}
                     />
-                </View>
-            </Modal >
-
-            {/* YEAR PICKER */}
-            < Modal visible={yearPickerVisible} animationType="slide" >
-                <View style={{ flex: 1, backgroundColor: "#fff" }}>
-
-                    <View style={styles.pickerHeader}>
-                        <TouchableOpacity onPress={() => setYearPickerVisible(false)}>
-                            <Icon name="arrow-back-ios" size={20} color="#000000" />
-                        </TouchableOpacity>
-
-                        <Text style={styles.pickerTitle}>Select Year</Text>
-                        <View style={{ width: 20 }} />
-                    </View>
-
-                    <FlatList
-                        data={yearOptions}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity style={styles.pickerItem}
-                                onPress={() => {
-                                    setSelectedYear(item);
-                                    setYearPickerVisible(false);
-                                }}>
-                                <Text style={{ color: '#000' }}>{item}</Text>
-                            </TouchableOpacity>
-                        )}
-                    />
-                </View>
-            </Modal >
-            {/* 🔥 DATA LIST */}
-            <FlatList
-                data={filteredCreelData}
-                keyExtractor={(item) => item.UId.toString()}
-                contentContainerStyle={{ padding: 16 }}
-
-                renderItem={({ item }) => {
-
-                    const borderColor = "#13879A";
-
-                    return (
+                    {/* 🔥 FLOATING ADD BUTTON */}
+                    <View style={styles.fabContainer}>
                         <TouchableOpacity
-                            style={[styles.ledgerCard, { borderLeftColor: borderColor }]}
-                            onPress={() => {
-                                // navigation.navigate("CreelIssueReturnModifyEntry", {
-                                //     creelData: item,
+                            style={styles.fab}
+                            onPress={() =>
+                                // navigation.navigate("CreelIssueReturnEntry", {
+                                //     creelData: null,
                                 //     token: token,
-                                //     selectedProperty: selectedProperty,
-                                //     selectedYear: selectedYear
-                                // });
-
+                                //     selectedProperty: selectedProperty,   // ✅ ADD THIS
+                                //     selectedYear: selectedYear           // ✅ ADD THIS
+                                // })
                                 router.push({
-                                    pathname: '/CreelIssueReturnModifyEntry',
+                                    pathname: '/CreelIssueReturnEntry',
                                     params: {
-                                        creelData: JSON.stringify(item),
+                                        creelData: null,
                                         token: token,
-                                        selectedProperty: JSON.stringify(selectedProperty),
+                                        selectedProperty: JSON.stringify(selectedProperty),   // ✅ ADD THIS
                                         selectedYear: selectedYear
                                     }
-                                });
-                            }}
-                        >
-
-                            {/* TOP SECTION */}
-                            <View style={styles.rowBetween}>
-
-                                {/* LEFT DATE */}
-                                <Text style={styles.dateText}>
-                                    {item.IssRDate}
-                                </Text>
-
-                                {/* RIGHT SIDE */}
-                                <View style={{ alignItems: "flex-end" }}>
-
-                                    {/* ISSR NO */}
-                                    <View style={styles.refBadge}>
-                                        <Text style={styles.refText}>
-                                            {item.IssRNo}
-                                        </Text>
-                                    </View>
-
-                                </View>
-
-                            </View>
-
-                            {/* TITLE */}
-                            <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                <Text style={styles.labelText}>Stock Type:</Text>
-                                <Text style={styles.valueText}>{item.StkType}</Text>
-                            </View>
-
-                            {/* BOTTOM */}
-                            <View style={styles.rowBetween}>
-                                <View style={{ flexDirection: "row", gap: 20 }}>
-                                    <View>
-                                        <Text style={styles.smallLabel}>Qty</Text>
-                                        <Text style={[styles.amount, { color: "#13879A" }]}>
-                                            {item.TotQty || 0}
-                                        </Text>
-                                    </View>
-
-                                    <View>
-                                        <Text style={styles.smallLabel}>Pcs</Text>
-                                        <Text style={[styles.amount, { color: "#13879A" }]}>
-                                            {item.TotPcs || 0}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            {/* DELETE ICON */}
-                            {/* DELETE ICON */}
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setSelectedDeleteItem(item);
-                                    setDeleteModal(true);
-                                }}
-                                style={styles.deleteBtn}
-                            >
-                                <Icon name="delete" size={18} color="#fff" />
-                            </TouchableOpacity>
-
-                        </TouchableOpacity>
-
-
-                    );
-                }}
-            />
-            {/* 🔥 FLOATING ADD BUTTON */}
-            <TouchableOpacity
-                style={styles.fab}
-                onPress={() =>
-                    // navigation.navigate("CreelIssueReturnEntry", {
-                    //     creelData: null,
-                    //     token: token,
-                    //     selectedProperty: selectedProperty,   // ✅ ADD THIS
-                    //     selectedYear: selectedYear           // ✅ ADD THIS
-                    // })
-                    router.push({
-                        pathname: '/CreelIssueReturnEntry',
-                        params: {
-                            creelData: null,
-                            token: token,
-                            selectedProperty: JSON.stringify(selectedProperty),   // ✅ ADD THIS
-                            selectedYear: selectedYear
-                        }
-                    })
-                }
-
-            >
-                <Icon name="add" size={26} color="#fff" />
-            </TouchableOpacity>
-
-            <Modal transparent visible={deleteModal} animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertBox}>
-
-                        <Icon
-                            name="delete"
-                            size={45}
-                            color="#F44336"
-                        />
-
-                        <Text style={styles.alertTitle}>
-                            Delete Confirmation
-                        </Text>
-
-                        <Text style={styles.alertMessage}>
-                            Are you sure you want to delete{" "}
-                            {selectedDeleteItem?.IssRNo} ?
-                        </Text>
-
-                        <View style={styles.confirmRow}>
-
-                            {/* NO BUTTON */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.confirmBtn,
-                                    { backgroundColor: "#9E9E9E" }
-                                ]}
-                                onPress={() => {
-                                    setDeleteModal(false);
-                                    setSelectedDeleteItem(null);
-                                }}
-                            >
-                                <Text style={styles.confirmBtnText}>
-                                    No
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* YES BUTTON */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.confirmBtn,
-                                    { backgroundColor: "#F44336" }
-                                ]}
-                                onPress={() => {
-                                    setDeleteModal(false);
-
-                                    if (selectedDeleteItem) {
-                                        handlebrowsedeletedata(selectedDeleteItem);
-                                    }
-                                }}
-                            >
-                                <Text style={styles.confirmBtnText}>
-                                    Yes
-                                </Text>
-                            </TouchableOpacity>
-
-                        </View>
-
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal transparent visible={alertData.visible} animationType="fade">
-                <View style={styles.alertOverlay}>
-                    <View style={styles.alertBox}>
-
-                        <Icon
-                            name={
-                                alertData.type === "success"
-                                    ? "check-circle"
-                                    : alertData.type === "error"
-                                        ? "error"
-                                        : "warning"
-                            }
-                            size={42}
-                            color={
-                                alertData.type === "success"
-                                    ? "#4CAF50"
-                                    : alertData.type === "error"
-                                        ? "#F44336"
-                                        : "#FFA000"
-                            }
-                        />
-
-                        <Text style={styles.alertTitle}>
-                            {
-                                alertData.type === "success"
-                                    ? "Success"
-                                    : alertData.type === "error"
-                                        ? "Error"
-                                        : "Warning"
-                            }
-                        </Text>
-
-                        <Text style={styles.alertMessage}>
-                            {alertData.message}
-                        </Text>
-
-                        <TouchableOpacity
-                            onPress={() =>
-                                setAlertData({
-                                    visible: false,
-                                    message: "",
-                                    type: "warning"
                                 })
                             }
-                            style={styles.alertBtn}
+
                         >
-                            <Text style={{ color: "#fff", fontWeight: "700" }}>
-                                OK
-                            </Text>
+                            <Icon name="add" size={26} color="#fff" />
                         </TouchableOpacity>
-
                     </View>
-                </View>
-            </Modal>
 
-        </View >
+                    <Modal transparent visible={deleteModal} animationType="fade">
+                        <View style={styles.alertOverlay}>
+                            <View style={styles.alertBox}>
+
+                                <Icon
+                                    name="delete"
+                                    size={45}
+                                    color="#F44336"
+                                />
+
+                                <Text style={styles.alertTitle}>
+                                    Delete Confirmation
+                                </Text>
+
+                                <Text style={styles.alertMessage}>
+                                    Are you sure you want to delete{" "}
+                                    {selectedDeleteItem?.IssRNo} ?
+                                </Text>
+
+                                <View style={styles.confirmRow}>
+
+                                    {/* NO BUTTON */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.confirmBtn,
+                                            { backgroundColor: "#9E9E9E" }
+                                        ]}
+                                        onPress={() => {
+                                            setDeleteModal(false);
+                                            setSelectedDeleteItem(null);
+                                        }}
+                                    >
+                                        <Text style={styles.confirmBtnText}>
+                                            No
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {/* YES BUTTON */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.confirmBtn,
+                                            { backgroundColor: "#F44336" }
+                                        ]}
+                                        onPress={() => {
+                                            setDeleteModal(false);
+
+                                            if (selectedDeleteItem) {
+                                                handlebrowsedeletedata(selectedDeleteItem);
+                                            }
+                                        }}
+                                    >
+                                        <Text style={styles.confirmBtnText}>
+                                            Yes
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                </View>
+
+                            </View>
+                        </View>
+                    </Modal>
+
+                    <Modal transparent visible={alertData.visible} animationType="fade">
+                        <View style={styles.alertOverlay}>
+                            <View style={styles.alertBox}>
+
+                                <Icon
+                                    name={
+                                        alertData.type === "success"
+                                            ? "check-circle"
+                                            : alertData.type === "error"
+                                                ? "error"
+                                                : "warning"
+                                    }
+                                    size={42}
+                                    color={
+                                        alertData.type === "success"
+                                            ? "#4CAF50"
+                                            : alertData.type === "error"
+                                                ? "#F44336"
+                                                : "#FFA000"
+                                    }
+                                />
+
+                                <Text style={styles.alertTitle}>
+                                    {
+                                        alertData.type === "success"
+                                            ? "Success"
+                                            : alertData.type === "error"
+                                                ? "Error"
+                                                : "Warning"
+                                    }
+                                </Text>
+
+                                <Text style={styles.alertMessage}>
+                                    {alertData.message}
+                                </Text>
+
+                                <TouchableOpacity
+                                    onPress={() =>
+                                        setAlertData({
+                                            visible: false,
+                                            message: "",
+                                            type: "warning"
+                                        })
+                                    }
+                                    style={styles.alertBtn}
+                                >
+                                    <Text style={{ color: "#fff", fontWeight: "700" }}>
+                                        OK
+                                    </Text>
+                                </TouchableOpacity>
+
+                            </View>
+                        </View>
+                    </Modal>
+
+                </View >
+            </SafeAreaView>
+        </>
     );
 };
 
 export default CreelIssueReturn;
 
+const { width, height } = Dimensions.get("window");
+
+const isTablet = width >= 768;
+
+const scale = size =>
+    PixelRatio.roundToNearestPixel(size * (width / 375));
+
+const font = size =>
+    PixelRatio.roundToNearestPixel(size * (width / 375));
+
 const styles = StyleSheet.create({
 
-    header: { flexDirection: "row", justifyContent: "space-between", padding: 16, paddingTop: 40 },
-    headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+    header: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: isTablet ? 30 : 18,
+        paddingVertical: isTablet ? 22 : 16,
+        // paddingTop: Platform.OS === "ios"
+        //     ? 55
+        //     : 40
+    },
+    headerTitle: { color: "#fff", fontSize: font(isTablet ? 22 : 18), fontWeight: "700" },
 
     backBtn: {
-        width: 40, height: 40, borderRadius: 20,
+        width: isTablet ? 52 : 42,
+        height: isTablet ? 52 : 42,
+        borderRadius: isTablet ? 26 : 21,
         backgroundColor: "rgba(255,255,255,0.2)",
         justifyContent: "center", alignItems: "center"
     },
 
     searchBox: {
         flexDirection: "row", alignItems: "center",
-        backgroundColor: "#fff", margin: 16, padding: 10,
-        borderRadius: 15
+        backgroundColor: "#fff", marginHorizontal: isTablet ? 28 : 16,
+        marginTop: 18,
+        paddingHorizontal: 18,
+        paddingVertical: isTablet ? 18 : 12,
+        borderRadius: 18
     },
 
-    searchInput: { flex: 1 },
+    searchInput: {
+        flex: 1,
+        fontSize: font(isTablet ? 18 : 15)
+    },
 
     overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-end" },
 
@@ -1011,7 +1074,8 @@ const styles = StyleSheet.create({
 
     applyBtnNew: {
         backgroundColor: "#13879A",
-        padding: 16,
+        paddingVertical: isTablet ? 18 : 14,
+        paddingHorizontal: 20,
         borderRadius: 20,
         marginTop: 20,
         alignItems: "center"
@@ -1150,23 +1214,46 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 12,
     },
-    fab: {
+    // fab: {
+    //     position: "absolute",
+    //     backgroundColor: "#13879A",
+    //     width: isTablet ? 76 : 60,
+    //     height: isTablet ? 76 : 60,
+    //     borderRadius: isTablet ? 38 : 30,
+    //     bottom: isTablet ? 35 : 22,
+    //     right: isTablet ? 35 : 22,
+    //     justifyContent: "center",
+    //     alignItems: "center",
+    //     elevation: 5,
+    // },
+    fabContainer: {
         position: "absolute",
-        bottom: 20,
-        right: 20,
+        left: 0,
+        right: 0,
+        bottom: 0,
+
+        alignItems: "flex-end",
+
+        paddingHorizontal: 20,
+        paddingBottom: Platform.OS === "ios" ? 34 : 20,
+
+        pointerEvents: "box-none",
+    },
+
+    fab: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         backgroundColor: "#13879A",
-        width: 56,
-        height: 56,
-        borderRadius: 28,
         justifyContent: "center",
         alignItems: "center",
-        elevation: 5,
+        elevation: 10,
     },
     ledgerCard: {
         backgroundColor: "#fff",
-        borderRadius: 18,
-        padding: 16,
-        marginBottom: 14,
+        padding: isTablet ? 22 : 16,
+        marginBottom: isTablet ? 18 : 14,
+        borderRadius: isTablet ? 22 : 18,
         borderLeftWidth: 5,
         shadowColor: "#000",
         shadowOpacity: 0.08,
@@ -1176,14 +1263,14 @@ const styles = StyleSheet.create({
     },
 
     dateText: {
-        fontSize: 13,
+        fontSize: font(isTablet ? 16 : 13),
         color: "#000"
     },
 
     refBadge: {
         backgroundColor: "#F1F3F5",
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingHorizontal: isTablet ? 14 : 10,
+        paddingVertical: isTablet ? 8 : 5,
         borderRadius: 8
     },
 
@@ -1202,12 +1289,12 @@ const styles = StyleSheet.create({
     },
 
     smallLabel: {
-        fontSize: 11,
+        fontSize: font(isTablet ? 14 : 11),
         color: "#000"
     },
 
     amount: {
-        fontSize: 14,
+        fontSize: font(isTablet ? 18 : 15),
         fontWeight: "600"
     },
 
@@ -1230,9 +1317,9 @@ const styles = StyleSheet.create({
     deleteBtn: {
         marginTop: -25,
         backgroundColor: "#EF4444",
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: isTablet ? 44 : 34,
+        height: isTablet ? 44 : 34,
+        borderRadius: isTablet ? 22 : 17,
         justifyContent: "center",
         alignItems: "center",
         alignSelf: "flex-end"
@@ -1245,7 +1332,7 @@ const styles = StyleSheet.create({
     },
 
     alertBox: {
-        width: "85%",
+        width: isTablet ? "55%" : "88%",
         backgroundColor: "#fff",
         borderRadius: 18,
         padding: 22,
@@ -1269,8 +1356,8 @@ const styles = StyleSheet.create({
     alertBtn: {
         marginTop: 18,
         backgroundColor: "#13879A",
-        paddingHorizontal: 28,
-        paddingVertical: 11,
+        paddingHorizontal: isTablet ? 36 : 28,
+        paddingVertical: isTablet ? 16 : 11,
         borderRadius: 10,
     },
     confirmRow: {
@@ -1280,8 +1367,8 @@ const styles = StyleSheet.create({
     },
 
     confirmBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 28,
+        paddingVertical: isTablet ? 16 : 10,
+        paddingHorizontal: isTablet ? 36 : 28,
         borderRadius: 10,
     },
 

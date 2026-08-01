@@ -122,7 +122,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     };
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         const loadProperty = async () => {
             const allprpdata = await fetchAllPropertyData(token);
             setAllPropertyData(allprpdata);
@@ -131,7 +131,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     }, [token]);
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
             const testFinct = async () => {
                 const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
@@ -630,7 +630,25 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
 
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+            {/* {isLoading && <FullScreenLoader />} */}
+            
+            {isLoading && (
+                <View
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: "rgba(255,255,255,0.3)",
+                        zIndex: 999,
+                    }}
+                >
+                    <ActivityIndicator size="large" color="#007EA7" />
+                </View>
+            )}
 
             <HeaderBarwithBack
                 userName={username}

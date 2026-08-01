@@ -1,18 +1,27 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import {
-    View, Text, StyleSheet, TextInput,
-    TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, Alert,
-    ScrollView, Modal, StatusBar
-} from 'react-native';
 import axios from 'axios';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { fetchPropertyData } from '../../common/API/Functions';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { API } from "../../common/API/dynamicAPI";
-import { useSalesOrder } from './SalesOrderContext';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+// import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { API } from "../../common/API/dynamicAPI";
+import { fetchPropertyData } from '../../common/API/Functions';
+import { useSalesOrder } from './SalesOrderContext';
 
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 

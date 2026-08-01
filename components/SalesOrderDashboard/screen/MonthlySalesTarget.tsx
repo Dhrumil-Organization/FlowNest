@@ -1,0 +1,668 @@
+// ─────────────────────────────────────────────────────────────
+// FILE: app/new/monthly-sales-target.tsx
+//
+// Monthly Sales Target module.
+//
+// - Month/Year filter: a card with chevrons on either side for
+//   one-step +/- navigation, and a tappable center label that opens
+//   a calendar-style modal (year stepper + month grid) for jumping
+//   further ahead/back without repeated tapping.
+//   List only loads once a period is picked (defaults to current
+//   month on first open — change DEFAULT_TO_CURRENT_MONTH below
+//   if you'd rather force an explicit pick first).
+// - Each row: checkbox + name + numeric textbox for target value.
+// - "Select all" checkbox at the top.
+// - "Save Selected" validates that every CHECKED row has a
+//   non-empty target before saving; empty ones are highlighted
+//   red and the save is blocked until fixed.
+//
+// Wire-up points (search for TODO):
+//   1. API_BASE_URL — point this at your real API host.
+//   2. PRPTYPE — this screen needs a "prptype" value for every call;
+//      wire it to wherever your app already keeps it (session store,
+//      a picked property, etc). Left as a placeholder getter below.
+//   3. FIELD — key names inside each browse-response row. Change these
+//      to match your actual API's field names; everything else adapts
+//      automatically.
+// ─────────────────────────────────────────────────────────────
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from "axios";
+import { useAppSessionStore } from '@/src/stores/AppSessionStore';
+import { T } from '@/src/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '@/src/api/client';
+import { API } from '@/common/API/dynamicAPI';
+
+// ---- Set to false if you want the list hidden until the user
+// explicitly interacts with the month/year stepper at least once. ----
+const DEFAULT_TO_CURRENT_MONTH = true;
+
+// TODO: point this at your real API host.
+// const API_BASE_URL = 'https://your-api-domain.com/api';
+
+const TXN_TYPE = 'monthly_sales_target';
+
+// TODO: adjust these to match the actual key names your browse API
+// returns for each row. Everything downstream (mapping, rendering,
+// the d1 payload on save) is driven off this object, so this is the
+// only place you should need to touch for field-name changes.
+const FIELD = {
+    id: 'id', // unique row identifier
+    name: 'name', // display name
+    code: 'code', // secondary label (optional — omit/blank if unused)
+    target: 'target', // the target-amount field, both read on browse and written on save
+};
+
+type TargetRow = {
+    id: string;
+    name: string;
+    code?: string;
+    target: string; // kept as string to match TextInput value
+    raw: Record<string, any>; // the untouched row exactly as browse returned it
+};
+
+const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const MONTH_SHORT = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+function formatMonthYear(month: number, year: number) {
+    return `${MONTH_NAMES[month]} ${year}`;
+}
+
+
+// async function saveTargets(
+//     month: number,
+//     year: number,
+//     rows: TargetRow[]
+// ): Promise<{ success: boolean; message?: string }> {
+//     const d1 = rows.map((r) => ({
+//         ...r.raw,
+//         [FIELD.target]: r.target,
+//     }));
+
+//     const response = await callApi<{ success?: boolean; message?: string }>(
+//         'add_edit_monthly_sales_target',
+//         'POST',
+//         {
+//             prptype: userPtype,
+//             yearno: year,
+//             monthno: month + 1, // TODO: same 0-based/1-based note as above — keep this consistent with browse
+//             d1,
+//         }
+//     );
+
+//     return { success: response?.success !== false, message: response?.message };
+// }
+
+export default function MonthlySalesTargetScreen({
+    token,
+    apiBase,
+}: {
+    token: string;
+    apiBase: string;
+}) {
+    const now = new Date();
+    const [month, setMonth] = useState(now.getMonth());
+    const [year, setYear] = useState(now.getFullYear());
+    const [periodPicked, setPeriodPicked] = useState(DEFAULT_TO_CURRENT_MONTH);
+
+    // Quick-jump picker (calendar-style modal opened by tapping the filter)
+    const [pickerVisible, setPickerVisible] = useState(false);
+    const [pickerYear, setPickerYear] = useState(now.getFullYear());
+
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [rows, setRows] = useState<TargetRow[]>([]);
+    const [selected, setSelected] = useState<Record<string, boolean>>({});
+    const [errors, setErrors] = useState<Record<string, boolean>>({});
+
+    let cancelToken: any;
+
+    const getRequestConfig = (props: any) => ({
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        params: props.params,
+        cancelToken: cancelToken?.token,
+    });
+
+    const loadTargetsForPeriod = async (month: number, year: number) => {
+        setLoading(true);
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        try {
+            const payload = {
+                // prptype: userPtype,
+                // // yearno: year,
+                // yearno: '27',
+                // // monthno: month + 1,
+                // monthno: '07',
+                // txntype: "monthly_sales_target",
+
+                prptype: "S",
+                monthno: "07",
+                yearno: "27",
+                txntype: "monthly_sales_target"
+            };
+
+            console.log("payload", payload);
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`,
+                getRequestConfig({
+                    params: { ...payload },
+                }),
+            );
+
+            console.log("response", response);
+            // if (response.data.success && response.data.response.data.length > 0) {
+            //     setRows(response.data.response.data);
+            // } else {
+            //     setRows([]);
+            // }
+        } catch (error) {
+            console.log("Browse API Error:", error);
+            setRows([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const saveTargets = async () => {
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+        try {
+            const payload = {
+                prptype: userPtype,
+                yearno: year,
+                monthno: month + 1,
+                d1: rows,
+            };
+
+            console.log("Save Payload :", payload);
+
+            const response = await axios.post(
+                `${API_BASE_URL}/add_edit_monthly_sales_target`,
+                payload
+            );
+
+            console.log("Save Response :", response.data);
+
+            if (response.data.success) {
+                Alert.alert("Success", "Data Saved Successfully");
+            }
+
+        } catch (error) {
+            console.log("Save API Error :", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!periodPicked) return;
+
+        setLoading(true);
+        setSelected({});
+        setErrors({});
+
+        loadTargetsForPeriod(month, year);
+    }, [month, year, periodPicked]);
+
+    const shiftMonth = (delta: number) => {
+        setPeriodPicked(true);
+        let m = month + delta;
+        let y = year;
+        if (m < 0) {
+            m = 11;
+            y -= 1;
+        } else if (m > 11) {
+            m = 0;
+            y += 1;
+        }
+        setMonth(m);
+        setYear(y);
+    };
+
+    const openPicker = () => {
+        setPickerYear(year);
+        setPickerVisible(true);
+    };
+
+    const shiftPickerYear = (delta: number) => setPickerYear((y) => y + delta);
+
+    const selectMonthFromPicker = (m: number) => {
+        setMonth(m);
+        setYear(pickerYear);
+        setPeriodPicked(true);
+        setPickerVisible(false);
+    };
+
+    const allSelected = rows.length > 0 && rows.every((r) => selected[r.id]);
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelected({});
+        } else {
+            const next: Record<string, boolean> = {};
+            rows.forEach((r) => {
+                next[r.id] = true;
+            });
+            setSelected(next);
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelected((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const handleChangeTarget = (id: string, value: string) => {
+        // digits only (allow empty while typing)
+        const cleaned = value.replace(/[^0-9]/g, '');
+        setRows((prev) => prev.map((r) => (r.id === id ? { ...r, target: cleaned } : r)));
+        if (errors[id]) {
+            setErrors((prev) => ({ ...prev, [id]: false }));
+        }
+    };
+
+    const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).length, [selected]);
+
+    const handleSaveSelected = async () => {
+        const selectedRows = rows.filter((r) => selected[r.id]);
+
+        if (selectedRows.length === 0) {
+            Alert.alert("Nothing selected", "Select at least one row to save.");
+            return;
+        }
+
+        const nextErrors: Record<string, boolean> = {};
+        let hasError = false;
+
+        selectedRows.forEach((r) => {
+            if (!r.target.trim()) {
+                nextErrors[r.id] = true;
+                hasError = true;
+            }
+        });
+
+        if (hasError) {
+            setErrors(nextErrors);
+            Alert.alert("Target required", "Enter a target value for every selected row.");
+            return;
+        }
+
+        setSaving(true);
+
+        try {
+            // agar sirf selected rows save karni hain
+            setRows(selectedRows);
+
+            await saveTargets();
+
+            Alert.alert("Success", "Data Saved Successfully");
+            setSelected({});
+        } catch (error) {
+            console.log(error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const renderRow = ({ item }: { item: TargetRow }) => {
+        const isChecked = !!selected[item.id];
+        const hasError = !!errors[item.id];
+        return (
+            <View style={styles.row}>
+                <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() => toggleSelect(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                    <View style={[styles.checkboxBox, isChecked && styles.checkboxBoxChecked]}>
+                        {isChecked && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                </TouchableOpacity>
+
+                <View style={styles.rowInfo}>
+                    <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
+                    {!!item.code && <Text style={styles.rowCode}>{item.code}</Text>}
+                </View>
+
+                <TextInput
+                    style={[styles.targetInput, hasError && styles.targetInputError]}
+                    value={item.target}
+                    onChangeText={(v) => handleChangeTarget(item.id, v)}
+                    placeholder="Target"
+                    placeholderTextColor="#7C93A6"
+                    keyboardType="numeric"
+                />
+            </View>
+        );
+    };
+
+    return (
+        <SafeAreaView style={styles.safe} edges={['top']} >
+            <Text style={styles.title}>Monthly Sales Target</Text>
+
+            {/* Month / Year filter */}
+            <View style={styles.filterCard}>
+                <TouchableOpacity
+                    style={styles.chevronBtn}
+                    onPress={() => shiftMonth(-1)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Ionicons name="chevron-back" size={18} color={T.copper} />
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.filterCenter} onPress={openPicker} activeOpacity={0.75}>
+                    <Ionicons name="calendar-outline" size={16} color="#A9C0D4" style={{ marginRight: 8 }} />
+                    <View>
+                        <Text style={styles.filterLabel}>{formatMonthYear(month, year)}</Text>
+                        <Text style={styles.filterSubLabel}>Tap to jump to a month</Text>
+                    </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.chevronBtn}
+                    onPress={() => shiftMonth(1)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Ionicons name="chevron-forward" size={18} color={T.copper} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Quick-jump modal: pick a year, then tap a month */}
+            <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
+                <Pressable style={styles.modalOverlay} onPress={() => setPickerVisible(false)}>
+                    <Pressable style={styles.modalCard} onPress={() => { }}>
+                        <View style={styles.modalYearRow}>
+                            <TouchableOpacity
+                                style={styles.chevronBtn}
+                                onPress={() => shiftPickerYear(-1)}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Ionicons name="chevron-back" size={18} color={T.copper} />
+                            </TouchableOpacity>
+
+                            <Text style={styles.modalYearText}>{pickerYear}</Text>
+
+                            <TouchableOpacity
+                                style={styles.chevronBtn}
+                                onPress={() => shiftPickerYear(1)}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <Ionicons name="chevron-forward" size={18} color={T.copper} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.monthGrid}>
+                            {MONTH_SHORT.map((label, m) => {
+                                const isActive = m === month && pickerYear === year;
+                                const isCurrent = m === now.getMonth() && pickerYear === now.getFullYear();
+                                return (
+                                    <TouchableOpacity
+                                        key={label}
+                                        style={[
+                                            styles.monthCell,
+                                            isActive && styles.monthCellActive,
+                                            isCurrent && !isActive && styles.monthCellCurrent,
+                                        ]}
+                                        onPress={() => selectMonthFromPicker(m)}
+                                    >
+                                        <Text style={[styles.monthCellText, isActive && styles.monthCellTextActive]}>{label}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
+                        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setPickerVisible(false)}>
+                            <Text style={styles.modalCloseText}>Close</Text>
+                        </TouchableOpacity>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {!periodPicked ? (
+                <View style={styles.center}>
+                    <Text style={styles.hint}>Use + / - above to pick a month, then the list will load here.</Text>
+                </View>
+            ) : loading ? (
+                <View style={styles.center}>
+                    <ActivityIndicator color={T.copper} size="large" />
+                </View>
+            ) : (
+                <>
+                    <View style={styles.selectAllRow}>
+                        <TouchableOpacity style={styles.checkbox} onPress={toggleSelectAll}>
+                            <View style={[styles.checkboxBox, allSelected && styles.checkboxBoxChecked]}>
+                                {allSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                            </View>
+                        </TouchableOpacity>
+                        <Text style={styles.selectAllText}>
+                            Select all {selectedCount > 0 ? `(${selectedCount} selected)` : ''}
+                        </Text>
+                    </View>
+
+                    <FlatList
+                        data={rows}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderRow}
+                        contentContainerStyle={styles.listContent}
+                        ListEmptyComponent={
+                            <View style={styles.center}>
+                                <Text style={styles.hint}>No parties found for this period.</Text>
+                            </View>
+                        }
+                    />
+
+                    <TouchableOpacity
+                        style={[styles.saveBtn, saving && styles.btnDisabled]}
+                        onPress={handleSaveSelected}
+                        disabled={saving}
+                        activeOpacity={0.85}
+                    >
+                        {saving ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.saveBtnText}>
+                                Save Selected{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                </>
+            )}
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    safe: { flex: 1, backgroundColor: T.nav },
+    title: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#fff',
+        paddingHorizontal: 18,
+        paddingTop: 16,
+        paddingBottom: 8,
+    },
+    filterCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        marginHorizontal: 18,
+        marginBottom: 14,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        shadowColor: '#000',
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
+    },
+    chevronBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(210,140,80,0.4)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    filterCenter: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 8,
+    },
+    filterLabel: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '800',
+        textAlign: 'center',
+    },
+    filterSubLabel: {
+        color: '#7C93A6',
+        fontSize: 10,
+        textAlign: 'center',
+        marginTop: 2,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 30,
+    },
+    modalCard: {
+        width: '100%',
+        maxWidth: 340,
+        backgroundColor: T.nav,
+        borderRadius: 20,
+        padding: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    modalYearRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    modalYearText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '900',
+        marginHorizontal: 28,
+        minWidth: 60,
+        textAlign: 'center',
+    },
+    monthGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    monthCell: {
+        width: '31%',
+        paddingVertical: 12,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    monthCellCurrent: { borderColor: 'rgba(210,140,80,0.5)' },
+    monthCellActive: { backgroundColor: T.copper },
+    monthCellText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700' },
+    monthCellTextActive: { color: '#fff' },
+    modalCloseBtn: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+    modalCloseText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700' },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
+    hint: { color: '#A9C0D4', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+    selectAllRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingBottom: 8,
+    },
+    selectAllText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700', marginLeft: 8 },
+    listContent: { paddingHorizontal: 18, paddingBottom: 90 },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 8,
+    },
+    checkbox: { marginRight: 10 },
+    checkboxBox: {
+        width: 20,
+        height: 20,
+        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: '#6F91AD',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    checkboxBoxChecked: { backgroundColor: T.copper, borderColor: T.copper },
+    rowInfo: { flex: 1, marginRight: 10 },
+    rowName: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    rowCode: { color: '#7C93A6', fontSize: 11, marginTop: 2 },
+    targetInput: {
+        width: 100,
+        height: 40,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#33506A',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        color: '#fff',
+        paddingHorizontal: 10,
+        fontSize: 14,
+        textAlign: 'right',
+    },
+    targetInputError: { borderColor: '#E38B8B' },
+    saveBtn: {
+        position: 'absolute',
+        left: 18,
+        right: 18,
+        bottom: 16,
+        height: 52,
+        borderRadius: 15,
+        backgroundColor: T.copper,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    btnDisabled: { opacity: 0.6 },
+    saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+});

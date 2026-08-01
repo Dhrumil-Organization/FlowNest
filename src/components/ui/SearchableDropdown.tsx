@@ -120,7 +120,14 @@ export function SearchableDropdown({ label, placeholder, value, items, onSelect,
                     </View>
 
                     {/* List — FlatList handles 100k+ rows efficiently */}
+                    {/* FIX: no explicit height/flex was set here, so without
+                        anything claiming the remaining modal space, the list
+                        could size itself to just fit however many rows the
+                        current search matched — visibly shrinking as you
+                        typed a narrower query. flex:1 keeps it pinned to the
+                        full available height regardless of result count. */}
                     <FlatList
+                        style={s.list}
                         data={filtered}
                         keyExtractor={i => i.id}
                         initialNumToRender={30}
@@ -196,6 +203,8 @@ const s = StyleSheet.create({
     countBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 },
     countTxt:     { fontSize: 11, color: T.muted },
     clearTxt:     { fontSize: 11, fontWeight: '700', color: T.copper },
+
+    list:         { flex: 1 },
 
     // List items — fixed height 60px for getItemLayout
     item:         { height: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: T.alt },

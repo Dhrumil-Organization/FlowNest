@@ -1,0 +1,27 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+
+import { API } from '@/common/API/dynamicAPI';
+import QuarterSummaryScreen from '@/components/QuarterWiseDispatch/QuarterSummaryScreen';
+
+export default function QuarterWiseDispatch() {
+    const [token, setToken] = useState('');
+    const [apiBase, setApiBase] = useState('');
+
+    useEffect(() => {
+        const load = async () => {
+            const t = await AsyncStorage.getItem('access_token');
+            // Agar aapke project me base url alag se AsyncStorage/env me store hoti hai
+            // to yaha se utha lo, warna common/API/dynamicAPI wala API object hi
+            // andar ke screens (StockScreen etc) use kar rahe hai — apiBase sirf
+            // useExpenseData hook (ExpenseScreen) ke liye chahiye.
+            const base = await AsyncStorage.getItem('api_base_url');
+
+            setToken(t || '');
+            setApiBase(base || '');
+        };
+        load();
+    }, []);
+
+    return <QuarterSummaryScreen token={token} apiBase={API} />;
+}

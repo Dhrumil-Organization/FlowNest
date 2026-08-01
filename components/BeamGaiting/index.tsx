@@ -358,7 +358,7 @@ const BeamGaiting: React.FC<{ token: string, username: string }> = ({ token, use
 
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+            {/* {isLoading && <FullScreenLoader />} */}
             <HeaderBarwithBack
                 userName={username}
                 header={'Beam Gaiting'}

@@ -30,6 +30,9 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
+import Icon from '@expo/vector-icons/MaterialIcons';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -90,6 +93,7 @@ export type FabricSpec = ReturnType<typeof calcSpec>;
 function calcSpec(d: any) {
     const s = (Number(d.warp_shrink) || 0) / 100;   // warp take-up
     const gf = (Number(d.gf_shrink) || 0) / 100;    // greige→finish shrink
+    const ws = (Number(d.weft_shrink) || 0) / 100;  // weft crimp / width-direction take-up
     const basis: 'reed' | 'greige' = d.width_basis === 'greige' ? 'greige' : 'reed';
 
     // reed ↔ greige width are interchangeable
@@ -108,7 +112,9 @@ function calcSpec(d: any) {
 
     const totalEnds = epiLoom * reed;
     const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;          // "+2 picks on table"
-    const wf = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+    const pickFactor = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+    const weftTakeupFactor = ws > 0 && ws < 1 ? 1 / (1 - ws) : 1;
+    const wf = pickFactor * weftTakeupFactor;
 
     // ends are conserved loom → greige → finished
     const epiGreige = widthGreige > 0 ? totalEnds / widthGreige : 0;
@@ -153,6 +159,7 @@ function calcSpec(d: any) {
 
     return {
         basis, reed, widthGreige, finWidthIn,
+        reedCount: Number(d.reed_count) || 0, weftShrink: ws * 100,
         epiLoom, ppiLoom, ppiTable, totalEnds,
         epiGreige, epiFinished, ppiFinished,
         warpGLM, weftGLM, greigGLM, greigGSM, finGLM, finGSM,
@@ -341,7 +348,7 @@ function LiveSpecPanel({ design }: { design: any }) {
                     <Text style={ls.formulaTxt}>
                         Reed and greige width are interchangeable: greige width = reed × (1 − warp shrink).
                         Total ends = ΣEPI(loom) × reed. EPI greige = ΣEPI ÷ (1 − warp shrink),
-                        PPI greige = ΣPPI + 2. Greige GSM = greige GLM ÷ width(m).
+                        PPI greige = ΣPPI + 2. Weft consumption includes weft crimp factor 1 ÷ (1 − weft shrink). Greige GSM = greige GLM ÷ width(m).
                         Finished GLM = greige GLM ÷ (1 − finish shrink); mass conserved.
                         Finished EPI = total ends ÷ finished width (ends conserved).
                         Finished PPI = PPI greige ÷ (1 − finish shrink) — picks pack closer as length shrinks.
@@ -406,53 +413,41 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
     const [search, setSearch] = useState('');
     const [yarns, setYarns] = useState<YarnMaster[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const loadYarns = useCallback(async (q = '') => {
         if (!visible) return;
         setLoading(true);
+        setError('');
         try {
             const res = await (DesignAPI.yarns as any)({
-                yearno: yearno,
-                prpcode: prpcode,
-                strcode: strcode,
+                yearno,
+                prpcode,
+                strcode,
                 limit: 50,
                 search: q.trim() || undefined,
             });
-            setYarns(res?.data?.data || []);
-            console.log('YARN SEARCH OK', {
-                search: q,
-                count: res?.data?.data?.length || 0,
-                url: res?.config?.url,
-                baseURL: res?.config?.baseURL,
-                params: res?.config?.params,
-            });
+            setYarns(Array.isArray(res?.data?.data) ? res.data.data : []);
         } catch (e: any) {
-            console.log('YARN SEARCH ERROR', {
-                message: e?.message,
-                code: e?.code,
-                status: e?.response?.status,
-                data: e?.response?.data,
-                baseURL: e?.config?.baseURL,
-                url: e?.config?.url,
-                params: e?.config?.params,
-            });
             setYarns([]);
+            setError(e?.response?.data?.message || 'Unable to load yarns. Please try again.');
         } finally {
             setLoading(false);
         }
-    }, [visible]);
+    }, [visible, yearno, prpcode, strcode]);
 
     useEffect(() => {
         if (!visible) return;
-        const t = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
-        return () => clearTimeout(t);
+        const timer = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
+        return () => clearTimeout(timer);
     }, [visible, search, loadYarns]);
 
-    const closePicker = () => {
+    const closePicker = useCallback(() => {
         onClose();
         setSearch('');
         setYarns([]);
-    };
+        setError('');
+    }, [onClose]);
 
     return (
         <Modal visible={visible} animationType="slide" transparent onRequestClose={closePicker}>
@@ -460,39 +455,56 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                 <View style={yp.sheet}>
                     <View style={yp.handle} />
                     <View style={yp.header}>
-                        <Text style={yp.title}>{title}</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={yp.title}>{title}</Text>
+                            <Text style={yp.pickerHint}>One result per Main Yarn Code</Text>
+                        </View>
                         <TouchableOpacity onPress={closePicker} style={yp.closeBtn}>
                             <Text style={yp.closeTxt}>✕</Text>
                         </TouchableOpacity>
                     </View>
                     <View style={yp.searchWrap}>
-                        <TextInput
-                            value={search}
-                            onChangeText={setSearch}
-                            placeholder="Search yarn name / code / count..."
-                            placeholderTextColor={T.muted}
-                            style={yp.search}
-                            autoFocus
-                        />
+                        <TextInput value={search} onChangeText={setSearch}
+                            placeholder="Search name, code or count..." placeholderTextColor={T.muted}
+                            style={yp.search} autoFocus autoCorrect={false} returnKeyType="search" />
                     </View>
-                    {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 10 }} />}
+                    {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 12 }} />}
+                    {!loading && !!error && (
+                        <View style={yp.errorBox}>
+                            <Text style={yp.errorText}>{error}</Text>
+                            <TouchableOpacity onPress={() => loadYarns(search)} style={yp.retryButton}>
+                                <Text style={yp.retryText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                     <FlatList
                         data={yarns}
-                        keyExtractor={(y, idx) => `${y.mi_id}-${idx}`}
+                        keyExtractor={(y) => String(y.main_yarn_code ?? y.m_itm_code ?? y.mi_id)}
                         keyboardShouldPersistTaps="handled"
-                        renderItem={({ item: y }) => (
-                            <TouchableOpacity style={yp.row} activeOpacity={0.7}
-                                onPress={() => { onSelect(y); closePicker(); }}>
-                                <Text style={yp.yarnName}>{y.name}</Text>
-                                <Text style={yp.yarnSub}>
-                                    Code {y.mi_id} · {y.cnt}/1 {y.sys}{y.price > 0 ? ` · ₹${y.price}/kg` : ''}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                        ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />}
-                        ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: T.muted, textAlign: 'center' }}>
-                            {search.trim() ? 'No yarns found' : 'Type to search yarns, or choose from the first 50 results'}
-                        </Text> : null}
+                        renderItem={({ item: y }) => {
+                            const mainCode = String(y.main_yarn_code ?? y.m_itm_code ?? y.mi_id ?? '');
+                            const itemCode = String(y.itm_code ?? y.mi_id ?? '');
+                            const countText = Number(y.cnt) > 0 ? `${Number(y.cnt)} ${y.sys || ''}`.trim() : y.sys || 'Count unavailable';
+                            return (
+                                <TouchableOpacity style={yp.yarnRow} activeOpacity={0.7}
+                                    onPress={() => { onSelect(y); closePicker(); }}>
+                                    <View style={yp.codeBadge}>
+                                        <Text style={yp.codeBadgeLabel}>MAIN CODE</Text>
+                                        <Text style={yp.codeBadgeValue}>{mainCode}</Text>
+                                    </View>
+                                    <View style={yp.yarnContent}>
+                                        <Text style={yp.yarnName} numberOfLines={2}>{y.name || y.itm_name || 'Unnamed yarn'}</Text>
+                                        <Text style={yp.yarnSub}>{countText}{Number(y.price) > 0 ? ` · ₹${Number(y.price).toLocaleString('en-IN')}/kg` : ''}</Text>
+                                        {!y.is_main_yarn_item && <Text style={yp.fallbackText}>ERP item {itemCode} · family representative</Text>}
+                                    </View>
+                                    <Text style={yp.selectArrow}>›</Text>
+                                </TouchableOpacity>
+                            );
+                        }}
+                        ItemSeparatorComponent={() => <View style={yp.separator} />}
+                        ListEmptyComponent={!loading && !error ? (
+                            <Text style={yp.emptyText}>{search.trim() ? 'No matching Main Yarn Codes found' : 'Type to search, or select from the first 50 Main Yarn Codes'}</Text>
+                        ) : null}
                         contentContainerStyle={{ paddingBottom: 40 }}
                     />
                 </View>
@@ -724,6 +736,20 @@ const yp = StyleSheet.create({
     row: { paddingHorizontal: 16, paddingVertical: 12 },
     yarnName: { fontSize: 14, fontWeight: '600', color: T.ink },
     yarnSub: { fontSize: 12, color: T.muted, marginTop: 2 },
+    pickerHint: { fontSize: 10, color: T.muted, marginTop: 2 },
+    yarnRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+    codeBadge: { width: 78, minHeight: 48, borderRadius: 9, backgroundColor: T.sub, borderWidth: 1, borderColor: T.border, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 6 },
+    codeBadgeLabel: { fontSize: 8, fontWeight: '700', color: T.muted, letterSpacing: 0.4 },
+    codeBadgeValue: { fontSize: 13, fontWeight: '800', color: T.copper, marginTop: 2 },
+    yarnContent: { flex: 1, paddingHorizontal: 12 },
+    fallbackText: { fontSize: 9, color: T.muted, marginTop: 3 },
+    selectArrow: { fontSize: 25, color: T.muted, paddingLeft: 4 },
+    separator: { height: 1, backgroundColor: T.border, marginLeft: 106 },
+    emptyText: { paddingHorizontal: 24, paddingVertical: 30, color: T.muted, textAlign: 'center', lineHeight: 18 },
+    errorBox: { margin: 16, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E7B9B9', backgroundColor: '#FFF4F4', alignItems: 'center' },
+    errorText: { fontSize: 12, color: '#9B3030', textAlign: 'center' },
+    retryButton: { marginTop: 8, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 7, backgroundColor: T.copper },
+    retryText: { fontSize: 12, fontWeight: '700', color: '#fff' },
 });
 
 // ── Yarn line row (✅ NEW: Sizing chip + selvedge/ENDS mode) ──
@@ -738,7 +764,8 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
             <View style={yl.row}>
                 <View style={{ flex: 1 }}>
                     <Text style={yl.name}>{yarn.name}</Text>
-                    <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}</Text>
+                    <Text style={yl.mainCode}>Main Yarn {String(yarn.main_yarn_code ?? yarn.m_itm_code ?? yarn.mi_id ?? '')}</Text>
+                    <Text style={yl.sub}>{Number(yarn.cnt) > 0 ? `${Number(yarn.cnt)} ${yarn.sys || ''}`.trim() : yarn.sys || 'Count unavailable'}</Text>
                 </View>
                 {type === 'warp' && (
                     <TouchableOpacity style={[yl.sizingChip, yarn.sizing && yl.sizingChipOn]}
@@ -766,6 +793,7 @@ const yl = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     name: { fontSize: 13, fontWeight: '700', color: T.ink },
     sub: { fontSize: 11, color: T.muted, marginTop: 2 },
+    mainCode: { fontSize: 10, fontWeight: '700', color: T.copper, marginTop: 2 },
     sizingChip: { borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: T.sub },
     sizingChipOn: { backgroundColor: T.copper + '22', borderColor: T.copper },
     sizingTxt: { fontSize: 10, fontWeight: '700', color: T.muted },
@@ -922,7 +950,7 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                                         return (
                                             <>
                                                 {!!det.weave && <Text style={ct.expandWeave}>{det.weave}{det.note ? ` · ${det.note}` : ''}</Text>}
-                                                {((det.warp_yarns?.length ?? 0) > 0 || (det.weft_yarns?.length ?? 0) > 0) && (
+                                                {((det.warp_yarns?.length ?? 0) > 0 || (det.weft_yarns?.length ?? 0) > 0 || (det.selvedge_yarns?.length ?? 0) > 0) && (
                                                     <>
                                                         <Text style={ct.expandSec}>YARNS</Text>
                                                         {det.warp_yarns?.map((y: any, i: number) => (
@@ -939,8 +967,20 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                                                                 <Text style={ct.yarnEpi}>{Number(y.ppi).toFixed(2)} PPI</Text>
                                                             </View>
                                                         ))}
+                                                        {det.selvedge_yarns?.map((y: any, i: number) => (
+                                                            <View key={`s${i}`} style={ct.yarnRow}>
+                                                                <View style={ct.yarnBadgeSelvedge}><Text style={ct.yarnBadgeTxt}>SELV</Text></View>
+                                                                <Text style={ct.yarnName}>{y.cnt ? `${y.cnt} ` : ''}{y.name}{y.blend_ratio ? ` ${y.blend_ratio}` : ''}</Text>
+                                                                <Text style={ct.yarnEpi}>{Number(y.ends).toFixed(0)} ENDS</Text>
+                                                            </View>
+                                                        ))}
                                                     </>
                                                 )}
+                                                <View style={ct.designMetaRow}>
+                                                    <Text style={ct.designMetaText}>Reed Count: {Number(det.reed_count) > 0 ? Number(det.reed_count) : '—'}</Text>
+                                                    <Text style={ct.designMetaText}>Warp Shrink: {Number(det.warp_shrink || 0).toFixed(2)}%</Text>
+                                                    <Text style={ct.designMetaText}>Weft Shrink: {Number(det.weft_shrink || 0).toFixed(2)}%</Text>
+                                                </View>
                                                 {hasC && (
                                                     <View style={ct.statsRow}>
                                                         <View style={ct.statBox}>
@@ -1112,6 +1152,9 @@ const ct = StyleSheet.create({
     cwTitle: { fontSize: 11, fontWeight: '700', color: T.muted, letterSpacing: 0.4 },
     cwAddBtn: { backgroundColor: T.copper + '22', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
     cwAddTxt: { fontSize: 12, fontWeight: '700', color: T.copper },
+    yarnBadgeSelvedge: { backgroundColor: '#7B6D8D22', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3, marginRight: 8 },
+    designMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+    designMetaText: { fontSize: 10, color: T.muted, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1119,7 +1162,7 @@ const ct = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 const EMPTY_FORM = {
     code: '', category: '', type: 'YD',
-    weave: '', reed_space: 0, greige_width: 0, warp_shrink: 0, gf_shrink: 0,
+    weave: '', reed_count: 0, reed_space: 0, greige_width: 0, warp_shrink: 0, weft_shrink: 0, gf_shrink: 0,
     fin_width: 0, warp_wastage: 0, weft_wastage: 0,
     warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
 };
@@ -1127,6 +1170,8 @@ const EMPTY_FORM = {
 function DesignTab({ design, onRefresh, onCancelEdit }: {
     design: Design | null; onRefresh: () => void; onCancelEdit: () => void;
 }) {
+    const { prpcode, strcode, yearno } = useERP();
+
     const [saving, setSaving] = useState(false);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
@@ -1136,7 +1181,9 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
         if (design) setForm({
             ...EMPTY_FORM, ...design,
             width_basis: (design as any).width_basis ?? 'reed',
+            reed_count: (design as any).reed_count ?? 0,
             greige_width: (design as any).greige_width ?? 0,
+            weft_shrink: (design as any).weft_shrink ?? 0,
             selvedge_yarns: (design as any).selvedge_yarns ?? [],
             warp_wastage: (design as any).warp_wastage ?? 0,
             weft_wastage: (design as any).weft_wastage ?? 6,
@@ -1153,7 +1200,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
         set(key, [...(form[key] ?? []), {
-            mi_id: y.mi_id, itm_code: y.itm_code, m_itm_code: y.m_itm_code, prp_code: y.prp_code, str_code: y.str_code, name: y.name, sys: y.sys, cnt: y.cnt, base_price: y.price,
+            mi_id: y.mi_id, itm_code: y.itm_code, m_itm_code: y.m_itm_code, main_yarn_code: y.main_yarn_code, is_main_yarn_item: y.is_main_yarn_item, prp_code: y.prp_code, str_code: y.str_code, name: y.name, sys: y.sys, cnt: y.cnt, base_price: y.price,
             blend_ratio: null,
             ...(type === 'warp' ? { epi: 60, sizing: false } : type === 'weft' ? { ppi: 52 } : { ends: 0 }),
         }]);
@@ -1166,20 +1213,141 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
         set(`${type}_yarns`, (form[`${type}_yarns`] ?? []).filter((_: any, i: number) => i !== idx));
 
     const save = async () => {
+        if (!String(form.code || '').trim()) {
+            Alert.alert('Validation', 'Design code is required.');
+            return;
+        }
+
+        if (!String(form.category || '').trim()) {
+            Alert.alert('Validation', 'Category is required.');
+            return;
+        }
+
+        if (!Array.isArray(form.warp_yarns) || form.warp_yarns.length === 0) {
+            Alert.alert('Validation', 'At least one warp yarn is required.');
+            return;
+        }
+
+        if (!Array.isArray(form.weft_yarns) || form.weft_yarns.length === 0) {
+            Alert.alert('Validation', 'At least one weft yarn is required.');
+            return;
+        }
+
         setSaving(true);
+
         try {
-            // send both widths — backend resolves from width_basis
             const payload = {
                 ...form,
+
+                yearno,
+                YearNo: yearno,
+
+                prpcode,
+                PrpCode: prpcode,
+
+                strcode,
+                StrCode: strcode,
+
                 width_basis: 'reed',
-                reed_space: form.reed_space,
-                greige_width: autoGreige,
+                reed_count: Number(form.reed_count) || 0,
+                reed_space: Number(form.reed_space) || 0,
+                greige_width: Number(autoGreige) || 0,
+                warp_shrink: Number(form.warp_shrink) || 0,
+                weft_shrink: Number(form.weft_shrink) || 0,
+                warp_wastage: Number(form.warp_wastage) || 0,
+                weft_wastage: Number(form.weft_wastage) || 6,
+
+                warp_yarns: (form.warp_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    epi: Number(row.epi) || 0,
+                    sizing: Boolean(row.sizing),
+                })),
+
+                weft_yarns: (form.weft_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    ppi: Number(row.ppi) || 0,
+                })),
+
+                selvedge_yarns: (form.selvedge_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    ends: Number(row.ends) || 0,
+                })),
             };
-            if (design?.id) await DesignAPI.update(design.id, payload);
-            else await DesignAPI.create(payload);
-            Alert.alert('Saved', 'Design saved successfully'); onRefresh();
-        } catch (e: any) { Alert.alert('Error', e?.response?.data?.message || e?.message || 'Unable to save design'); }
-        finally { setSaving(false); }
+
+            console.log('DESIGN SAVE PAYLOAD', JSON.stringify(payload, null, 2));
+
+            const response = design?.id
+                ? await DesignAPI.update(design.id, payload)
+                : await DesignAPI.create(payload);
+
+            console.log('DESIGN SAVE FULL RESPONSE', {
+                status: response.status,
+                baseURL: response.config?.baseURL,
+                url: response.config?.url,
+                requestParams: response.config?.params,
+                responseData: response.data,
+            });
+
+            const saved = response?.data?.data;
+
+            if (
+                response?.data?.success !== true ||
+                !saved ||
+                !String(saved.id || '').trim()
+            ) {
+                throw new Error(
+                    'Server returned success without a saved engineering design ID.'
+                );
+            }
+
+            // Verify immediately by fetching the same record.
+            const verifyResponse = await DesignAPI.get(String(saved.id));
+            const verified = verifyResponse?.data?.data;
+
+            console.log('DESIGN SAVE VERIFY RESPONSE', {
+                id: saved.id,
+                responseData: verifyResponse.data,
+            });
+
+            if (!verified || String(verified.id) !== String(saved.id)) {
+                throw new Error(
+                    `Design ${saved.id} was returned by save but could not be read back.`
+                );
+            }
+
+            Alert.alert(
+                'Saved',
+                `Design saved successfully.\n\nID: ${saved.id}`
+            );
+
+            setForm({ ...EMPTY_FORM });
+            setPickerFor(null);
+            onRefresh();
+            if (design?.id) onCancelEdit();
+        } catch (e: any) {
+            console.log('DESIGN SAVE FINAL ERROR', {
+                message: e?.message,
+                status: e?.response?.status,
+                responseData: e?.response?.data,
+                baseURL: e?.config?.baseURL,
+                url: e?.config?.url,
+            });
+
+            Alert.alert(
+                'Design save failed',
+                String(
+                    e?.response?.data?.message ||
+                    e?.response?.data?.error ||
+                    e?.message ||
+                    'Unable to save design'
+                )
+            );
+        } finally {
+            setSaving(false);
+        }
     };
 
     const Chip = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
@@ -1249,6 +1417,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 <Text style={fm.label}>WEAVE / STRUCTURE</Text>
                 <TextInput value={form.weave ?? ''} onChangeText={v => set('weave', v)} placeholder="e.g. Dobby — fine dobby" placeholderTextColor={T.muted} style={fm.input} />
 
+                <Text style={fm.label}>REED COUNT</Text>
+                <Text style={fm.hint}>Reed specification used by production and reporting</Text>
+                <TextInput
+                    value={form.reed_count ? String(form.reed_count) : ''}
+                    onChangeText={v => set('reed_count', parseFloat(v) || 0)}
+                    keyboardType="decimal-pad"
+                    style={fm.input}
+                    placeholder="e.g. 72"
+                    placeholderTextColor={T.muted}
+                />
+
                 <Text style={fm.label}>WIDTH BASIS</Text>
                 <Text style={fm.hint}>Reed Space is the construction anchor. Greige Width is calculated automatically.</Text>
                 <View style={fm.chipRow}>
@@ -1284,6 +1463,20 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                         <Text style={fm.roTxt}>{autoGreige > 0 ? autoGreige.toFixed(1) : '—'}</Text>
                     </View>
                     <Text style={fm.unit}>"</Text>
+                </View>
+
+                <Text style={fm.label}>WEFT SHRINK / CRIMP</Text>
+                <Text style={fm.hint}>Used in weft consumption: factor = 1 ÷ (1 − shrink)</Text>
+                <View style={fm.inputRow}>
+                    <TextInput
+                        value={String(form.weft_shrink ?? '')}
+                        onChangeText={v => set('weft_shrink', parseFloat(v) || 0)}
+                        keyboardType="decimal-pad"
+                        style={[fm.input, { flex: 1 }]}
+                        placeholder="0"
+                        placeholderTextColor={T.muted}
+                    />
+                    <Text style={fm.unit}>%</Text>
                 </View>
 
                 <Text style={fm.label}>WARP YARNS</Text>
@@ -1874,6 +2067,7 @@ const yn = StyleSheet.create({
     badgeTxt: { fontSize: 10, fontWeight: '800' },
     name: { fontSize: 13, fontWeight: '700', color: T.ink },
     sub: { fontSize: 11, color: T.muted, marginTop: 2 },
+    mainCode: { fontSize: 10, fontWeight: '700', color: T.copper, marginTop: 2 },
     price: { fontSize: 13, fontWeight: '700', color: T.copper },
 });
 
@@ -1939,57 +2133,105 @@ export function DesignsScreen() {
     const [tab, setTab] = useState<Tab>('Catalog');
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
+    const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+    const router = useRouter();
 
     const handleSelectDesign = async (d: Design) => {
-        setSelected(d); setDetail(d);
-        try {
-            const res = await DesignAPI.get(d.id); setDetail({ ...d, ...res.data.data });
-            console.log("design res", res);
-        } catch { }
-
-        setTab('Design');
-    };
-
-    const handleAddSubDesign = async (d: Design) => {
         setSelected(d);
+        setDetail(d);
+
         try {
             const res = await DesignAPI.get(d.id);
             setDetail({ ...d, ...res.data.data });
         } catch {
             setDetail(d);
         }
+
+        setTab('Design');
+    };
+
+    const handleAddSubDesign = async (d: Design) => {
+        setSelected(d);
+
+        try {
+            const res = await DesignAPI.get(d.id);
+            setDetail({ ...d, ...res.data.data });
+        } catch {
+            setDetail(d);
+        }
+
         setTab('Colourway');
     };
 
-    const handleCancelEdit = () => { setSelected(null); setDetail(null); };
+    const handleCancelEdit = () => {
+        setSelected(null);
+        setDetail(null);
+    };
 
+    const handleDesignSaved = () => {
+        setSelected(null);
+        setDetail(null);
+        setCatalogRefreshKey(value => value + 1);
+        setTab('Catalog');
+    };
+
+    const goBack = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/');
+    };
     return (
         <ERPContext.Provider value={context}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-                <View style={hdr.wrap}>
-                    <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                    <Text style={hdr.title}>Designs</Text>
-                    {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
-                </View>
-                <TabBar active={tab} onChange={setTab} />
-                <View style={{ flex: 1 }}>
-                    {tab === 'Catalog' && <CatalogTab onSelectDesign={handleAddSubDesign} onEditDesign={(design) => {
-                        handleSelectDesign(design);
-                    }}
+            <SafeAreaView style={{ flex: 0, backgroundColor: T.nav }} edges={['top']} />
+            <StatusBar style="light" backgroundColor={T.nav} />
+
+            <View style={hdr.wrap}>
+                {/* <TouchableOpacity onPress={goBack} style={hdr.backBtn}>
+                    <Icon name="arrow-back-ios-new" size={18} color="#fff" />
+                </TouchableOpacity> */}
+
+                <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
+                <Text style={hdr.title}>Designs</Text>
+
+                {selectedDesign && (
+                    <Text style={hdr.sub}>
+                        Selected: {selectedDesign.code}
+                    </Text>
+                )}
+            </View>
+
+            <TabBar active={tab} onChange={setTab} />
+
+            <View style={{ flex: 1 }}>
+                {tab === 'Catalog' && (
+                    <CatalogTab
+                        key={catalogRefreshKey}
+                        onSelectDesign={handleAddSubDesign}
+                        onEditDesign={handleSelectDesign}
                     />
-                    }
-                    {tab === 'Design' && (
-                        <DesignTab
-                            design={detailDesign}
-                            onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
-                            onCancelEdit={handleCancelEdit}
-                        />
-                    )}
-                    {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
-                    {tab === 'Yarns' && <YarnsTab />}
-                    {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
-                </View>
-            </SafeAreaView>
+                )}
+
+                {tab === 'Design' && (
+                    <DesignTab
+                        design={detailDesign}
+                        onRefresh={handleDesignSaved}
+                        onCancelEdit={handleCancelEdit}
+                    />
+                )}
+
+                {tab === 'Colourway' && (
+                    <ColourwayTab
+                        design={detailDesign}
+                        onNavigateToCatalog={() => setTab('Catalog')}
+                    />
+                )}
+
+                {tab === 'Yarns' && <YarnsTab />}
+
+                {tab === 'Dyeing' && (
+                    <DyeingTab design={detailDesign} />
+                )}
+            </View>
+            {/* </SafeAreaView> */}
         </ERPContext.Provider>
     );
 }
@@ -1999,6 +2241,13 @@ const hdr = StyleSheet.create({
     brand: { fontSize: 10, fontWeight: '700', color: '#fff', letterSpacing: 1 },
     title: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 2 },
     sub: { fontSize: 11, color: '#fff', marginTop: 2 },
+    backBtn: {
+        position: 'absolute',
+        left: 15,
+        top: 15,
+        zIndex: 9999,
+        elevation: 9999,
+    }
 });
 
 const s = StyleSheet.create({

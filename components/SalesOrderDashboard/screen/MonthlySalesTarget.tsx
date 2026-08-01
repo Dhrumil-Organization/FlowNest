@@ -69,8 +69,8 @@ const FIELD = {
 
 type TargetRow = {
     id: string;
-    name: string;
-    code?: string;
+    sexename: string;
+    sexe?: string;
     target: string; // kept as string to match TextInput value
     raw: Record<string, any>; // the untouched row exactly as browse returned it
 };
@@ -148,39 +148,52 @@ export default function MonthlySalesTargetScreen({
         cancelToken: cancelToken?.token,
     });
 
+    const getFinancialYear = (year: number, month: number) => {
+        // month: 0 = Jan, ..., 11 = Dec
+        return month >= 3
+            ? String((year + 1) % 100).padStart(2, "0") // Apr-Dec => next year
+            : String(year % 100).padStart(2, "0");      // Jan-Mar => current year
+    };
+
     const loadTargetsForPeriod = async (month: number, year: number) => {
         setLoading(true);
         const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
             const payload = {
-                // prptype: userPtype,
-                // // yearno: year,
-                // yearno: '27',
-                // // monthno: month + 1,
-                // monthno: '07',
-                // txntype: "monthly_sales_target",
+                prptype: userPtype,
+                // yearno: year,
+                yearno: getFinancialYear(year, month),
+                // monthno: month + 1,
+                monthno: String(month + 1).padStart(2, '0'),
+                txntype: "monthly_sales_target",
 
-                prptype: "S",
-                monthno: "07",
-                yearno: "27",
-                txntype: "monthly_sales_target"
+                // prptype: "S",
+                // monthno: "07",
+                // yearno: "27",
+                // txntype: "monthly_sales_target"
             };
 
             console.log("payload", payload);
 
             const response = await axios.get(
-                `${API}/api/get_criterion`,
+                `${API}/api/monthly_sales_target_browse`,
                 getRequestConfig({
                     params: { ...payload },
                 }),
             );
 
             console.log("response", response);
-            // if (response.data.success && response.data.response.data.length > 0) {
-            //     setRows(response.data.response.data);
-            // } else {
-            //     setRows([]);
-            // }
+            if (
+                response.data.success && response.data.data?.monthly_sales_target?.length > 0) {
+                const targets = response.data.data.monthly_sales_target.map((item: any) => ({
+                    ...item,
+                    id: item.sexe,
+                }));
+                // setRows(response.data.data.monthly_sales_target);
+                setRows(targets);
+            } else {
+                setRows([]);
+            }
         } catch (error) {
             console.log("Browse API Error:", error);
             setRows([]);
@@ -193,12 +206,13 @@ export default function MonthlySalesTargetScreen({
     const saveTargets = async () => {
 
         const userPtype = await AsyncStorage.getItem('user_prptype');
+        const selectedRows = rows.filter((row) => selected[row.id]);
         try {
             const payload = {
                 prptype: userPtype,
                 yearno: year,
                 monthno: month + 1,
-                d1: rows,
+                d1: selectedRows,
             };
 
             console.log("Save Payload :", payload);
@@ -346,8 +360,8 @@ export default function MonthlySalesTargetScreen({
                 </TouchableOpacity>
 
                 <View style={styles.rowInfo}>
-                    <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
-                    {!!item.code && <Text style={styles.rowCode}>{item.code}</Text>}
+                    <Text style={styles.rowName} numberOfLines={1}>{item.sexename}</Text>
+                    {!!item.sexe && <Text style={styles.rowCode}>{item.sexe}</Text>}
                 </View>
 
                 <TextInput

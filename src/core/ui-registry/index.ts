@@ -1,6 +1,8 @@
-import './modules/management.ui';
-import './modules/design.ui';
+// import './modules/checking.ui';
+// import './modules/beam-close.ui';
 import './modules/core-navigation.ui';
+import './modules/design.ui';
+import './modules/management.ui';
 import './modules/production.ui';
 
 import { validateUiRegistry } from './uiRegistry';
@@ -13,7 +15,8 @@ import { flattenPermissionRegistry } from '../../registry';
 const knownPermissionPaths = new Set(flattenPermissionRegistry().map((entry) => entry.resourcePath));
 validateUiRegistry(knownPermissionPaths);
 
+export * from './components/PermissionUi';
+export * from './components/RegistryRenderer';
 export * from './types';
 export * from './uiRegistry';
-export * from './components/RegistryRenderer';
-export * from './components/PermissionUi';
+

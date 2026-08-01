@@ -5,27 +5,24 @@
 // ─────────────────────────────────────────────────────────────
 
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { AuthAPI } from '../../api/client';
-import { useAppSessionStore } from '../../stores/AppSessionStore';
-import { useAppStore } from '../../stores/AppStore';
+import { performLogin } from '../../core/authFlow';
+import { getBiometricLabel, isBiometricSupported } from '../../lib/biometricAuth';
 import { T } from '../../theme';
-import type { UserAccount } from '../../types';
 
 const COLORS = {
   background: '#F6F4F1',
@@ -39,28 +36,24 @@ const COLORS = {
   success: '#2BA84A',
 };
 
-function makeLegacyUser(user: any): UserAccount {
-  const first = user?.first_name || user?.displayname || user?.name || 'User';
-  const isSuper = Number(user?.is_superadmin || 0) !== 0;
-
-  return {
-    role: isSuper ? 'owner' : 'designer',
-    name: first,
-    glyph: isSuper ? '♔' : '◳',
-    sub: isSuper ? 'Owner / Super Admin' : 'Sudamo User',
-  };
-}
-
 export function RoleLoginScreen() {
   const router = useRouter();
-  const setSession = useAppSessionStore((s) => s.setLoggedIn);
-  const setBiometricEnabled = useAppSessionStore((s) => s.setBiometricEnabled);
-  const setLegacyUser = useAppStore((s) => s.setUser);
-
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [bioSupported, setBioSupported] = useState(false);
+  const [bioLabel, setBioLabel] = useState('screen lock');
+  const [rememberMe, setRememberMe] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supported = await isBiometricSupported();
+      setBioSupported(supported);
+      if (supported) setBioLabel(await getBiometricLabel());
+    })();
+  }, []);
 
   const canSubmit = useMemo(
     () => username.trim().length > 0 && password.trim().length > 0 && !loading,
@@ -71,50 +64,18 @@ export function RoleLoginScreen() {
     if (!canSubmit) return;
 
     setLoading(true);
-
     try {
-      const payload = {
-        name: username.trim(),
-        password: password.trim(),
-        noti_token: 'test',
-      };
-
-      const res = await AuthAPI.login(payload);
-      console.log('Login Response:', res);
-
-      if (!res.success) {
-        Alert.alert('Login failed', res.message || 'Invalid username or password.');
-        return;
+      const rememberAction = bioSupported && rememberMe ? 'save' : bioSupported ? 'clear' : undefined;
+      const outcome = await performLogin(username, password, rememberAction);
+      if (!outcome.success) {
+        Alert.alert('Login failed', outcome.message);
+      } else if (outcome.message) {
+        // e.g. "Remember me" was requested but the device lock confirm failed.
+        Alert.alert('Note', outcome.message);
       }
-
-      console.log('Login Response:', res);
-
-      const response = res.response || {};
-      const token = response.access_token;
-      const user = response.user;
-      const appSession = response?.app_session || {};
-
-      // if (!token || !user || !appSession) {
-      if (!token || !user) {
-        Alert.alert('Login error', 'Login response is missing token, user, or app_session.');
-        return;
-      }
-
-      await AsyncStorage.setItem('access_token', token);
-      await AsyncStorage.setItem('app_session', JSON.stringify(appSession));
-      await AsyncStorage.setItem('user_details', user?.first_name || user?.name || 'User');
-      await AsyncStorage.setItem('user_id', String(user?.id || 0));
-      await AsyncStorage.setItem(
-        'user_prptype',
-        response.userof || appSession.business_context?.prp_group || ''
-      );
-      await AsyncStorage.setItem('yno', appSession.business_context?.year_no || '');
-
-      setLegacyUser(makeLegacyUser(user));
-      setBiometricEnabled(false); // Biometric UI will be added cleanly in the next phase.
-      setSession({ token, user, appSession, rawLoginResponse: response });
-    } catch (e: any) {
-      Alert.alert('Server error', e?.message || 'Unable to login.');
+      // On success, AppSessionStore's token flips to truthy and the
+      // route watching it (app/new/role-login.tsx) redirects into the
+      // app automatically — no navigation call needed here.
     } finally {
       setLoading(false);
     }
@@ -221,13 +182,22 @@ export function RoleLoginScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.bioBox}>
-            <Text style={styles.bioIcon}>◉</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bioTitle}>Quick login coming next</Text>
-              <Text style={styles.bioSub}>Face ID / Fingerprint will be enabled after the session core is stable.</Text>
+          {bioSupported && (
+            <View style={styles.bioBox}>
+              <Text style={styles.bioIcon}>◉</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bioTitle}>Remember me</Text>
+                <Text style={styles.bioSub}>
+                  We'll confirm with your {bioLabel} and save this login for next time.
+                </Text>
+              </View>
+              <Switch
+                value={rememberMe}
+                onValueChange={setRememberMe}
+                trackColor={{ true: T.copper }}
+              />
             </View>
-          </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -331,5 +301,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
 export default RoleLoginScreen;

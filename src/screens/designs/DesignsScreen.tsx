@@ -1,35 +1,52 @@
 // ═══════════════════════════════════════════════════════════════
 // FILE: screens/designs/DesignsScreen.tsx
-// ✅ FIXED — adds the 3 MISSING pieces from the web artifact:
-//    1. GREIGE WIDTH field (auto = reed × (1 − warp shrink), or the
-//       entry field when width basis = "Greige width")
-//    2. "Sizing" toggle chip on each warp yarn row
-//    3. LIVE SPEC panel — reed/total-ends card, LOOM→GREIGE→FINISHED
-//       construction table, GSM/GLM grid, fibre blend bar, formula
-//       basis, Rapier-loom warning
-//    + corrected fabric math to match CostingEngine / web artifact:
-//       EPI greige  = total ends ÷ greige width   (ends conserved)
-//       EPI finished= total ends ÷ finished width
-//       PPI greige  = PPI(loom) + 2               (table pick)
-//       PPI finished= PPI greige ÷ (1 − finish shrink)
+// ✅ MERGED VERSION
+//    Base UI/structure = original DesignsScreen (Doc 1)
+//    Client            = new lightweight client (common/API/client.ts)
+//    Save logic        = validated + verified save from Doc 3
+//    Navigation        = Doc 3's catalogRefreshKey / handleDesignSaved
+//      so that after a successful save the user is taken back to
+//      Catalog and the list is force-refreshed.
 // ═══════════════════════════════════════════════════════════════
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    View, Text, ScrollView, FlatList, TextInput,
-    TouchableOpacity, StyleSheet, Alert, RefreshControl,
-    ActivityIndicator, Modal,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    findNodeHandle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
 import { T } from '../../theme';
-import client, { DesignAPI, type Design, type SubDesign, type YarnMaster, ItemAPI, type GetItem } from '../../api/legacyClient';
+import { usePermission } from '../../core/permissions';
+// ✅ CHANGED: import from the new lightweight client instead of legacyClient
+// import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
+import client, { Alias, AliasesTabProps, DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
 const r0 = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 const f1 = (n: number) => n > 0 ? n.toFixed(1) : '—';
 
-const TABS = ['Catalog', 'Design', 'Colourway', 'Yarns', 'Dyeing'] as const;
-type Tab = typeof TABS[number];
+const DESIGN_TABS = [
+    { key: 'Aliases', label: 'Aliases', resource: 'designs.aliases' },
+    { key: 'Catalog', label: 'Catalog', resource: 'designs.catalog' },
+    { key: 'Design', label: 'Design', resource: 'designs.design' },
+    { key: 'Colourway', label: 'Colourway', resource: 'designs.colourway' },
+    { key: 'Yarns', label: 'Yarns', resource: 'designs.yarns' },
+    { key: 'Dyeing', label: 'Dyeing', resource: 'designs.dyeing' },
+] as const;
+
+type DesignTabDefinition = typeof DESIGN_TABS[number];
+type Tab = DesignTabDefinition['key'];
 
 const getCurrentFinancialYear = () => {
     const currentDate = new Date();
@@ -158,14 +175,25 @@ const BLEND_COLORS: Record<string, string> = {
 };
 
 // ── TabBar ────────────────────────────────────────────────────
-function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+function TabBar({
+    active,
+    tabs,
+    onChange,
+}: {
+    active: Tab | null;
+    tabs: readonly DesignTabDefinition[];
+    onChange: (t: Tab) => void;
+}) {
     return (
         <View style={tb.bar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={tb.inner}>
-                {TABS.map(t => (
-                    <TouchableOpacity key={t} onPress={() => onChange(t)}
-                        style={[tb.tab, active === t && tb.tabActive]}>
-                        <Text style={[tb.label, active === t && tb.labelActive]}>{t}</Text>
+                {tabs.map(item => (
+                    <TouchableOpacity
+                        key={item.key}
+                        onPress={() => onChange(item.key)}
+                        style={[tb.tab, active === item.key && tb.tabActive]}
+                    >
+                        <Text style={[tb.label, active === item.key && tb.labelActive]}>{item.label}</Text>
                     </TouchableOpacity>
                 ))}
             </ScrollView>
@@ -214,7 +242,7 @@ function enrich(d: Design): Design & { epi_total: number; ppi_total: number } {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ✅ NEW — LIVE SPEC PANEL (the whole MISSING right-hand panel)
+// LIVE SPEC PANEL
 // ═══════════════════════════════════════════════════════════════
 function LiveSpecPanel({ design }: { design: any }) {
     const [showFormula, setShowFormula] = useState(false);
@@ -385,8 +413,6 @@ const ls = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════
 // SHARED: Server Search Yarn Picker Modal
-// Used by Warp / Weft / Selvedge. It does NOT depend on first 300 yarns.
-// Every search uses DEFAULT_PRPCODE, DEFAULT_STRCODE and the current financial year
 // ═══════════════════════════════════════════════════════════════
 function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: {
     visible: boolean;
@@ -524,58 +550,14 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
             console.log("ITEM RESPONSE =>", res.data);
 
             const list = res.data.response?.data || [];
-            // const filtered = q.trim()
-            //     ? list.filter((item: any) =>
-            //         item.ItmName?.toLowerCase().includes(q.toLowerCase()) ||
-            //         item.ItmCode?.toLowerCase().includes(q.toLowerCase())
-            //     )
-            //     : list;
-
-            // setCategories(list);
             setCategories(list);
-
-            // console.log("CATEGORY SEARCH OK", {
-            //     search: q,
-            //     count: list.length,
-            //     url: res.config?.url,
-            //     baseURL: res.config?.baseURL,
-            //     params: res.config?.params,
-            // });
-
         } catch (e: any) {
-
-            // console.log("CATEGORY SEARCH ERROR", {
-            //     message: e?.message,
-            //     code: e?.code,
-            //     status: e?.response?.status,
-            //     data: e?.response?.data,
-            //     baseURL: e?.config?.baseURL,
-            //     url: e?.config?.url,
-            //     params: e?.config?.params,
-            // });
-
             setCategories([]);
-
         } finally {
-
             setLoading(false);
-
         }
 
     }, [visible]);
-
-    // useEffect(() => {
-
-    //     if (!visible) return;
-
-    //     const t = setTimeout(
-    //         () => loadCategories(search),
-    //         search.trim() ? 350 : 0
-    //     );
-
-    //     return () => clearTimeout(t);
-
-    // }, [visible, search, loadCategories]);
 
     useEffect(() => {
         if (!visible) return;
@@ -629,10 +611,6 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
                         <TextInput
                             value={search}
                             onChangeText={setSearch}
-                            // onChangeText={(text) => {
-                            //     setSearch(text);
-                            //     loadCategories(text);
-                            // }}
                             placeholder="Search Category..."
                             placeholderTextColor={T.muted}
                             style={yp.search}
@@ -648,9 +626,7 @@ function CategoryPickerModal({ visible, onSelect, onClose, }: {
                     )}
 
                     <FlatList
-                        // data={categories}
                         data={filteredCategories}
-                        // keyExtractor={(item) => item.ItmCode}
                         keyExtractor={(item, index) =>
                             `${item.ItmCode}_${item.ItmName}_${index}`
                         }
@@ -718,7 +694,7 @@ const yp = StyleSheet.create({
     yarnSub: { fontSize: 12, color: T.muted, marginTop: 2 },
 });
 
-// ── Yarn line row (✅ NEW: Sizing chip + selvedge/ENDS mode) ──
+// ── Yarn line row ──
 function YarnLineRow({ yarn, type, onChange, onRemove }: {
     yarn: any; type: 'warp' | 'weft' | 'selvedge';
     onChange: (k: string, v: any) => void; onRemove: () => void;
@@ -803,8 +779,6 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                 params: res.config?.params,
                 status: res.status,
             });
-
-            console.log("Design res", res)
 
             const body: any = res.data;
             const rows: Design[] = Array.isArray(body?.data)
@@ -907,7 +881,6 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                                     {detailLoading ? (
                                         <ActivityIndicator color={T.copper} style={{ paddingVertical: 20 }} />
                                     ) : det ? (() => {
-                                        // ✅ uses the same corrected math as the Live Spec panel
                                         const fab = calcSpec(det);
                                         const hasC = det.epi_total > 0 && (det.reed_space ?? 0) > 0;
                                         const hasG = fab.greigGLM > 0;
@@ -1108,17 +1081,24 @@ const ct = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 2 — DESIGN  (Reed Space input + calculated Greige Width + Live Spec)
+// ✅ save() logic below is the validated + verified version (from the
+//    second file) adapted to the new lightweight client, which does
+//    NOT inject yearno/prpcode/strcode automatically — so we add them
+//    to the payload explicitly here.
 // ═══════════════════════════════════════════════════════════════
 const EMPTY_FORM = {
     code: '', category: '', type: 'YD',
     weave: '', reed_space: 0, greige_width: 0, warp_shrink: 0, gf_shrink: 0,
-    fin_width: 0, warp_wastage: 0, weft_wastage: 0,
+    fin_width: 58, warp_wastage: 0, weft_wastage: 0,
     warp_yarns: [], weft_yarns: [], selvedge_yarns: [], width_basis: 'reed',
 };
 
 function DesignTab({ design, onRefresh, onCancelEdit }: {
     design: Design | null; onRefresh: () => void; onCancelEdit: () => void;
 }) {
+    // ✅ needed because the new client doesn't auto-attach these
+    const { prpcode, strcode, yearno } = useERP();
+
     const [saving, setSaving] = useState(false);
     const [pickerFor, setPickerFor] = useState<'warp' | 'weft' | 'selvedge' | null>(null);
     const [form, setForm] = useState<any>({ ...EMPTY_FORM });
@@ -1132,13 +1112,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             selvedge_yarns: (design as any).selvedge_yarns ?? [],
             warp_wastage: (design as any).warp_wastage ?? 0,
             weft_wastage: (design as any).weft_wastage ?? 6,
+            fin_width: (design as any).fin_width ?? 58,
         });
         else setForm({ ...EMPTY_FORM });
     }, [design?.id]);
 
     const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
-    // ✅ MISSING #1 — greige width ⇄ reed space, kept in sync live
+    // greige width ⇄ reed space, kept in sync live
     const shrinkFrac = (Number(form.warp_shrink) || 0) / 100;
     const autoGreige = (Number(form.reed_space) || 0) * (1 - shrinkFrac);
 
@@ -1157,21 +1138,138 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const removeYarn = (type: string, idx: number) =>
         set(`${type}_yarns`, (form[`${type}_yarns`] ?? []).filter((_: any, i: number) => i !== idx));
 
+    // ✅ validated + verified save (ported logic)
     const save = async () => {
+        if (!String(form.code || '').trim()) {
+            Alert.alert('Validation', 'Design code is required.');
+            return;
+        }
+
+        if (!String(form.category || '').trim()) {
+            Alert.alert('Validation', 'Category is required.');
+            return;
+        }
+
+        if (!Array.isArray(form.warp_yarns) || form.warp_yarns.length === 0) {
+            Alert.alert('Validation', 'At least one warp yarn is required.');
+            return;
+        }
+
+        if (!Array.isArray(form.weft_yarns) || form.weft_yarns.length === 0) {
+            Alert.alert('Validation', 'At least one weft yarn is required.');
+            return;
+        }
+
         setSaving(true);
+
         try {
-            // send both widths — backend resolves from width_basis
             const payload = {
                 ...form,
+
+                yearno,
+                YearNo: yearno,
+
+                prpcode,
+                PrpCode: prpcode,
+
+                strcode,
+                StrCode: strcode,
+
                 width_basis: 'reed',
-                reed_space: form.reed_space,
-                greige_width: autoGreige,
+                reed_space: Number(form.reed_space) || 0,
+                greige_width: Number(autoGreige) || 0,
+                warp_shrink: Number(form.warp_shrink) || 0,
+                warp_wastage: Number(form.warp_wastage) || 0,
+                weft_wastage: Number(form.weft_wastage) || 6,
+
+                warp_yarns: (form.warp_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    epi: Number(row.epi) || 0,
+                    sizing: Boolean(row.sizing),
+                })),
+
+                weft_yarns: (form.weft_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    ppi: Number(row.ppi) || 0,
+                })),
+
+                selvedge_yarns: (form.selvedge_yarns || []).map((row: any) => ({
+                    mi_id: String(row.mi_id),
+                    blend_ratio: row.blend_ratio || null,
+                    ends: Number(row.ends) || 0,
+                })),
             };
-            if (design?.id) await DesignAPI.update(design.id, payload);
-            else await DesignAPI.create(payload);
-            Alert.alert('Saved', 'Design saved successfully'); onRefresh();
-        } catch (e: any) { Alert.alert('Error', e?.response?.data?.message || e?.message || 'Unable to save design'); }
-        finally { setSaving(false); }
+
+            console.log('DESIGN SAVE PAYLOAD', JSON.stringify(payload, null, 2));
+
+            const response = design?.id
+                ? await DesignAPI.update(design.id, payload)
+                : await DesignAPI.create(payload);
+
+            console.log('DESIGN SAVE FULL RESPONSE', {
+                status: response.status,
+                baseURL: response.config?.baseURL,
+                url: response.config?.url,
+                requestParams: response.config?.params,
+                responseData: response.data,
+            });
+
+            const saved = response?.data?.data;
+
+            if (
+                response?.data?.success !== true ||
+                !saved ||
+                !String(saved.id || '').trim()
+            ) {
+                throw new Error(
+                    'Server returned success without a saved engineering design ID.'
+                );
+            }
+
+            // Verify immediately by fetching the same record.
+            const verifyResponse = await DesignAPI.get(String(saved.id));
+            const verified = verifyResponse?.data?.data;
+
+            console.log('DESIGN SAVE VERIFY RESPONSE', {
+                id: saved.id,
+                responseData: verifyResponse.data,
+            });
+
+            if (!verified || String(verified.id) !== String(saved.id)) {
+                throw new Error(
+                    `Design ${saved.id} was returned by save but could not be read back.`
+                );
+            }
+
+            Alert.alert(
+                'Saved',
+                `Design saved successfully.\n\nID: ${saved.id}`
+            );
+
+            onRefresh();
+        } catch (e: any) {
+            console.log('DESIGN SAVE FINAL ERROR', {
+                message: e?.message,
+                status: e?.response?.status,
+                responseData: e?.response?.data,
+                baseURL: e?.config?.baseURL,
+                url: e?.config?.url,
+            });
+
+            Alert.alert(
+                'Design save failed',
+                String(
+                    e?.response?.data?.message ||
+                    e?.response?.data?.error ||
+                    e?.message ||
+                    'Unable to save design'
+                )
+            );
+        } finally {
+            setSaving(false);
+        }
     };
 
     const Chip = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
@@ -1201,11 +1299,6 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 <TextInput value={form.code ?? ''} onChangeText={v => set('code', v)} placeholder="e.g. Cambridge" placeholderTextColor={T.muted} style={fm.input} />
 
                 <Text style={fm.label}>CATEGORY</Text>
-                {/* <View style={fm.chipRow}>
-                    {[['Shirting', 'Linen Shirting'], ['Sportswear', 'Sportswear'], ['Suiting', 'Linen Suiting']].map(([label, val]) => (
-                        <Chip key={val} label={label} active={form.category === val} onPress={() => set('category', val)} />
-                    ))}
-                </View> */}
 
                 {form.category ? (
                     <View style={yl.row}>
@@ -1340,7 +1433,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     </View>
                 </View>
 
-                {/* ✅ MISSING #3 — LIVE SPEC panel (updates as you type) */}
+                {/* LIVE SPEC panel (updates as you type) */}
                 <LiveSpecPanel design={{
                     ...form,
                     width_basis: 'reed',
@@ -1358,18 +1451,10 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 onSelect={y => pickerFor && addYarn(y, pickerFor)}
                 onClose={() => setPickerFor(null)}
             />
-            {/* <CategoryPickerModal
-                visible={categoryPickerVisible}
-                onSelect={(category) => {
-                    set('category', category);
-                }}
-                onClose={() => setCategoryPickerVisible(false)}
-            /> */}
             <CategoryPickerModal
                 visible={categoryPickerVisible}
                 onSelect={(item) => {
                     set('category', item.ItmName);
-                    // setCategoryPickerVisible(false);
                 }}
                 onClose={() => setCategoryPickerVisible(false)}
             />
@@ -1406,8 +1491,6 @@ const fm = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 3 — SUB DESIGN / COLOURWAY
-// Each yarn has its own independent shade-band builder.
-// Same/different shades and multiple shades per yarn are supported.
 // ═══════════════════════════════════════════════════════════════
 function DesignPickerModal({ visible, onSelect, onClose }: {
     visible: boolean;
@@ -1797,6 +1880,673 @@ const cw3 = StyleSheet.create({
     saveText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
 
+// Design Picker Modal (Isolated for AliasesTab)
+function AliasesDesignPickerModal({
+    visible,
+    onSelect,
+    onClose,
+}: {
+    visible: boolean;
+    onSelect: (d: Design) => void;
+    onClose: () => void;
+}) {
+    const { yearno } = useERP();
+    const [designs, setDesigns] = useState<Design[]>([]);
+    const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const loadDesigns = useCallback(async () => {
+        if (!visible) return;
+        setLoading(true);
+        try {
+            const res = await DesignAPI.list({
+                page: 1,
+                per_page: 200,
+                limit: 200,
+                yearno: yearno,
+            } as any);
+            const envelope: any = res.data.data;
+            setDesigns(Array.isArray(envelope) ? envelope : (envelope?.data ?? []));
+        } catch (e) {
+            setDesigns([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [visible, yearno]);
+
+    useEffect(() => {
+        loadDesigns();
+    }, [visible, loadDesigns]);
+
+    const filteredDesigns = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return !q
+            ? designs
+            : designs.filter(
+                d =>
+                    d.code.toLowerCase().includes(q) ||
+                    String(d.category || '').toLowerCase().includes(q)
+            );
+    }, [designs, search]);
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalSheet}>
+                    <View style={styles.modalHandle} />
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Select Main Design</Text>
+                        <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+                            <Text style={styles.modalCloseTxt}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.modalSearchWrap}>
+                        <TextInput
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Search design..."
+                            placeholderTextColor={T.muted}
+                            style={styles.modalSearch}
+                            autoFocus
+                        />
+                    </View>
+                    {loading ? (
+                        <ActivityIndicator color={T.copper} style={{ padding: 24 }} />
+                    ) : (
+                        <FlatList
+                            data={filteredDesigns}
+                            keyExtractor={d => d.id}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.modalRow}
+                                    onPress={() => {
+                                        onSelect(item);
+                                        onClose();
+                                    }}
+                                >
+                                    <Text style={styles.modalRowName}>{item.code}</Text>
+                                    <Text style={styles.modalRowSub}>
+                                        {item.category} · {item.type}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                            ItemSeparatorComponent={() => (
+                                <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />
+                            )}
+                            ListEmptyComponent={
+                                !loading ? (
+                                    <Text style={styles.modalEmptyText}>No designs found</Text>
+                                ) : null
+                            }
+                        />
+                    )}
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+// Main AliasesTab Component
+// Main AliasesTab Component
+function AliasesTab({ design }: AliasesTabProps) {
+    // State
+    const [selectedDesign, setSelectedDesign] = useState<Design | null>(design);
+    const [showDesignPicker, setShowDesignPicker] = useState(false);
+    const [aliasInput, setAliasInput] = useState('');
+    const [aliases, setAliases] = useState<Alias[]>([]);
+    const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // refs for auto-scroll
+    const scrollViewRef = useRef<ScrollView>(null);
+    const itemRefs = useRef<Record<string, any>>({});
+
+    // Load aliases when design changes (simulate API call)
+    useEffect(() => {
+        if (design) {
+            setSelectedDesign(design);
+            setAliases([
+                { id: '1', name: `${design.code}-ALIAS-1` },
+                { id: '2', name: `${design.code}-SUMMER` },
+            ]);
+            setEditingAliasId(null);
+            setAliasInput('');
+        } else {
+            setSelectedDesign(null);
+            setAliases([]);
+        }
+    }, [design?.id]);
+
+    // Filter aliases based on search
+    const filteredAliases = useMemo(() => {
+        return aliases.filter(alias =>
+            alias.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [aliases, searchQuery]);
+
+    // Load full design details when selected
+    const loadFullDesign = useCallback(async (d: Design) => {
+        try {
+            const res = await DesignAPI.get(d.id);
+            setSelectedDesign({ ...d, ...res.data.data });
+            setAliases([
+                { id: '1', name: `${d.code}-ALIAS-1` },
+                { id: '2', name: `${d.code}-SUMMER` },
+            ]);
+            setEditingAliasId(null);
+            setAliasInput('');
+        } catch {
+            setSelectedDesign(d);
+        }
+    }, []);
+
+    // Scroll helper: jump to a specific alias row in the list
+    const scrollToAlias = useCallback((id: string) => {
+        setTimeout(() => {
+            const node = itemRefs.current[id];
+            const scrollNode = findNodeHandle(scrollViewRef.current);
+            if (node && scrollNode && typeof node.measureLayout === 'function') {
+                node.measureLayout(
+                    scrollNode,
+                    (_x: number, y: number) => {
+                        scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+                    },
+                    () => { }
+                );
+            }
+        }, 100); // small delay so layout is settled after re-render
+    }, []);
+
+    // Start editing: fills the top "Add New Alias" box and scrolls up to it
+    const handleEditStart = (alias: Alias) => {
+        setEditingAliasId(alias.id);
+        setAliasInput(alias.name);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    };
+
+    // Cancel editing — resets the top box back to "Add" mode
+    const handleEditCancel = () => {
+        setEditingAliasId(null);
+        setAliasInput('');
+    };
+
+    // Single handler for both Add and Update (dynamic based on editingAliasId)
+    const handleAddOrUpdateAlias = () => {
+        if (!aliasInput.trim()) {
+            Alert.alert('Error', 'Alias name cannot be empty.');
+            return;
+        }
+        if (!selectedDesign) {
+            Alert.alert('Error', 'Please select a main design first.');
+            return;
+        }
+
+        if (editingAliasId) {
+            // ── UPDATE MODE ──
+            const targetId = editingAliasId;
+            const newName = aliasInput.trim();
+
+            setAliases(prev =>
+                prev.map(a => (a.id === targetId ? { ...a, name: newName } : a))
+            );
+
+            setEditingAliasId(null);
+            setAliasInput('');
+            console.log('Updated alias:', targetId, newName);
+
+            // auto-scroll back down to that alias's position in the list
+            scrollToAlias(targetId);
+        } else {
+            // ── ADD MODE ──
+            const newAlias: Alias = {
+                id: Date.now().toString(),
+                name: aliasInput.trim(),
+            };
+            setAliases(prev => [...prev, newAlias]);
+            setAliasInput('');
+            console.log('Added alias:', newAlias);
+        }
+    };
+
+    // Delete an alias
+    const handleDeleteAlias = (id: string) => {
+        Alert.alert(
+            'Delete Alias',
+            'Are you sure you want to delete this alias?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        setAliases(prev => prev.filter(alias => alias.id !== id));
+                        if (editingAliasId === id) {
+                            setEditingAliasId(null);
+                            setAliasInput('');
+                        }
+                        console.log('Deleted alias:', id);
+                    },
+                },
+            ]
+        );
+    };
+
+    // Render
+    return (
+        <>
+            <ScrollView
+                ref={scrollViewRef}
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* Header: Selected Design */}
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Aliases for Design</Text>
+                    <TouchableOpacity
+                        style={styles.picker}
+                        onPress={() => setShowDesignPicker(true)}
+                    >
+                        <Text style={styles.pickerText}>
+                            {selectedDesign ? `${selectedDesign.code} (${selectedDesign.type})` : 'Select Main Design'}
+                        </Text>
+                        <Text style={styles.pickerArrow}>▾</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Add / Update Alias Input — dynamic section */}
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>
+                        {editingAliasId ? 'UPDATE ALIAS' : 'ADD NEW ALIAS'}
+                    </Text>
+                    <View style={styles.inputRow}>
+                        <TextInput
+                            value={aliasInput}
+                            onChangeText={setAliasInput}
+                            placeholder="e.g. RIB-145-NAVY"
+                            placeholderTextColor={T.muted}
+                            style={styles.input}
+                            autoCapitalize="words"
+                        />
+                        <TouchableOpacity style={styles.addButton} onPress={handleAddOrUpdateAlias}>
+                            <Text style={styles.addButtonText}>
+                                {editingAliasId ? 'Update' : '+ Add'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    {editingAliasId && (
+                        <TouchableOpacity onPress={handleEditCancel} style={{ marginTop: 8 }}>
+                            <Text style={{ color: T.copper, fontSize: 12, fontWeight: '700' }}>
+                                Cancel update
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Search */}
+                <View style={styles.searchContainer}>
+                    <Text style={styles.label}>SEARCH ALIASES</Text>
+                    <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search..."
+                        placeholderTextColor={T.muted}
+                        style={styles.searchInput}
+                    />
+                </View>
+
+                {/* Aliases List */}
+                <View style={styles.listHeader}>
+                    <Text style={styles.listTitle}>ALIASES LIST ({filteredAliases.length})</Text>
+                </View>
+
+                {filteredAliases.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>No aliases found.</Text>
+                    </View>
+                ) : (
+                    <View style={styles.listContent}>
+                        {filteredAliases.map((item, idx) => (
+                            <View key={item.id}>
+                                <View
+                                    ref={(ref) => { itemRefs.current[item.id] = ref; }}
+                                    style={[
+                                        styles.aliasItem,
+                                        editingAliasId === item.id && styles.aliasItemActive,
+                                    ]}
+                                >
+                                    <View style={styles.aliasRow}>
+                                        <Text style={styles.aliasName}>{item.name}</Text>
+                                        <View style={styles.aliasActions}>
+                                            <TouchableOpacity
+                                                style={styles.actionButton}
+                                                onPress={() => handleEditStart(item)}
+                                            >
+                                                <Text style={styles.actionButtonText}>Edit</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.actionButton, styles.deleteButton]}
+                                                onPress={() => handleDeleteAlias(item.id)}
+                                            >
+                                                <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                                                    Delete
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </View>
+                                {idx < filteredAliases.length - 1 && <View style={styles.separator} />}
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* Save Button — logs all aliases with the selected design attached */}
+                <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={() => {
+                        const payload = aliases.map(alias => ({
+                            ...alias,
+                            design_id: selectedDesign?.id,
+                            design_code: selectedDesign?.code,
+                        }));
+                        console.log('SAVED ALIASES', payload);
+                        Alert.alert('Success', `Aliases saved for ${selectedDesign?.code || 'design'}.`);
+                    }}
+                >
+                    <Text style={styles.saveButtonText}>Save Aliases</Text>
+                </TouchableOpacity>
+            </ScrollView>
+
+            {/* Isolated Design Picker Modal */}
+            <AliasesDesignPickerModal
+                visible={showDesignPicker}
+                onSelect={(d) => {
+                    loadFullDesign(d);
+                    setShowDesignPicker(false);
+                }}
+                onClose={() => setShowDesignPicker(false)}
+            />
+        </>
+    );
+}
+// Styles
+const styles = StyleSheet.create({
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    modalSheet: {
+        backgroundColor: T.surface,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        maxHeight: '85%',
+    },
+    modalHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: T.border,
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginTop: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+    },
+    modalTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: T.ink,
+    },
+    modalCloseBtn: {
+        padding: 4,
+    },
+    modalCloseTxt: {
+        fontSize: 16,
+        color: T.muted,
+    },
+    modalSearchWrap: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+    },
+    modalSearch: {
+        backgroundColor: T.sub,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        fontSize: 14,
+        color: T.ink,
+    },
+    modalRow: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    modalRowName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: T.ink,
+    },
+    modalRowSub: {
+        fontSize: 12,
+        color: T.muted,
+        marginTop: 2,
+    },
+    modalEmptyText: {
+        padding: 16,
+        color: T.muted,
+        textAlign: 'center',
+    },
+
+    // Main Container
+    container: {
+        padding: 14,
+        paddingBottom: 30,
+        backgroundColor: T.bg,
+    },
+    header: {
+        marginBottom: 16,
+    },
+    headerTitle: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: T.ink,
+        letterSpacing: 0.8,
+        marginBottom: 8,
+    },
+    picker: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: T.surface,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        padding: 14,
+    },
+    pickerText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: T.ink,
+    },
+    pickerArrow: {
+        fontSize: 14,
+        color: T.muted,
+    },
+    inputContainer: {
+        marginBottom: 16,
+    },
+    label: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: T.muted,
+        letterSpacing: 0.5,
+        marginBottom: 6,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    input: {
+        flex: 1,
+        backgroundColor: T.surface,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 14,
+        color: T.ink,
+    },
+    addButton: {
+        backgroundColor: T.copper,
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    searchContainer: {
+        marginBottom: 16,
+    },
+    searchInput: {
+        backgroundColor: T.surface,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 14,
+        color: T.ink,
+    },
+    listHeader: {
+        marginBottom: 8,
+    },
+    listTitle: {
+        fontSize: 11,
+        fontWeight: '900',
+        color: T.ink,
+        letterSpacing: 0.8,
+    },
+    aliasItem: {
+        backgroundColor: T.surface,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: T.border,
+        padding: 12,
+    },
+    aliasItemActive: {
+        borderColor: T.copper,
+        borderWidth: 2,
+    },
+    aliasRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    aliasName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: T.ink,
+        flex: 1,
+    },
+    aliasActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    actionButton: {
+        backgroundColor: T.sub,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    actionButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: T.copper,
+    },
+    deleteButton: {
+        backgroundColor: '#FBF3E3',
+        borderWidth: 1,
+        borderColor: '#EAD9B0',
+    },
+    deleteButtonText: {
+        color: '#7A5C1E',
+    },
+    editRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    editInput: {
+        flex: 1,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.copper,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        fontSize: 14,
+        color: T.ink,
+    },
+    editButton: {
+        backgroundColor: T.copper,
+        borderRadius: 8,
+        padding: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    editButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    separator: {
+        height: 1,
+        backgroundColor: T.border,
+        marginVertical: 4,
+    },
+    listContent: {
+        paddingVertical: 4,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        padding: 20,
+    },
+    emptyText: {
+        fontSize: 13,
+        color: T.muted,
+    },
+    saveButton: {
+        backgroundColor: T.copper,
+        borderRadius: 10,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '800',
+    },
+});
+
+// Export
+//   export { AliasesTab };
+
 // ═══════════════════════════════════════════════════════════════
 // TAB 4 — YARNS
 // ═══════════════════════════════════════════════════════════════
@@ -1925,21 +2675,73 @@ const dy = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN SCREEN
+// ✅ Adds catalogRefreshKey / handleDesignSaved so that a successful
+//    save takes the user back to Catalog and force-refreshes the list.
 // ═══════════════════════════════════════════════════════════════
 export function DesignsScreen() {
     const context = DEFAULT_ERP_CONTEXT;
-    const [tab, setTab] = useState<Tab>('Catalog');
+    const { canAccess } = usePermission();
+    const setHeaderExtras = useHeaderExtrasStore((state) => state.setHeaderExtras);
+    const clearHeaderExtras = useHeaderExtrasStore((state) => state.clearHeaderExtras);
+    const [tab, setTab] = useState<Tab | null>('Catalog');
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
+    const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+
+    // One permission-aware source drives the tab header and tab content.
+    // A developer only adds a tab to DESIGN_TABS and the registry definition.
+    const visibleTabs = useMemo(
+        () => DESIGN_TABS.filter(item => canAccess(item.resource)),
+        [canAccess],
+    );
+
+    const firstAllowedTab = visibleTabs[0]?.key ?? null;
+
+    // FIX: this screen used to render its own hand-rolled header ("MADHUSUDHAN
+    // FABRICS" / "Designs" / "Selected: ...") completely separately from
+    // AppHeader — that was the second navy header block stacking under the
+    // Designs tab. The header is now rendered once, in
+    // app/new/(tabs)/_layout.tsx; only the "Selected: code" subtitle still
+    // needs to reach it, via the shared extras store.
+    useFocusEffect(
+        useCallback(() => {
+            setHeaderExtras({ subtitle: selectedDesign ? `Selected: ${selectedDesign.code}` : null });
+            return () => clearHeaderExtras();
+        }, [selectedDesign, setHeaderExtras, clearHeaderExtras]),
+    );
+
+    const openTab = useCallback((nextTab: Tab) => {
+        const definition = DESIGN_TABS.find(item => item.key === nextTab);
+        if (definition && canAccess(definition.resource)) {
+            setTab(nextTab);
+            return true;
+        }
+        setTab(firstAllowedTab);
+        return false;
+    }, [canAccess, firstAllowedTab]);
+
+    // Live permission changes are applied without logout. If the active tab is
+    // denied, move to the first allowed tab and never render denied content.
+    useEffect(() => {
+        if (visibleTabs.length === 0) {
+            if (tab !== null) setTab(null);
+            return;
+        }
+
+        const activeIsAllowed = tab !== null && visibleTabs.some(item => item.key === tab);
+        if (!activeIsAllowed) setTab(firstAllowedTab);
+    }, [firstAllowedTab, tab, visibleTabs]);
 
     const handleSelectDesign = async (d: Design) => {
-        setSelected(d); setDetail(d);
+        setSelected(d);
+        setDetail(d);
         try {
-            const res = await DesignAPI.get(d.id); setDetail({ ...d, ...res.data.data });
-            console.log("design res", res);
+            const res = await DesignAPI.get(d.id);
+            setDetail({ ...d, ...res.data.data });
+            console.log('design res', res);
         } catch { }
 
-        setTab('Design');
+        openTab('Design');
     };
 
     const handleAddSubDesign = async (d: Design) => {
@@ -1950,38 +2752,59 @@ export function DesignsScreen() {
         } catch {
             setDetail(d);
         }
-        setTab('Colourway');
+        openTab('Colourway');
     };
 
-    const handleCancelEdit = () => { setSelected(null); setDetail(null); };
+    const handleCancelEdit = () => {
+        setSelected(null);
+        setDetail(null);
+    };
+
+    const handleDesignSaved = () => {
+        setSelected(null);
+        setDetail(null);
+        setCatalogRefreshKey(v => v + 1);
+        openTab('Catalog');
+    };
 
     return (
         <ERPContext.Provider value={context}>
-            <SafeAreaView style={{ flex: 1, backgroundColor: T.bg }} edges={['top']}>
-                <View style={hdr.wrap}>
-                    <Text style={hdr.brand}>MADHUSUDHAN FABRICS</Text>
-                    <Text style={hdr.title}>Designs</Text>
-                    {selectedDesign && <Text style={hdr.sub}>Selected: {selectedDesign.code}</Text>}
-                </View>
-                <TabBar active={tab} onChange={setTab} />
-                <View style={{ flex: 1 }}>
-                    {tab === 'Catalog' && <CatalogTab onSelectDesign={handleAddSubDesign} onEditDesign={(design) => {
-                        handleSelectDesign(design);
-                    }}
-                    />
-                    }
-                    {tab === 'Design' && (
-                        <DesignTab
-                            design={detailDesign}
-                            onRefresh={() => selectedDesign && handleSelectDesign(selectedDesign)}
-                            onCancelEdit={handleCancelEdit}
-                        />
-                    )}
-                    {tab === 'Colourway' && <ColourwayTab design={detailDesign} onNavigateToCatalog={() => setTab('Catalog')} />}
-                    {tab === 'Yarns' && <YarnsTab />}
-                    {tab === 'Dyeing' && <DyeingTab design={detailDesign} />}
-                </View>
-            </SafeAreaView>
+            <View style={{ flex: 1, backgroundColor: T.bg }}>
+                {visibleTabs.length > 0 ? (
+                    <>
+                        <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
+                        <View style={{ flex: 1 }}>
+                            {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
+                            {tab === 'Catalog' && canAccess('designs.catalog') && (
+                                <CatalogTab
+                                    key={catalogRefreshKey}
+                                    onSelectDesign={handleAddSubDesign}
+                                    onEditDesign={handleSelectDesign}
+                                />
+                            )}
+                            {tab === 'Design' && canAccess('designs.design') && (
+                                <DesignTab
+                                    design={detailDesign}
+                                    onRefresh={handleDesignSaved}
+                                    onCancelEdit={handleCancelEdit}
+                                />
+                            )}
+                            {tab === 'Colourway' && canAccess('designs.colourway') && (
+                                <ColourwayTab
+                                    design={detailDesign}
+                                    onNavigateToCatalog={() => openTab('Catalog')}
+                                />
+                            )}
+                            {tab === 'Yarns' && canAccess('designs.yarns') && <YarnsTab />}
+                            {tab === 'Dyeing' && canAccess('designs.dyeing') && <DyeingTab design={detailDesign} />}
+                        </View>
+                    </>
+                ) : (
+                    <View style={s.center}>
+                        <Text style={s.empty}>You do not have access to any Design tab.</Text>
+                    </View>
+                )}
+            </View>
         </ERPContext.Provider>
     );
 }

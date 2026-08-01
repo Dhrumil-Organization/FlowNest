@@ -61,6 +61,7 @@ const WeftIssueItemDrawer = ({
     // const { hasPermission, requestPermission } = useCameraPermission();
     const [scannedValue, setScannedValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [getData, setData] = useState([]);
     const [yearNo, setYearNo] = useState('');
     const [design, setDesign] = useState('');
@@ -106,6 +107,8 @@ const WeftIssueItemDrawer = ({
     const [successMessage, setSuccessMessage] = useState('');
     const [deleteshowSuccess, setdeleteShowSuccess] = useState(false);
     const [selectedCreel, setSelectedCreel] = useState(null);
+    const [availableChees, setAvailableChees] = useState('');
+    const [availableQty, setAvailableQty] = useState('');
     // const [mainUId, setMainUId] = useState(null);
     // const [isEditMode, setIsEditMode] = useState(false);
     const [propertydata, setpropertydata] = useState([]);
@@ -633,6 +636,53 @@ const WeftIssueItemDrawer = ({
             fontWeight: '700',
             fontSize: 15
         },
+
+        saveOverlay: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99999,
+        },
+
+        saveCard: {
+            width: 180,
+            backgroundColor: "#fff",
+            borderRadius: 18,
+            paddingVertical: 24,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            elevation: 12,
+        },
+
+        saveTitle: {
+            marginTop: 15,
+            fontSize: 16,
+            fontWeight: "700",
+            color: "#000",
+        },
+
+        saveSubTitle: {
+            marginTop: 6,
+            fontSize: 13,
+            color: "#000",
+        },
+        loaderOverlay: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999999,
+            elevation: 999999,
+        },
     });
 
     let cancelToken: any;
@@ -765,8 +815,14 @@ const WeftIssueItemDrawer = ({
             setScannedObj(parsed);
             setCartonNo(parsed.CartNo || '');
             setYearNo(parsed.yearNo || '');
-            setchees(parsed.Chees || '');
-            setavgwt(parsed.Wt || '');
+            setchees('');
+            setavgwt('');
+
+            // setchees(parsed.Chees || '');
+            // setavgwt(parsed.Wt || '');
+
+            setAvailableChees(parsed.Chees || '');
+            setAvailableQty(parsed.Wt || '');
 
             fetchitmgrdshdname(parsed);
             sendScannedValue(value);
@@ -1132,7 +1188,7 @@ const WeftIssueItemDrawer = ({
     const handleSubmitScan = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
+        setIsSaving(true);
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
@@ -1200,12 +1256,12 @@ const WeftIssueItemDrawer = ({
                 setShowSuccess(true);
 
                 // ✅ RESET + CLOSE
-                resetAllFields();
+                resetAllData();
                 setIsScanModalVisible(false);
 
             }
             else if (response.data.success === false) {
-                setIsLoading(false);
+                setIsSaving(false);
                 setDataSaved(false);
 
                 // Snackbar.show({
@@ -1221,7 +1277,7 @@ const WeftIssueItemDrawer = ({
                 });
             }
             else {
-                setIsLoading(false);
+                setIsSaving(false);
                 setDataSaved(false);
 
                 // Snackbar.show({
@@ -1238,10 +1294,10 @@ const WeftIssueItemDrawer = ({
             }
         } catch (error) {
             setDataSaved(false);
-            setIsLoading(false);
+            setIsSaving(false);
             console.log("API handleSubmitScan error:", error);
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
 
     }
@@ -1258,7 +1314,7 @@ const WeftIssueItemDrawer = ({
     const handleaddCreel = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
-        setIsLoading(true);
+        setIsSaving(true);
         try {
             let yno = await AsyncStorage.getItem('yno');
             const payloadObj = {
@@ -1388,10 +1444,10 @@ const WeftIssueItemDrawer = ({
             }
         } catch (error) {
             setDataSaved(false);
-            setIsLoading(false);
+            setIsSaving(false);
             console.log("API handleSubmitScan error:", error);
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
 
     }
@@ -1508,6 +1564,25 @@ const WeftIssueItemDrawer = ({
         );
     };
 
+    const resetCurrentItem = () => {
+        setCartonSummary([]);
+        setGridData([]);
+        setSelectedCreel(null);
+
+        setShowManualSearch(null);
+        setSearchResults([]);
+        setSearchText('');
+        setSelectedItem(null);
+
+        setCartonNo('');
+        setScannedValue('');
+        setRemark('');
+
+        setShowList(false);
+
+        setIsScanning(false);
+        scanLock.current = false;
+    };
 
     return (
         <>
@@ -1543,7 +1618,8 @@ const WeftIssueItemDrawer = ({
                                     // }}
                                     onPress={() => {
                                         setShowSuccess(false);
-                                        resetAllFields();
+                                        resetAllData();
+                                        resetCurrentItem();
 
                                         closeAllDrawers();
                                         fetchbrowse();  // 🔥 sab band
@@ -1584,10 +1660,10 @@ const WeftIssueItemDrawer = ({
                                     // }}
                                     onPress={() => {
                                         setdeleteShowSuccess(false);
-                                        resetAllFields();
+                                        resetAllData();
 
-                                        // closeAllDrawers();
-                                        // fetchbrowse();  // 🔥 sab band
+                                        closeAllDrawers();
+                                        fetchbrowse();  // 🔥 sab band
                                     }}
                                 >
                                     <Text style={styles.okButtonText}>OK</Text>
@@ -1596,7 +1672,11 @@ const WeftIssueItemDrawer = ({
                             </View>
                         </View>
                     )}
-
+                    {isSaving && (
+                        <View style={styles.loaderOverlay}>
+                            <ActivityIndicator size="large" color="#fff" />
+                        </View>
+                    )}
                     {/* HEADER */}
                     <View style={styles.header}>
                         <TouchableOpacity style={styles.backBtn} onPress={onClose}>
@@ -1767,8 +1847,15 @@ const WeftIssueItemDrawer = ({
                                                         SrNo: selectedItem.SrNo,
                                                     };
                                                     setCartonNo(data.CartNo || '');
-                                                    setchees(data.Chees || '');
-                                                    setavgwt(data.Wt || '');
+                                                    setchees('');
+                                                    setavgwt('');
+
+                                                    // setchees(data.Chees || '');
+                                                    // setavgwt(data.Wt || '');
+
+                                                    setAvailableChees(data.Chees || '');
+                                                    setAvailableQty(data.Wt || '');
+
                                                     setScannedObj(data);
                                                     setShowManualSearch(null);
                                                     setSearchText('');
@@ -1862,7 +1949,29 @@ const WeftIssueItemDrawer = ({
                                     </View>
                                     <View style={styles.row}>
                                         <View style={styles.fieldHalf}>
-                                            <Text style={styles.label}>Chees</Text>
+                                            {/* <Text style={styles.label}>Chees</Text> */}
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    marginBottom: 6,
+                                                }}
+                                            >
+                                                <Text style={styles.label}>Chees</Text>
+
+                                                {!!availableChees && (
+                                                    <Text
+                                                        style={{
+                                                            color: 'red',
+                                                            fontWeight: '700',
+                                                            marginLeft: 8,
+                                                            fontSize: 12,
+                                                        }}
+                                                    >
+                                                        ({availableChees})
+                                                    </Text>
+                                                )}
+                                            </View>
                                             <TextInput
                                                 style={styles.input}
                                                 value={getchees}
@@ -1872,7 +1981,29 @@ const WeftIssueItemDrawer = ({
                                         </View>
 
                                         <View style={styles.fieldHalf}>
-                                            <Text style={styles.label}>Quantity</Text>
+                                            {/* <Text style={styles.label}>Quantity</Text> */}
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    marginBottom: 6,
+                                                }}
+                                            >
+                                                <Text style={styles.label}>Quantity</Text>
+
+                                                {!!availableQty && (
+                                                    <Text
+                                                        style={{
+                                                            color: 'red',
+                                                            fontWeight: '700',
+                                                            marginLeft: 8,
+                                                            fontSize: 12,
+                                                        }}
+                                                    >
+                                                        ({availableQty})
+                                                    </Text>
+                                                )}
+                                            </View>
                                             <TextInput
                                                 style={styles.input}
                                                 value={getavgwt}

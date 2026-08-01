@@ -1,6 +1,6 @@
-import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { ExpenseDashboardData, fetchExpenseDashboardCard } from '../../services/Dashboard/expenseDashboardApi';
 
 type Props = {
@@ -14,7 +14,7 @@ const money = (v:unknown, d=0) => `₹${n(v).toLocaleString('en-IN',{minimumFrac
 const num = (v:unknown, d=0) => n(v).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
 
 const ExpenseDashboardCard:React.FC<Props> = ({
-  token, prptype='S', yearno, monthno, date, prpcodes = [], isConnected=true, onPress
+  token, prptype='S', yearno, monthno, date, prpcodes, isConnected=true, onPress
 }) => {
   const [data,setData] = useState<ExpenseDashboardData|null>(null);
   const [loading,setLoading] = useState(true);

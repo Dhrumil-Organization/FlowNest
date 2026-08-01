@@ -7,8 +7,18 @@ import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// FEATURE: floating "pill" tab bar (matches the native iOS Phone-app style
+// tab bar — a rounded bar with a soft gap from the screen edges, instead of
+// a bar docked flush along the bottom). Kept as named constants so the
+// floating math below (bar position + the paddingBottom every screen needs
+// so its content isn't hidden behind the bar) stays in one place and can't
+// drift out of sync.
+const TAB_BAR_HEIGHT = 75;
+const TAB_BAR_SIDE_MARGIN = 14;
+const TAB_BAR_GROUND_GAP = 10; // gap between the bar and the home indicator / nav bar
 
 // FIX: this is now the ONE place a header is rendered for every tab screen.
 // Previously DashboardScreen, DesignsScreen, PermissionManagerScreen and
@@ -30,8 +40,9 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
-  'beam-close/index': { eyebrow: 'PRODUCTION', title: 'Beam Close' },
-  'beam-gaiting/index': { eyebrow: 'PRODUCTION', title: 'Beam Gaiting' },
+  'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
+  'beam-close': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Open/Close' },
+  'beam-gaiting/index': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Beam Gaiting' },
 };
 
 // FEATURE: bottom tab bar caps at this many real tabs; anything beyond it
@@ -48,7 +59,19 @@ export default function TabsLayout() {
   const appSession = useAppSessionStore((state) => state.appSession);
   const pathname = usePathname();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const ready = hydrated && Boolean(appSession);
+
+  // Distance from the physical bottom edge to where the pill sits — clears
+  // the home indicator on iOS and the gesture bar on Android either way,
+  // since both report their own value through `insets.bottom` (Android's is
+  // 0 on 3-button nav, ~16-24 on gesture nav; this works for both).
+  const barBottomOffset = insets.bottom + TAB_BAR_GROUND_GAP;
+  // Every screen needs this much bottom padding so its last row of content
+  // never sits underneath the floating (position: 'absolute') bar — React
+  // Navigation doesn't add this automatically for absolute tab bars, so it's
+  // applied once here via `sceneStyle` rather than in every screen file.
+  const sceneBottomPadding = TAB_BAR_HEIGHT + barBottomOffset + 12;
   const onDashboard = pathname === '/new' || pathname === '/new/' || pathname.endsWith('/new/(tabs)') || pathname.endsWith('/new/(tabs)/');
 
   const activeRouteName = onDashboard
@@ -103,10 +126,32 @@ export default function TabsLayout() {
         <Tabs screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: T.copper,
-          tabBarInactiveTintColor: T.muted,
-          tabBarStyle: { height: 64, backgroundColor: T.surface, borderTopColor: T.border },
-          tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginBottom: 7 },
-          tabBarIconStyle: { marginTop: 7 },
+          tabBarInactiveTintColor: 'rgba(255,255,255,0.55)',
+          // `position: 'absolute'` + explicit left/right/bottom is what turns
+          // this from a bar docked flush along the bottom into a floating
+          // pill with a visible gap on all four sides, like the reference
+          // screenshot. `sceneStyle` is the paired fix — see note above.
+          tabBarStyle: {
+            position: 'absolute',
+            left: TAB_BAR_SIDE_MARGIN,
+            right: TAB_BAR_SIDE_MARGIN,
+            bottom: barBottomOffset,
+            height: TAB_BAR_HEIGHT,
+            borderRadius: TAB_BAR_HEIGHT / 2,
+            backgroundColor: T.nav,
+            borderTopWidth: 0,
+            paddingHorizontal: 6,
+            elevation: 12, // Android shadow
+            shadowColor: '#000', // iOS shadow
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.22,
+            shadowRadius: 14,
+            marginHorizontal: 10,
+          },
+          tabBarItemStyle: { paddingVertical: 6, borderRadius: TAB_BAR_HEIGHT / 2 },
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '800', marginTop: 1 },
+          tabBarIconStyle: { marginTop: 2 },
+          sceneStyle: { backgroundColor: T.bg, paddingBottom: sceneBottomPadding },
         }}>
           {APP_NAVIGATION.map((item) => {
             const isPrimary = primaryRouteNames.has(item.routeName);
@@ -128,6 +173,14 @@ export default function TabsLayout() {
               />
             );
           })}
+          {/* TEMPORARY PRODUCTION HOLD:
+              Keep route files in the project for later re-testing, but explicitly
+              hide them from Expo Router tabs and deep-link navigation surfaces.
+              These entries do not mount or call any module API. */}
+          <Tabs.Screen name="beam-close" options={{ href: null }} />
+          <Tabs.Screen name="beam-close/index" options={{ href: null }} />
+          <Tabs.Screen name="beam-gaiting/index" options={{ href: null }} />
+          <Tabs.Screen name="checking_scanner" options={{ href: null }} />
           {/* "More" is a real placeholder route (see more.tsx) purely so
               Expo Router has something to attach this Tabs.Screen to.
               Pressing it never navigates there — tabPress is intercepted
@@ -166,7 +219,7 @@ export default function TabsLayout() {
           role/user picker). */}
       <Modal visible={moreOpen} transparent animationType="slide" onRequestClose={() => setMoreOpen(false)}>
         <View style={moreStyles.shade}>
-          <View style={moreStyles.sheet}>
+          <View style={[moreStyles.sheet, { paddingBottom: 20 + insets.bottom }]}>
             <View style={moreStyles.handle} />
             <View style={moreStyles.sheetHeader}>
               <Text style={moreStyles.sheetTitle}>More</Text>

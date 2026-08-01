@@ -1,6 +1,11 @@
 import { registerPermissionArea } from '../permissionRegistry';
 
-registerPermissionArea({
+// TEMPORARY PRODUCTION HOLD: keep definitions in source, but do not publish them
+// to the permission registry until Beam Close and Beam Gaiting are re-tested.
+// Change only this flag to true when both modules are ready.
+const ENABLE_BEAM_MODULES = false;
+
+if (ENABLE_BEAM_MODULES) registerPermissionArea({
   key: 'production',
   name: 'Production',
   icon: 'construct-outline',

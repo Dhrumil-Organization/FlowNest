@@ -15,7 +15,7 @@ import Header from '../Header';
 import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView } from 'react-native';
-import Snackbar from '../Snackbar';
+import { Snackbar } from 'react-native-snackbar';
 import { Switch } from 'react-native';
 import CustomDrawer from './CustomDrawer';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
@@ -2480,7 +2480,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             // }
             if (response.data.success === true) {
                 setDataSaved(true);
-                setSuccessMessage('Data Updated Successfully ✅');
+                // setSuccessMessage('Data Updated Successfully ✅');
+                setSuccessMessage(response.data.message || response.data.response?.message);
                 setShowSuccess(true);
                 // resetAllFields();
                 // setIsScanModalVisible(false);
@@ -2542,8 +2543,13 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             console.log("delete response", response);
 
             if (response.data.success === true) {
+
+                const successMsg =
+                    response.data.response?.message ||
+                    response.data.message;
+
                 setDataSaved(true);
-                setSuccessMessage('Data deleted Successfully ✅');
+                setSuccessMessage(successMsg);
                 setShowSuccess(true);
                 resetAllFields();
 
@@ -2597,8 +2603,14 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             console.log("delete response", response);
 
             if (response.data.success === true) {
+
+                const successMsg =
+                    response.data.response?.message ||
+                    response.data.message;
+
+
                 setDataSaved(true);
-                setSuccessMessage('Data deleted Successfully ✅');
+                setSuccessMessage(successMsg);
                 setShowSuccess(true);
                 // resetAllFields();
 
@@ -3160,10 +3172,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         Alert.alert("Validation", "Select Setup Date");
                                                         return;
                                                     }
-                                                    if (!shift) {
-                                                        Alert.alert("Validation", "Select Shift");
-                                                        return;
-                                                    }
+                                                    // if (!shift) {
+                                                    //     Alert.alert("Validation", "Select Shift");
+                                                    //     return;
+                                                    // }
                                                     if (!selectedstocktype) {
                                                         Alert.alert("Validation", "Select Stock Type");
                                                         return;
@@ -3280,7 +3292,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                             {isDelete && (
                                 <View style={styles.loaderOverlay}>
-                                    <ActivityIndicator size="large" color="#fff" />                                   
+                                    <ActivityIndicator size="large" color="#fff" />
                                 </View>
                             )}
 

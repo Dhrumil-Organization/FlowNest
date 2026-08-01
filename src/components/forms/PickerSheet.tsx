@@ -1,7 +1,7 @@
-import { T } from '@/constants/theme';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { BottomSheet } from '../../components/layout/BottomSheet';
+import { T } from '../../theme';
 
 interface Item { k: string; label: string; sub?: string; right?: string }
 interface Props {

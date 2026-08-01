@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { T } from '../../theme';
 import { PickerSheet } from './PickerSheet';
-import { T } from '@/constants/theme';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Drop-in replacement for the old app's `PartyDropdown` (`@/Shared/PartyDropdown`),

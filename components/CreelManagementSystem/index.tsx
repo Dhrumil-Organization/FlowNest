@@ -3172,10 +3172,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         Alert.alert("Validation", "Select Setup Date");
                                                         return;
                                                     }
-                                                    // if (!shift) {
-                                                    //     Alert.alert("Validation", "Select Shift");
-                                                    //     return;
-                                                    // }
+                                                    if (!shift) {
+                                                        Alert.alert("Validation", "Select Shift");
+                                                        return;
+                                                    }
                                                     if (!selectedstocktype) {
                                                         Alert.alert("Validation", "Select Stock Type");
                                                         return;

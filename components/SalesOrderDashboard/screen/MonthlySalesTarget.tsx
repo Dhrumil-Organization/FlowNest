@@ -202,38 +202,78 @@ export default function MonthlySalesTargetScreen({
         }
     };
 
+    const getToken = () => {
+        return token;
+    };
 
     const saveTargets = async () => {
-
-        const userPtype = await AsyncStorage.getItem('user_prptype');
+        const userPtype = await AsyncStorage.getItem("user_prptype");
         const selectedRows = rows.filter((row) => selected[row.id]);
+
+        const payload = {
+            prptype: userPtype,
+            yearno: getFinancialYear(year, month),
+            monthno: String(month + 1).padStart(2, "0"),
+            d1: selectedRows,
+        };
+
+        const headers = {
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "application/json",
+            "X-Requested-with": "XMLHttpRequest",
+        };
+
         try {
-            const payload = {
-                prptype: userPtype,
-                yearno: year,
-                monthno: month + 1,
-                d1: selectedRows,
-            };
-
-            console.log("Save Payload :", payload);
-
             const response = await axios.post(
-                `${API_BASE_URL}/add_edit_monthly_sales_target`,
-                payload
+                `${API}/api/add_edit_monthly_sales_target`,
+                payload,
+                { headers }
             );
 
             console.log("Save Response :", response.data);
 
-            if (response.data.success) {
-                Alert.alert("Success", "Data Saved Successfully");
-            }
+            const message =
+                response.data?.message ||
+                response.data?.response?.message ||
+                "Operation completed.";
 
+            if (response.data?.success) {
+                Alert.alert(
+                    "Success",
+                    message,
+                    [
+                        {
+                            text: "OK",
+                            onPress: async () => {
+                                setSelected({});
+                                setErrors({});
+                                await loadTargetsForPeriod(month, year);
+                            },
+                        },
+                    ],
+                    { cancelable: false }
+                );
+            } else {
+                Alert.alert("Error", message);
+            }
         } catch (error) {
             console.log("Save API Error :", error);
+
+            if (axios.isAxiosError(error)) {
+                const message =
+                    error.response?.data?.message ||
+                    error.response?.data?.response?.message ||
+                    error.message;
+
+                Alert.alert("Error", message);
+            } else {
+                Alert.alert("Error", "Something went wrong.");
+            }
         } finally {
             setSaving(false);
         }
     };
+
 
     useEffect(() => {
         if (!periodPicked) return;
@@ -293,54 +333,131 @@ export default function MonthlySalesTargetScreen({
     };
 
     const handleChangeTarget = (id: string, value: string) => {
-        // digits only (allow empty while typing)
-        const cleaned = value.replace(/[^0-9]/g, '');
-        setRows((prev) => prev.map((r) => (r.id === id ? { ...r, target: cleaned } : r)));
-        if (errors[id]) {
-            setErrors((prev) => ({ ...prev, [id]: false }));
+        if (/^\d*\.?\d{0,2}$/.test(value)) {
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === id ? { ...r, target: value } : r
+                )
+            );
+
+            if (errors[id]) {
+                setErrors((prev) => ({ ...prev, [id]: false }));
+            }
         }
     };
 
     const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).length, [selected]);
 
+    // const handleSaveSelected = async () => {
+    //     if (!rows.some((r) => selected[r.id])) {
+    //         Alert.alert("Select at least one row.");
+    //         return;
+    //     }
+
+    //     await saveTargets();
+    // };
+
     const handleSaveSelected = async () => {
         const selectedRows = rows.filter((r) => selected[r.id]);
 
         if (selectedRows.length === 0) {
-            Alert.alert("Nothing selected", "Select at least one row to save.");
+            Alert.alert("Select at least one row.");
             return;
         }
 
-        const nextErrors: Record<string, boolean> = {};
-        let hasError = false;
+        const invalidRow = selectedRows.find((r) => {
+            const value = (r.target || "").trim();
 
-        selectedRows.forEach((r) => {
-            if (!r.target.trim()) {
-                nextErrors[r.id] = true;
-                hasError = true;
-            }
+            return (
+                value === "" ||
+                value === ".00" ||
+                value === "0" ||
+                value === "0.0" ||
+                value === "0.00"
+            );
         });
 
-        if (hasError) {
-            setErrors(nextErrors);
-            Alert.alert("Target required", "Enter a target value for every selected row.");
+        if (invalidRow) {
+            Alert.alert(
+                "Validation",
+                "Target value cannot be blank ."
+            );
             return;
         }
 
         setSaving(true);
+        await saveTargets();
+    };
 
+    const showTarget = async (id: string) => {
+        const userPtype = await AsyncStorage.getItem("user_prptype");
+
+        const payload = {
+            prptype: userPtype,
+            yearno: getFinancialYear(year, month),
+            monthno: String(month + 1).padStart(2, "0"),
+            sexe: id,
+        };
         try {
-            // agar sirf selected rows save karni hain
-            setRows(selectedRows);
+            const response = await axios.get(
+                `${API}/api/monthly_sales_target_show`,
+                getRequestConfig({
+                    params: payload,
+                })
+            );
 
-            await saveTargets();
+            console.log("Show Response :", response.data);
 
-            Alert.alert("Success", "Data Saved Successfully");
-            setSelected({});
+            if (response.data.success) {
+                // data set karo
+                setRows(response.data.data.monthly_sales_target);
+            }
         } catch (error) {
             console.log(error);
-        } finally {
-            setSaving(false);
+        }
+    };
+
+    const deleteTarget = async (id: string) => {
+        const userPtype = await AsyncStorage.getItem("user_prptype");
+
+        const payload = {
+            prptype: userPtype,
+            yearno: getFinancialYear(year, month),
+            monthno: String(month + 1).padStart(2, "0"),
+            sexe: id,
+        };
+
+        try {
+            const response = await axios.post(
+                `${API}/api/monthly_sales_target_delete`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        "Content-Type": "application/json",
+                        "X-Requested-with": "XMLHttpRequest",
+                    },
+                }
+            );
+
+            const message =
+                response.data?.message ||
+                response.data?.response?.message ||
+                "Deleted Successfully";
+
+            if (response.data.success) {
+                Alert.alert("Success", message);
+
+                // Grid refresh
+                loadTargetsForPeriod(month, year);
+            } else {
+                Alert.alert("Error", message);
+            }
+        } catch (error: any) {
+            Alert.alert(
+                "Error",
+                error.response?.data?.message || "Something went wrong."
+            );
         }
     };
 

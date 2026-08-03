@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-const WeftIssueReturn = () => {
+const WeftIssueReturn = ({ token, navigation }) => {
 
     // const refresh = route?.params?.refresh;
     // const refresh = route?.params?.refresh;
@@ -26,7 +26,7 @@ const WeftIssueReturn = () => {
     const router = useRouter();
 
     const {
-        token,
+        // token,
         refresh,
         selectedProperty: routeProperty,
         selectedYear: routeYear,
@@ -167,33 +167,35 @@ const WeftIssueReturn = () => {
     }, []);
 
     useEffect(() => {
+        if (!token) return;
 
         if (selectedYear) {
             getFinancialYearDates(selectedYear);
         }
 
-    }, [selectedYear]);
+    }, [token, selectedYear]);
 
-    // useEffect(() => {
-    //     const load = async () => {
-    //         const data = await fetchPropertyData(token);
-    //         setPropertyData(data || []);
-    //         // if (data?.length) setSelectedProperty(data[0]);
-    //     };
-    //     load();
-    // }, []);
+    useEffect(() => {
+        if (!token) return;
+        const load = async () => {
+            const data = await fetchPropertyData(token);
+            setPropertyData(data || []);
+            if (data?.length) setSelectedProperty(data[0]);
+        };
+        load();
+    }, [token]);
 
 
-    const loadPropertyData = async () => {
-        const data = await fetchPropertyData(token);
+    // const loadPropertyData = async () => {
+    //     const data = await fetchPropertyData(token);
 
-        setPropertyData(data || []);
+    //     setPropertyData(data || []);
 
-        // Agar first property select karni ho to uncomment kar dena
-        // if (data?.length) {
-        //     setSelectedProperty(data[0]);
-        // }
-    };
+    //     // Agar first property select karni ho to uncomment kar dena
+    //     // if (data?.length) {
+    //     //     setSelectedProperty(data[0]);
+    //     // }
+    // };
 
     // const fetchCreelReturnData = async () => {
     //     if (!selectedProperty) return;
@@ -616,7 +618,7 @@ const WeftIssueReturn = () => {
                         <TouchableOpacity
                             // onPress={() => setFilterVisible(true)}
                             onPress={() => {
-                                loadPropertyData();
+                                // loadPropertyData();
                                 setFilterVisible(true);
                             }}
                         >
@@ -648,7 +650,7 @@ const WeftIssueReturn = () => {
                             style={styles.chip}
                             // onPress={() => setFilterVisible(true)}
                             onPress={() => {
-                                loadPropertyData();
+                                // loadPropertyData();
                                 setFilterVisible(true);
                             }}
                         >
@@ -866,48 +868,53 @@ const WeftIssueReturn = () => {
                     </Modal>
                     {/* PROPERTY PICKER */}
                     <Modal visible={propertyPickerVisible} animationType="slide">
-                        <View style={{ flex: 1, backgroundColor: "#fff" }}>
+                        <SafeAreaView
+                            edges={['top']}
+                            style={{ flex: 1, backgroundColor: "#fff" }}
+                        >
+                            <View style={{ flex: 1, backgroundColor: "#fff" }}>
 
-                            <View style={styles.pickerHeader}>
-                                <TouchableOpacity onPress={() => {
-                                    setPropertyPickerVisible(false);
-                                    setPropertySearch(""); // ✅ CLEAR SEARCH
-                                }}>
-                                    <Icon name="arrow-back-ios" size={20} color="#000000" />
-                                </TouchableOpacity>
+                                <View style={styles.pickerHeader}>
+                                    <TouchableOpacity onPress={() => {
+                                        setPropertyPickerVisible(false);
+                                        setPropertySearch(""); // ✅ CLEAR SEARCH
+                                    }}>
+                                        <Icon name="arrow-back-ios" size={20} color="#000000" />
+                                    </TouchableOpacity>
 
-                                <Text style={styles.pickerTitle}>Select Property</Text>
-                                <View style={{ width: 20 }} />
-                            </View>
+                                    <Text style={styles.pickerTitle}>Select Property</Text>
+                                    <View style={{ width: 20 }} />
+                                </View>
 
-                            <View style={styles.pickerSearch}>
-                                <Icon name="search" size={18} color="#000000" />
-                                <TextInput
-                                    placeholder="Search property..."
-                                    placeholderTextColor="#000"
-                                    value={propertySearch}
-                                    onChangeText={setPropertySearch}
-                                    style={{ flex: 1 }}
+                                <View style={styles.pickerSearch}>
+                                    <Icon name="search" size={18} color="#000000" />
+                                    <TextInput
+                                        placeholder="Search property..."
+                                        placeholderTextColor="#000"
+                                        value={propertySearch}
+                                        onChangeText={setPropertySearch}
+                                        style={{ flex: 1 }}
+                                    />
+                                </View>
+
+                                <FlatList
+                                    data={propertyData.filter(p =>
+                                        p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
+                                    )}
+                                    keyExtractor={(i) => i.PrpCode}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity style={styles.pickerItem}
+                                            onPress={() => {
+                                                setSelectedProperty(item);
+                                                setPropertyPickerVisible(false);
+                                                setPropertySearch(""); // ✅ CLEAR SEARCH
+                                            }}>
+                                            <Text style={{ color: '#000' }}>{item.LngName}</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 />
                             </View>
-
-                            <FlatList
-                                data={propertyData.filter(p =>
-                                    p.LngName.toLowerCase().includes(propertySearch.toLowerCase())
-                                )}
-                                keyExtractor={(i) => i.PrpCode}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity style={styles.pickerItem}
-                                        onPress={() => {
-                                            setSelectedProperty(item);
-                                            setPropertyPickerVisible(false);
-                                            setPropertySearch(""); // ✅ CLEAR SEARCH
-                                        }}>
-                                        <Text style={{ color: '#000' }}>{item.LngName}</Text>
-                                    </TouchableOpacity>
-                                )}
-                            />
-                        </View>
+                        </SafeAreaView>
                     </Modal >
 
                     {/* YEAR PICKER */}

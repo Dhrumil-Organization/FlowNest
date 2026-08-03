@@ -12,7 +12,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 // import FullScreenLoader from '../Loader/Loader';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const { height } = Dimensions.get('window');
 
 const CustomDrawer = (props) => {
@@ -98,6 +98,46 @@ const CustomDrawer = (props) => {
     const getToken = () => token
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
+
+
+    useEffect(() => {
+        const test = async () => {
+            const currentYearNo = await AsyncStorage.getItem("selected_yearno");
+            console.log("selected_yearno =", currentYearNo);
+
+            console.log("Year List =", getAllYearData);
+        };
+
+        test();
+    }, [getAllYearData]);
+
+    useEffect(() => {
+        if (getAllYearData.length === 0) return;
+
+        const setCurrentYear = async () => {
+            const currentYearNo = await AsyncStorage.getItem("yno");
+
+            const currentYear = getAllYearData.find(
+                item => String(item.YearNo) === String(currentYearNo)
+            );
+
+            if (currentYear) {
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        YearNo: currentYear.YearNo,
+                        YearName: currentYear.YearName,
+                    },
+                }));
+            }
+        };
+
+        setCurrentYear();
+
+    }, [getAllYearData]);
+
+    console.log("Year List", getAllYearData);
 
     return (
         <>

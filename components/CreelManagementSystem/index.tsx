@@ -2777,6 +2777,41 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         action: 70
     };
 
+    useEffect(() => {
+        if (!token) return;
+
+        const load = async () => {
+            const data = await fetchPropertyData(token);
+            setPropertyData(data || []);
+
+            if (data?.length) {
+                const prpCode = data[0].PrpCode;
+
+                const years = await fetchAllYeardata(token, prpCode);
+                setAllYearData(years);
+
+                const currentFY = getCurrentFinancialYear();
+
+                const currentYear =
+                    years.find(y => String(y.YearNo) === String(currentFY))
+                    || years[0];
+
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        PrpCode: prpCode,
+                        LngName: data[0].LngName,
+                        YearNo: currentYear?.YearNo || '',
+                        YearName: currentYear?.YearName || '',
+                    }
+                }));
+            }
+        };
+
+        load();
+    }, [token]);
+
     return (
         <>
 
@@ -3172,10 +3207,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         Alert.alert("Validation", "Select Setup Date");
                                                         return;
                                                     }
-                                                    // if (!shift) {
-                                                    //     Alert.alert("Validation", "Select Shift");
-                                                    //     return;
-                                                    // }
+                                                    if (!shift) {
+                                                        Alert.alert("Validation", "Select Shift");
+                                                        return;
+                                                    }
                                                     if (!selectedstocktype) {
                                                         Alert.alert("Validation", "Select Stock Type");
                                                         return;
@@ -4194,6 +4229,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 getAllYearData={getAllYearData}
                 setAllYearData={setAllYearData}
                 token={token}
+                fetchAllYeardata={fetchAllYeardata}
             />
 
         </>

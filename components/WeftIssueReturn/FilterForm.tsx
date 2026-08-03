@@ -1,18 +1,18 @@
-import React, { useRef, useEffect } from 'react';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef } from 'react';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    Modal,
-    StyleSheet,
+    ActivityIndicator,
     Animated,
     Dimensions,
+    Modal,
     ScrollView,
-    ActivityIndicator
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import LinearGradient from 'react-native-linear-gradient';
-import theme from '../../android/app/src/theme';
 
 const { height } = Dimensions.get('window');
 

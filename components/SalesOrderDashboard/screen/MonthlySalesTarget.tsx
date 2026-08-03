@@ -495,7 +495,7 @@ export default function MonthlySalesTargetScreen({
 
     return (
         <SafeAreaView style={styles.safe} edges={['top']} >
-            <Text style={styles.title}>Monthly Sales Target</Text>
+            {/* <Text style={styles.title}>Monthly Sales Target</Text> */}
 
             {/* Month / Year filter */}
             <View style={styles.filterCard}>

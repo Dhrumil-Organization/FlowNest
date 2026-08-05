@@ -481,7 +481,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
         if (!checker) return Alert.alert('Checker can not be blank.');
         if (!shift) return Alert.alert('Shift can not be blank.');
         if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
-        if (!operator) return Alert.alert('Operator can not be blank.');
+        // if (!operator) return Alert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -536,7 +536,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                 IsAuth: d.IsAuth,
                 PrpCode: d.PrpCode,
                 EMode: 'S',
-                OprCode: operator
+                OprCode: operator || ''
             };
 
             console.log('handleSubmitScan payloadObj:', payloadObj);
@@ -1102,10 +1102,10 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
             await showAlert('Please select Checker');
             return false;
         }
-        if (!FormState.values.ShfCode) {
-            await showAlert('Please select Shift');
-            return false;
-        }
+        // if (!FormState.values.ShfCode) {
+        //     await showAlert('Please select Shift');
+        //     return false;
+        // }
         return true;
     };
 
@@ -1612,7 +1612,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
-                                    <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
+                                    {/* <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
                                     <PartyDropdown
                                         data={getOperatorData}
                                         placeholder="Choose Operator..."
@@ -1626,7 +1626,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                                             setSelectedOperator(item);
                                             setOperator(item.OprCode);
                                         }}
-                                    />
+                                    /> */}
 
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(getShiftData, shift, (val) => setShift(val))}
@@ -1879,7 +1879,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
-                                    <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
+                                    {/* <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
                                     <PartyDropdown
                                         data={manualOperatorData}
                                         placeholder="Choose operator."
@@ -1901,7 +1901,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                                                 },
                                             }));
                                         }}
-                                    />
+                                    /> */}
 
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(manualShiftData, manualShift, (val) => {
@@ -2119,9 +2119,9 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                                                 <Text style={checkingScannerStyles.subText}>
                                                     Linked Order No : {item.LinkedOrderNo}
                                                 </Text>
-                                                <Text style={checkingScannerStyles.subText}>
+                                                {/* <Text style={checkingScannerStyles.subText}>
                                                     Operator : {item.OprName}
-                                                </Text>
+                                                </Text> */}
                                             </View>
                                             <View>
                                                 <TouchableOpacity

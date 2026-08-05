@@ -1067,7 +1067,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                                 </Text>
                             )}
                         </TouchableOpacity>
-                        {getDataSaved && status === "Close" && (
+                        {/* {getDataSaved && status === "Close" && (
                             // <TouchableOpacity
                             //     style={[styles.saveBtn, loading && { opacity: 0.7 }]}
                             //     onPress={printSticker}
@@ -1078,6 +1078,146 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                             //     </Text>
                             // </TouchableOpacity>
 
+                            <View
+                                style={{
+                                    backgroundColor: "#fff",
+                                    borderRadius: 18,
+                                    padding: 18,
+                                    marginTop: 14,
+                                    marginBottom: 12,
+                                    elevation: 3,
+                                    shadowColor: "#000",
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 8,
+                                }}
+                            >
+
+                                <View style={{ flexDirection: "row" }}>
+
+                                    <View
+                                        style={{
+                                            width: 56,
+                                            height: 56,
+                                            borderRadius: 14,
+                                            backgroundColor: "#EAF7FF",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                            marginRight: 14
+                                        }}>
+
+                                        <Icon
+                                            name="print"
+                                            size={30}
+                                            color="#0E83C8"
+                                        />
+
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+
+                                        <Text
+                                            style={{
+                                                fontSize: 18,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            Sticker Printing
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: "#6B7280",
+                                                marginTop: 2,
+                                                fontSize: 12
+                                            }}>
+                                            Select printer and print saved sticker
+                                        </Text>
+
+                                    </View>
+
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (getPrinters.length === 0) {
+                                            getAllPrinters();
+                                        }
+                                        setPrinterModalVisible(true);
+                                    }}
+                                    style={{
+                                        marginTop: 18,
+                                        borderWidth: 1.5,
+                                        borderColor: "#8CCBFF",
+                                        borderRadius: 16,
+                                        padding: 15,
+                                        flexDirection: "row",
+                                        justifyContent: "space-between",
+                                        alignItems: "center"
+                                    }}>
+
+                                    <View>
+
+                                        <Text
+                                            style={{
+                                                fontSize: 14,
+                                                fontWeight: "700",
+                                                color: "#111827"
+                                            }}>
+                                            {printer || "Select Printer"}
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color: "#0F6C7B",
+                                                marginTop: 2,
+                                                fontWeight: "700"
+                                            }}>
+                                            {selectedPrinterStatus || "Idle"}
+                                        </Text>
+
+                                    </View>
+
+                                    <Icon
+                                        name="keyboard-arrow-down"
+                                        size={28}
+                                        color="#374151"
+                                    />
+
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    onPress={printSticker}
+                                    style={{
+                                        backgroundColor: "#0F6C7B",
+                                        borderRadius: 14,
+                                        height: 56,
+                                        marginTop: 16,
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        flexDirection: "row"
+                                    }}>
+
+                                    <Icon
+                                        name="print"
+                                        size={22}
+                                        color="#fff"
+                                    />
+
+                                    <Text
+                                        style={{
+                                            color: "#fff",
+                                            fontSize: 18,
+                                            fontWeight: "700",
+                                            marginLeft: 10
+                                        }}>
+                                        Print Sticker
+                                    </Text>
+
+                                </TouchableOpacity>
+
+                            </View>
+                        )} */}
+                        {getDataSaved && status === "Close" && (
                             <View
                                 style={{
                                     backgroundColor: "#fff",

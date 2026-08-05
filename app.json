@@ -24,7 +24,7 @@
       }
     },
     "android": {
-      "versionCode": 25,
+      "versionCode": 25, 
       "package": "com.anonymous.FlowNest",
       "googleServicesFile": "./google-services.json",
       "permissions": [

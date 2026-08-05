@@ -483,7 +483,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         if (!checker) return Alert.alert('Checker can not be blank.');
         if (!shift) return Alert.alert('Shift can not be blank.');
         if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
-        if (!operator) return Alert.alert('Operator can not be blank.');
+        // if (!operator) return Alert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -508,7 +508,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 Wt: kgs,
                 AvgWt: getavgWt,
                 txntype: 'chekingScanner',
-                ShfCode: shift || '1',
+                ShfCode: shift,
                 SrNo: '0',
                 islasttaka: getScannedObj.islasttaka,
                 isfirsttaka: getScannedObj.isfirsttaka,
@@ -538,7 +538,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 IsAuth: d.IsAuth,
                 PrpCode: d.PrpCode,
                 EMode: 'S',
-                OprCode: operator
+                OprCode: operator || ''
             };
 
             console.log('handleSubmitScan payloadObj:', payloadObj);
@@ -1269,10 +1269,26 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
             console.log('handledelete response:', response);
 
+            // if (response.data.success) {
+            //     Alert.alert('Success', response.data.message || 'Record deleted successfully');
+            //     await handleScannerList();
+            // } 
             if (response.data.success) {
-                Alert.alert('Success', response.data.message || 'Record deleted successfully');
-                await handleScannerList();
-            } else {
+                Alert.alert(
+                    'Success',
+                    response.data.message || 'Delete successfully',
+                    [
+                        {
+                            text: 'OK',
+                            onPress: async () => {
+                                await handleScannerList(); // Browse API
+                            },
+                        },
+                    ],
+                    { cancelable: false }
+                );
+            }
+            else {
                 Alert.alert('Warning', response.data.message);
             }
         } catch (error) {
@@ -1614,7 +1630,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
-                                    <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
+                                    {/* <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
                                     <PartyDropdown
                                         data={getOperatorData}
                                         placeholder="Choose Operator..."
@@ -1628,7 +1644,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                             setSelectedOperator(item);
                                             setOperator(item.OprCode);
                                         }}
-                                    />
+                                    /> */}
 
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(getShiftData, shift, (val) => setShift(val))}
@@ -1881,7 +1897,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
-                                    <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
+                                    {/* <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
                                     <PartyDropdown
                                         data={manualOperatorData}
                                         placeholder="Choose operator."
@@ -1903,7 +1919,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                                 },
                                             }));
                                         }}
-                                    />
+                                    /> */}
 
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(manualShiftData, manualShift, (val) => {
@@ -2006,7 +2022,50 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                     >
                         <View style={styles.modalOverlayBottom}>
                             <View style={styles.printerSheet}>
-                                <Text style={styles.modalTitle}>Select Printer</Text>
+                                <View
+                                    style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        marginBottom: 16,
+                                    }}
+                                >
+                                    <View style={{ width: 38 }} />
+
+                                    <Text
+                                        style={[
+                                            styles.modalTitle,
+                                            {
+                                                flex: 1,
+                                                textAlign: "center",
+                                            },
+                                        ]}
+                                    >
+                                        Select Printer
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setPrinterModalVisible(false);
+                                            setPendingPrintItem(null);
+                                            setPrinterSearch("");
+                                        }}
+                                        style={{
+                                            width: 38,
+                                            height: 38,
+                                            borderRadius: 19,
+                                            backgroundColor: "#F1F5F9",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <Icon
+                                            name="close"
+                                            size={24}
+                                            color="#374151"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
                                 <TextInput
                                     placeholder="Search printer..."
                                     value={printerSearch}
@@ -2055,7 +2114,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                     </Modal>
 
                     {/* Scanner list modal */}
-                    <Modal visible={scannerModal} animationType="slide" onRequestClose={() => setScannerModal(false)}>
+                    {/* <Modal visible={scannerModal} animationType="slide" onRequestClose={() => setScannerModal(false)}>
                         <View style={{ flex: 1, backgroundColor: '#fff' }}>
                             <View style={checkingScannerStyles.headerContainer}>
                                 <View>
@@ -2120,10 +2179,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
                                                 <Text style={checkingScannerStyles.subText}>
                                                     Linked Order No : {item.LinkedOrderNo}
-                                                </Text>
-                                                 <Text style={checkingScannerStyles.subText}>
-                                                    Operator : {item.OprName}
-                                                </Text>
+                                                </Text>                                             
                                             </View>
                                             <View>
                                                 <TouchableOpacity
@@ -2151,7 +2207,166 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                 />
                             )}
                         </View>
-                    </Modal>
+                    </Modal> */}
+
+                    {scannerModal && (
+                        <View
+                            style={{
+                                flex: 1,
+                                backgroundColor: "#fff",
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 999,
+                            }}
+                        >
+                            <View style={checkingScannerStyles.headerContainer}>
+                                <View>
+                                    <Text style={{ fontSize: 24, fontWeight: "900" }}>
+                                        Scanner List
+                                    </Text>
+                                    <Text style={{ color: "#777" }}>
+                                        {filteredData.length} items
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={checkingScannerStyles.closeButton}
+                                    onPress={() => setScannerModal(false)}
+                                >
+                                    <Icon name="close" size={24} color="#000" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={checkingScannerStyles.searchContainer}>
+                                <Icon name="search" size={22} color="#777" />
+
+                                <TextInput
+                                    placeholder="Search scanner data..."
+                                    value={searchText}
+                                    onChangeText={setSearchText}
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 10,
+                                        color: "#000",
+                                    }}
+                                />
+                            </View>
+
+                            {scannerLoading ? (
+                                <View style={styles.centered}>
+                                    <ActivityIndicator
+                                        size="large"
+                                        color="#007EA7"
+                                    />
+                                </View>
+                            ) : (
+                                <FlatList
+                                    data={filteredData}
+                                    keyExtractor={(item, index) =>
+                                        `${item.UId}_${item.SrNo}_${index}`
+                                    }
+                                    contentContainerStyle={{
+                                        padding: 16,
+                                        paddingBottom: 40,
+                                    }}
+                                    onEndReached={loadMoreData}
+                                    showsVerticalScrollIndicator={false}
+                                    renderItem={({ item }) => (
+                                        <View style={checkingScannerStyles.billCard}>
+                                            <View
+                                                style={[
+                                                    styles.measurementField,
+                                                    isCompactScreen &&
+                                                    styles.measurementFieldCompact,
+                                                ]}
+                                            >
+                                                <Text
+                                                    numberOfLines={1}
+                                                    style={checkingScannerStyles.title}
+                                                >
+                                                    {item.DsnName}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Beam No : {item.BeamNo}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Taka : {item.TakaNo}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Design : {item.OrdDsnName || item.DsnName}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Weight : {item.Wt}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Avg Weight : {item.AvgWt}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Grade : {item.GrdName}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Linked Order No : {item.LinkedOrderNo}
+                                                </Text>
+                                            </View>
+
+                                            <View>
+                                                <TouchableOpacity
+                                                    style={{
+                                                        backgroundColor: "#0369A1",
+                                                        padding: 8,
+                                                        borderRadius: 8,
+                                                        marginBottom: 8,
+                                                    }}
+                                                    onPress={() =>
+                                                        openPrinterForScannerRow(item)
+                                                    }
+                                                >
+                                                    <Icon
+                                                        name="local-printshop"
+                                                        size={20}
+                                                        color="#fff"
+                                                    />
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    disabled={
+                                                        Number(item.islasttakatrack) === 1
+                                                    }
+                                                    style={[
+                                                        checkingScannerStyles.deleteButton,
+                                                        Number(item.islasttakatrack) === 1 && {
+                                                            backgroundColor: "#BDBDBD",
+                                                            opacity: 0.6,
+                                                        },
+                                                    ]}
+                                                    onPress={() => {
+                                                        setSelectedDeleteItem(item);
+                                                        setShowDeleteAlert(true);
+                                                    }}
+                                                >
+                                                    <Icon
+                                                        name="delete-outline"
+                                                        size={20}
+                                                        color="#fff"
+                                                    />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                />
+                            )}
+                        </View>
+                    )}
 
                     {/* Delete confirm */}
                     <Modal transparent visible={showDeleteAlert} animationType="fade" onRequestClose={() => setShowDeleteAlert(false)}>

@@ -1,9 +1,9 @@
 export const ROLE_TABS: Record<string, string[]> = {
-  owner:      ['home','orders','designs','costing','stock','expense','po','aliases','loom','ledger'],
+  owner:      ['home','orders','designs','costing','stock','expense','po','aliases', 'monthlysalestarget', 'loom','ledger'],
   planthead:  ['home','designs','costing','stock','po','loom','ledger'],
   prodhead:   ['home','designs','costing','po','loom','ledger'],
   designer:   ['designs','costing'],
-  sales:      ['home','orders','aliases'],
+  sales:      ['home','orders','aliases', 'monthlysalestarget'],
   erpop:      ['designs','costing'],
   deo_elec:   ['expense'],
   deo_sal:    ['expense'],

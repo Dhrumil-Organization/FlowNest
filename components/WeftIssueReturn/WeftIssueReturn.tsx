@@ -1010,6 +1010,29 @@ const WeftIssueReturn = ({ token, navigation }) => {
                                                 <Text style={styles.valueText}>{item.StkType}</Text>
                                             </View>
 
+                                            <View
+                                                style={{
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    marginTop: 8,
+                                                    marginBottom: 8,
+                                                }}
+                                            >
+                                                <Text style={styles.smallLabel1}>Carton No:</Text>
+
+                                                <Text
+                                                    style={[
+                                                        styles.amount1,
+                                                        {
+                                                            color: "#000",
+                                                            marginLeft: 6,
+                                                        },
+                                                    ]}
+                                                >
+                                                    {item.CartNo || 0}
+                                                </Text>
+                                            </View>
+
                                             <View style={styles.rowBetween}>
                                                 <View style={{ flexDirection: "row", gap: 20 }}>
                                                     <View>
@@ -1477,6 +1500,15 @@ const styles = StyleSheet.create({
     },
     amount: {
         fontSize: 14,
+        fontWeight: "600"
+    },
+    smallLabel1: {
+        fontSize: 13,
+        color: "#000"
+    },
+
+    amount1: {
+        fontSize: 13,
         fontWeight: "600"
     },
     balanceText: {

@@ -25,7 +25,11 @@
 //      to match your actual API's field names; everything else adapts
 //      automatically.
 // ─────────────────────────────────────────────────────────────
+import { API } from '@/common/API/dynamicAPI';
+import { T } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -40,12 +44,6 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from "axios";
-import { useAppSessionStore } from '@/src/stores/AppSessionStore';
-import { T } from '@/src/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@/src/api/client';
-import { API } from '@/common/API/dynamicAPI';
 
 // ---- Set to false if you want the list hidden until the user
 // explicitly interacts with the month/year stepper at least once. ----
@@ -173,7 +171,7 @@ export default function MonthlySalesTargetScreen({
                 // txntype: "monthly_sales_target"
             };
 
-            console.log("payload", payload);
+            console.log("mmm payload", payload);
 
             const response = await axios.get(
                 `${API}/api/monthly_sales_target_browse`,
@@ -182,7 +180,7 @@ export default function MonthlySalesTargetScreen({
                 }),
             );
 
-            console.log("response", response);
+            console.log("mmm response", response, API);
             if (
                 response.data.success && response.data.data?.monthly_sales_target?.length > 0) {
                 const targets = response.data.data.monthly_sales_target.map((item: any) => ({

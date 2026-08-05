@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { usePermission } from '../../permissions';
-import { getUiNodes } from '../uiRegistry';
 import type { UiNodeKind, UiRenderMap } from '../types';
+import { getUiNodes } from '../uiRegistry';
 
 type RegistryItemBoundaryProps = {
   nodeId: string;
@@ -57,6 +57,9 @@ export function RegistryRenderer<TContext>({
     const aliases = Array.isArray(node.metadata?.permissionAliases)
       ? (node.metadata?.permissionAliases as string[])
       : [];
+    const monthlysalestarget = Array.isArray(node.metadata?.permissionMonthlysalestarget)
+      ? (node.metadata?.permissionMonthlysalestarget as string[])
+      : [];
     const anyPermissions = Array.isArray(node.metadata?.anyPermissions)
       ? (node.metadata?.anyPermissions as string[])
       : [];
@@ -70,7 +73,7 @@ export function RegistryRenderer<TContext>({
       return anyPermissions.some((permission) => hasResourceAccess(permission));
     }
 
-    return hasResourceAccess(node.permission) || aliases.some((permission) => hasResourceAccess(permission));
+    return hasResourceAccess(node.permission) || aliases.some((permission) => hasResourceAccess(permission) || monthlysalestarget.some((permission) => hasResourceAccess(permission)));
   });
 
   if (visible.length === 0) return <>{empty}</>;

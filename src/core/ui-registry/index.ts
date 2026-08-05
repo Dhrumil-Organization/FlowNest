@@ -4,6 +4,7 @@ import './modules/core-navigation.ui';
 import './modules/design.ui';
 import './modules/management.ui';
 import './modules/production.ui';
+import './modules/salesTarget.ui';
 
 import { validateUiRegistry } from './uiRegistry';
 // FIX: cross-check every UI-registry node's `permission` string against

@@ -70,6 +70,7 @@ export async function performLogin(
     if (!res.success) {
       return { success: false, message: res.message || 'Invalid username or password.' };
     }
+    console.log('Login response:', res);
 
     const response = res.response || {};
     const token = response.access_token;

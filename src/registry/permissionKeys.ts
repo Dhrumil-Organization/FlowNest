@@ -39,6 +39,9 @@ export const PermissionKeys = {
     accessUsers: 'access_control.users',
     registrySync: 'access_control.registry_sync',
   },
+  salesTarget: {
+    monthlySalesTarget: 'monthlysalestarget',
+  },
 } as const;
 
 export const PermissionActions = {

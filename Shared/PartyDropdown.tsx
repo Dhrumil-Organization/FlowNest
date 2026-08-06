@@ -102,6 +102,45 @@ interface PaymentData {
     paytype: string;
 }
 
+interface BranchData {
+    BankBr?: string;
+}
+
+
+interface BeamData {
+    BeamUId: string;
+    BeamNo: string;
+    UBeamNo: string;
+    TranDate: string;
+    NTranDate: string;
+    RollNo: string;
+    GTexNo: string;
+    WarpLen: string;
+    PrpCode: string;
+    LngName: string;
+    DsnCode: string | null;
+    DsnName: string;
+    BeamWt: string;
+    PipeWt: string;
+    YarnWt: string;
+    Ends: string;
+    Reeds: string;
+    IsJobOut: string;
+    ischecked: string;
+    reason: string;
+    BeamBalance: string;
+    PipeName: string;
+    BeamStatus: string;
+}
+interface Operator {
+    EmpCode: string;
+    EmpName: string;
+    id: string;
+    label: string;
+    OprCode: string;
+    OprName: string
+
+}
 interface Employee {
     PrpCode: string;
     EmpName: string;
@@ -115,10 +154,66 @@ interface Employee {
     PEmpCode: string
 
 }
+interface Supervisor {
+    PRPCODE: string;
+    SupName: string;
+    SupCode: string;
+    ShtName: string;
+    DptCode: string;
+    DptName: string;
+    DsgCode: string;
+    DsgName: string;
+    PPrpCode: string;
+    PEmpCode: string;
 
-interface BranchData {
-    BankBr?: string;
 }
+interface blend {
+    category: string;
+    id: string;
+    name: string;
+    sh_name: string;
+    count: string;
+    ply: string;
+    type: string;
+    lustre: string;
+}
+interface Item {
+    ItmCode: string,
+    ItmName: string,
+    UOM: string,
+    Denier: string,
+    tag: string,
+    Rate: string,
+    HsnCode: string,
+    GSTGrpCode: string
+
+}
+interface SubItem {
+    WBlend: string
+    WBlendPer: string
+    WCount: string
+    WDenier: string
+    WLustre: string
+    WNameCode: string
+    WOther: string
+    WPly: string
+    WType: string
+    WYarnType: string
+    itmcode: string
+    mitmcode: string
+    name: string
+    sh_name: string
+    strcode: string
+}
+interface stock {
+    StkType: string;
+    stktypename: string
+}
+interface chekingdesigndata {
+    dsncode: string;
+    dsnname: string
+}
+
 
 const extractLocation = (addr?: string) => {
     if (!addr) return '';
@@ -233,9 +328,9 @@ const PartyDropdown: React.FC<Props> = ({
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.MacName || '—'}
                     </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.MacCode || '—'}
-                    </Text>
+                    </Text> */}
                 </View>
             </View>
         );
@@ -264,6 +359,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentBeamData = (item: BeamData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -288,6 +384,91 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+    const renderRowContentWeftBeamData = (item: BeamData, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.BeamNo)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamNo : {item.BeamNo || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        TranDate : {item.TranDate || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamBalance : {item.BeamBalance || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        PipeName : {item.PipeName || '—'}
+                    </Text>
+                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        BeamStatus : {item.BeamStatus || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentperson = (item: Employee, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.EmpName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.EmpName || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.EmpCode || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentoperator = (item: Operator, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.OprName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.OprName || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.OprCode || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentsupervisior = (item: Supervisor, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.SupName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.SupCode || '—'}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.SupName || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
     const renderRowContentDesign = (item: DesignData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -312,6 +493,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentChecker = (item: CheckerData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -330,6 +512,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentGrd = (item: GrdData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -348,6 +531,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentShift = (item: ShiftData, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
@@ -367,7 +551,6 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
-
 
     const renderRowContentAdj = (item: AdjData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
@@ -417,6 +600,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentBank = (item: BankData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
         return (
@@ -433,6 +617,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
+
     const renderRowContentPayment = (item: PaymentData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
         return (
@@ -449,24 +634,7 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
-    const renderRowContentperson = (item: Employee, isSelected: boolean) => {
-        return (
-            <View style={rowStyles.rowInner}>
-                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.EmpName)}</Text>
-                </View>
 
-                <View style={rowStyles.main}>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.EmpName || '—'}
-                    </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.EmpCode || '—'}
-                    </Text>
-                </View>
-            </View>
-        );
-    };
     const renderRowContentBranch = (item: BranchData, isSelected: boolean) => {
         // const location = extractLocation(item.Address);
         return (
@@ -483,38 +651,20 @@ const PartyDropdown: React.FC<Props> = ({
             </View>
         );
     };
-    const renderRowContentoperator = (item: Operator, isSelected: boolean) => {
+
+    const renderRowContentblend = (item: blend, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
                 <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.OprName)}</Text>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.name)}</Text>
                 </View>
 
                 <View style={rowStyles.main}>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.OprName || '—'}
+                        {item.name || '—'}
                     </Text>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.OprCode || '—'}
-                    </Text>
-                </View>
-            </View>
-        );
-    };
-
-    const renderRowContentsupervisior = (item: Supervisor, isSelected: boolean) => {
-        return (
-            <View style={rowStyles.rowInner}>
-                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.SupName)}</Text>
-                </View>
-
-                <View style={rowStyles.main}>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.SupCode || '—'}
-                    </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.SupName || '—'}
+                        {item.id || '—'}
                     </Text>
                 </View>
             </View>
@@ -559,53 +709,81 @@ const PartyDropdown: React.FC<Props> = ({
         );
     };
 
-    const renderRowContentblend = (item: blend, isSelected: boolean) => {
+    const renderRowContenttype = (item: blend, isSelected: boolean) => {
         return (
             <View style={rowStyles.rowInner}>
                 <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.name)}</Text>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.type)}</Text>
                 </View>
 
                 <View style={rowStyles.main}>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.name || '—'}
-                    </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        {item.id || '—'}
-                    </Text>
-                </View>
-            </View>
-        );
-    };
-
-    const renderRowContentWeftBeamData = (item: BeamData, isSelected: boolean) => {
-        return (
-            <View style={rowStyles.rowInner}>
-                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
-                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.BeamNo)}</Text>
-                </View>
-
-                <View style={rowStyles.main}>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        BeamNo : {item.BeamNo || '—'}
-                    </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        TranDate : {item.TranDate || '—'}
-                    </Text>
-                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        BeamBalance : {item.BeamBalance || '—'}
+                        {item.type || '—'}
                     </Text>
                     {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        PipeName : {item.PipeName || '—'}
-                    </Text>
-                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
-                        BeamStatus : {item.BeamStatus || '—'}
+                        {item.id || '—'}
                     </Text> */}
                 </View>
             </View>
         );
     };
 
+    const renderRowContentlustre = (item: blend, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.lustre)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.lustre || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.id || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentItem1 = (item: Item, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.ItmName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.ItmName || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.ItmCode || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentSubItem = (item: SubItem, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.WNameCode)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.WNameCode || '—'}
+                    </Text>
+                    {/* <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        {item.itmcode || '—'}
+                    </Text> */}
+                </View>
+            </View>
+        );
+    };
 
     const renderRowContentStock = (item: stock, isSelected: boolean) => {
         return (
@@ -620,6 +798,45 @@ const PartyDropdown: React.FC<Props> = ({
                     </Text>
                     <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
                         {item.StkType || '—'}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+
+    const renderRowContentWeftDesign = (item: DesignData, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.DsnName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Design : {`${item.DsnName || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.DsnCode || '—'}`}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const renderRowContentpartydata = (item: Party, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.accountname)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Party : {`${item.accountname || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.acccode || '—'}`}
                     </Text>
                 </View>
             </View>
@@ -671,30 +888,35 @@ const PartyDropdown: React.FC<Props> = ({
                     initialValue={selected ?? initialValue}
                     multiple={multiple}
                     emptyMessage={type == 'bank' ? 'No banks!' : type == 'party' ? "No parties!" : type == 'branch' ? "No branches!" : type == 'payment' ? "No payments!" : type == 'adj' ? "No adjustments!" : 'No items'}
-                    renderRowContent={
-                        type == 'bank' ? renderRowContentBank
-                            : type == 'party' ? renderRowContent
-                                : type == 'branch' ? renderRowContentBranch
-                                    : type == 'payment' ? renderRowContentPayment
-                                        : type == 'adj' ? renderRowContentAdj
-                                            : type == 'machine' ? renderRowContentMachine
-                                                : type == 'design' ? renderRowContentDesign
-                                                    : type == 'checker' ? renderRowContentChecker
-                                                        : type == 'grd' ? renderRowContentGrd
-                                                            : type == 'shift' ? renderRowContentShift
-                                                                : type == 'item' ? renderRowContentItem
-                                                                    : type == 'machine1' ? renderRowContentMachine1
-                                                                        : type == 'beam' ? renderRowContentBeamData
-                                                                            : type == 'employee' ? renderRowContentperson
-                                                                                : type == 'operator' ? renderRowContentoperator
-                                                                                    : type == 'supervisior' ? renderRowContentsupervisior
+                    renderRowContent={type == 'bank' ? renderRowContentBank
+                        : type == 'party' ? renderRowContent
+                            : type == 'branch' ? renderRowContentBranch
+                                : type == 'payment' ? renderRowContentPayment
+                                    : type == 'adj' ? renderRowContentAdj
+                                        : type == 'machine' ? renderRowContentMachine
+                                            : type == 'design' ? renderRowContentDesign
+                                                : type == 'checker' ? renderRowContentChecker
+                                                    : type == 'grd' ? renderRowContentGrd
+                                                        : type == 'shift' ? renderRowContentShift
+                                                            : type == 'item' ? renderRowContentItem
+                                                                : type == 'machine1' ? renderRowContentMachine1
+                                                                    : type == 'beam' ? renderRowContentBeamData
+                                                                        : type == 'employee' ? renderRowContentperson
+                                                                            : type == 'operator' ? renderRowContentoperator
+                                                                                : type == 'supervisior' ? renderRowContentsupervisior
+                                                                                    : type == 'blend' ? renderRowContentblend
                                                                                         : type == 'count' ? renderRowContentcount
                                                                                             : type == 'ply' ? renderRowContentply
-                                                                                                : type == 'blend' ? renderRowContentblend
-                                                                                                    : type == 'weftbeam' ? renderRowContentWeftBeamData
-                                                                                                        : type == 'stocktype' ? renderRowContentStock
-                                                                                                            : type == 'checkingdesigndata' ? renderdesigndata
-                                                                                                                : renderRowContentEmpty}
+                                                                                                : type == 'type' ? renderRowContenttype
+                                                                                                    : type == 'lustre' ? renderRowContentlustre
+                                                                                                        : type == 'Item1' ? renderRowContentItem1
+                                                                                                            : type == 'SubItem' ? renderRowContentSubItem
+                                                                                                                : type == 'stocktype' ? renderRowContentStock
+                                                                                                                    : type == 'weftbeam' ? renderRowContentWeftBeamData
+                                                                                                                        : type == 'Designdata' ? renderRowContentWeftDesign
+                                                                                                                            : type == 'partydata' ? renderRowContentpartydata
+                                                                                                                                : type == 'checkingdesigndata' ? renderdesigndata
+                                                                                                                                    : renderRowContentEmpty}
                 />
             )}
 

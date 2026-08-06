@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   LayoutAnimation,
+  PanResponder,
   Platform,
   StyleSheet,
   Text,
@@ -30,6 +31,11 @@ const CHILD_LABELS = {
   design: 'BY DESIGN',
   party: 'BY PARTY',
 };
+
+
+const CHART_WIDTH = 340;
+const CHART_HEIGHT = 38;
+const TOOLTIP_WIDTH = 96;
 
 const formatQty = value => {
   const amount = Number(value || 0);
@@ -74,13 +80,185 @@ function ChildSection({ type, rows }) {
   );
 }
 
+function InteractiveSalesChart({ dailyTrend }) {
+  const [selectedIndex, setSelectedIndex] = useState(null);
+
+  const points = useMemo(
+    () =>
+      (Array.isArray(dailyTrend) ? dailyTrend : []).map(item => ({
+        ...item,
+        amount: Number(item.amount || 0),
+      })),
+    [dailyTrend],
+  );
+
+  const values = useMemo(
+    () => points.map(item => item.amount),
+    [points],
+  );
+
+  const minValue = values.length ? Math.min(...values) : 0;
+  const maxValue = values.length ? Math.max(...values) : 0;
+
+  const selectNearestPoint = locationX => {
+    if (!points.length) return;
+
+    const safeX = Math.max(
+      0,
+      Math.min(CHART_WIDTH, Number(locationX || 0)),
+    );
+
+    if (points.length === 1) {
+      setSelectedIndex(0);
+      return;
+    }
+
+    const nextIndex = Math.round(
+      (safeX / CHART_WIDTH) * (points.length - 1),
+    );
+
+    setSelectedIndex(
+      Math.max(0, Math.min(points.length - 1, nextIndex)),
+    );
+  };
+
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+
+      onPanResponderGrant: event => {
+        selectNearestPoint(event.nativeEvent.locationX);
+      },
+
+      onPanResponderMove: event => {
+        selectNearestPoint(event.nativeEvent.locationX);
+      },
+
+      onPanResponderRelease: () => {
+        setSelectedIndex(null);
+      },
+
+      onPanResponderTerminate: () => {
+        setSelectedIndex(null);
+      },
+    }),
+  ).current;
+
+  const selectedPoint =
+    selectedIndex === null ? null : points[selectedIndex];
+
+  const xPosition =
+    selectedIndex === null
+      ? null
+      : points.length <= 1
+        ? CHART_WIDTH / 2
+        : (selectedIndex / (points.length - 1)) * CHART_WIDTH;
+
+  const yPosition =
+    !selectedPoint || maxValue === minValue
+      ? CHART_HEIGHT / 2
+      : CHART_HEIGHT -
+        ((selectedPoint.amount - minValue) /
+          (maxValue - minValue)) *
+          CHART_HEIGHT;
+
+  const tooltipLeft =
+    xPosition === null
+      ? 0
+      : Math.max(
+          0,
+          Math.min(
+            CHART_WIDTH - TOOLTIP_WIDTH,
+            xPosition - TOOLTIP_WIDTH / 2,
+          ),
+        );
+
+  const axisItems = useMemo(
+    () =>
+      points.filter(
+        (_, index, all) =>
+          index === 0 ||
+          index === all.length - 1 ||
+          index %
+            Math.max(1, Math.floor(all.length / 3)) ===
+            0,
+      ),
+    [points],
+  );
+
+  return (
+    <View style={styles.chartWrap}>
+      <View
+        style={styles.chartTouchArea}
+        {...responder.panHandlers}
+      >
+        <MiniLineChart
+          data={values}
+          color="#0D2234"
+          fillColor="#0D2234"
+          width={CHART_WIDTH}
+          height={CHART_HEIGHT}
+        />
+
+        {selectedPoint && xPosition !== null ? (
+          <>
+            <View
+              pointerEvents="none"
+              style={[styles.chartGuide, { left: xPosition }]}
+            />
+
+            <View
+              pointerEvents="none"
+              style={[
+                styles.chartDot,
+                {
+                  left: xPosition - 5,
+                  top: yPosition - 5,
+                },
+              ]}
+            />
+
+            <View
+              pointerEvents="none"
+              style={[
+                styles.chartTooltip,
+                { left: tooltipLeft },
+              ]}
+            >
+              <Text style={styles.tooltipDay}>
+                {selectedPoint.day}
+              </Text>
+
+              <Text style={styles.tooltipValue}>
+                {cleanAmount(selectedPoint.amount)}
+              </Text>
+            </View>
+          </>
+        ) : null}
+      </View>
+
+      <View style={styles.axisRow}>
+        {axisItems.map((item, index) => (
+          <Text
+            key={`${item.day}-${index}`}
+            style={styles.axisText}
+          >
+            {item.day}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function SalesDashboardCard({ sales, dateString, view = 'owner' }) {
   const router = useRouter();
   const [dimension, setDimension] = useState(sales?.default_dimension || 'category');
   const [expandedKey, setExpandedKey] = useState(null);
 
   const rows = useMemo(() => sales?.dimensions?.[dimension] || [], [sales, dimension]);
-  const trend = useMemo(() => (sales?.daily_trend || []).map(item => Number(item.amount || 0)), [sales]);
+  const dailyTrend = useMemo(() => sales?.daily_trend || [], [sales]);
 
   const chooseDimension = next => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -129,14 +307,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
         </View>
       </View>
 
-      <View style={styles.chartWrap}>
-        <MiniLineChart data={trend} color="#0D2234" fillColor="#0D2234" width={340} height={38} />
-        <View style={styles.axisRow}>
-          {(sales?.daily_trend || []).filter((_, i, all) => i === 0 || i === all.length - 1 || i % Math.max(1, Math.floor(all.length / 3)) === 0).map((item, index) => (
-            <Text key={`${item.day}-${index}`} style={styles.axisText}>{item.day}</Text>
-          ))}
-        </View>
-      </View>
+      <InteractiveSalesChart dailyTrend={dailyTrend} />
 
       <View style={styles.tabs}>
         {DIMENSIONS.map(tab => {
@@ -216,7 +387,13 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 9, letterSpacing: 1.1, color: '#8C837B', fontWeight: '700' },
   todayValue: { marginTop: 3, fontSize: 17, color: '#16633C', fontWeight: '800' },
   monthValue: { marginTop: 3, fontSize: 17, color: '#121417', fontWeight: '800' },
-  chartWrap: { paddingHorizontal: 12, paddingBottom: 6, overflow: 'hidden' },
+  chartWrap: { paddingHorizontal: 12, paddingBottom: 6, overflow: 'visible' },
+  chartTouchArea: { width: CHART_WIDTH, height: CHART_HEIGHT, position: 'relative', overflow: 'visible' },
+  chartGuide: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: '#7D8A93' },
+  chartDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#0D2234' },
+  chartTooltip: { position: 'absolute', top: -48, width: TOOLTIP_WIDTH, minHeight: 40, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#1E2327', alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  tooltipDay: { color: '#C8CFD4', fontSize: 8.5, fontWeight: '700' },
+  tooltipValue: { marginTop: 1, color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' },
   axisRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -2 },
   axisText: { fontSize: 8, color: '#9D958D' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 12, paddingVertical: 10 },

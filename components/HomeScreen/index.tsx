@@ -295,6 +295,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         { name: 'Quarter Summary', route: 'QuarterWiseDispatch', icon: 'swap-horiz', color: '#5E35B1', category: 'Production' },
         { name: 'Weft Issue Return', route: 'weft-issue-return', icon: 'published-with-changes', color: '#4169E1', category: 'Production' },
         { name: 'Sudamo Sales Order Entry', route: 'sudamo-sales-order-entry', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
+        { name: 'Fabric Stock Verification', route: 'fabric-stock-verification', icon: 'shopping-cart-checkout', color: '#4169E1', category: 'Production' },
     ];
 
     useEffect(() => {
@@ -469,6 +470,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                         "title": "Sales Order Entry",
                     //                         "href": "/"
                     //                     },
+                    //                     {
+                    //                         "title": "Fabric Stock Verification",
+                    //                         "href": "/"
+                    //                     },                                       
                     //                 ]
                     //             }
                     //         ]

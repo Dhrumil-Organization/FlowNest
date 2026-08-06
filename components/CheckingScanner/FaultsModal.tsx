@@ -1,6 +1,6 @@
 import Icon from '@expo/vector-icons/MaterialIcons';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface Fault {
   Faults: string;
@@ -20,43 +20,105 @@ interface FaultsModalProps {
   fetchData: (cacheKey: string) => Promise<Fault[]>;
   onClose: () => void;
   onOK: (updatedData: any[]) => void;
+  loading?: boolean;
 }
 
 const FaultsModal: React.FC<FaultsModalProps> = ({
   visible,
   data,
-  initialFilledData,
+  initialFilledData = [], // Default to empty array if undefined
   cacheKey,
   fetchData,
   onClose,
   onOK,
+  loading = false,
 }) => {
-  const [selectedFaults, setSelectedFaults] = useState<any[]>(initialFilledData);
-  const [localData, setLocalData] = useState<Fault[]>(data);
+  // State for selected faults and their remarks
+  const [selectedFaults, setSelectedFaults] = useState<any[]>([]);
+  const [faultsData, setFaultsData] = useState<any[]>([]);
+  // const [localData, setLocalData] = useState<Fault[]>(data);
 
+  // Initialize selectedFaults with initialFilledData
   useEffect(() => {
-    if (visible && cacheKey) {
-      fetchData(cacheKey).then((fetchedData) => {
-        setLocalData(fetchedData);
-      });
+    if (initialFilledData && Array.isArray(initialFilledData)) {
+      setSelectedFaults(
+        initialFilledData.map((fault) => ({
+          ...fault,
+          Remark: fault.Remark || '', // Ensure Remark is initialized
+        }))
+      );
+    } else {
+      setSelectedFaults([]); // Fallback to empty array
     }
-  }, [visible, cacheKey]);
-
-  useEffect(() => {
-    setSelectedFaults(initialFilledData);
   }, [initialFilledData]);
 
+  useEffect(() => {
+    if (!visible) return;
+
+    const loadFaults = async () => {
+      const apiData = await fetchData(cacheKey);
+
+      const finalData = apiData.map(item => {
+        const old = initialFilledData.find(
+          x => x.UId === item.UId && x.SubSr === item.SubSr
+        );
+
+        return {
+          ...item,
+          Remark: old?.Remark ?? "",
+        };
+      });
+
+      setFaultsData(finalData);
+    };
+
+    loadFaults();
+
+  }, [visible, cacheKey, initialFilledData]);
+
+  // Fetch faults data when modal opens
+
+
+  // Toggle fault selection
   const toggleFaultSelection = (fault: Fault) => {
     const isSelected = selectedFaults.some((item) => item.UId === fault.UId);
+
     if (isSelected) {
+      // Remove the fault if already selected
       setSelectedFaults(selectedFaults.filter((item) => item.UId !== fault.UId));
     } else {
-      setSelectedFaults([...selectedFaults, fault]);
+      // Add the fault with an empty Remark if not selected
+      setSelectedFaults([
+        ...selectedFaults,
+        {
+          ...fault,
+          Remark: '', // Initialize Remark as empty
+        },
+      ]);
     }
   };
 
+  // Update the Remark for a specific fault
+  const handleRemarkChange = (uid: string, SubSr: string, remark: string) => {
+
+    setFaultsData(prev =>
+      prev.map(item =>
+        item.UId === uid && item.SubSr === SubSr
+          ? {
+            ...item,
+            Remark: remark,
+          }
+          : item
+      )
+    );
+
+  };
+
+  // Save selected faults and their remarks
   const handleOK = () => {
-    onOK(selectedFaults);
+
+    onOK(faultsData);
+
   };
 
   return (
@@ -70,20 +132,44 @@ const FaultsModal: React.FC<FaultsModalProps> = ({
         </View>
 
         <FlatList
-          data={localData}
+          data={faultsData}
           keyExtractor={(item) => item.UId}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.faultItem,
-                selectedFaults.some((fault) => fault.UId === item.UId) &&
-                  styles.selectedFaultItem,
-              ]}
-              onPress={() => toggleFaultSelection(item)}
-            >
-              <Text style={styles.faultText}>{item.Faults}</Text>
-              <Text style={styles.faultDesc}>{item.RDesc}</Text>
-            </TouchableOpacity>
+
+            <View style={styles.faultItem}>
+
+              <View style={styles.faultHeader}>
+
+                <View style={styles.faultLeftColumn}>
+                  <Text style={styles.faultSubSr}>
+                    Sr. No: {item.SubSr}
+                  </Text>
+
+                  <Text style={styles.faultRDesc}>
+                    {item.RDesc}
+                  </Text>
+                </View>
+
+                <View style={styles.faultRightColumn}>
+                  <Text style={styles.faultRsnCode}>
+                    {item.RsnCode}
+                  </Text>
+                </View>
+
+              </View>
+
+              <TextInput
+                style={styles.remarkInput}
+                placeholder="123, 345-678"
+                placeholderTextColor="#999"
+                value={item.Remark ?? ""}
+                onChangeText={(text) =>
+                  handleRemarkChange(item.UId, item.SubSr, text)
+                }
+              />
+
+            </View>
+
           )}
         />
 
@@ -91,8 +177,16 @@ const FaultsModal: React.FC<FaultsModalProps> = ({
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
             <Text style={styles.buttonText}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.okButton} onPress={handleOK}>
-            <Text style={styles.buttonText}>OK</Text>
+          <TouchableOpacity
+            style={[styles.okButton, loading && { opacity: 0.6 }]}
+            onPress={handleOK}
+            disabled={loading}
+          >
+            {
+              loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.okButtonText}>OK</Text>
+            }
           </TouchableOpacity>
         </View>
       </View>
@@ -111,6 +205,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    marginTop: 30,
   },
   modalTitle: {
     fontSize: 18,
@@ -123,17 +218,57 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    marginBottom: 8,
   },
   selectedFaultItem: {
     backgroundColor: '#e3f2fd',
   },
-  faultText: {
-    fontSize: 16,
-    fontWeight: '600',
+  faultHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  faultDesc: {
+  faultLeftColumn: {
+    flex: 1,
+  },
+  faultRightColumn: {
+    alignItems: 'flex-end',
+  },
+  faultSubSr: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  faultRDesc: {
     fontSize: 14,
     color: '#666',
+    marginTop: 4,
+  },
+  faultRsnCode: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  remarkInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    fontSize: 14,
+    backgroundColor: '#fff',
+    color: '#000',          // <-- Add this
+  },
+  selectButton: {
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  selectButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   modalFooter: {
     flexDirection: 'row',
@@ -144,13 +279,17 @@ const styles = StyleSheet.create({
     padding: 12,
     marginRight: 16,
   },
+  buttonText: {
+    color: '#007AFF',
+    fontWeight: 'bold',
+  },
   okButton: {
     padding: 12,
     backgroundColor: '#007AFF',
     borderRadius: 8,
   },
-  buttonText: {
-    color: '#007AFF',
+  okButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
   },
 });

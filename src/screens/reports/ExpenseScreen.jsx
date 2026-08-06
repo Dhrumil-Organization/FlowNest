@@ -65,6 +65,7 @@ const SK = StyleSheet.create({
 
 // ── Month tab ─────────────────────────────────────────────────────
 function MonthTab({ label, active, status, onPress }) {
+  console.log("label",label);
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -1496,7 +1497,7 @@ export default function ExpenseScreen({ token, apiBase }) {
             {/* Cost composition donut */}
             <View style={S.compositionCard}>
               <Text style={S.compositionTitle}>
-                Cost composition · {m.shortLabel} '{m.yearno}
+                Cost composition · {m.shortLabel} '{m.displayYear}
               </Text>
               <DonutChart
                 elec={d.elec_total}

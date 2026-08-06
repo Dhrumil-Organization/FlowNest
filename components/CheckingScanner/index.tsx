@@ -1,5 +1,6 @@
 import CustomPicker from '@/common/CustomPicker';
 import { checkingScannerStyles } from '@/common/Style';
+import { useFaults } from '@/common/useFaults';
 import { showError, showSuccess } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
 import PartyDropdown from '@/Shared/PartyDropdown';
@@ -28,6 +29,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from '../../common/API/dynamicAPI';
+import FaultsModal from './FaultsModal';
 
 interface Props {
     token: string;
@@ -121,6 +123,24 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
     const [manualOperatorData, setManualOperatorData] = useState<any[]>([]);
     const [selectedManualOperator, setSelectedManualOperator] = useState<any>(null);
+    // 
+    const {
+        faultsData,
+        faultsLoading,
+        showFaultsModal,
+        setShowFaultsModal,
+        handleSaveFaults,
+    } = useFaults(token);
+
+    const [form, setForm] = useState<any>({
+        selectedMachine: null,
+        ShfCode: '',
+        ChkDate: new Date().toISOString().split('T')[0],
+        YearNo: '',
+        BeamNo: '',
+        UId: '',
+        // Add other form fields as needed
+    });
 
     let cancelToken: any;
 
@@ -1683,6 +1703,15 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={() => handleScannerList('S')}>
                                             <Text style={checkingScannerStyles.submitText}>Scanner List</Text>
                                         </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.faultsButton}
+                                            onPress={() => handleSaveFaults(form)}
+                                            disabled={faultsLoading}
+                                        >
+                                            <Text style={styles.buttonText}>
+                                                {faultsLoading ? 'Loading...' : `Select Faults [${form.d2?.length || 0}]`}
+                                            </Text>
+                                        </TouchableOpacity>
                                         <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={handleSubmitScan}>
                                             <Text style={checkingScannerStyles.submitText}>Save Entry</Text>
                                         </TouchableOpacity>
@@ -1744,7 +1773,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         </View>
                                         <Text style={{ color: "#075985", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>FABRIC INFO</Text>
                                     </View>
-                                    <Text style={checkingScannerStyles.label}>Beam No <Text style={{ color: 'red' }}>*</Text></Text>
+                                    <Text style={checkingScannerStyles.label}> Beam No<Text style={{ color: 'red' }}>*</Text></Text>
                                     <PartyDropdown
                                         data={manualBeamData}
                                         placeholder="Select Beam No"
@@ -1755,6 +1784,16 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         type="beam"
                                         onSelect={(item) => {
                                             setSelectedBeam(item);
+                                            setForm((prev) => ({
+                                                ...prev.values,
+                                                BeamNo: item.BeamNo,
+                                                BeamUId: item.BeamUId,
+                                                UId: item.UId,
+                                                // YearNo: item.YearNo,
+                                                ChkDate: form?.ChkDate, 
+                                                PrpCode: item.PrpCode,
+                                                YearNo: getCurrentFinancialYear(),
+                                            }));
                                             setFormState((prev) => ({
                                                 ...prev,
                                                 values: {
@@ -1969,7 +2008,15 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         {/* <TouchableOpacity style={[checkingScannerStyles.submitBtn1, { marginTop: 12, height: 50, width: '100%', alignSelf: 'stretch' }]} onPress={handlesave}>
                                                 <Text style={checkingScannerStyles.submitText}>Save</Text>
                                             </TouchableOpacity> */}
-
+                                        <TouchableOpacity
+                                            style={styles.faultsButton}
+                                            onPress={() => handleSaveFaults(form)}
+                                            disabled={faultsLoading}
+                                        >
+                                            <Text style={styles.buttonText}>
+                                                {faultsLoading ? 'Loading...' : `Select Faults [${form.d2?.length || 0}]`}
+                                            </Text>
+                                        </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[
                                                 checkingScannerStyles.submitBtn1,
@@ -2112,6 +2159,39 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                             </View>
                         </View>
                     </Modal>
+
+                    <FaultsModal
+                        visible={showFaultsModal}
+                        data={faultsData}
+                        initialFilledData={form.d2 || []}
+                        cacheKey={form.UId || ''}
+                        fetchData={async (cacheKey: string) => {
+                            const params = {
+                                UId: cacheKey,
+                                SrNo: '0',
+                                BeamNo: form.BeamNo || '',
+                                ShfCode: form.ShfCode,
+                                ChkDate: form.ChkDate,
+                                PrpCode: form.PrpCode || '',
+                                yearno: form.YearNo,
+                                txntype: 'beam_checking_tablet',
+                            };
+                            const response = await axios.get(`${API}/api/get_checking_fault_help`, {
+                                headers: {
+                                    Authorization: `Bearer ${token}`,
+                                    'Content-Type': 'application/json',
+                                    Accept: 'application/json',
+                                },
+                                params,
+                            });
+                            return response.data.response.data;
+                        }}
+                        onClose={() => setShowFaultsModal(false)}
+                        onOK={(updatedData) => {
+                            setForm((prev) => ({ ...prev, d2: updatedData }));
+                            setShowFaultsModal(false);
+                        }}
+                    />
 
                     {/* Scanner list modal */}
                     {/* <Modal visible={scannerModal} animationType="slide" onRequestClose={() => setScannerModal(false)}>
@@ -2598,6 +2678,17 @@ const styles = StyleSheet.create({
 
         zIndex: 9999,
         elevation: 9999,
+    },
+    faultsButton: {
+        backgroundColor: '#007AFF',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: 'bold',
     },
 });
 

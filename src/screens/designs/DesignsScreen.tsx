@@ -149,21 +149,164 @@ function calcSpec(d: any) {
     const finWidthM = finWidthIn * 0.0254;
     const finGSM = finWidthM > 0 ? finGLM / finWidthM : 0;
 
-    // ── fibre blend, weighted by grams contributed ─────────────
-    const fibreOf = (sys: string) =>
-        sys === 'Lea' ? 'Linen' : sys === 'Ne' ? 'Cotton'
-            : (sys === 'Den' || sys === 'Dtx') ? 'Polyester' : 'Other';
+    // ── fibre blend, weighted by actual yarn grams contributed ──
+    //
+    // A yarn such as COTTON/LINEN 45:55 is split into its actual
+    // fibre components. Because the yarn gram contribution depends on
+    // EPI/PPI, Fibre Blend updates immediately whenever EPI/PPI changes.
+    const normalizeFibreName = (value: string): string => {
+        const name = String(value || '').trim().toLowerCase();
+
+        if (!name) return 'Other';
+        if (name.includes('linen') || name.includes('flax')) return 'Linen';
+        if (name.includes('cotton')) return 'Cotton';
+        if (name.includes('polyester') || name === 'poly' || name === 'pes') return 'Polyester';
+        if (name.includes('viscose') || name.includes('rayon')) return 'Viscose';
+        if (name.includes('modal')) return 'Modal';
+        if (name.includes('lyocell') || name.includes('tencel')) return 'Lyocell';
+        if (name.includes('bamboo')) return 'Bamboo';
+        if (name.includes('wool')) return 'Wool';
+        if (name.includes('silk')) return 'Silk';
+        if (name.includes('nylon') || name.includes('polyamide')) return 'Nylon';
+        if (name.includes('acrylic')) return 'Acrylic';
+        if (name.includes('elastane') || name.includes('spandex') || name.includes('lycra')) return 'Elastane';
+
+        return value.trim() || 'Other';
+    };
+
+    const defaultFibreOf = (yarn: any): string => {
+        const sys = String(yarn?.sys || '').trim();
+
+        if (sys === 'Lea') return 'Linen';
+        if (sys === 'Ne') return 'Cotton';
+        if (sys === 'Den' || sys === 'Dtx') return 'Polyester';
+
+        return 'Other';
+    };
+
+    const extractNamedFibres = (yarn: any): string[] => {
+        const rawName = `${yarn?.name || ''} ${yarn?.itm_name || ''}`.toUpperCase();
+        const fibres: string[] = [];
+
+        const add = (fibre: string) => {
+            if (!fibres.includes(fibre)) fibres.push(fibre);
+        };
+
+        if (/\bCOTTON\b/.test(rawName)) add('Cotton');
+        if (/\bLINEN\b|\bFLAX\b/.test(rawName)) add('Linen');
+        if (/\bPOLYESTER\b|\bPES\b/.test(rawName)) add('Polyester');
+        if (/\bVISCOSE\b|\bRAYON\b/.test(rawName)) add('Viscose');
+        if (/\bMODAL\b/.test(rawName)) add('Modal');
+        if (/\bLYOCELL\b|\bTENCEL\b/.test(rawName)) add('Lyocell');
+        if (/\bBAMBOO\b/.test(rawName)) add('Bamboo');
+        if (/\bWOOL\b/.test(rawName)) add('Wool');
+        if (/\bSILK\b/.test(rawName)) add('Silk');
+        if (/\bNYLON\b|\bPOLYAMIDE\b/.test(rawName)) add('Nylon');
+        if (/\bACRYLIC\b/.test(rawName)) add('Acrylic');
+        if (/\bELASTANE\b|\bSPANDEX\b|\bLYCRA\b/.test(rawName)) add('Elastane');
+
+        // Common textile abbreviation: PC = Polyester/Cotton.
+        if (/\bPC\b/.test(rawName)) {
+            add('Polyester');
+            add('Cotton');
+        }
+
+        return fibres;
+    };
+
+    const parseBlendPercentages = (value: any): number[] => {
+        const raw = String(value ?? '').trim();
+
+        if (!raw) return [];
+
+        const values = raw
+            .replace(/%/g, '')
+            .split(/[:/,+-]/)
+            .map(part => Number(part.trim()))
+            .filter(part => Number.isFinite(part) && part >= 0);
+
+        if (values.length < 2) return [];
+
+        const total = values.reduce((sum, part) => sum + part, 0);
+        if (total <= 0) return [];
+
+        return values.map(part => part / total);
+    };
+
+    const resolveYarnFibreShares = (yarn: any): Array<{ fibre: string; share: number }> => {
+        const percentages = parseBlendPercentages(
+            yarn?.blend_ratio ?? yarn?.br ?? yarn?.w_blend_per
+        );
+        const namedFibres = extractNamedFibres(yarn);
+
+        if (percentages.length > 0 && namedFibres.length > 0) {
+            const resolved: Array<{ fibre: string; share: number }> = [];
+            const pairedCount = Math.min(percentages.length, namedFibres.length);
+
+            for (let index = 0; index < pairedCount; index += 1) {
+                resolved.push({
+                    fibre: normalizeFibreName(namedFibres[index]),
+                    share: percentages[index],
+                });
+            }
+
+            const assigned = resolved.reduce((sum, row) => sum + row.share, 0);
+            const balance = Math.max(0, 1 - assigned);
+
+            if (balance > 0.000001) {
+                const fallback = defaultFibreOf(yarn);
+                const existing = resolved.find(row => row.fibre === fallback);
+
+                if (existing) existing.share += balance;
+                else resolved.push({ fibre: fallback, share: balance });
+            }
+
+            return resolved;
+        }
+
+        return [{
+            fibre: defaultFibreOf(yarn),
+            share: 1,
+        }];
+    };
+
     const blendTotals: Record<string, number> = {};
+
+    const addYarnContribution = (yarn: any, grams: number) => {
+        if (!(grams > 0)) return;
+
+        resolveYarnFibreShares(yarn).forEach(({ fibre, share }) => {
+            if (!(share > 0)) return;
+
+            const key = normalizeFibreName(fibre);
+            blendTotals[key] = (blendTotals[key] ?? 0) + (grams * share);
+        });
+    };
+
     warpYarns.forEach((y) => {
-        const g = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
-        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+        const grams = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+        addYarnContribution(y, grams);
     });
+
     weftYarns.forEach((y) => {
-        const g = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
-        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+        const grams = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
+        addYarnContribution(y, grams);
     });
+
     const blendGrand = Object.values(blendTotals).reduce((a, b) => a + b, 0);
-    const hasNaturalFibre = warpYarns.concat(weftYarns).some(y => y.sys === 'Lea');
+    const naturalFibres = new Set([
+        'Cotton',
+        'Linen',
+        'Viscose',
+        'Modal',
+        'Lyocell',
+        'Bamboo',
+        'Wool',
+        'Silk',
+    ]);
+    const hasNaturalFibre = Object.keys(blendTotals).some(
+        fibre => naturalFibres.has(fibre) && (blendTotals[fibre] ?? 0) > 0
+    );
 
     return {
         basis, reed, widthGreige, finWidthIn,
@@ -176,7 +319,19 @@ function calcSpec(d: any) {
 }
 
 const BLEND_COLORS: Record<string, string> = {
-    Linen: '#C8A96E', Cotton: '#A8C8A0', Polyester: '#A0B8C8', Other: '#C8A8B0',
+    Linen: '#C8A96E',
+    Cotton: '#A8C8A0',
+    Polyester: '#A0B8C8',
+    Viscose: '#B8A0C8',
+    Modal: '#9FC4B6',
+    Lyocell: '#8FBDB0',
+    Bamboo: '#AFC58A',
+    Wool: '#C4B29C',
+    Silk: '#D8C0A8',
+    Nylon: '#9EB5CD',
+    Acrylic: '#C6A3B8',
+    Elastane: '#9C9C9C',
+    Other: '#C8A8B0',
 };
 
 // ── TabBar ────────────────────────────────────────────────────
@@ -1690,36 +1845,126 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 responseData: response.data,
             });
 
-            const saved = response?.data?.data;
+            /*
+             * Normalize all supported production response envelopes.
+             *
+             * Supported examples:
+             * 1. { success, id, design_id, data: { id } }
+             * 2. { success, data: { design_id, data: { id } } }
+             * 3. { response: { success, id, data: { id } } }
+             * 4. Axios interceptor already returned the JSON body.
+             */
+            const rawBody: any = response?.data ?? response;
 
-            if (
-                response?.data?.success !== true ||
-                !saved ||
-                !String(saved.id || '').trim()
-            ) {
+            const body: any =
+                rawBody?.response?.data ??
+                rawBody?.response ??
+                rawBody;
+
+            const nestedData: any =
+                body?.data?.data ??
+                body?.data ??
+                {};
+
+            const savedId = String(
+                nestedData?.id ??
+                nestedData?.design_id ??
+                nestedData?.engineering_design_id ??
+                body?.design_id ??
+                body?.engineering_design_id ??
+                body?.id ??
+                rawBody?.design_id ??
+                rawBody?.engineering_design_id ??
+                rawBody?.id ??
+                ''
+            ).trim();
+
+            const saveConfirmed =
+                body?.success === true ||
+                rawBody?.success === true ||
+                response?.status === 200 ||
+                response?.status === 201;
+
+            console.log('DESIGN SAVE NORMALIZED RESPONSE', {
+                status: response?.status,
+                baseURL: response?.config?.baseURL,
+                url: response?.config?.url,
+                rawBody,
+                body,
+                nestedData,
+                savedId,
+                saveConfirmed,
+            });
+
+            if (!saveConfirmed) {
                 throw new Error(
-                    'Server returned success without a saved engineering design ID.'
+                    String(
+                        body?.message ||
+                        rawBody?.message ||
+                        'Server did not confirm the design save.'
+                    )
                 );
             }
 
-            // Verify immediately by fetching the same record.
-            const verifyResponse = await DesignAPI.get(String(saved.id));
-            const verified = verifyResponse?.data?.data;
+            if (!savedId) {
+                throw new Error(
+                    'Server confirmed the save but did not return the engineering design ID.'
+                );
+            }
+
+            /*
+             * Verify the committed record immediately. Include ERP context
+             * explicitly so verification uses the same property/year context
+             * as the save request even if the lightweight client does not
+             * append these values automatically.
+             */
+            const verifyResponse = await client.get(
+                `/designs/${encodeURIComponent(savedId)}`,
+                {
+                    params: {
+                        yearno,
+                        YearNo: yearno,
+                        prpcode,
+                        PrpCode: prpcode,
+                        strcode,
+                        StrCode: strcode,
+                    },
+                }
+            );
+
+            const verifyRawBody: any =
+                verifyResponse?.data ??
+                verifyResponse;
+
+            const verifyBody: any =
+                verifyRawBody?.response?.data ??
+                verifyRawBody?.response ??
+                verifyRawBody;
+
+            const verified: any =
+                verifyBody?.data?.data ??
+                verifyBody?.data ??
+                null;
 
             console.log('DESIGN SAVE VERIFY RESPONSE', {
-                id: saved.id,
-                responseData: verifyResponse.data,
+                savedId,
+                status: verifyResponse?.status,
+                responseData: verifyResponse?.data,
+                verified,
             });
 
-            if (!verified || String(verified.id) !== String(saved.id)) {
+            if (
+                !verified ||
+                String(verified?.id || '').trim() !== savedId
+            ) {
                 throw new Error(
-                    `Design ${saved.id} was returned by save but could not be read back.`
+                    `Design ${savedId} was returned by save but could not be read back.`
                 );
             }
 
             Alert.alert(
                 'Saved',
-                `Design saved successfully.\n\nID: ${saved.id}`
+                `Design saved successfully.\n\nID: ${savedId}`
             );
 
             onRefresh();
@@ -1732,11 +1977,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 url: e?.config?.url,
             });
 
+            const errorBody =
+                e?.response?.data?.response?.data ??
+                e?.response?.data?.response ??
+                e?.response?.data ??
+                {};
+
             Alert.alert(
                 'Design save failed',
                 String(
-                    e?.response?.data?.message ||
-                    e?.response?.data?.error ||
+                    errorBody?.message ||
+                    errorBody?.error ||
                     e?.message ||
                     'Unable to save design'
                 )

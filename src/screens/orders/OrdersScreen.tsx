@@ -16,7 +16,8 @@ import { SalesOrderAPI } from '@/src/api/legacyClient';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { NewOrderTab } from './tabs/NewOrderTab';
+// import { NewOrderTab } from './tabs/NewOrderTab';
+import { NewOrderTab } from './NewOrderTab';
 import { AuthTab, TrackingTab, SummaryTab } from './tabs/_legacyOrderTabs';
 
 const TABS = [
@@ -59,7 +60,7 @@ export function OrdersScreen({ token, userid }: Props) {
             fromdate: new Date().toISOString().slice(0, 7).replace('-', '') + '01',
             todate: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
             prpcodes: [],
-        }).then((r) => setPendingCnt((r.data?.response?.data || []).length)).catch(() => {});
+        }).then((r) => setPendingCnt((r.data?.response?.data || []).length)).catch(() => { });
     }, [token]);
 
     const visibleTabs = TABS.filter((t) => (t.permAction ? canDo('orders', t.permAction) : canAccess('orders')));

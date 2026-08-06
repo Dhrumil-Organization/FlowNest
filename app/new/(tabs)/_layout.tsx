@@ -753,6 +753,7 @@ const moreStyles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.35)',
     paddingTop: 10,
     paddingBottom: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: T.border, alignSelf: 'center', marginBottom: 10 },
   sheetHeader: {

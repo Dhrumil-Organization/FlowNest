@@ -35,7 +35,7 @@ export const LEGACY_ROUTES = {
   costingCompute: '/costing/compute',
   costingSave: '/costing/save',
   costingHistory: '/costing/history',
-  costingVariance: (id: string | number) => `/costing/variance/${id}`,
+  costingVariance: '/costing/variance',
   realCostingDashboard: '/real-costing-chain/dashboard',
 } as const;
 
@@ -53,12 +53,106 @@ export const ItemAPI = {
   getItem: (params?: any) => client.get(LEGACY_ROUTES.itemList, { params }),
 };
 
-export const CostingAPI = {
-  compute: (body: any) => client.post(LEGACY_ROUTES.costingCompute, body),
-  save: (body: any) => client.post(LEGACY_ROUTES.costingSave, body),
-  history: () => client.get(LEGACY_ROUTES.costingHistory),
-  variance: (id: string | number) => client.get(LEGACY_ROUTES.costingVariance(id)),
+// Replace only the existing CostingAPI block in api/legacyClient.ts.
+
+export type CostingHistoryParams = {
+    md_id?: string;
+    sub_design_id?: string | null;
+    tier_code?: string | null;
+    page?: number;
+    per_page?: number;
+    records_per_design?: number;
 };
+
+export type CostingVarianceParams = {
+    md_id: string;
+    sub_design_id?: string | null;
+    tier_code?: string | null;
+};
+
+export type CostingDetailResponse = {
+    id: string;
+    md_id: string;
+    sub_design_id?: string | null;
+    tier_code?: string | null;
+    scenario_name?: string | null;
+    code?: string;
+    type?: string;
+    category?: string;
+    created_at?: string | null;
+    inputs: {
+        price_map?: Record<string, number>;
+        dye_map?: Record<string, number>;
+        sizing_map?: Record<string, number>;
+        gpm_map?: Record<string, number>;
+        weaving_rate?: number;
+        rpm?: number;
+        eff?: number;
+        greige_brok?: number;
+        dyeing_proc?: number;
+        finished_brok?: number;
+        cut_pack?: number;
+        greige_width?: number;
+        warp_wastage?: number;
+        weft_wastage?: number;
+        weft_shrink?: number;
+        fin_width?: number;
+        gf_shrink?: number;
+    };
+    snap?: Record<string, unknown>;
+    yarn_lines?: unknown[];
+};
+
+export const CostingAPI = {
+    compute: (body: { md_id: string } & CostInputs) =>
+        client.post<{ success: boolean; data: ComputeResult }>(
+            '/costing/compute',
+            body
+        ),
+
+    save: (body: { md_id: string } & CostInputs) =>
+        client.post<{
+            success: boolean;
+            persisted?: boolean;
+            message?: string;
+            data: ComputeResult & { id: string; persisted?: boolean };
+        }>('/costing/save', body),
+
+    history: (params: CostingHistoryParams = {}) =>
+        client.get<{ success: boolean; data: any[]; meta?: any }>(
+            '/costing/history',
+            {
+                params: {
+                    ...params,
+                    sub_design_id:
+                        params.sub_design_id || undefined,
+                    tier_code:
+                        params.tier_code || undefined,
+                },
+            }
+        ),
+
+    get: (id: string | number) =>
+        client.get<{
+            success: boolean;
+            data: CostingDetailResponse;
+        }>(`/costing/${encodeURIComponent(String(id))}`),
+
+    variance: (params: CostingVarianceParams) =>
+        client.get<{
+            success: boolean;
+            data: { records: any[]; variance: any };
+        }>('/costing/variance', {
+            params: {
+                md_id: params.md_id,
+                sub_design_id:
+                    params.sub_design_id || undefined,
+                tier_code:
+                    params.tier_code || undefined,
+            },
+        }),
+};
+
 
 export const RealCostingChainAPI = {
   dashboard: (params?: any) => client.get(LEGACY_ROUTES.realCostingDashboard, { params }),

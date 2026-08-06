@@ -492,7 +492,7 @@ export function NewOrderTab({ token, userid }: Props) {
                 </View>
 
                 {/* Step 2: Sales Executive */}
-                {/* {showStep2 && (
+                {showStep2 && (
                     <View style={s.stepCard}>
                         <View style={s.stepHead}>
                             <View style={[s.stepBadge, !!selectedExec && s.stepBadgeDone]}>
@@ -512,10 +512,10 @@ export function NewOrderTab({ token, userid }: Props) {
                             <View style={s.warnBox}><Text style={s.warnText}>⚠ {selectedExec.note}</Text></View>
                         ) : null}
                     </View>
-                )} */}
+                )}
 
                 {/* Step 3: Item & Design */}
-                {/* {showStep3 && (
+                {showStep3 && (
                     <View style={s.stepCard}>
                         <View style={s.stepHead}>
                             <View style={[s.stepBadge, !!(selectedDesign && selectedItem) && s.stepBadgeDone]}>
@@ -532,10 +532,10 @@ export function NewOrderTab({ token, userid }: Props) {
                             </>
                         )}
                     </View>
-                )} */}
+                )}
 
                 {/* Step 4: Price & delivery */}
-                {/* {showStep4 && (
+                {showStep4 && (
                     <View style={s.stepCard}>
                         <View style={s.stepHead}>
                             <View style={[s.stepBadge, !!(pricePerM && deliveryDate) && s.stepBadgeDone]}>
@@ -580,10 +580,10 @@ export function NewOrderTab({ token, userid }: Props) {
                             </View>
                         )}
                     </View>
-                )} */}
+                )}
 
                 {/* Step 5: Shade & quantities */}
-                {/* {showStep5 && (
+                {showStep5 && (
                     <View style={s.stepCard}>
                         <View style={s.stepHead}>
                             <View style={[s.stepBadge, colourways.length > 0 && s.stepBadgeDone]}>
@@ -628,7 +628,7 @@ export function NewOrderTab({ token, userid }: Props) {
                             </View>
                         )}
                     </View>
-                )} */}
+                )}
             </ScrollView>
 
             {canSubmitOrder && (

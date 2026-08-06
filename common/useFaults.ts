@@ -53,23 +53,24 @@ export const useFaults = (token: string) => {
     }
   };
 
-  const handleSaveFaults = async (form: any) => {
+  const handleSaveFaults = async (form: any, FormState: any) => {
     console.log('faults form', form);
     const params = {
       UId: form.selectedMachine?.UId || form.UId || '',
       SrNo: '0',
       BeamNo: form.BeamNo || form.selectedMachine?.BeamNo || '',
-      ShfCode: form.ShfCode || '',
+      ShfCode: form.ShfCode || FormState.values.ShfCode || '',
       ChkDate: form.ChkDate || '',
       PrpCode: form.PrpCode || form.selectedMachine?.PrpCode || '',
       yearno: form.YearNo || '',
-      txntype: 'beam_checking_tablet',
+      txntype: 'beam_checking',
     };
     await fetchFaultsData(params);
   };
 
   return {
     faultsData,
+    setFaultsData,
     faultsLoading,
     showFaultsModal,
     setShowFaultsModal,

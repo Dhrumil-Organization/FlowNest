@@ -1762,6 +1762,15 @@ export const checkingScannerStyles = StyleSheet.create({
         alignItems: 'center',
     },
 
+    printButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 19,
+        backgroundColor: 'rgb(53, 85, 229)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
     qty: {
         marginTop: 18,
         fontSize: 14,

@@ -48,35 +48,77 @@ import * as XLSX from 'xlsx';
 // April (3) onwards belongs to the NEW financial year
 // e.g. Jun 2026 (m=5, y=2026) → FY 2026-27 → yearno "27"
 // e.g. Mar 2026 (m=2, y=2026) → FY 2025-26 → yearno "26"
-function getFY(calMonth, calYear) {
-  return calMonth >= 3
-    ? String((calYear + 1) % 100).padStart(2, '0')
-    : String(calYear % 100).padStart(2, '0');
+// Returns the financial-year ENDING year.
+//
+// Apr 2026–Dec 2026 => FY 2026-27 => "27"
+// Jan 2027–Mar 2027 => FY 2026-27 => "27"
+// Jan 2026–Mar 2026 => FY 2025-26 => "26"
+function getFYYearNo(calMonth, calYear) {
+  const fyEndYear = calMonth >= 3 ? calYear + 1 : calYear;
+
+  return String(fyEndYear % 100).padStart(2, '0');
+}
+
+// Actual calendar year used only for the displayed month label.
+//
+// Jul 2026 => "26"
+// Mar 2026 => "26"
+function getDisplayYear(calYear) {
+  return String(calYear % 100).padStart(2, '0');
 }
 
 // ── Build last-6-months list (newest first) ──────────────────────
 export function buildSixMonths(fromDate = new Date()) {
-  const NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  let m = fromDate.getMonth();   // 0-indexed
+  const NAMES = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  let m = fromDate.getMonth();
   let y = fromDate.getFullYear();
+
   const months = [];
 
   for (let i = 0; i < 6; i++) {
-    const yearno = getFY(m, y);
+    const yearno = getFYYearNo(m, y); // API/database financial year
+    const displayYear = getDisplayYear(y); // Month's calendar year
     const monthno = String(m + 1).padStart(2, '0');
+
     months.push({
       index: i,
+
+      // Sent to API
       yearno,
       monthno,
-      label: `${NAMES[m]} '${yearno}`,           // "Jun '27"
-      shortLabel: NAMES[m],                            // "Jun"
-      fullLabel: `${NAMES[m]} ${y}`,                 // "Jun 2026"
+      displayYear,
+      // Shown to user
+      label: `${NAMES[m]}-${displayYear}`,
+      shortLabel: NAMES[m],
+      fullLabel: `${NAMES[m]} ${y}`,
+
       calMonth: m,
       calYear: y,
-      key: monthno + yearno,                     // unique key e.g. "0627"
+
+      // Unique API-state key
+      key: `${monthno}${yearno}`,
     });
+
     m--;
-    if (m < 0) { m = 11; y--; }
+
+    if (m < 0) {
+      m = 11;
+      y--;
+    }
   }
 
   return months;
@@ -283,6 +325,9 @@ export function useExpenseData({ token, apiBase, txntype = 'monthly_expense_rpt'
         .then((res) => {
           const filedata = res.data?.data?.filedata;
           const data = filedata ? parseXlsxBase64(filedata) : null;
+
+          console.log("filedata", filedata);
+          console.log("data", data);
 
           // Only update THIS month — others are unaffected
           setStates((prev) => ({

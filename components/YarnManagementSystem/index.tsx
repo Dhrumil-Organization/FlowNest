@@ -430,7 +430,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     cancelToken: cancelToken.token
                 })
             );
-            console.log("type API Response:", response);
+            console.log("type1111 API Response:", response);
 
             const data = response?.data?.data?.data || [];
             if (response?.data?.success && response?.data?.data?.data?.length > 0) {

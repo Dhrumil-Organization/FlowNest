@@ -17,6 +17,17 @@ const pct = (n: number) => `${Math.round(n)}%`;
 const TABS = ['Costing', 'History', 'Variance'] as const;
 type Tab = typeof TABS[number];
 
+type ReopenCostingRequest = {
+    costingId: string;
+    requestKey: number;
+};
+
+type ReopenedCostingInfo = {
+    id: string;
+    createdAt?: string | null;
+};
+
+
 function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
     return (
         <View style={tb.bar}>
@@ -124,7 +135,7 @@ function Inp({ value, onChange, suffix }: { value: string; onChange: (v: string)
     );
 }
 const inp = StyleSheet.create({
-    wrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 9, borderWidth: 1.5, borderColor: T.border, paddingHorizontal: 12, paddingVertical: 11 },
+    wrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: T.surface, borderRadius: 9, borderWidth: 1.5, borderColor: T.border, paddingHorizontal: 12 },
     field: { flex: 1, fontSize: 15, color: T.ink },
     suffix: { fontSize: 11, color: T.muted, marginLeft: 4 },
 });
@@ -321,7 +332,13 @@ const DEFAULT_P: Omit<CostInputs, 'price_map' | 'dye_map'> = {
     greige_brok: 2, dyeing_proc: 40, finished_brok: 3, cut_pack: 10,
 };
 
-function CostingTab({ onSaved }: { onSaved: () => void }) {
+function CostingTab({
+    onSaved,
+    reopenRequest,
+}: {
+    onSaved: () => void;
+    reopenRequest: ReopenCostingRequest | null;
+}) {
     const [mdId, setMdId] = useState('');
     const [design, setDesign] = useState<Design | null>(null);
     const [priceMap, setPriceMap] = useState<Record<string, number>>({});
@@ -331,6 +348,8 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
     const [computing, setComputing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [reopening, setReopening] = useState(false);
+    const [reopenedInfo, setReopenedInfo] = useState<ReopenedCostingInfo | null>(null);
 
     // build yarn key
     const yKey = (miId: string, br: string | null) => `${miId}|${br ?? ''}`;
@@ -343,6 +362,7 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
             setDesign(full);
             setMdId(full.id);
             setResult(null);
+            setReopenedInfo(null);
 
             // init price map from base prices
             const pm: Record<string, number> = {};
@@ -357,6 +377,162 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
             Alert.alert('Error', e.message);
         }
     };
+
+    // Reopen a historical costing as an editable new revision.
+    // The original costing is never updated or overwritten.
+    useEffect(() => {
+        if (!reopenRequest?.costingId) return;
+
+        let cancelled = false;
+
+        const reopen = async () => {
+            setReopening(true);
+            setResult(null);
+
+            try {
+                const detailResponse = await CostingAPI.get(
+                    reopenRequest.costingId
+                );
+
+                const saved = detailResponse?.data?.data;
+                if (!saved?.md_id) {
+                    throw new Error(
+                        'Saved costing does not contain a design reference.'
+                    );
+                }
+
+                const designResponse = await DesignAPI.get(
+                    String(saved.md_id)
+                );
+                const fullDesign = designResponse?.data?.data;
+
+                if (!fullDesign) {
+                    throw new Error(
+                        'Unable to load the design for this costing.'
+                    );
+                }
+
+                if (cancelled) return;
+
+                const inputs = saved.inputs || {};
+
+                setDesign(fullDesign);
+                setMdId(String(saved.md_id));
+                const savedPriceMap =
+                    inputs.price_map &&
+                        typeof inputs.price_map === 'object'
+                        ? inputs.price_map
+                        : {};
+
+                const savedDyeMap =
+                    inputs.dye_map &&
+                        typeof inputs.dye_map === 'object'
+                        ? inputs.dye_map
+                        : {};
+
+                const savedLines = Array.isArray(saved.yarn_lines)
+                    ? saved.yarn_lines
+                    : [];
+
+                const reopenedPriceMap: Record<string, number> = {};
+                const reopenedDyeMap: Record<string, number> = {};
+
+                const allDesignYarns = [
+                    ...(fullDesign.warp_yarns || []),
+                    ...(fullDesign.weft_yarns || []),
+                ];
+
+                allDesignYarns.forEach((yarn: any) => {
+                    const currentKey = yKey(
+                        String(yarn.mi_id),
+                        yarn.blend_ratio ?? null
+                    );
+
+                    const matchedLine = savedLines.find((line: any) => {
+                        const sameItem =
+                            String(line.mi_id || '') ===
+                            String(yarn.mi_id || '');
+
+                        const sameBlend =
+                            String(line.blend_ratio || '').trim() ===
+                            String(yarn.blend_ratio || '').trim();
+
+                        return sameItem && sameBlend;
+                    });
+
+                    const savedKey = matchedLine?.yarn_key;
+
+                    const savedPrice =
+                        savedPriceMap[currentKey] ??
+                        (savedKey ? savedPriceMap[savedKey] : undefined) ??
+                        matchedLine?.price ??
+                        yarn.base_price ??
+                        0;
+
+                    const savedDye =
+                        savedDyeMap[currentKey] ??
+                        (savedKey ? savedDyeMap[savedKey] : undefined) ??
+                        matchedLine?.dye_cost ??
+                        0;
+
+                    reopenedPriceMap[currentKey] =
+                        Number(savedPrice) || 0;
+
+                    reopenedDyeMap[currentKey] =
+                        Number(savedDye) || 0;
+                });
+
+                setPriceMap(reopenedPriceMap);
+                setDyeMap(reopenedDyeMap);
+                setParams({
+                    weaving_rate: Number(
+                        inputs.weaving_rate ?? DEFAULT_P.weaving_rate
+                    ),
+                    rpm: Number(inputs.rpm ?? DEFAULT_P.rpm),
+                    eff: Number(inputs.eff ?? DEFAULT_P.eff),
+                    greige_brok: Number(
+                        inputs.greige_brok ?? DEFAULT_P.greige_brok
+                    ),
+                    dyeing_proc: Number(
+                        inputs.dyeing_proc ?? DEFAULT_P.dyeing_proc
+                    ),
+                    finished_brok: Number(
+                        inputs.finished_brok ?? DEFAULT_P.finished_brok
+                    ),
+                    cut_pack: Number(
+                        inputs.cut_pack ?? DEFAULT_P.cut_pack
+                    ),
+                });
+                setReopenedInfo({
+                    id: String(saved.id || reopenRequest.costingId),
+                    createdAt: saved.created_at || null,
+                });
+            } catch (e: any) {
+                if (!cancelled) {
+                    console.log(
+                        'REOPEN COSTING ERROR:',
+                        e?.response?.data || e
+                    );
+                    Alert.alert(
+                        'Unable to reopen costing',
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        'The saved costing could not be loaded.'
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setReopening(false);
+                }
+            }
+        };
+
+        void reopen();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [reopenRequest?.requestKey, reopenRequest?.costingId]);
 
     // live compute
     const compute = useCallback(async () => {
@@ -381,15 +557,45 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
         return () => clearTimeout(t);
     }, [mdId, priceMap, dyeMap, params]);
 
+    // const save = async () => {
+    //     if (!result) { Alert.alert('Compute first'); return; }
+    //     setSaving(true);
+    //     try {
+    //         await CostingAPI.save({ md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params });
+    //         Alert.alert('Saved ✓', 'Costing record saved to history');
+    //         onSaved();
+    //     } catch (e: any) {
+    //         Alert.alert('Error', e.message);
+    //     } finally {
+    //         setSaving(false);
+    //     }
+    // };
+
     const save = async () => {
-        if (!result) { Alert.alert('Compute first'); return; }
+        if (!result) {
+            Alert.alert('Compute first');
+            return;
+        }
         setSaving(true);
         try {
-            await CostingAPI.save({ md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params });
-            Alert.alert('Saved ✓', 'Costing record saved to history');
-            onSaved();
+            const payload = {
+                md_id: mdId,
+                price_map: priceMap,
+                dye_map: dyeMap,
+                ...params,
+            };
+            console.log("SAVE REQUEST:", payload);
+            const response = await CostingAPI.save(payload);
+            console.log("SAVE RESPONSE:", response?.data);
+            if (response?.data?.success) {
+                Alert.alert("Success", response.data.message);
+                onSaved();
+            } else {
+                Alert.alert("Error", response?.data?.message);
+            }
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            console.log("SAVE ERROR:", e?.response?.data || e);
+            Alert.alert("Error", e?.response?.data?.message || e?.message);
         } finally {
             setSaving(false);
         }
@@ -412,6 +618,39 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
 
     return (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 40 }}>
+            {reopening ? (
+                <View style={c.reopenBanner}>
+                    <ActivityIndicator color={T.copper} size="small" />
+                    <View style={{ flex: 1 }}>
+                        <Text style={c.reopenTitle}>Opening saved costing…</Text>
+                        <Text style={c.reopenSub}>
+                            Loading the saved inputs and design.
+                        </Text>
+                    </View>
+                </View>
+            ) : reopenedInfo ? (
+                <View style={c.reopenBanner}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={c.reopenTitle}>REOPENED COSTING</Text>
+                        <Text style={c.reopenSub}>
+                            {reopenedInfo.id}
+                            {reopenedInfo.createdAt
+                                ? ` · ${historyDateTimeLabel(reopenedInfo.createdAt)}`
+                                : ''}
+                        </Text>
+                        <Text style={c.reopenHint}>
+                            Saving creates a new revision. The original remains unchanged.
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={c.reopenDismiss}
+                        onPress={() => setReopenedInfo(null)}
+                    >
+                        <Text style={c.reopenDismissText}>×</Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
+
             {/* Design selector */}
             <View style={c.section}>
                 <DesignPicker value={mdId} onSelect={handleSelectDesign} />
@@ -596,83 +835,1074 @@ const c = StyleSheet.create({
     previewTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
     saveBtn: { backgroundColor: T.ink, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 0 },
     saveTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    reopenBanner: {
+        marginBottom: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: T.copper + '55',
+        borderRadius: 11,
+        backgroundColor: T.copper + '10',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    reopenTitle: {
+        color: T.copper,
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.6,
+    },
+    reopenSub: {
+        marginTop: 3,
+        color: T.ink,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    reopenHint: {
+        marginTop: 3,
+        color: T.muted,
+        fontSize: 9.5,
+        lineHeight: 13,
+    },
+    reopenDismiss: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: T.surface,
+    },
+    reopenDismissText: {
+        color: T.muted,
+        fontSize: 20,
+        lineHeight: 22,
+        fontWeight: '700',
+    },
 });
 
 // ═══════════════════════════════════════════════════════════════
 // TAB 2 — HISTORY
 // ═══════════════════════════════════════════════════════════════
-function HistoryTab({ refreshKey }: { refreshKey: number }) {
-    const [groups, setGroups] = useState<any[]>([]);
+type HistoryRecord = {
+    id: string;
+    created_at?: string | null;
+    snap_final_cost?: number | string | null;
+    snap_rm?: number | string | null;
+    snap_weaving_cost?: number | string | null;
+    snap_greige_price?: number | string | null;
+    snap_finished_price?: number | string | null;
+    snap_has_fin?: boolean | number | null;
+    snap_rm_pct?: number | string | null;
+    snap_weave_pct?: number | string | null;
+    scenario_name?: string | null;
+    tier_code?: string | null;
+};
+
+type HistoryGroup = {
+    md_id: string;
+    code: string;
+    category?: string | null;
+    type?: 'YD' | 'PD' | string | null;
+    count?: number | string | null;
+    latest_cost?: number | string | null;
+    latest_at?: string | null;
+    records?: HistoryRecord[];
+};
+
+const HISTORY_FILTER_ALL = 'All';
+
+const historyNumber = (value: unknown): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const historyDateLabel = (value?: string | null): string => {
+    if (!value) return '—';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return String(value).slice(0, 10);
+    }
+
+    return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: '2-digit',
+    });
+};
+
+const historyDateTimeLabel = (value?: string | null): string => {
+    if (!value) return '—';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return String(value).slice(0, 16);
+    }
+
+    return date.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+function HistorySparkline({
+    records,
+    selectedRecordId,
+    onPointPress,
+    width = 250,
+    height = 62,
+}: {
+    records: HistoryRecord[];
+    selectedRecordId?: string | null;
+    onPointPress: (record: HistoryRecord) => void;
+    width?: number;
+    height?: number;
+}) {
+    const ordered = useMemo(
+        () =>
+            [...records]
+                .filter(record =>
+                    Number.isFinite(Number(record.snap_final_cost))
+                )
+                .sort((a, b) => {
+                    const left = new Date(a.created_at || 0).getTime();
+                    const right = new Date(b.created_at || 0).getTime();
+                    return left - right;
+                }),
+        [records],
+    );
+
+    const values = ordered.map(record =>
+        historyNumber(record.snap_final_cost)
+    );
+
+    if (values.length < 2) {
+        return (
+            <View style={[hs.noTrendBox, { height }]}>
+                {ordered.length === 1 ? (
+                    <TouchableOpacity
+                        activeOpacity={0.75}
+                        style={hs.singlePointButton}
+                        onPress={() => onPointPress(ordered[0])}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        <View
+                            style={[
+                                hs.sparkDot,
+                                hs.sparkDotSelected,
+                            ]}
+                        />
+                        <Text style={hs.noTrendText}>
+                            Tap the point to view this costing.
+                        </Text>
+                    </TouchableOpacity>
+                ) : (
+                    <Text style={hs.noTrendText}>
+                        No costing points available.
+                    </Text>
+                )}
+            </View>
+        );
+    }
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+    const horizontalPadding = 14;
+    const verticalPadding = 10;
+    const usableWidth = width - horizontalPadding * 2;
+    const usableHeight = height - verticalPadding * 2;
+
+    const points = values.map((value, index) => ({
+        record: ordered[index],
+        x:
+            horizontalPadding +
+            (index / Math.max(values.length - 1, 1)) * usableWidth,
+        y:
+            verticalPadding +
+            (1 - (value - min) / range) * usableHeight,
+    }));
+
+    return (
+        <View style={[hs.sparklineWrap, { width, height }]}>
+            {points.slice(0, -1).map((point, index) => {
+                const next = points[index + 1];
+                const dx = next.x - point.x;
+                const dy = next.y - point.y;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+                return (
+                    <View
+                        key={`line-${point.record.id}`}
+                        pointerEvents="none"
+                        style={[
+                            hs.sparkLine,
+                            {
+                                width: length,
+                                left: point.x,
+                                top: point.y,
+                                transform: [{ rotateZ: `${angle}deg` }],
+                            },
+                        ]}
+                    />
+                );
+            })}
+
+            {points.map(point => {
+                const selected =
+                    selectedRecordId === point.record.id;
+
+                return (
+                    <TouchableOpacity
+                        key={`point-${point.record.id}`}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Costing ${historyDateLabel(
+                            point.record.created_at
+                        )}, ₹${historyNumber(
+                            point.record.snap_final_cost
+                        ).toFixed(2)} per metre`}
+                        onPress={() => onPointPress(point.record)}
+                        hitSlop={{
+                            top: 14,
+                            bottom: 14,
+                            left: 14,
+                            right: 14,
+                        }}
+                        style={[
+                            hs.sparkPointButton,
+                            {
+                                left: point.x - 12,
+                                top: point.y - 12,
+                            },
+                        ]}
+                    >
+                        <View
+                            style={[
+                                hs.sparkDot,
+                                selected && hs.sparkDotSelected,
+                            ]}
+                        />
+                    </TouchableOpacity>
+                );
+            })}
+        </View>
+    );
+}
+
+function HistoryTab({
+    refreshKey,
+    onOpenCosting,
+}: {
+    refreshKey: number;
+    onOpenCosting: (costingId: string) => void;
+}) {
+    const [groups, setGroups] = useState<HistoryGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [search, setSearch] = useState('');
+    const [category, setCategory] = useState(HISTORY_FILTER_ALL);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [chartWidth, setChartWidth] = useState(250);
+    const [selectedPoint, setSelectedPoint] = useState<{
+        mdId: string;
+        record: HistoryRecord;
+    } | null>(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         try {
-            const res = await CostingAPI.history();
-            setGroups(res.data.data);
+            const res = await CostingAPI.history({
+                page: 1,
+                per_page: 100,
+                records_per_design: 20,
+            });
+
+            const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
+            setGroups(rows);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            console.log('history error', e?.response?.data || e);
+
+            Alert.alert(
+                'History Error',
+                e?.response?.data?.message ||
+                e?.message ||
+                'Unable to load costing history',
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
+    }, []);
+
+    useEffect(() => {
+        setLoading(true);
+        void load();
+    }, [load, refreshKey]);
+
+    const categories = useMemo(() => {
+        const values = groups
+            .map(group => String(group.category || '').trim())
+            .filter(Boolean);
+
+        return [
+            HISTORY_FILTER_ALL,
+            ...Array.from(new Set(values)).sort((a, b) => a.localeCompare(b)),
+        ];
+    }, [groups]);
+
+    useEffect(() => {
+        if (category !== HISTORY_FILTER_ALL && !categories.includes(category)) {
+            setCategory(HISTORY_FILTER_ALL);
+        }
+    }, [categories, category]);
+
+    const filteredGroups = useMemo(() => {
+        const query = search.trim().toLowerCase();
+
+        return groups.filter(group => {
+            const matchesCategory =
+                category === HISTORY_FILTER_ALL ||
+                String(group.category || '').trim() === category;
+
+            if (!matchesCategory) return false;
+            if (!query) return true;
+
+            return [
+                group.code,
+                group.category,
+                group.type,
+                group.md_id,
+            ].some(value =>
+                String(value || '').toLowerCase().includes(query),
+            );
+        });
+    }, [groups, search, category]);
+
+    const toggleExpanded = (mdId: string) => {
+        setExpandedId(current => (current === mdId ? null : mdId));
     };
 
-    useEffect(() => { load(); }, [refreshKey]);
-
-    if (loading) return <View style={s.center}><ActivityIndicator color={T.copper} /></View>;
+    if (loading) {
+        return (
+            <View style={s.center}>
+                <ActivityIndicator color={T.copper} />
+                <Text style={hs.loadingText}>Loading costing history…</Text>
+            </View>
+        );
+    }
 
     return (
         <FlatList
-            data={groups}
-            keyExtractor={g => g.md_id}
-            contentContainerStyle={{ padding: 14, paddingBottom: 32 }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-            renderItem={({ item: g }) => (
-                <View style={h.card}>
-                    <View style={h.header}>
-                        <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={h.code}>{g.code}</Text>
-                                <View style={{ backgroundColor: g.type === 'YD' ? T.yd + '20' : T.pd + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                                    <Text style={{ fontSize: 10, fontWeight: '800', color: g.type === 'YD' ? T.yd : T.pd }}>{g.type}</Text>
-                                </View>
-                            </View>
-                            <Text style={h.sub}>{g.count} costing{g.count > 1 ? 's' : ''}</Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={h.costAmt}>₹{g.latest_cost} /m</Text>
-                            <Text style={h.costDate}>{g.latest_at?.slice(0, 10)}</Text>
-                        </View>
+            data={filteredGroups}
+            keyExtractor={group => group.md_id}
+            contentContainerStyle={hs.listContent}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={() => {
+                        setRefreshing(true);
+                        void load();
+                    }}
+                />
+            }
+            ListHeaderComponent={
+                <View>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={hs.filterRow}
+                    >
+                        {categories.map(item => {
+                            const active = category === item;
+
+                            return (
+                                <TouchableOpacity
+                                    key={item}
+                                    activeOpacity={0.75}
+                                    style={[
+                                        hs.filterChip,
+                                        active && hs.filterChipActive,
+                                    ]}
+                                    onPress={() => setCategory(item)}
+                                >
+                                    <Text
+                                        style={[
+                                            hs.filterChipText,
+                                            active && hs.filterChipTextActive,
+                                        ]}
+                                    >
+                                        {item}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+
+                    <View style={hs.searchWrap}>
+                        <TextInput
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Search design..."
+                            placeholderTextColor={T.muted}
+                            style={hs.searchInput}
+                            autoCapitalize="characters"
+                            autoCorrect={false}
+                            clearButtonMode="while-editing"
+                        />
                     </View>
-                    {g.records.slice(0, 3).map((r: any) => (
-                        <View key={r.id} style={h.recRow}>
-                            <Text style={h.recDate}>{r.created_at?.slice(0, 10)}</Text>
-                            <Text style={h.recAmt}>₹{r.snap_final_cost} /m</Text>
-                            <View style={[h.typeBadge, { backgroundColor: r.snap_has_fin ? T.green + '20' : T.amber + '20' }]}>
-                                <Text style={{ fontSize: 9, fontWeight: '700', color: r.snap_has_fin ? T.green : T.amber }}>
-                                    {r.snap_has_fin ? 'FIN' : 'GRG'}
+                </View>
+            }
+            renderItem={({ item: group }) => {
+                const records = Array.isArray(group.records) ? group.records : [];
+                const orderedRecords = [...records].sort((a, b) => {
+                    const left = new Date(a.created_at || 0).getTime();
+                    const right = new Date(b.created_at || 0).getTime();
+                    return left - right;
+                });
+
+                const latestRecord = orderedRecords[orderedRecords.length - 1];
+                const previousRecord = orderedRecords[orderedRecords.length - 2];
+
+                const latestCost = historyNumber(
+                    group.latest_cost ?? latestRecord?.snap_final_cost,
+                );
+                const previousCost = historyNumber(previousRecord?.snap_final_cost);
+
+                const delta =
+                    previousRecord && previousCost !== 0
+                        ? ((latestCost - previousCost) / previousCost) * 100
+                        : null;
+
+                const expanded = expandedId === group.md_id;
+                const earliestDate = orderedRecords[0]?.created_at;
+                const latestDate =
+                    group.latest_at || latestRecord?.created_at || null;
+
+                return (
+                    <View style={hs.card}>
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() => toggleExpanded(group.md_id)}
+                        >
+                            <View style={hs.cardHeader}>
+                                <View style={hs.cardTitleArea}>
+                                    <View style={hs.codeRow}>
+                                        <Text style={hs.code}>{group.code}</Text>
+
+                                        <View
+                                            style={[
+                                                hs.typeBadge,
+                                                {
+                                                    backgroundColor:
+                                                        group.type === 'YD'
+                                                            ? T.yd + '20'
+                                                            : T.pd + '20',
+                                                },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={[
+                                                    hs.typeBadgeText,
+                                                    {
+                                                        color:
+                                                            group.type === 'YD'
+                                                                ? T.yd
+                                                                : T.pd,
+                                                    },
+                                                ]}
+                                            >
+                                                {group.type || '—'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    <Text style={hs.categoryText}>
+                                        {group.category || 'Uncategorised'} ·{' '}
+                                        {historyNumber(group.count || records.length)} costing
+                                        {historyNumber(group.count || records.length) === 1
+                                            ? ''
+                                            : 's'}
+                                    </Text>
+                                </View>
+
+                                <View style={hs.latestArea}>
+                                    <Text style={hs.latestCost}>₹{latestCost.toFixed(2)}</Text>
+                                    <Text style={hs.perMetre}>/m</Text>
+
+                                    {delta !== null ? (
+                                        <Text
+                                            style={[
+                                                hs.delta,
+                                                {
+                                                    color:
+                                                        delta > 0
+                                                            ? T.red
+                                                            : delta < 0
+                                                                ? T.green
+                                                                : T.muted,
+                                                },
+                                            ]}
+                                        >
+                                            {delta > 0 ? '▲ ' : delta < 0 ? '▼ ' : ''}
+                                            {Math.abs(delta).toFixed(1)}%
+                                        </Text>
+                                    ) : null}
+                                </View>
+
+                                <Text style={hs.chevron}>{expanded ? '⌄' : '›'}</Text>
+                            </View>
+
+                            <View
+                                style={hs.chartArea}
+                                onLayout={event => {
+                                    const width = Math.max(
+                                        180,
+                                        event.nativeEvent.layout.width,
+                                    );
+                                    setChartWidth(width);
+                                }}
+                            >
+                                <HistorySparkline
+                                    records={orderedRecords}
+                                    selectedRecordId={
+                                        selectedPoint?.mdId === group.md_id
+                                            ? selectedPoint.record.id
+                                            : null
+                                    }
+                                    onPointPress={record => {
+                                        setSelectedPoint({
+                                            mdId: group.md_id,
+                                            record,
+                                        });
+                                        setExpandedId(group.md_id);
+                                    }}
+                                    width={chartWidth}
+                                    height={62}
+                                />
+                            </View>
+
+                            <View style={hs.dateRow}>
+                                <Text style={hs.dateText}>
+                                    {historyDateLabel(earliestDate)}
+                                </Text>
+                                <Text style={hs.dateText}>
+                                    {historyDateLabel(latestDate)}
                                 </Text>
                             </View>
-                        </View>
-                    ))}
+
+                            {selectedPoint?.mdId === group.md_id ? (
+                                <View style={hs.pointDetail}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={hs.pointDetailDate}>
+                                            {historyDateTimeLabel(
+                                                selectedPoint.record.created_at
+                                            )}
+                                        </Text>
+                                        <Text style={hs.pointDetailCost}>
+                                            ₹
+                                            {historyNumber(
+                                                selectedPoint.record
+                                                    .snap_final_cost
+                                            ).toFixed(2)}
+                                            /m
+                                        </Text>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        activeOpacity={0.75}
+                                        style={hs.openButton}
+                                        onPress={() =>
+                                            onOpenCosting(
+                                                selectedPoint.record.id
+                                            )
+                                        }
+                                    >
+                                        <Text style={hs.openButtonText}>
+                                            Open
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
+                        </TouchableOpacity>
+
+                        {expanded ? (
+                            <View style={hs.expandedSection}>
+                                <Text style={hs.expandedTitle}>COSTING REVISIONS</Text>
+
+                                {[...records]
+                                    .sort((a, b) => {
+                                        const left = new Date(a.created_at || 0).getTime();
+                                        const right = new Date(b.created_at || 0).getTime();
+                                        return right - left;
+                                    })
+                                    .map((record, index) => {
+                                        const finalCost = historyNumber(
+                                            record.snap_final_cost,
+                                        );
+                                        const isLatest = index === 0;
+
+                                        return (
+                                            <View
+                                                key={record.id}
+                                                style={[
+                                                    hs.revisionRow,
+                                                    isLatest && hs.latestRevisionRow,
+                                                ]}
+                                            >
+                                                <View style={hs.revisionMain}>
+                                                    <View style={hs.revisionDateRow}>
+                                                        <Text style={hs.revisionDate}>
+                                                            {historyDateTimeLabel(record.created_at)}
+                                                        </Text>
+
+                                                        {isLatest ? (
+                                                            <View style={hs.latestBadge}>
+                                                                <Text style={hs.latestBadgeText}>
+                                                                    LATEST
+                                                                </Text>
+                                                            </View>
+                                                        ) : null}
+                                                    </View>
+
+                                                    <Text style={hs.revisionSub}>
+                                                        RM ₹
+                                                        {historyNumber(
+                                                            record.snap_rm,
+                                                        ).toFixed(2)}
+                                                        {' · '}Weaving ₹
+                                                        {historyNumber(
+                                                            record.snap_weaving_cost,
+                                                        ).toFixed(2)}
+                                                    </Text>
+                                                </View>
+
+                                                <View style={hs.revisionCostArea}>
+                                                    <Text
+                                                        style={[
+                                                            hs.revisionCost,
+                                                            isLatest && {
+                                                                color: T.copper,
+                                                            },
+                                                        ]}
+                                                    >
+                                                        ₹{finalCost.toFixed(2)}
+                                                    </Text>
+
+                                                    <Text style={hs.revisionPerMetre}>
+                                                        /m
+                                                    </Text>
+                                                </View>
+
+                                                <TouchableOpacity
+                                                    activeOpacity={0.75}
+                                                    style={hs.revisionOpenButton}
+                                                    onPress={() =>
+                                                        onOpenCosting(record.id)
+                                                    }
+                                                >
+                                                    <Text
+                                                        style={
+                                                            hs.revisionOpenText
+                                                        }
+                                                    >
+                                                        Open
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })}
+                            </View>
+                        ) : null}
+                    </View>
+                );
+            }}
+            ListEmptyComponent={
+                <View style={hs.emptyWrap}>
+                    <Text style={hs.emptyTitle}>No costing history found</Text>
+                    <Text style={hs.emptyText}>
+                        Save a costing or adjust the current search/filter.
+                    </Text>
                 </View>
-            )}
-            ListEmptyComponent={<Text style={s.empty}>No costings saved yet</Text>}
+            }
         />
     );
 }
-const h = StyleSheet.create({
-    card: { backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 10 },
-    header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-    code: { fontSize: 15, fontWeight: '800', color: T.ink },
-    sub: { fontSize: 10.5, color: T.muted, marginTop: 2 },
-    costAmt: { fontSize: 15, fontWeight: '800', color: T.green },
-    costDate: { fontSize: 9.5, color: T.muted, marginTop: 2 },
-    recRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: T.sub },
-    recDate: { flex: 1, fontSize: 11, color: T.muted },
-    recAmt: { fontSize: 12.5, fontWeight: '700', color: T.ink },
-    typeBadge: { marginLeft: 8, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
+
+const hs = StyleSheet.create({
+    listContent: {
+        paddingHorizontal: 14,
+        paddingBottom: 36,
+    },
+
+    filterRow: {
+        gap: 8,
+        paddingTop: 12,
+        paddingBottom: 10,
+    },
+
+    filterChip: {
+        minHeight: 32,
+        paddingHorizontal: 14,
+        borderRadius: 17,
+        backgroundColor: T.sub,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    filterChipActive: {
+        backgroundColor: T.ink,
+    },
+
+    filterChipText: {
+        color: T.muted,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+
+    filterChipTextActive: {
+        color: '#FFFFFF',
+    },
+
+    searchWrap: {
+        marginBottom: 12,
+    },
+
+    searchInput: {
+        minHeight: 46,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 11,
+        backgroundColor: T.surface,
+        color: T.ink,
+        fontSize: 13,
+    },
+
+    loadingText: {
+        marginTop: 10,
+        color: T.muted,
+        fontSize: 12,
+    },
+
+    card: {
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 13,
+        backgroundColor: T.surface,
+        overflow: 'hidden',
+    },
+
+    cardHeader: {
+        paddingHorizontal: 13,
+        paddingTop: 13,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+
+    cardTitleArea: {
+        flex: 1,
+        paddingRight: 10,
+    },
+
+    codeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+
+    code: {
+        color: T.ink,
+        fontSize: 15,
+        fontWeight: '900',
+    },
+
+    typeBadge: {
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 5,
+    },
+
+    typeBadgeText: {
+        fontSize: 9,
+        fontWeight: '900',
+    },
+
+    categoryText: {
+        marginTop: 3,
+        color: T.muted,
+        fontSize: 10.5,
+    },
+
+    latestArea: {
+        alignItems: 'flex-end',
+    },
+
+    latestCost: {
+        color: T.green,
+        fontSize: 16,
+        fontWeight: '900',
+        fontVariant: ['tabular-nums'],
+    },
+
+    perMetre: {
+        marginTop: -1,
+        color: T.muted,
+        fontSize: 8.5,
+    },
+
+    delta: {
+        marginTop: 3,
+        fontSize: 9,
+        fontWeight: '800',
+    },
+
+    chevron: {
+        width: 18,
+        marginLeft: 6,
+        color: T.muted,
+        fontSize: 20,
+        textAlign: 'right',
+    },
+
+    chartArea: {
+        minHeight: 58,
+        marginHorizontal: 13,
+        marginTop: 6,
+        overflow: 'hidden',
+    },
+
+    sparklineWrap: {
+        position: 'relative',
+    },
+
+    sparkLine: {
+        position: 'absolute',
+        height: 2,
+        borderRadius: 1,
+        backgroundColor: T.copper,
+        transformOrigin: 'left center',
+    },
+
+    sparkDot: {
+        position: 'absolute',
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: T.copper,
+    },
+
+    noTrendBox: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    noTrendText: {
+        color: T.muted,
+        fontSize: 10,
+    },
+
+    dateRow: {
+        paddingHorizontal: 13,
+        paddingBottom: 11,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+
+    dateText: {
+        color: T.muted,
+        fontSize: 8.5,
+    },
+
+    expandedSection: {
+        paddingHorizontal: 13,
+        paddingTop: 10,
+        paddingBottom: 12,
+        borderTopWidth: 1,
+        borderTopColor: T.border,
+        backgroundColor: T.bg,
+    },
+
+    expandedTitle: {
+        marginBottom: 7,
+        color: T.muted,
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 0.6,
+    },
+
+    revisionRow: {
+        minHeight: 52,
+        paddingHorizontal: 9,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: T.border,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+
+    latestRevisionRow: {
+        backgroundColor: T.copper + '10',
+    },
+
+    revisionMain: {
+        flex: 1,
+        paddingRight: 10,
+    },
+
+    revisionDateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+    },
+
+    revisionDate: {
+        color: T.ink,
+        fontSize: 11,
+        fontWeight: '700',
+    },
+
+    latestBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        backgroundColor: T.copper + '20',
+    },
+
+    latestBadgeText: {
+        color: T.copper,
+        fontSize: 8,
+        fontWeight: '900',
+    },
+
+    revisionSub: {
+        marginTop: 3,
+        color: T.muted,
+        fontSize: 9.5,
+    },
+
+    revisionCostArea: {
+        alignItems: 'flex-end',
+    },
+
+    revisionCost: {
+        color: T.ink,
+        fontSize: 13,
+        fontWeight: '900',
+        fontVariant: ['tabular-nums'],
+    },
+
+    revisionPerMetre: {
+        color: T.muted,
+        fontSize: 8,
+    },
+
+    emptyWrap: {
+        paddingVertical: 48,
+        alignItems: 'center',
+    },
+
+    emptyTitle: {
+        color: T.ink,
+        fontSize: 14,
+        fontWeight: '800',
+    },
+
+    emptyText: {
+        marginTop: 5,
+        color: T.muted,
+        fontSize: 11,
+        textAlign: 'center',
+    },
+    sparkPointButton: {
+        position: 'absolute',
+        width: 24,
+        height: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 5,
+    },
+
+    sparkDotSelected: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 2,
+        borderColor: T.surface,
+        backgroundColor: T.copper,
+    },
+
+    singlePointButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+
+    pointDetail: {
+        marginHorizontal: 13,
+        marginBottom: 12,
+        paddingHorizontal: 11,
+        paddingVertical: 9,
+        borderWidth: 1,
+        borderColor: T.copper + '55',
+        borderRadius: 9,
+        backgroundColor: T.copper + '0D',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+
+    pointDetailDate: {
+        color: T.muted,
+        fontSize: 9.5,
+    },
+
+    pointDetailCost: {
+        marginTop: 2,
+        color: T.ink,
+        fontSize: 13,
+        fontWeight: '900',
+    },
+
+    openButton: {
+        minWidth: 68,
+        minHeight: 34,
+        paddingHorizontal: 13,
+        borderRadius: 17,
+        backgroundColor: T.copper + '18',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    openButtonText: {
+        color: T.copper,
+        fontSize: 10.5,
+        fontWeight: '900',
+    },
+
+    revisionOpenButton: {
+        minWidth: 58,
+        minHeight: 31,
+        marginLeft: 10,
+        paddingHorizontal: 11,
+        borderRadius: 16,
+        backgroundColor: T.copper + '18',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    revisionOpenText: {
+        color: T.copper,
+        fontSize: 9.5,
+        fontWeight: '900',
+    },
+
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -683,19 +1913,58 @@ function VarianceTab() {
     const [mdId, setMdId] = useState('');
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [designLoading, setDesignLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    // useEffect(() => {
+    //     DesignAPI.list().then(r => setDesigns(r.data.data)).catch(() => { });
+    // }, []);
 
     useEffect(() => {
-        DesignAPI.list().then(r => setDesigns(r.data.data)).catch(() => { });
+        DesignAPI.list()
+            .then(r => setDesigns(r.data.data))
+            .catch(() => { })
+            .finally(() => setDesignLoading(false));
     }, []);
+
+    const filteredDesigns = useMemo(() => {
+        const q = search.trim().toLowerCase();
+
+        if (!q) return designs;
+
+        return designs.filter(d =>
+            (d.code || '').toLowerCase().includes(q) ||
+            (d.category || '').toLowerCase().includes(q)
+        );
+    }, [designs, search]);
 
     const load = async (id: string) => {
         setMdId(id);
         setLoading(true);
+        setData(null);
+
         try {
-            const res = await CostingAPI.variance(id);
+            const res = await CostingAPI.variance({
+                md_id: id,
+            });
+
             setData(res.data.data);
+            console.log(
+                'variance res',
+                res.data
+            );
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            console.log(
+                'variance error',
+                e?.response?.data || e
+            );
+
+            Alert.alert(
+                'Error',
+                e?.response?.data?.message ||
+                e?.message ||
+                'Unable to load variance'
+            );
         } finally {
             setLoading(false);
         }
@@ -719,14 +1988,134 @@ function VarianceTab() {
             {/* Design selector */}
             <View style={{ backgroundColor: T.surface, borderRadius: 12, borderWidth: 1, borderColor: T.border, padding: 14, marginBottom: 12 }}>
                 <Text style={{ fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginBottom: 8 }}>SELECT DESIGN</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {/* <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                     {designs?.map(d => (
                         <TouchableOpacity key={d.id} onPress={() => load(d.id)}
                             style={[v.chip, mdId === d.id && v.chipActive]}>
                             <Text style={[v.chipTxt, mdId === d.id && { color: '#fff' }]}>{d.code}</Text>
                         </TouchableOpacity>
                     ))}
-                </ScrollView>
+                </ScrollView> */}
+                <View style={{ marginTop: 8 }}>
+                    <TouchableOpacity
+                        style={dp.trigger}
+                        activeOpacity={0.7}
+                        onPress={() => setOpen(o => !o)}
+                    >
+                        <Text
+                            style={[
+                                dp.triggerTxt,
+                                !mdId && { color: T.muted, fontWeight: '400' },
+                            ]}
+                        >
+                            {mdId
+                                ? designs.find(x => x.id === mdId)?.code
+                                : 'Select Design'}
+                        </Text>
+
+                        <Text style={{ color: T.muted }}>
+                            {open ? '▲' : '▼'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {open && (
+                        <View style={dp.sheet}>
+                            <TextInput
+                                value={search}
+                                onChangeText={setSearch}
+                                placeholder="Search design..."
+                                placeholderTextColor={T.muted}
+                                style={dp.search}
+                                autoFocus
+                            />
+                            <ScrollView
+                                style={{ maxHeight: 220 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {designLoading ? (
+                                    <View
+                                        style={{
+                                            padding: 20,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <ActivityIndicator color={T.copper} />
+                                        <Text
+                                            style={{
+                                                marginTop: 8,
+                                                color: T.muted,
+                                                fontSize: 12,
+                                            }}
+                                        >
+                                            Loading designs...
+                                        </Text>
+                                    </View>
+                                ) : designs.length === 0 ? (
+                                    <View
+                                        style={{
+                                            padding: 20,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: T.muted,
+                                                fontSize: 12,
+                                            }}
+                                        >
+                                            No designs found
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    filteredDesigns.map(d => {
+                                        const selected = mdId === d.id;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={d.id}
+                                                style={[
+                                                    dp.row,
+                                                    selected && {
+                                                        backgroundColor: T.sub,
+                                                    },
+                                                ]}
+                                                onPress={() => {
+                                                    setOpen(false);
+                                                    load(d.id);
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        flex: 1,
+                                                        fontSize: 14,
+                                                        fontWeight: selected ? '700' : '500',
+                                                        color: selected ? T.copper : T.ink,
+                                                    }}
+                                                >
+                                                    {d.code}
+                                                </Text>
+
+                                                {selected && (
+                                                    <Text
+                                                        style={{
+                                                            color: T.copper,
+                                                            fontSize: 16,
+                                                            fontWeight: '700',
+                                                        }}
+                                                    >
+                                                        ✓
+                                                    </Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    })
+                                )}
+                            </ScrollView>
+                        </View>
+                    )}
+                </View>
             </View>
 
             {loading && <ActivityIndicator color={T.copper} style={{ marginVertical: 20 }} />}
@@ -769,6 +2158,7 @@ function VarianceTab() {
         </ScrollView>
     );
 }
+
 const v = StyleSheet.create({
     chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: T.sub },
     chipActive: { backgroundColor: T.ink },
@@ -780,6 +2170,8 @@ const v = StyleSheet.create({
 export function CostingScreen() {
     const [tab, setTab] = useState<Tab>('Costing');
     const [histRefreshKey, setHistRefreshKey] = useState(0);
+    const [reopenRequest, setReopenRequest] =
+        useState<ReopenCostingRequest | null>(null);
 
     // FIX: this screen used to render its own hand-rolled header (same bug
     // as Designs/Orders/Permission Manager — see app/new/(tabs)/_layout.tsx).
@@ -790,8 +2182,24 @@ export function CostingScreen() {
             <TabBar active={tab} onChange={setTab} />
 
             <View style={{ flex: 1 }}>
-                {tab === 'Costing' && <CostingTab onSaved={() => setHistRefreshKey(k => k + 1)} />}
-                {tab === 'History' && <HistoryTab refreshKey={histRefreshKey} />}
+                {tab === 'Costing' && (
+                    <CostingTab
+                        reopenRequest={reopenRequest}
+                        onSaved={() => setHistRefreshKey(k => k + 1)}
+                    />
+                )}
+                {tab === 'History' && (
+                    <HistoryTab
+                        refreshKey={histRefreshKey}
+                        onOpenCosting={costingId => {
+                            setReopenRequest({
+                                costingId,
+                                requestKey: Date.now(),
+                            });
+                            setTab('Costing');
+                        }}
+                    />
+                )}
                 {tab === 'Variance' && <VarianceTab />}
             </View>
         </View>

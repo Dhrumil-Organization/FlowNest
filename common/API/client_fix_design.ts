@@ -28,6 +28,8 @@ client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     config.baseURL = `${base}/api`;
 
     const token = await AsyncStorage.getItem('access_token');
+    config.headers['x-platform'] = 'mob';
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -137,18 +139,66 @@ export interface SubDesign {
     weft_patterns: { color_name: string; hex?: string; thread_count: number }[];
 }
 
-export interface YarnMaster {
+export interface YarnMainRow {
+    row_type: 'main';
+    selectable: true;
     mi_id: string;
-    itm_code?: string;
-    m_itm_code?: string;
-    prp_code?: string;
-    str_code?: string;
+    itm_code: null;
+    m_itm_code: string;
+    main_yarn_code: string;
+    name: string;
+    prp_code: string;
+    str_code: string;
+    variant_count: number;
+    available_blends: string[];
+}
+
+export interface YarnMaster {
+    row_type?: 'item';
+    selectable?: true;
+    mi_id: string;
+    itm_code: string;
+    m_itm_code: string;
+    main_yarn_code: string;
+    is_main_yarn_item?: boolean;
+    prp_code: string;
+    str_code: string;
     name: string;
     sys: string;
     cnt: number;
+    ply?: number;
     price: number;
+    blend_ratio?: string;
+    w_blend_per?: string;
     w_name_code?: string;
     itm_name?: string;
+    count_source?: string;
+    engineering_warning?: string | null;
+    fibre?: string;
+    w_count_type?: number;
+    w_count?: number;
+    w_denier?: number;
+    denier?: number;
+    w_ply?: number;
+}
+
+export interface YarnHelpMeta {
+    mode: 'main' | 'items';
+    prpcode: string;
+    strcode: string;
+    limit: number;
+    count: number;
+    search?: string;
+    main_yarn_code?: string;
+    candidate_count?: number;
+    family_count?: number;
+}
+
+export interface YarnHelpResponse<T> {
+    success: boolean;
+    data: T[];
+    message?: string;
+    meta?: YarnHelpMeta;
 }
 
 export interface CostInputs {
@@ -338,13 +388,64 @@ export const DesignAPI = {
             params: { yearno: '27' },
         }),
 
-    yarns: (params: { limit?: number; search?: string; yearno?: string; prpcode?: string; strcode?: string } = {}) =>
-        client.get<{ success: boolean; data: YarnMaster[]; meta?: any }>('/yarns', {
+    mainYarns: (params: {
+        limit?: number;
+        search?: string;
+        yearno?: string;
+        prpcode?: string;
+        strcode?: string;
+    } = {}) =>
+        client.get<YarnHelpResponse<YarnMainRow>>('/yarns', {
             params: {
+                mode: 'main',
                 yearno: params.yearno || '27',
                 prpcode: params.prpcode || 'SIP',
                 strcode: params.strcode || '002',
-                limit: params.limit || 300,
+                limit: params.limit || 100,
+                search: params.search,
+            },
+        }),
+
+    yarnItems: (params: {
+        main_yarn_code: string;
+        limit?: number;
+        search?: string;
+        yearno?: string;
+        prpcode?: string;
+        strcode?: string;
+    }) =>
+        client.get<YarnHelpResponse<YarnMaster>>('/yarns', {
+            params: {
+                mode: 'items',
+                yearno: params.yearno || '27',
+                prpcode: params.prpcode || 'SIP',
+                strcode: params.strcode || '002',
+                main_yarn_code: params.main_yarn_code,
+                limit: params.limit || 250,
+                search: params.search,
+            },
+        }),
+
+    /*
+     * Backward-compatible generic call for older screens.
+     */
+    yarns: (params: {
+        mode?: 'main' | 'items';
+        main_yarn_code?: string;
+        limit?: number;
+        search?: string;
+        yearno?: string;
+        prpcode?: string;
+        strcode?: string;
+    } = {}) =>
+        client.get<YarnHelpResponse<YarnMainRow | YarnMaster>>('/yarns', {
+            params: {
+                mode: params.mode || (params.main_yarn_code ? 'items' : 'main'),
+                yearno: params.yearno || '27',
+                prpcode: params.prpcode || 'SIP',
+                strcode: params.strcode || '002',
+                main_yarn_code: params.main_yarn_code,
+                limit: params.limit || (params.main_yarn_code ? 250 : 100),
                 search: params.search,
             },
         }),

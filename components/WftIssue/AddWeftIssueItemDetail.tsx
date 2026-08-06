@@ -163,10 +163,23 @@ const AddWeftIssueDetail = (props) => {
     }, [maindesigndata]);
 
     useEffect(() => {
-        if (isVisible && isEditMode && mainUId) {
-            handleclick({ UId: mainUId });   // 🔥 yaha call hogi
+        // 🔥 FIX: this used to depend on [isVisible] ONLY, while actually
+        // reading isEditMode/mainUId from the closure. If mainUId changed
+        // without isVisible changing (e.g. user tapped Edit on a different
+        // row before this component fully unmounted), this effect would
+        // either not re-run at all, or re-run with a stale mainUId — showing
+        // the previous item's data under the new item's screen.
+        //
+        // With the parent (index.tsx) now fetching the item via
+        // handleViewClick() and only opening this screen once editData is
+        // ready, this call is normally redundant. It's kept only as a
+        // fallback (e.g. if this screen is ever opened without that
+        // pre-fetch) and now depends on the actual values it uses, and skips
+        // re-fetching once editData for this mainUId is already present.
+        if (isVisible && isEditMode && mainUId && !editData) {
+            handleclick({ UId: mainUId });
         }
-    }, [isVisible]);
+    }, [isVisible, isEditMode, mainUId, editData]);
 
     useEffect(() => {
         if (

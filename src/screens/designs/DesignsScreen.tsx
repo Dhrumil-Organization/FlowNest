@@ -9,7 +9,7 @@
 //      Catalog and the list is force-refreshed.
 // ═══════════════════════════════════════════════════════════════
 import { useFocusEffect } from '@react-navigation/native';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -32,6 +32,7 @@ import { T } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
+import { TwoStepYarnHelp, type YarnHelpPurpose, } from '../../components/help/TwoStepYarnHelp';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -418,6 +419,31 @@ const ls = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 // SHARED: Server Search Yarn Picker Modal
 // ═══════════════════════════════════════════════════════════════
+type MainYarnHelpRow = {
+    row_type?: 'main';
+    selectable?: boolean;
+    mi_id: string;
+    itm_code: null;
+    m_itm_code: string;
+    main_yarn_code: string;
+    name: string;
+    prp_code: string;
+    str_code: string;
+    variant_count: number;
+    available_blends: string[];
+};
+
+type YarnItemHelpRow = YarnMaster & {
+    row_type?: 'item';
+    selectable?: boolean;
+    itm_code: string;
+    m_itm_code: string;
+    main_yarn_code: string;
+    is_main_yarn_item?: boolean;
+    blend_ratio?: string;
+    w_blend_per?: string;
+};
+
 function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: {
     visible: boolean;
     title?: string;
@@ -425,99 +451,462 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
     onClose: () => void;
 }) {
     const { prpcode, strcode, yearno } = useERP();
-    const [search, setSearch] = useState('');
-    const [yarns, setYarns] = useState<YarnMaster[]>([]);
-    const [loading, setLoading] = useState(false);
 
-    const loadYarns = useCallback(async (q = '') => {
-        if (!visible) return;
+    const [stage, setStage] = useState<'main' | 'items'>('main');
+    const [mainSearch, setMainSearch] = useState('');
+    const [itemSearch, setItemSearch] = useState('');
+    const [mainYarns, setMainYarns] = useState<MainYarnHelpRow[]>([]);
+    const [itemYarns, setItemYarns] = useState<YarnItemHelpRow[]>([]);
+    const [selectedMain, setSelectedMain] = useState<MainYarnHelpRow | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [errorText, setErrorText] = useState('');
+    const requestSequence = useRef(0);
+
+    const resetPicker = useCallback(() => {
+        requestSequence.current += 1;
+        setStage('main');
+        setMainSearch('');
+        setItemSearch('');
+        setMainYarns([]);
+        setItemYarns([]);
+        setSelectedMain(null);
+        setLoading(false);
+        setErrorText('');
+    }, []);
+
+    const closePicker = useCallback(() => {
+        resetPicker();
+        onClose();
+    }, [onClose, resetPicker]);
+
+    const goBackToMain = useCallback(() => {
+        requestSequence.current += 1;
+        setStage('main');
+        setItemSearch('');
+        setItemYarns([]);
+        setSelectedMain(null);
+        setErrorText('');
+        /*
+         * mainSearch and mainYarns are intentionally preserved so the user
+         * returns to the exact Main Yarn result list they were viewing.
+         */
+    }, []);
+
+    const loadMainYarns = useCallback(async (queryText = '') => {
+        if (!visible || stage !== 'main') return;
+
+        const requestId = ++requestSequence.current;
         setLoading(true);
+        setErrorText('');
+
         try {
-            const res = await (DesignAPI.yarns as any)({
-                yearno: yearno,
-                prpcode: prpcode,
-                strcode: strcode,
-                limit: 50,
-                search: q.trim() || undefined,
+            const response = await (DesignAPI.yarns as any)({
+                mode: 'main',
+                yearno,
+                prpcode,
+                strcode,
+                limit: 100,
+                search: queryText.trim() || undefined,
             });
-            setYarns(res?.data?.data || []);
-            console.log('YARN SEARCH OK', {
-                search: q,
-                count: res?.data?.data?.length || 0,
-                url: res?.config?.url,
-                baseURL: res?.config?.baseURL,
-                params: res?.config?.params,
+
+            if (requestId !== requestSequence.current) return;
+
+            if (response?.data?.success !== true) {
+                throw new Error(
+                    response?.data?.message || 'Unable to load Main Yarn help.'
+                );
+            }
+
+            setMainYarns(
+                Array.isArray(response?.data?.data)
+                    ? response.data.data
+                    : []
+            );
+        } catch (error: any) {
+            if (requestId !== requestSequence.current) return;
+
+            console.log('MAIN YARN HELP ERROR', {
+                message: error?.message,
+                status: error?.response?.status,
+                data: error?.response?.data,
+                url: error?.config?.url,
+                params: error?.config?.params,
             });
-        } catch (e: any) {
-            console.log('YARN SEARCH ERROR', {
-                message: e?.message,
-                code: e?.code,
-                status: e?.response?.status,
-                data: e?.response?.data,
-                baseURL: e?.config?.baseURL,
-                url: e?.config?.url,
-                params: e?.config?.params,
-            });
-            setYarns([]);
+
+            setMainYarns([]);
+            setErrorText(String(
+                error?.response?.data?.message ||
+                error?.message ||
+                'Unable to load Main Yarn help.'
+            ));
         } finally {
-            setLoading(false);
+            if (requestId === requestSequence.current) {
+                setLoading(false);
+            }
         }
-    }, [visible]);
+    }, [prpcode, stage, strcode, visible, yearno]);
+
+    const loadItemYarns = useCallback(async (
+        mainRow: MainYarnHelpRow,
+        queryText = ''
+    ) => {
+        if (!visible) return;
+
+        const requestId = ++requestSequence.current;
+        setLoading(true);
+        setErrorText('');
+
+        try {
+            const response = await (DesignAPI.yarns as any)({
+                mode: 'items',
+                yearno,
+                prpcode,
+                strcode,
+                main_yarn_code: mainRow.main_yarn_code,
+                limit: 250,
+                search: queryText.trim() || undefined,
+            });
+
+            if (requestId !== requestSequence.current) return;
+
+            if (response?.data?.success !== true) {
+                throw new Error(
+                    response?.data?.message || 'Unable to load Yarn Item help.'
+                );
+            }
+
+            setItemYarns(
+                Array.isArray(response?.data?.data)
+                    ? response.data.data
+                    : []
+            );
+        } catch (error: any) {
+            if (requestId !== requestSequence.current) return;
+
+            console.log('YARN ITEM HELP ERROR', {
+                main_yarn_code: mainRow.main_yarn_code,
+                message: error?.message,
+                status: error?.response?.status,
+                data: error?.response?.data,
+                url: error?.config?.url,
+                params: error?.config?.params,
+            });
+
+            setItemYarns([]);
+            setErrorText(String(
+                error?.response?.data?.message ||
+                error?.message ||
+                'Unable to load Yarn Item help.'
+            ));
+        } finally {
+            if (requestId === requestSequence.current) {
+                setLoading(false);
+            }
+        }
+    }, [prpcode, strcode, visible, yearno]);
 
     useEffect(() => {
-        if (!visible) return;
-        const t = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
-        return () => clearTimeout(t);
-    }, [visible, search, loadYarns]);
+        if (!visible) {
+            resetPicker();
+            return;
+        }
 
-    const closePicker = () => {
-        onClose();
-        setSearch('');
-        setYarns([]);
-    };
+        if (stage !== 'main') return;
+
+        const timer = setTimeout(
+            () => void loadMainYarns(mainSearch),
+            mainSearch.trim() ? 350 : 0
+        );
+
+        return () => clearTimeout(timer);
+    }, [loadMainYarns, mainSearch, resetPicker, stage, visible]);
+
+    useEffect(() => {
+        if (!visible || stage !== 'items' || !selectedMain) return;
+
+        const timer = setTimeout(
+            () => void loadItemYarns(selectedMain, itemSearch),
+            itemSearch.trim() ? 350 : 0
+        );
+
+        return () => clearTimeout(timer);
+    }, [itemSearch, loadItemYarns, selectedMain, stage, visible]);
+
+    const openItemHelp = useCallback((mainRow: MainYarnHelpRow) => {
+        setSelectedMain(mainRow);
+        setStage('items');
+        setItemSearch('');
+        setItemYarns([]);
+        setErrorText('');
+    }, []);
+
+    const chooseItem = useCallback((item: YarnItemHelpRow) => {
+        const actualItemCode = String(item.itm_code || item.mi_id || '').trim();
+
+        if (!actualItemCode) {
+            Alert.alert(
+                'Invalid Yarn Item',
+                'The selected row does not contain an actual ItmCode.'
+            );
+            return;
+        }
+
+        onSelect({
+            ...item,
+            mi_id: actualItemCode,
+            itm_code: actualItemCode,
+            m_itm_code: String(
+                item.m_itm_code || item.main_yarn_code || ''
+            ),
+            main_yarn_code: String(
+                item.main_yarn_code || item.m_itm_code || ''
+            ),
+            blend_ratio: item.blend_ratio || null,
+        } as YarnMaster);
+
+        closePicker();
+    }, [closePicker, onSelect]);
+
+    const childTitle = selectedMain
+        ? `${selectedMain.main_yarn_code} · ${selectedMain.name}`
+        : 'Select Yarn Item';
 
     return (
-        <Modal visible={visible} animationType="slide" transparent onRequestClose={closePicker}>
+        <Modal
+            visible={visible}
+            animationType="slide"
+            transparent
+            onRequestClose={stage === 'items' ? goBackToMain : closePicker}
+        >
             <View style={yp.overlay}>
                 <View style={yp.sheet}>
                     <View style={yp.handle} />
+
                     <View style={yp.header}>
-                        <Text style={yp.title}>{title}</Text>
-                        <TouchableOpacity onPress={closePicker} style={yp.closeBtn}>
+                        {stage === 'items' ? (
+                            <TouchableOpacity
+                                onPress={goBackToMain}
+                                style={yp.backBtn}
+                            >
+                                <Text style={yp.backTxt}>‹ Main Yarn</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={yp.backPlaceholder} />
+                        )}
+
+                        <Text style={yp.title} numberOfLines={1}>
+                            {stage === 'main' ? title : 'Select Yarn Item'}
+                        </Text>
+
+                        <TouchableOpacity
+                            /*
+                             * In child help, close returns to Main Yarn Help as
+                             * requested. Only Main Yarn Help closes the modal.
+                             */
+                            onPress={stage === 'items' ? goBackToMain : closePicker}
+                            style={yp.closeBtn}
+                        >
                             <Text style={yp.closeTxt}>✕</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {stage === 'items' && selectedMain ? (
+                        <View style={yp.mainSelectionCard}>
+                            <Text style={yp.mainSelectionLabel}>MAIN YARN</Text>
+                            <Text style={yp.mainSelectionCode}>
+                                {selectedMain.main_yarn_code}
+                            </Text>
+                            <Text style={yp.mainSelectionName} numberOfLines={2}>
+                                {childTitle}
+                            </Text>
+                            {selectedMain.available_blends?.length > 0 ? (
+                                <Text style={yp.mainSelectionBlend} numberOfLines={2}>
+                                    Available blends: {selectedMain.available_blends.join(' · ')}
+                                </Text>
+                            ) : null}
+                        </View>
+                    ) : null}
+
                     <View style={yp.searchWrap}>
                         <TextInput
-                            value={search}
-                            onChangeText={setSearch}
-                            placeholder="Search yarn name / code / count..."
+                            value={stage === 'main' ? mainSearch : itemSearch}
+                            onChangeText={
+                                stage === 'main'
+                                    ? setMainSearch
+                                    : setItemSearch
+                            }
+                            placeholder={
+                                stage === 'main'
+                                    ? 'Search Main Yarn code / name...'
+                                    : 'Search Item Code / name / blend...'
+                            }
                             placeholderTextColor={T.muted}
                             style={yp.search}
                             autoFocus
+                            autoCorrect={false}
+                            autoCapitalize="characters"
+                            returnKeyType="search"
                         />
                     </View>
-                    {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 10 }} />}
-                    <View style={yp.listFrame}>
-                        <FlatList
-                            data={yarns}
-                            keyExtractor={(y, idx) => `${y.mi_id}-${idx}`}
-                            keyboardShouldPersistTaps="handled"
-                            renderItem={({ item: y }) => (
-                                <TouchableOpacity style={yp.row} activeOpacity={0.7}
-                                    onPress={() => { onSelect(y); closePicker(); }}>
-                                    <Text style={yp.yarnName}>{y.name}</Text>
-                                    <Text style={yp.yarnSub}>
-                                        Code {y.mi_id} · {y.cnt}/1 {y.sys}{y.price > 0 ? ` · ₹${y.price}/kg` : ''}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-                            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />}
-                            ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: T.muted, textAlign: 'center' }}>
-                                {search.trim() ? 'No yarns found' : 'Type to search yarns, or choose from the first 50 results'}
-                            </Text> : null}
-                            contentContainerStyle={{ paddingBottom: 40 }}
+
+                    {errorText ? (
+                        <View style={yp.errorBox}>
+                            <Text style={yp.errorText}>{errorText}</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (stage === 'main') {
+                                        void loadMainYarns(mainSearch);
+                                    } else if (selectedMain) {
+                                        void loadItemYarns(selectedMain, itemSearch);
+                                    }
+                                }}
+                            >
+                                <Text style={yp.retryText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
+
+                    {loading && (
+                        <ActivityIndicator
+                            color={T.copper}
+                            style={{ paddingVertical: 10 }}
                         />
+                    )}
+
+                    <View style={yp.listFrame}>
+                        {stage === 'main' ? (
+                            <FlatList
+                                data={mainYarns}
+                                keyExtractor={(row) => row.main_yarn_code}
+                                keyboardShouldPersistTaps="handled"
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={yp.row}
+                                        activeOpacity={0.7}
+                                        onPress={() => openItemHelp(item)}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={yp.yarnName}>
+                                                {item.main_yarn_code}
+                                            </Text>
+                                            <Text style={yp.yarnSub} numberOfLines={2}>
+                                                {item.name}
+                                            </Text>
+                                            <View style={yp.metaRow}>
+                                                <Text style={yp.metaText}>
+                                                    {item.variant_count} item
+                                                    {item.variant_count === 1 ? '' : 's'}
+                                                </Text>
+                                                {item.available_blends?.length > 0 ? (
+                                                    <Text
+                                                        style={yp.blendPreview}
+                                                        numberOfLines={1}
+                                                    >
+                                                        {item.available_blends.join(' · ')}
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                        <Text style={yp.chevron}>›</Text>
+                                    </TouchableOpacity>
+                                )}
+                                ItemSeparatorComponent={() => (
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: T.border,
+                                            marginLeft: 16,
+                                        }}
+                                    />
+                                )}
+                                ListEmptyComponent={!loading ? (
+                                    <Text style={yp.emptyText}>
+                                        {mainSearch.trim()
+                                            ? 'No Main Yarn found.'
+                                            : 'No Main Yarn is available.'}
+                                    </Text>
+                                ) : null}
+                                contentContainerStyle={{ paddingBottom: 40 }}
+                            />
+                        ) : (
+                            <FlatList
+                                data={itemYarns}
+                                keyExtractor={(row, index) =>
+                                    `${row.main_yarn_code || selectedMain?.main_yarn_code}:${row.itm_code || row.mi_id}:${index}`
+                                }
+                                keyboardShouldPersistTaps="handled"
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={yp.row}
+                                        activeOpacity={0.7}
+                                        onPress={() => chooseItem(item)}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <View style={yp.itemCodeRow}>
+                                                <Text style={yp.yarnName}>
+                                                    {item.itm_code || item.mi_id}
+                                                </Text>
+                                                {item.is_main_yarn_item ? (
+                                                    <View style={yp.mainBadge}>
+                                                        <Text style={yp.mainBadgeText}>
+                                                            MAIN
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+
+                                            <Text style={yp.yarnSub} numberOfLines={2}>
+                                                {item.name || item.itm_name}
+                                            </Text>
+
+                                            <View style={yp.metaRow}>
+                                                {item.blend_ratio ? (
+                                                    <Text style={yp.blendChip}>
+                                                        Blend {item.blend_ratio}
+                                                    </Text>
+                                                ) : null}
+
+                                                <Text style={yp.metaText}>
+                                                    {item.cnt || item.denier || 0}{' '}
+                                                    {item.sys || ''}
+                                                </Text>
+
+                                                {Number(item.price || 0) > 0 ? (
+                                                    <Text style={yp.metaText}>
+                                                        ₹{Number(item.price).toFixed(2)}/kg
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                )}
+                                ItemSeparatorComponent={() => (
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: T.border,
+                                            marginLeft: 16,
+                                        }}
+                                    />
+                                )}
+                                ListEmptyComponent={!loading ? (
+                                    <View style={yp.childEmptyBox}>
+                                        <Text style={yp.emptyText}>
+                                            No Yarn Item found under this Main Yarn.
+                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={goBackToMain}
+                                            style={yp.changeMainBtn}
+                                        >
+                                            <Text style={yp.changeMainTxt}>
+                                                Select another Main Yarn
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : null}
+                                contentContainerStyle={{ paddingBottom: 40 }}
+                            />
+                        )}
                     </View>
                 </View>
             </View>
@@ -706,6 +1095,61 @@ const yp = StyleSheet.create({
     yarnName: { fontSize: 14, fontWeight: '600', color: T.ink },
     yarnSub: { fontSize: 12, color: T.muted, marginTop: 2 },
     listFrame: { height: 430 },
+    backBtn: { minWidth: 88, paddingVertical: 4 },
+    backPlaceholder: { width: 88 },
+    backTxt: { fontSize: 12, fontWeight: '800', color: T.copper },
+    mainSelectionCard: {
+        marginHorizontal: 16,
+        marginTop: 10,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        padding: 10,
+    },
+    mainSelectionLabel: { fontSize: 8.5, fontWeight: '800', color: T.muted, letterSpacing: 0.6 },
+    mainSelectionCode: { marginTop: 2, fontSize: 15, fontWeight: '900', color: T.ink },
+    mainSelectionName: { marginTop: 2, fontSize: 11, color: T.muted },
+    mainSelectionBlend: { marginTop: 5, fontSize: 10, color: T.copper },
+    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 6 },
+    metaText: { fontSize: 10.5, color: T.muted },
+    blendPreview: { flex: 1, fontSize: 10.5, color: T.copper },
+    chevron: { marginLeft: 10, fontSize: 24, color: T.muted },
+    itemCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    mainBadge: { backgroundColor: '#E7F1EA', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2 },
+    mainBadgeText: { fontSize: 8.5, fontWeight: '900', color: T.green },
+    blendChip: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: T.copper,
+        backgroundColor: T.copper + '18',
+        borderRadius: 10,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    errorBox: {
+        marginHorizontal: 16,
+        marginBottom: 6,
+        padding: 10,
+        borderRadius: 9,
+        backgroundColor: '#FFF1F0',
+        borderWidth: 1,
+        borderColor: '#F0C3C0',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    errorText: { flex: 1, fontSize: 11, color: '#8B302B' },
+    retryText: { marginLeft: 10, fontSize: 11, fontWeight: '800', color: '#8B302B' },
+    emptyText: { padding: 16, color: T.muted, textAlign: 'center' },
+    childEmptyBox: { alignItems: 'center', paddingVertical: 20 },
+    changeMainBtn: {
+        marginTop: 8,
+        borderRadius: 8,
+        backgroundColor: T.copper,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+    },
+    changeMainTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
 });
 
 // ── Yarn line row ──
@@ -720,7 +1164,13 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
             <View style={yl.row}>
                 <View style={{ flex: 1 }}>
                     <Text style={yl.name}>{yarn.name}</Text>
-                    <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}</Text>
+                    <Text style={yl.sub}>
+                        Item {yarn.itm_code || yarn.mi_id}
+                        {yarn.main_yarn_code || yarn.m_itm_code
+                            ? ` · Main ${yarn.main_yarn_code || yarn.m_itm_code}`
+                            : ''}
+                        {yarn.cnt ? ` · ${yarn.cnt}/1 ${yarn.sys || ''}` : ''}
+                    </Text>
                 </View>
                 {type === 'warp' && (
                     <TouchableOpacity style={[yl.sizingChip, yarn.sizing && yl.sizingChipOn]}
@@ -739,7 +1189,8 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
             <TextInput value={yarn.blend_ratio ?? ''}
                 onChangeText={v => onChange('blend_ratio', v.trim() || null)}
                 placeholder="Pure or ratio/sub-item, e.g. 65/35"
-                placeholderTextColor={T.muted} style={yl.blendInput} />
+                placeholderTextColor={T.muted} style={yl.blendInput}
+                editable={false} />
         </View>
     );
 }
@@ -1140,8 +1591,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
         set(key, [...(form[key] ?? []), {
-            mi_id: y.mi_id, itm_code: y.itm_code, m_itm_code: y.m_itm_code, prp_code: y.prp_code, str_code: y.str_code, name: y.name, sys: y.sys, cnt: y.cnt, base_price: y.price,
-            blend_ratio: null,
+            mi_id: String(y.itm_code || y.mi_id),
+            itm_code: String(y.itm_code || y.mi_id),
+            m_itm_code: String(y.m_itm_code || (y as any).main_yarn_code || ''),
+            main_yarn_code: String((y as any).main_yarn_code || y.m_itm_code || ''),
+            prp_code: y.prp_code,
+            str_code: y.str_code,
+            name: y.name,
+            sys: y.sys,
+            cnt: y.cnt,
+            base_price: y.price,
+            blend_ratio: (y as any).blend_ratio || null,
             ...(type === 'warp' ? { epi: 60, sizing: false } : type === 'weft' ? { ppi: 52 } : { ends: 0 }),
         }]);
     };
@@ -1459,10 +1919,22 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
             </ScrollView>
-            <YarnPickerModal
+            {/* <YarnPickerModal
                 visible={pickerFor !== null}
                 title={pickerFor === 'warp' ? 'Select warp yarn' : pickerFor === 'weft' ? 'Select weft yarn' : 'Select selvedge yarn'}
                 onSelect={y => pickerFor && addYarn(y, pickerFor)}
+                onClose={() => setPickerFor(null)}
+            /> */}
+            <TwoStepYarnHelp
+                visible={pickerFor !== null}
+                purpose={pickerFor ?? 'warp'}
+                prpcode={prpcode}
+                strcode={strcode}
+                onSelect={(item) => {
+                    if (pickerFor) {
+                        addYarn(item, pickerFor);
+                    }
+                }}
                 onClose={() => setPickerFor(null)}
             />
             <CategoryPickerModal
@@ -3054,7 +3526,7 @@ const mst = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor:T.copper ,
+        backgroundColor: T.copper,
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 10,

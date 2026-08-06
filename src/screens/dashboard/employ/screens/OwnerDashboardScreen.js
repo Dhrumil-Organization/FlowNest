@@ -2931,7 +2931,7 @@ export default function OwnerDashboardScreen({
             />
 
             <TotalRow
-              leftLabel="TODAY (m)"
+              leftLabel="YESTERDAY (m)"
               leftValue={production.total.today_meters.toLocaleString('en-IN')}
               tealLeft
               rightLabel="MTD (m)"

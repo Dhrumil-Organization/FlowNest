@@ -116,7 +116,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [selectedCreel, setSelectedCreel] = useState(null);
-    const [mainUId, setMainUId] = useState(null);
+    const [mainUId, setMainUId] = useState<number | null>(null);
+    const [sessionStatus, setSessionStatus] = useState<'DRAFT' | 'FINAL' | ''>('');
     const [isEditMode, setIsEditMode] = useState(false);
     const [propertyData, setPropertyData] = useState([]);
     const [selectedProperty, setSelectedProperty] = useState(null);
@@ -1436,6 +1437,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 fromdate: FormState.values.fromdate || '',
                 todate: FormState.values.todate || '',
                 status: FormState.values.status || '',
+                include_drafts: 1,
 
             };
 
@@ -1529,7 +1531,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             };
             console.log("show Payload:", payload);
             const response = await axios.post(
-                `${API}/api/get_yarn_issue_show`,
+                `${API}/api/${String(item.SessionStatus || item.Status || '').toUpperCase() === 'DRAFT' ? 'resume_creel_session' : 'get_yarn_issue_show'}`,
                 payload,
                 { headers }
             );
@@ -1545,7 +1547,20 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                 const mainData = resData.main || [];
                 if (mainData.length > 0) {
-                    setCreelId(mainData[0].BatchNo || '');
+                    const header = mainData[0];
+                    setCreelId(header.BatchNo || '');
+                    setSessionStatus(String(header.Status || item.SessionStatus || 'FINAL').toUpperCase() as 'DRAFT' | 'FINAL');
+                    setShift(String(header.ImTag || ''));
+                    setstocktype(String(header.StkType || ''));
+                    setRemark(String(header.Remark || ''));
+                    setFormState(prev => ({
+                        ...prev,
+                        values: {
+                            ...prev.values,
+                            StkType: String(header.StkType || prev.values.StkType || ''),
+                            MacCode: String(header.IssTo || prev.values.MacCode || ''),
+                        },
+                    }));
                 }
 
                 // const mappedData = d2.map(d2Item => {
@@ -1949,95 +1964,124 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
     };
 
-    const handleAddCarton = () => {
+    const handleAddCarton = async () => {
         if (!CartonNo) {
             Alert.alert("Error", "Please scan carton first");
             return;
         }
+        if (!mainUId) {
+            Alert.alert("Session Error", "Creel session is not started. Please go back and tap Save & Next again.");
+            return;
+        }
+        if (sessionStatus === 'FINAL') {
+            Alert.alert("Completed", "This creel is already FINAL and cannot accept more cartons.");
+            return;
+        }
 
-        const isDuplicate = cartonSummary.some(
-            item => item.cartonNo === CartonNo
-        );
-
+        const isDuplicate = cartonSummary.some(item => item.cartonNo === CartonNo);
         if (isDuplicate) {
             Alert.alert("Duplicate Error", `Carton No ${CartonNo} already added.`);
             return;
         }
 
-        // const enteredChees = parseFloat(getchees);
-        // const enteredQty = parseFloat(getavgwt);
+        const enteredChees = parseFloat(getchees || '0');
+        const enteredQty = parseFloat(getavgwt || '0');
+        const availableChees = parseFloat(getScannedObj?.Chees || '0');
+        const availableQty = parseFloat(getScannedObj?.Wt || '0');
 
-        const enteredChees = parseFloat(getchees || 0);
-        const enteredQty = parseFloat(getavgwt || 0);
-
-
-        const availableCheesValue = getScannedObj?.Chees;
-        const availableQtyValue = getScannedObj?.Wt;
-
-        const availableChees = parseFloat(getScannedObj?.Chees || 0);
-        const availableQty = parseFloat(getScannedObj?.Wt || 0);
-
-        // if (enteredChees > availableChees) {
-        if (
-            availableChees > 0 &&
-            enteredChees > availableChees
-        ) {
-            Alert.alert(
-                "Validation Error",
-                `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableChees}).`
-            );
+        if (availableChees > 0 && enteredChees > availableChees) {
+            Alert.alert("Validation Error", `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableChees}).`);
             return;
         }
-
-        // if (enteredQty > availableQty) {
-        if (enteredQty > 0 && enteredQty > availableQty) {
-            Alert.alert(
-                "Validation Error",
-                `Entered Quantity (${enteredQty}) Cannot not be greater than Available Quantity (${availableQty}).`
-            );
+        if (availableQty > 0 && enteredQty > availableQty) {
+            Alert.alert("Validation Error", `Entered Quantity (${enteredQty}) cannot be greater than Available Quantity (${availableQty}).`);
             return;
         }
-
         if (enteredChees <= 0) {
             Alert.alert("Validation Error", "Chees must be greater than 0.");
             return;
         }
-
         if (enteredQty <= 0) {
             Alert.alert("Validation Error", "Qty must be greater than 0.");
             return;
         }
 
-        const newCarton = {
-            cartonNo: CartonNo,
-            chees: getchees,
-            qty: getavgwt,
+        const cartonPayload = {
+            PrpCode: getScannedObj?.PrpCode || FormState.values.PrpCode || '',
+            CartNo: CartonNo,
+            Chees: enteredChees,
+            Wt: enteredQty,
             PUId: getScannedObj?.PUId,
             PSrNo: getScannedObj?.PSrNo,
             PSubSr: getScannedObj?.PSubSr,
             TranType: getScannedObj?.TranType,
             ItmCode: getScannedObj?.ItmCode,
-            ItmName: getScannedObj?.ItmName,
             MerCode: getScannedObj?.MerCode,
-            MerName: getScannedObj?.MerName,
             GrdCode: getScannedObj?.GrdCode,
-            GrdName: getScannedObj?.GrdName,
             ShdCode: getScannedObj?.ShdCode,
-            ShdName: getScannedObj?.ShdName,
-            Denier: getScannedObj?.Denier,
-            yearNo: getScannedObj?.yearNo,
-            SrNo: getScannedObj.SrNo,
-            SubSr: getScannedObj.SubSr,
-            PrpCode: getScannedObj.PrpCode,
-            Rate: getScannedObj.Rate,
-            UId: mainUId?.UId,
+            Denier: getScannedObj?.Denier || 0,
+            Rate: getScannedObj?.Rate || 0,
+            ExpProdQty: 0,
+            DsnRcpSrNo: getScannedObj?.DsnRcpSrNo || 0,
+            DsnCode: getScannedObj?.DsnCode || 0,
         };
-        setCartonSummary(prev => [...prev, newCarton]);
+
+        // Optimistic tick: show immediately, then replace with DB-confirmed SrNo/SubSr.
+        const optimisticKey = `pending-${Date.now()}`;
+        const optimisticRow = {
+            optimisticKey,
+            cartonNo: CartonNo,
+            chees: enteredChees,
+            qty: enteredQty,
+            ...getScannedObj,
+            UId: mainUId,
+            isPending: true,
+        };
+        setCartonSummary(prev => [...prev, optimisticRow]);
         setCartonNo('');
         setchees('');
         setavgwt('');
-        setSearchResults({});
+        setSearchResults([]);
         setScannedObj({});
+
+        try {
+            const response = await axios.post(`${API}/api/add_single_carton_scan`, {
+                uid: mainUId,
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                carton: cartonPayload,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response?.data?.success) {
+                throw new Error(response?.data?.message || 'Carton could not be saved.');
+            }
+
+            const saved = response?.data?.response || {};
+            const savedCarton = saved?.carton || cartonPayload;
+            setCartonSummary(prev => prev.map(item => item.optimisticKey === optimisticKey ? {
+                ...optimisticRow,
+                ...savedCarton,
+                cartonNo: savedCarton.CartNo || optimisticRow.cartonNo,
+                chees: savedCarton.Chees ?? optimisticRow.chees,
+                qty: savedCarton.Wt ?? savedCarton.Qty ?? optimisticRow.qty,
+                SrNo: saved.SrNo ?? savedCarton.SrNo,
+                d1SrNo: String(saved.SrNo ?? savedCarton.SrNo ?? ''),
+                SubSr: saved.SubSr ?? savedCarton.SubSr,
+                SubSrNo: saved.SubSr ?? savedCarton.SubSr,
+                UId: mainUId,
+                isPending: false,
+                optimisticKey: undefined,
+            } : item));
+        } catch (error: any) {
+            setCartonSummary(prev => prev.filter(item => item.optimisticKey !== optimisticKey));
+            Alert.alert('Carton Not Saved', error?.response?.data?.message || error?.message || 'Please scan again.');
+        }
     };
 
     {
@@ -2048,15 +2092,102 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         )
     }
 
-    const handleFinalSubmit = () => {
-        console.log("isEditMode:", isEditMode);
-        console.log("mainUId:", mainUId);
-
-        if (isEditMode && mainUId !== null) {
-            handleSubmitScan();   // MODIFY
-        } else {
-            handleaddCreel();     // ADD
+    const handleFinalSubmit = async () => {
+        if (!mainUId) {
+            Alert.alert('Session Error', 'Creel session UID is missing.');
+            return;
         }
+        if (cartonSummary.some(item => item.isPending)) {
+            Alert.alert('Please Wait', 'One or more carton scans are still being saved.');
+            return;
+        }
+        if (cartonSummary.length === 0) {
+            Alert.alert('Validation', 'At least one carton is required.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const response = await axios.post(`${API}/api/finalize_creel_session`, {
+                uid: mainUId,
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+            }, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response?.data?.success) {
+                throw new Error(response?.data?.message || 'Unable to finalize creel.');
+            }
+            setSessionStatus('FINAL');
+            setDataSaved(true);
+            setSuccessMessage(response.data.message || 'Creel submitted successfully.');
+            setShowSuccess(true);
+        } catch (error: any) {
+            Snackbar.show({
+                text: error?.response?.data?.message || error?.message || 'Unable to finalize creel.',
+                duration: Snackbar.LENGTH_LONG,
+                backgroundColor: '#000',
+                textColor: '#fff',
+                action: { text: 'OK', textColor: 'yellow' },
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const discardDraftSession = () => {
+        if (!mainUId || sessionStatus !== 'DRAFT') return;
+
+        Alert.alert(
+            'Discard Draft Creel',
+            'This will reverse stock for every scanned carton and permanently delete this draft. Continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Discard',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsDelete(true);
+                        try {
+                            const response = await axios.post(`${API}/api/discard_creel_session`, {
+                                uid: mainUId,
+                                prpcode: FormState.values.PrpCode,
+                                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+                                txntype: 'creel_yarn_issue',
+                            }, {
+                                headers: {
+                                    Authorization: `Bearer ${getToken()}`,
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-with': 'XMLHttpRequest',
+                                },
+                            });
+
+                            if (!response?.data?.success) {
+                                throw new Error(response?.data?.message || 'Unable to discard draft.');
+                            }
+
+                            setIsScanModalVisible(false);
+                            setShowList(false);
+                            setCartonSummary([]);
+                            setMainUId(null);
+                            setSessionStatus('');
+                            resetAllFields();
+                            await fetchBrowseData();
+                            Alert.alert('Draft Discarded', response.data.message || 'Draft creel discarded successfully.');
+                        } catch (error: any) {
+                            Alert.alert('Discard Failed', error?.response?.data?.message || error?.message || 'Unable to discard draft.');
+                        } finally {
+                            setIsDelete(false);
+                        }
+                    },
+                },
+            ],
+        );
     };
 
     const getToken = () => {
@@ -2308,6 +2439,52 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
     };
 
+    const startCreelSession = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            const response = await axios.post(`${API}/api/start_creel_session`, {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
+                txntype: 'creel_yarn_issue',
+                CreelId: creelId,
+                SetupDate: setupDate.toISOString().split('T')[0],
+                Shift: shift,
+                Remark: Remark || '',
+                StkType: FormState.values.StkType || stocktype || '',
+                RecipeUId: 1,
+                BeamUId: 0,
+                DsnCode: 0,
+                IssTo: FormState.values.MacCode,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response?.data?.success) {
+                throw new Error(response?.data?.message || 'Unable to start creel session.');
+            }
+            const data = response?.data?.response || {};
+            const uid = Number(data.uid || data.UId || 0);
+            if (!uid) throw new Error('Server did not return the creel session UID.');
+
+            setMainUId(uid);
+            setCreelId(data.CreelId || data.BatchNo || creelId);
+            setSessionStatus('DRAFT');
+            setIsEditMode(true);
+            setCartonSummary([]);
+            setIsCreelModalVisible(false);
+            setIsScanModalVisible(true);
+        } catch (error: any) {
+            Alert.alert('Unable to Start', error?.response?.data?.message || error?.message || 'Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleSubmitScan = async () => {
         if (cancelToken?.cancel) cancelToken.cancel();
         cancelToken = axios.CancelToken.source();
@@ -2538,7 +2715,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 'X-Requested-with': 'XMLHttpRequest',
             };
 
-            const response = await axios.post(`${API}/api/delete_creel_data`, payloadObj, { headers });
+            const response = await axios.post(`${API}/api/discard_creel_session`, payloadObj, { headers });
 
             console.log("delete response", response);
 
@@ -2610,9 +2787,17 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
 
                 setDataSaved(true);
-                setSuccessMessage(successMsg);
-                setShowSuccess(true);
-                // resetAllFields();
+                setCartonSummary(prev => prev.filter(row => !(
+                    String(row.UId) === String(item.UId) &&
+                    String(row.SrNo) === String(item.SrNo) &&
+                    String(row.SubSrNo ?? row.SubSr) === String(item.SubSrNo ?? item.SubSr)
+                )));
+                Snackbar.show({
+                    text: successMsg || 'Carton deleted successfully.',
+                    duration: Snackbar.LENGTH_SHORT,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                });
 
             }
             else {
@@ -2662,6 +2847,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const resetAllFields = () => {
         setIsEditMode(false);   // 🔥 VERY IMPORTANT
         setMainUId(null);
+        setSessionStatus('');
         // Creel modal fields
         setCreelId('');
         setShift('');
@@ -3235,8 +3421,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         );
                                                         return;
                                                     }
-                                                    setIsCreelModalVisible(false);
-                                                    setIsScanModalVisible(true);
+                                                    startCreelSession();
                                                 }}
                                             >
                                                 <Text style={styles.btnText}>Save & Next</Text>
@@ -3266,7 +3451,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 visible={isScanModalVisible}
                 animationType="slide"
                 transparent={false}
-                onRequestClose={() => setIsScanModalVisible(false)}
+                onRequestClose={() => { setIsScanModalVisible(false); setShowList(false); fetchBrowseData(); }}
             >
                 <SafeAreaView
                     edges={['top']}
@@ -3288,7 +3473,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             <TouchableOpacity
                                 onPress={() => {
                                     setIsScanModalVisible(false);
-                                    setIsCreelModalVisible(true);
+                                    setShowList(false);
+                                    fetchBrowseData();
                                 }}
                             >
                                 <Icon
@@ -4067,9 +4253,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                                                 {/* RIGHT SIDE */}
                                                 <View style={styles.rightSection}>
-                                                    <TouchableOpacity
+                                                    {sessionStatus === 'DRAFT' && <TouchableOpacity
                                                         style={styles.deleteIcon}
-                                                        // onPress={() => confirmcartondelete(item)}
                                                         onPress={() => {
                                                             if (item?.UId) {
                                                                 confirmcartondelete(item);
@@ -4079,7 +4264,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         }}
                                                     >
                                                         <Text style={{ fontSize: 16 }}>🗑️</Text>
-                                                    </TouchableOpacity>
+                                                    </TouchableOpacity>}
 
                                                     <Text style={styles.qtyText}>
                                                         Qty: {item.qty}
@@ -4121,10 +4306,23 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         >
                                             <Text style={styles.backText}>＋ Add More</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity style={styles.submitBtn}
+                                        {sessionStatus === 'DRAFT' && (
+                                            <TouchableOpacity
+                                                style={[styles.submitBtn, { backgroundColor: '#b91c1c' }]}
+                                                onPress={discardDraftSession}
+                                                disabled={isDelete || isSaving}
+                                            >
+                                                <Text style={styles.submitText}>Discard</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity
+                                            style={styles.submitBtn}
                                             onPress={handleFinalSubmit}
+                                            disabled={sessionStatus !== 'DRAFT' || isSaving || isDelete}
                                         >
-                                            <Text style={styles.submitText}>✈ Submit All</Text>
+                                            <Text style={styles.submitText}>
+                                                {sessionStatus === 'FINAL' ? '✓ Final' : '✈ Submit All'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
 

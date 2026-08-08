@@ -232,14 +232,14 @@ function calcSpec(d: any) {
         return values.map(part => part / total);
     };
 
-    const resolveYarnFibreShares = (yarn: any): Array<{ fibre: string; share: number }> => {
+    const resolveYarnFibreShares = (yarn: any): { fibre: string; share: number }[] => {
         const percentages = parseBlendPercentages(
             yarn?.blend_ratio ?? yarn?.br ?? yarn?.w_blend_per
         );
         const namedFibres = extractNamedFibres(yarn);
 
         if (percentages.length > 0 && namedFibres.length > 0) {
-            const resolved: Array<{ fibre: string; share: number }> = [];
+            const resolved: { fibre: string; share: number }[] = [];
             const pairedCount = Math.min(percentages.length, namedFibres.length);
 
             for (let index = 0; index < pairedCount; index += 1) {
@@ -983,10 +983,10 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                     >
                                         <View style={{ flex: 1 }}>
                                             <Text style={yp.yarnName}>
-                                                {item.main_yarn_code}
+                                                {item.name}
                                             </Text>
                                             <Text style={yp.yarnSub} numberOfLines={2}>
-                                                {item.name}
+                                                {item.main_yarn_code}
                                             </Text>
                                             <View style={yp.metaRow}>
                                                 <Text style={yp.metaText}>
@@ -1044,7 +1044,8 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                         <View style={{ flex: 1 }}>
                                             <View style={yp.itemCodeRow}>
                                                 <Text style={yp.yarnName}>
-                                                    {item.itm_code || item.mi_id}
+                                                    {item.name || item.itm_name}
+
                                                 </Text>
                                                 {item.is_main_yarn_item ? (
                                                     <View style={yp.mainBadge}>
@@ -1056,7 +1057,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                             </View>
 
                                             <Text style={yp.yarnSub} numberOfLines={2}>
-                                                {item.name || item.itm_name}
+                                                {item.itm_code || item.mi_id}
                                             </Text>
 
                                             <View style={yp.metaRow}>

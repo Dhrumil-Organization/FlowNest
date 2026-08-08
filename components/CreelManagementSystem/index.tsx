@@ -1418,21 +1418,53 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     //     loadProperty();
     // }, [token]);
 
+    // useEffect(() => {
+    //     if (!token) return;
+
+    //     const load = async () => {
+    //         const data = await fetchPropertyData(token);
+
+    //         setPropertyData(data || []);
+
+    //         if (data?.length) {
+    //             setFormState(prev => ({
+    //                 ...prev,
+    //                 values: {
+    //                     ...prev.values,
+    //                     PrpCode: data[0].PrpCode,
+    //                     LngName: data[0].LngName,
+    //                 }
+    //             }));
+    //         }
+    //     };
+
+    //     load();
+    // }, [token]);
+
     useEffect(() => {
         if (!token) return;
 
         const load = async () => {
             const data = await fetchPropertyData(token);
-
             setPropertyData(data || []);
 
             if (data?.length) {
+                const prpCode = data[0].PrpCode;
+                const years = await fetchAllYeardata(token, prpCode);
+                setAllYearData(years);
+
+                const currentFY = getCurrentFinancialYear();
+                const currentYear =
+                    years.find(y => String(y.YearNo) === String(currentFY)) || years[0];
+
                 setFormState(prev => ({
                     ...prev,
                     values: {
                         ...prev.values,
-                        PrpCode: data[0].PrpCode,
+                        PrpCode: prpCode,
                         LngName: data[0].LngName,
+                        YearNo: currentYear?.YearNo || '',
+                        YearName: currentYear?.YearName || '',
                     }
                 }));
             }
@@ -2949,10 +2981,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         return token;
     };
 
-    const getShifts = async (prpCode: string) => {
+    const getShifts = async (prpCode) => {
 
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
@@ -2987,10 +3019,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
     }
 
-    const getMachine = async (prpCode: string) => {
+    const getMachine = async (prpCode) => {
 
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
@@ -3027,8 +3059,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     const getcreelid = async (macCode) => {
 
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
@@ -3752,6 +3784,33 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
         load();
     }, [token]);
+
+    const lastMachineShiftPrp = useRef('');
+
+    useEffect(() => {
+        const { PrpCode, YearNo } = FormState.values;
+
+        if (!token || !PrpCode || !YearNo) {
+            console.log("⏳ Machine API waiting...", {
+                token: !!token,
+                PrpCode,
+                YearNo
+            });
+            return;
+        }
+
+        console.log(
+            "🔄 Property/Year available, loading Machine + Shift...",
+            {
+                PrpCode,
+                YearNo
+            }
+        );
+
+        getMachine(PrpCode);
+        getShifts(PrpCode);
+
+    }, [token, FormState.values.PrpCode, FormState.values.YearNo]);
 
     return (
         <>

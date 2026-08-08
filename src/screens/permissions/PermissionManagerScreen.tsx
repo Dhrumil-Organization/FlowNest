@@ -1,8 +1,8 @@
+import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { AccessPermissionRow, AccessRole, AccessUser, AppAccessAPI, unwrapAccessResponse } from '../../api/accessControl';
 import { useHeaderExtrasStore } from '../../core/layout/headerExtras';
-import { AppAccessAPI, AccessPermissionRow, AccessRole, AccessUser, unwrapAccessResponse } from '../../api/accessControl';
 import { createPermissionRegistrySyncPayload, flattenPermissionRegistry, getPermissionRegistry } from '../../registry';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -147,6 +147,7 @@ export function PermissionManagerScreen() {
           <TouchableOpacity style={s.sync} disabled={syncing} onPress={boot}>
             <Text style={s.syncText}>{syncing ? 'Syncing…' : 'Sync Registry'}</Text>
           </TouchableOpacity>
+          // <></>
         ),
       });
       return () => clearHeaderExtras();

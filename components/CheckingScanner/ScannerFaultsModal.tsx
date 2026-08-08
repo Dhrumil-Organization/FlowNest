@@ -33,6 +33,10 @@ interface ScannerFaultsModalProps {
     onOK: (updatedData: any[]) => Promise<void>;
 }
 
+const sanitizeRemarkInput = (text: string) => {
+    return text.replace(/[^0-9,\- ]/g, '');
+};
+
 const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
     visible,
     token,
@@ -44,6 +48,7 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
 
     const [faultsData, setFaultsData] = useState<any[]>([]);
     const [pageLoading, setPageLoading] = useState(false);
+    const [searchText, setSearchText] = useState('');
 
     const headers = {
         Authorization: `Bearer ${token}`,
@@ -125,11 +130,19 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
 
     };
 
+    // Modal band hone pe search reset
+    useEffect(() => {
+        if (!visible) {
+            setSearchText('');
+        }
+    }, [visible]);
+
     const handleRemarkChange = (
         uid: string,
         subSr: string,
         remark: string
     ) => {
+        const cleanedRemark = sanitizeRemarkInput(remark); // 👈 sanitize
 
         setFaultsData(prev =>
             prev.map(item =>
@@ -137,12 +150,11 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
                     item.SubSr === subSr
                     ? {
                         ...item,
-                        Remark: remark,
+                        Remark: cleanedRemark,
                     }
                     : item
             )
         );
-
     };
 
     const handleOK = async () => {
@@ -150,6 +162,18 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
         await onOK(faultsData);
 
     };
+
+    // 👇 Search se filter
+    const filteredFaultsData = faultsData.filter((item) => {
+        if (!searchText.trim()) return true;
+        const q = searchText.toLowerCase();
+        return (
+            (item.RDesc ?? '').toLowerCase().includes(q) ||
+            (item.RsnCode ?? '').toLowerCase().includes(q) ||
+            (item.SubSr ?? '').toString().toLowerCase().includes(q) ||
+            (item.Faults ?? '').toLowerCase().includes(q)
+        );
+    });
 
     return (
 
@@ -179,6 +203,24 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
 
                 </View>
 
+                {/* 👇 Naya search box */}
+                <View style={styles.searchContainer}>
+                    <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search by description or code"
+                        placeholderTextColor="#999"
+                        value={searchText}
+                        onChangeText={setSearchText}
+                    />
+                    {searchText.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchText('')}>
+                            <Icon name="close" size={18} color="#999" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+
                 {
                     pageLoading ?
 
@@ -195,38 +237,19 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
                         :
 
                         <FlatList
-                            data={faultsData}
-                            keyExtractor={(item, index) =>
-                                `${item.UId}_${item.SubSr}_${index}`
+                            data={filteredFaultsData} // 👈 filtered data use kiya
+                            keyExtractor={(item, index) => `${item.UId}_${item.SubSr}_${index}`}
+                            ListEmptyComponent={
+                                <Text style={styles.noResultText}>No matching faults found</Text>
                             }
                             renderItem={({ item }) => (
-
                                 <View style={styles.faultItem}>
-
                                     <View style={styles.faultHeader}>
-
                                         <View style={{ flex: 1 }}>
-
-                                            <Text
-                                                style={styles.faultSubSr}
-                                            >
-                                                Sr. No : {item.SubSr}
-                                            </Text>
-
-                                            <Text
-                                                style={styles.faultDesc}
-                                            >
-                                                {item.RDesc}
-                                            </Text>
-
+                                            {/* <Text style={styles.faultSubSr}>Sr. No : {item.SubSr}</Text> */}
+                                            <Text style={styles.faultDesc}>{item.RDesc}</Text>
                                         </View>
-
-                                        <Text
-                                            style={styles.reasonCode}
-                                        >
-                                            {item.RsnCode}
-                                        </Text>
-
+                                        {/* <Text style={styles.reasonCode}>{item.RsnCode}</Text> */}
                                     </View>
 
                                     <TextInput
@@ -235,16 +258,10 @@ const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
                                         placeholder="123, 345-678"
                                         placeholderTextColor="#999"
                                         onChangeText={(text) =>
-                                            handleRemarkChange(
-                                                item.UId,
-                                                item.SubSr,
-                                                text
-                                            )
+                                            handleRemarkChange(item.UId, item.SubSr, text)
                                         }
                                     />
-
                                 </View>
-
                             )}
                         />
 
@@ -338,7 +355,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-start",
-        marginBottom: 8,
+        marginBottom: 1,
     },
 
     faultSubSr: {
@@ -351,6 +368,7 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: "#222",
         marginTop: 4,
+        fontWeight: "600",
     },
 
     reasonCode: {
@@ -404,7 +422,31 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         fontSize: 15,
     },
-
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#DADADA',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        marginBottom: 14,
+        backgroundColor: '#fafafa',
+    },
+    searchIcon: {
+        marginRight: 6,
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: 10,
+        fontSize: 14,
+        color: '#000',
+    },
+    noResultText: {
+        textAlign: 'center',
+        color: '#999',
+        marginTop: 20,
+        fontSize: 14,
+    },
 });
 
 export default ScannerFaultsModal;

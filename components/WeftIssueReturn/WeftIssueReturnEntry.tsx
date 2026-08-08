@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from "../../common/API/dynamicAPI";
 import CustomSearchableDropdown from '@/Shared/CustomSearchableDropdown';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import Snackbar from "../Snackbar";
+import { Snackbar } from 'react-native-snackbar';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';

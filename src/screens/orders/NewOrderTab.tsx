@@ -206,7 +206,7 @@ export function NewOrderTab({ token, userid }: Props) {
             setPartyLoading(true);
             const userPtype = await AsyncStorage.getItem('user_prptype');
             const res = await SalesOrderAPI.accountBasic({
-                prpcode:'SIP', prptype: userPtype, yearno: yearno, strcode: '012',
+                prpcode: 'SIP', prptype: userPtype, yearno: yearno, strcode: '012',
                 txntype: 'sales_order', partytype: 'p', type: 'S',
                 page: '', limit: '', search: '', isceo: '', partype: '',
                 grntype: '', fetch: '', acccode: '', billdate: '', strtype: '', isfaint: '',
@@ -323,12 +323,42 @@ export function NewOrderTab({ token, userid }: Props) {
                         )}
                     </View>
                 )}
+
+                {step === 2 && (
+                    <View style={ns.stepBody}>
+                        {/* <SearchableDropdown
+                            label="Select customer"
+                            placeholder="Search by name or city…"
+                            value={custId}
+                            items={DUMMY_CUSTOMERS}
+                            onSelect={item => { setCustId(item.id); }}
+                        /> */}
+                        {partyLoading ? (
+                            <ActivityIndicator color={T.copper} />
+                        ) : (
+                            <SearchableDropdown
+                                label="Select customer"
+                                placeholder="Search by name or city..."
+                                value={custId}
+                                items={customerItems}
+                                onSelect={(item) => {
+                                    setCustId(item.id);
+                                }}
+                            />
+                        )}
+                        {custId && (
+                            <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(2)}>
+                                <Text style={ns.nextBtnTxt}>Next →</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
             </Card>
 
             {/* ── Step 2: Design & fabric ── */}
             {custId && (
                 <Card style={ns.card}>
-                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(2)} activeOpacity={0.7}>
+                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(3)} activeOpacity={0.7}>
                         <StepDot n={2} done={!!mdId} />
                         <View style={{ flex: 1 }}>
                             <Text style={ns.stepTitle}>Design & fabric type</Text>
@@ -337,7 +367,7 @@ export function NewOrderTab({ token, userid }: Props) {
                         <Text style={ns.chevron}>{step === 2 ? '▾' : '›'}</Text>
                     </TouchableOpacity>
 
-                    {step === 2 && (
+                    {step === 3 && (
                         <View style={ns.stepBody}>
                             <SearchableDropdown
                                 label="Select design"
@@ -364,7 +394,7 @@ export function NewOrderTab({ token, userid }: Props) {
                                             </TouchableOpacity>
                                         ))}
                                     </View>
-                                    <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(3)}>
+                                    <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(4)}>
                                         <Text style={ns.nextBtnTxt}>Next →</Text>
                                     </TouchableOpacity>
                                 </>
@@ -377,7 +407,7 @@ export function NewOrderTab({ token, userid }: Props) {
             {/* ── Step 3: Price & delivery ── */}
             {mdId && (
                 <Card style={ns.card}>
-                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(3)} activeOpacity={0.7}>
+                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(4)} activeOpacity={0.7}>
                         <StepDot n={3} done={!!(price && delivDate)} />
                         <View style={{ flex: 1 }}>
                             <Text style={ns.stepTitle}>Price & delivery date</Text>
@@ -386,7 +416,7 @@ export function NewOrderTab({ token, userid }: Props) {
                         <Text style={ns.chevron}>{step === 3 ? '▾' : '›'}</Text>
                     </TouchableOpacity>
 
-                    {step === 3 && (
+                    {step === 4 && (
                         <View style={ns.stepBody}>
                             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
                                 <View style={{ flex: 1 }}>
@@ -418,7 +448,7 @@ export function NewOrderTab({ token, userid }: Props) {
                             )}
 
                             {price && delivDate && (
-                                <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(4)}>
+                                <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(5)}>
                                     <Text style={ns.nextBtnTxt}>Next →</Text>
                                 </TouchableOpacity>
                             )}
@@ -430,7 +460,7 @@ export function NewOrderTab({ token, userid }: Props) {
             {/* ── Step 4: Shades & quantities ── */}
             {price && delivDate && (
                 <Card style={ns.card}>
-                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(4)} activeOpacity={0.7}>
+                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(5)} activeOpacity={0.7}>
                         <StepDot n={4} done={validLines.length > 0} />
                         <View style={{ flex: 1 }}>
                             <Text style={ns.stepTitle}>Shades & quantities</Text>
@@ -441,7 +471,7 @@ export function NewOrderTab({ token, userid }: Props) {
                         <Text style={ns.chevron}>{step === 4 ? '▾' : '›'}</Text>
                     </TouchableOpacity>
 
-                    {step === 4 && (
+                    {step === 5 && (
                         <View style={ns.stepBody}>
                             {colorLines.map((line, i) => (
                                 <View key={i} style={ns.shadeLine}>

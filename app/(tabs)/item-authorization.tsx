@@ -2,10 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 
 // import { AuthProvider, useAuth } from '@/hooks/AuthContext';
-import Footer from '@/components/Footer';
 // import GreyPurchaseOrder from '@/components/GreyPurchaseOrder';
-import ProdOrderTracking from '@/components/ProdOrderTracking';
-import PurchaseOrderTracking from '@/components/PurchaseOrderTracking';
 import ItemAuthorization from '@/components/ItemAuthorization';
 
 export default function CRLimit_Request_Container() {
@@ -28,7 +25,7 @@ export default function CRLimit_Request_Container() {
         <>
             {/* <AuthProvider> */}
             <ItemAuthorization token={token || ''} isConnected={true} username={username} />
-            <Footer/>
+            {/* <Footer/> */}
             {/* </AuthProvider> */}
         </>
     );

@@ -9,12 +9,11 @@ import {
   ActivityIndicator,
   FlatList,
   Modal,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 import {

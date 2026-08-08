@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import {
-    ScrollView,
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    Dimensions,
-    Image,
-    StatusBar,
-} from 'react-native';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import theme from '@/components/theme';
+import React, { useState } from 'react';
+import {
+    Dimensions,
+    Image,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -68,8 +68,9 @@ export default function YarnManufacturingScreen() {
     };
 
      const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
+        // if (router.canGoBack()) router.back();
+        // else router.replace('/');
+        router.replace('/(tabs)');
     };
 
     return (

@@ -2959,7 +2959,7 @@ export default function OwnerDashboardScreen({
               </View>
             </View>
 
-            <ColHeader label1="MACHINE" label2="TODAY" label3="MTD" />
+            <ColHeader label1="MACHINE" label2="YESTERDAY" label3="MTD" />
             <TableWrapper rowCount={production.by_machine.length}>
               {production.by_machine.map((m, i) => (
                 <RankRow

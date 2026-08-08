@@ -469,23 +469,23 @@ function LiveSpecPanel({ design }: { design: any }) {
                 <>
                     <Text style={ls.weightHeading}>FABRIC WEIGHT · LIVE</Text>
                     <View style={ls.gsmGrid}>
-                    <View style={ls.gsmBox}>
-                        <Text style={ls.gsmLabel}>Greige GSM</Text>
-                        <Text style={ls.gsmVal}>{Math.round(spec.greigGSM)}</Text>
-                    </View>
-                    <View style={ls.gsmBox}>
-                        <Text style={ls.gsmLabel}>Greige GLM</Text>
-                        <Text style={ls.gsmVal}>{spec.greigGLM.toFixed(1)} g/m</Text>
-                    </View>
-                    <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
-                        <Text style={ls.gsmLabel}>Finished GSM</Text>
-                        <Text style={ls.gsmVal}>{Math.round(spec.finGSM)}</Text>
-                        {spec.finWidthEntered && <Text style={ls.gsmNote}>{spec.finWidthIn}" fin</Text>}
-                    </View>
-                    <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
-                        <Text style={ls.gsmLabel}>Finished GLM</Text>
-                        <Text style={ls.gsmVal}>{spec.finGLM.toFixed(1)} g/m</Text>
-                    </View>
+                        <View style={ls.gsmBox}>
+                            <Text style={ls.gsmLabel}>Greige GSM</Text>
+                            <Text style={ls.gsmVal}>{Math.round(spec.greigGSM)}</Text>
+                        </View>
+                        <View style={ls.gsmBox}>
+                            <Text style={ls.gsmLabel}>Greige GLM</Text>
+                            <Text style={ls.gsmVal}>{spec.greigGLM.toFixed(1)} g/m</Text>
+                        </View>
+                        <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
+                            <Text style={ls.gsmLabel}>Finished GSM</Text>
+                            <Text style={ls.gsmVal}>{Math.round(spec.finGSM)}</Text>
+                            {spec.finWidthEntered && <Text style={ls.gsmNote}>{spec.finWidthIn}" fin</Text>}
+                        </View>
+                        <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
+                            <Text style={ls.gsmLabel}>Finished GLM</Text>
+                            <Text style={ls.gsmVal}>{spec.finGLM.toFixed(1)} g/m</Text>
+                        </View>
                     </View>
                 </>
             )}
@@ -1308,8 +1308,8 @@ const yp = StyleSheet.create({
         padding: 10,
     },
     mainSelectionLabel: { fontSize: 8.5, fontWeight: '800', color: T.muted, letterSpacing: 0.6 },
-    mainSelectionCode: { marginTop: 2, fontSize: 15, fontWeight: '900', color: T.ink },
-    mainSelectionName: { marginTop: 2, fontSize: 11, color: T.muted },
+    mainSelectionCode: { marginTop: 2, fontSize: 11, color: T.ink },
+    mainSelectionName: { marginTop: 2, fontSize: 15, fontWeight: '900', color: T.muted },
     mainSelectionBlend: { marginTop: 5, fontSize: 10, color: T.copper },
     metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 6 },
     metaText: { fontSize: 10.5, color: T.muted },

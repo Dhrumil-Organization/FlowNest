@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
-// import Snackbar from 'react-native-snackbar';
+import { Snackbar } from 'react-native-snackbar';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -618,41 +618,41 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                         const res = response.data;
 
                         if (res.success) {
-                            // Snackbar.show({
-                            //     text: '✅ ${res.printed} label(s) sent to printer.',
-                            //     duration: Snackbar.LENGTH_INDEFINITE,
-                            //     backgroundColor: 'green',
-                            //     action: { text: 'OK', textColor: 'white' },
-                            // });
+                            Snackbar.show({
+                                text: '✅ ${res.printed} label(s) sent to printer.',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'green',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
                             Alert.alert('✅ ${res.printed} label(s) sent to printer.');
                         } else {
-                            // Snackbar.show({
-                            //     text: res.message || 'Operation failed',
-                            //     duration: Snackbar.LENGTH_INDEFINITE,
-                            //     backgroundColor: 'red',
-                            //     action: { text: 'OK', textColor: 'white' },
-                            // });
+                            Snackbar.show({
+                                text: res.message || 'Operation failed',
+                                duration: Snackbar.LENGTH_INDEFINITE,
+                                backgroundColor: 'red',
+                                action: { text: 'OK', textColor: 'white' },
+                            });
                             Alert.alert(res.message || 'Operation failed');
                         }
                     }).catch(error => {
                         setIsLoading(false);
-                        // Snackbar.show({
-                        //     text: error?.response?.data?.error || error.message || 'Print failed',
-                        //     duration: Snackbar.LENGTH_LONG,
-                        //     backgroundColor: 'red',
-                        //     action: { text: 'OK', textColor: 'white' },
-                        // });
+                        Snackbar.show({
+                            text: error?.response?.data?.error || error.message || 'Print failed',
+                            duration: Snackbar.LENGTH_LONG,
+                            backgroundColor: 'red',
+                            action: { text: 'OK', textColor: 'white' },
+                        });
                         Alert.alert(error?.response?.data?.error || error.message || 'Print failed');
                     });
             } else {
                 setIsLoading(false);
-                // Snackbar.show({
-                //     text: 'printing sticker data is empty',
-                //     duration: Snackbar.LENGTH_LONG,
-                //     backgroundColor: 'red',
-                //     textColor: '#fff',
-                //     action: { text: 'OK', textColor: '#fff' },
-                // });
+                Snackbar.show({
+                    text: 'printing sticker data is empty',
+                    duration: Snackbar.LENGTH_LONG,
+                    backgroundColor: 'red',
+                    textColor: '#fff',
+                    action: { text: 'OK', textColor: '#fff' },
+                });
                 Alert.alert('printing sticker data is empty');
             }
         }

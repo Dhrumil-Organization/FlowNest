@@ -22,6 +22,7 @@ registerPermissionArea({
       displayOrder: 10,
       actions: standardActions,
       children: [
+        { key: 'monthlysalestarget', name: 'monthlysalestarget', type: 'tab', displayOrder: 5, actions: [{ key: 'add', name: 'Add' }, { key: 'edit', name: 'Edit' }, { key: 'delete', name: 'Delete', dangerous: true }] },
         { key: 'aliases', name: 'Aliases', type: 'tab', displayOrder: 5, actions: [{ key: 'add', name: 'Add' }, { key: 'edit', name: 'Edit' }, { key: 'delete', name: 'Delete', dangerous: true }] },
         { key: 'catalog', name: 'Catalog', type: 'tab', displayOrder: 10, actions: [{ key: 'print', name: 'Print' }] },
         { key: 'design', name: 'Design', type: 'tab', displayOrder: 20, actions: standardActions },

@@ -1,5 +1,6 @@
 import CustomPicker from '@/common/CustomPicker';
 import { checkingScannerStyles } from '@/common/Style';
+import { useFaults } from '@/common/useFaults';
 import { showError, showSuccess } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
 import PartyDropdown from '@/Shared/PartyDropdown';
@@ -28,6 +29,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from '../../common/API/dynamicAPI';
+import FaultsModal from './FaultsModal';
+import ScannerFaultsModal from './ScannerFaultsModal';
 
 interface Props {
     token: string;
@@ -121,6 +124,33 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
     const [manualOperatorData, setManualOperatorData] = useState<any[]>([]);
     const [selectedManualOperator, setSelectedManualOperator] = useState<any>(null);
+    // 
+    const [faultSaveLoading, setFaultSaveLoading] = useState(false);
+    const {
+        faultsData,
+        setFaultsData,
+        faultsLoading,
+        showFaultsModal,
+        setShowFaultsModal,
+        handleSaveFaults,
+    } = useFaults(token);
+
+    const [form, setForm] = useState<any>({
+        selectedMachine: null,
+        ShfCode: '',
+        ChkDate: new Date().toISOString().split('T')[0],
+        YearNo: '',
+        BeamNo: '',
+        UId: '',
+        d2: [],
+        // Add other form fields as needed
+    });
+
+    const [scannerFaultModal, setScannerFaultModal] = useState(false);
+    const [scannerFaultLoading, setScannerFaultLoading] = useState(false);
+    const [scannerFaultData, setScannerFaultData] = useState<any[]>([]);
+    const [selectedScannerRow, setSelectedScannerRow] = useState<any>(null);
+
 
     let cancelToken: any;
 
@@ -167,6 +197,18 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         setPrinters([]);
         setDataSaved(false);
         setSavedData({});
+
+        // 👇 NEW
+        setForm({
+            selectedMachine: null,
+            ShfCode: '',
+            ChkDate: new Date().toISOString().split('T')[0],
+            YearNo: '',
+            BeamNo: '',
+            UId: '',
+            d2: [],
+        });
+        setFaultsData([]);
     };
 
     useEffect(() => {
@@ -182,6 +224,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         setScannedValue('');
 
         const value = result?.data || '';
+        console.log('📦 Raw QR Value 👉', value);
         setScannedValue(value);
 
         try {
@@ -189,6 +232,24 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             setScannedObj(parsed);
             setBeamNo(parsed.beamno || '');
             setTakaNo(parsed.takano || '');
+
+            // 👇 NEW: form ko scan ki value se bharo (faults API isi form ko use karti hai)
+            setForm((prev: any) => ({
+                ...prev,
+                ShfCode: '',
+                ChkDate: new Date().toISOString().split('T')[0],
+                YearNo: parsed.yearno || getCurrentFinancialYear(),
+                BeamNo: parsed.beamno || '',
+                BeamUId: parsed.beamuid || '',
+                UId: parsed.UId || '',
+                PrpCode: parsed.prpcode || '',
+                TakaNo: parsed.takano || '',
+                isfirsttaka: parsed.isfirsttaka,
+                islasttaka: parsed.islasttaka,
+                d2: [],
+            }));
+            setFaultsData([]);
+
             getGrades(parsed);
             getCheckers(parsed);
             getShifts(parsed);
@@ -426,6 +487,14 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 if (dataArr.length > 0) {
                     setDesigndata(dataArr);
                     setWarpLen(dataArr[0].WarpLen || '0');
+
+                    // setForm((prev: any) => ({
+                    //     ...prev,
+                    //     UId: dataArr[0].UId || prev.UId,
+                    //     MacCode: dataArr[0].MacCode,
+                    //     MacGrp: dataArr[0].MacGrp,
+                    //     DsnCode: dataArr[0].DsnCode,
+                    // }));
                 } else {
                     setDesigndata([]);
                     setWarpLen('0');
@@ -483,7 +552,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         if (!checker) return Alert.alert('Checker can not be blank.');
         if (!shift) return Alert.alert('Shift can not be blank.');
         if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
-        if (!operator) return Alert.alert('Operator can not be blank.');
+        // if (!operator) return Alert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -508,7 +577,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 Wt: kgs,
                 AvgWt: getavgWt,
                 txntype: 'chekingScanner',
-                ShfCode: shift || '1',
+                ShfCode: shift,
                 SrNo: '0',
                 islasttaka: getScannedObj.islasttaka,
                 isfirsttaka: getScannedObj.isfirsttaka,
@@ -538,7 +607,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 IsAuth: d.IsAuth,
                 PrpCode: d.PrpCode,
                 EMode: 'S',
-                OprCode: operator
+                OprCode: operator || '',
+                d2: form.d2 || [],
             };
 
             console.log('handleSubmitScan payloadObj:', payloadObj);
@@ -562,6 +632,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                     setSavedData(response.data.data.main[0]);
                 }
                 getAllPrinters();
+                setFaultsData([]);                              // 👈 NEW
+                setForm((prev: any) => ({ ...prev, d2: [] }));   // 👈 NEW
                 showSuccess('Saved successfully', { text: 'OK', onPress: () => { } });
             } else {
                 setDataSaved(false);
@@ -1126,7 +1198,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         BeamNoHelp();
     };
 
-    const handlesave = async () => {
+    const handlesave = async (form: any) => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
         const isValid = await validateForm();
         if (!isValid) return;
@@ -1148,6 +1220,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 txntype: 'chekingScanner',
                 yearno: getCurrentFinancialYear(),
                 EMode: 'M',
+                d2: form.d2 || [],
             };
 
             console.log('handlesave payloadObj:', payloadObj);
@@ -1172,6 +1245,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                         },
                     },
                 ]);
+                setFaultsData([]);
+                // setFormState({ values: { ...FormState.values, TakaNo: '' } });
+                setForm({ d2: [] });
             } else {
                 showError(`⚠️ ${response.data.message}`, { text: 'OK', onPress: () => { } });
             }
@@ -1239,6 +1315,116 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         );
     });
 
+    // const handledelete = async () => {
+    //     try {
+    //         setShowDeleteAlert(false);
+    //         if (!selectedDeleteItem) return;    
+    //         setIsDeleteLoading(true);
+
+    //         const infoPyload = {
+    //             ShfCode: selectedDeleteItem?.ShfCode || '',
+    //             ChkDate: selectedDeleteItem?.ChkDate || '',
+    //             MacGrp: selectedDeleteItem?.MacGrp || '',
+    //             PrpCode: selectedDeleteItem?.PrpCode || '',
+    //             yearno: selectedDeleteItem?.yearno || getCurrentFinancialYear(),
+    //             txntype: 'chekingScanner',
+    //             SrNo: selectedDeleteItem?.SrNo || '',
+    //             UId: selectedDeleteItem?.UId || '',
+    //             BeamNo: selectedDeleteItem?.BeamNo || '',
+    //         };
+
+    //         console.log('handledelete infoPyload:', infoPyload);
+
+    //         const headers = {
+    //             Authorization: `Bearer ${getToken()}`,
+    //             'Content-Type': 'application/json',
+    //             'X-Requested-with': 'XMLHttpRequest',
+    //         };
+
+    //         const response = await axios.post(`${API}/api/delete_checking_detail`, infoPyload, { headers });
+
+    //         console.log('handledelete response:', response);
+
+    //         // if (response.data.success) {
+    //         //     Alert.alert('Success', response.data.message || 'Record deleted successfully');
+    //         //     await handleScannerList();
+    //         // } 
+    //         if (response.data.success) {
+    //             Alert.alert(
+    //                 'Success',
+    //                 response.data.message || 'Delete successfully',
+    //                 [
+    //                     {
+    //                         text: 'OK',
+    //                         onPress: async () => {
+    //                             await handleScannerList(); // Browse API
+    //                         },
+    //                     },
+    //                 ],
+    //                 { cancelable: false }
+    //             );
+    //         }
+    //         else {
+    //             Alert.alert('Warning', response.data.message);
+    //         }
+    //     } catch (error) {
+    //         Alert.alert('Error', 'Something went wrong');
+    //     } finally {
+    //         setIsDeleteLoading(false);
+    //     }
+    // };
+
+
+    const clearAndSaveFaultsForRow = async (row: any) => {
+        try {
+            const payload = getScannerFaultPayload(row);
+
+            // const faultRes = await axios.post(
+            //     `${API}/api/show_checking_fault`,
+            //     payload,
+            //     { headers: getScannerFaultHeaders() }
+            // );
+            const faultRes = await axios.get(`${API}/api/show_checking_fault`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                params: payload,
+            });
+
+            const list = faultRes?.data?.data || faultRes?.data?.response?.data || [];
+            if (!list.length) return;
+
+            // 👇 sabhi records ki Remark value empty kar do
+            const clearedData = list.map((item: any) => ({ ...item, Remark: '' }));
+
+            const savePayload = {
+                ShfCode: row?.ShfCode || '',
+                ChkDate: row?.ChkDate || '',
+                MacGrp: row?.MacGrp || '',
+                PrpCode: row?.PrpCode || '',
+                BeamNo: row?.BeamNo || '',
+                SrNo: row?.SrNo || '',
+                UId: row?.UId || '',
+                yearno: getCurrentFinancialYear(),
+                txntype: 'beam_checking',
+                d1: clearedData,
+            };
+
+            // 👇 auto save (cleared) faults
+            await axios.post(`${API}/api/add_checking_fault`, savePayload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+        } catch (e) {
+            console.log('clearAndSaveFaultsForRow error', e);
+        }
+    };
+
     const handledelete = async () => {
         try {
             setShowDeleteAlert(false);
@@ -1270,18 +1456,23 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             console.log('handledelete response:', response);
 
             if (response.data.success) {
-                Alert.alert('Success', response.data.message || 'Record deleted successfully');
-                await handleScannerList();
+                // 👇 delete success hote hi faults fetch -> remark clear -> auto save
+                await clearAndSaveFaultsForRow(selectedDeleteItem);
+
+                showSuccess(response.data.message || 'Delete successfully', { text: 'OK', onPress: () => { } });
+
+                await handleScannerList(); // list refresh
             } else {
-                Alert.alert('Warning', response.data.message);
+                showError(response.data.message || 'Delete failed', { text: 'OK', onPress: () => { } });
             }
         } catch (error) {
-            Alert.alert('Error', 'Something went wrong');
+            console.log('handledelete error', error);
+            showError('Something went wrong', { text: 'OK', onPress: () => { } });
         } finally {
             setIsDeleteLoading(false);
+            setSelectedDeleteItem(null);
         }
     };
-
     const openPrinterForScannerRow = async (item: any) => {
         setPendingPrintItem(item);
         setPrinterModalVisible(true);
@@ -1344,6 +1535,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         </CustomPicker>
     );
 
+    console.log('Fault Data: ', form, FormState);
+
     const renderShiftPicker = (
         items: any[],
         value: string,
@@ -1373,6 +1566,165 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             </CustomPicker>
         </View>
     );
+
+    const getScannerFaultHeaders = () => ({
+        Authorization: `Bearer ${getToken()}`,
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+    });
+
+    const getScannerFaultPayload = (row: any) => ({
+        ShfCode: row?.ShfCode || '',
+        ChkDate: row?.ChkDate || '',
+        MacGrp: row?.MacGrp || '',
+        PrpCode: row?.PrpCode || '',
+        yearno: row?.yearno || getCurrentFinancialYear(),
+        BeamNo: row?.BeamNo || '',
+        UId: row?.UId || '',
+        SrNo: row?.SrNo || '',
+        txntype: 'beam_checking',
+    });
+
+    const fetchScannerFaults = async (row: any) => {
+        try {
+
+            setScannerFaultLoading(true);
+
+            const payload = getScannerFaultPayload(row);
+
+            console.log("fetchScannerFaults Payload", payload);
+
+            const response = await axios.post(
+                `${API}/api/show_checking_fault`,
+                payload,
+                {
+                    headers: getScannerFaultHeaders(),
+                }
+            );
+
+            console.log(
+                "fetchScannerFaults Response",
+                response.data
+            );
+
+            if (response.data.success) {
+
+                setScannerFaultData(
+                    response?.data?.data ||
+                    response?.data?.response?.data ||
+                    []
+                );
+
+            } else {
+
+                setScannerFaultData([]);
+
+                showError(response.data.message);
+
+            }
+
+        } catch (error) {
+
+            console.log("fetchScannerFaults Error", error);
+
+            showError("Unable to fetch faults.");
+
+        } finally {
+
+            setScannerFaultLoading(false);
+
+        }
+    };
+
+    const openScannerFault = (item: any) => {
+
+        setSelectedScannerRow(item);
+
+        setScannerFaultModal(true);
+
+    };
+
+    const saveScannerFault = async (updatedFaults: any[]) => {
+
+        if (!selectedScannerRow) return;
+
+        try {
+
+            setScannerFaultLoading(true);
+
+            const payload = {
+
+                ShfCode: selectedScannerRow.ShfCode,
+                ChkDate: selectedScannerRow.ChkDate,
+                MacGrp: selectedScannerRow.MacGrp,
+                PrpCode: selectedScannerRow.PrpCode,
+                // yearno: selectedScannerRow.yearno,
+                BeamNo: selectedScannerRow.BeamNo,
+                SrNo: selectedScannerRow.SrNo,
+                UId: selectedScannerRow.UId,
+                yearno: getCurrentFinancialYear(),
+
+                txntype: "beam_checking",
+
+                d1: updatedFaults,
+
+            };
+
+            console.log(
+                "Scanner Fault Save Payload",
+                payload
+            );
+
+            const response = await axios.post(
+                `${API}/api/add_checking_fault`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                }
+            );
+
+            console.log(response.data);
+
+            if (response.data.success) {
+
+                setScannerFaultModal(false);
+
+                await handleScannerList();
+
+                showSuccess(
+                    response.data.message ||
+                    "Fault Saved Successfully",
+                    {
+                        text: "OK",
+                    }
+                );
+
+            } else {
+
+                showError(
+                    response.data.message ||
+                    "Save Failed"
+                );
+
+            }
+
+        } catch (e) {
+
+            console.log(e);
+
+            showError("Unable to save faults.");
+
+        } finally {
+
+            setScannerFaultLoading(false);
+
+        }
+
+    };
 
     return (
         <>
@@ -1614,7 +1966,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
-                                    <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
+                                    {/* <Text style={checkingScannerStyles.label}>operator <Text style={{ color: 'red' }}>*</Text></Text>
                                     <PartyDropdown
                                         data={getOperatorData}
                                         placeholder="Choose Operator..."
@@ -1628,10 +1980,14 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                             setSelectedOperator(item);
                                             setOperator(item.OprCode);
                                         }}
-                                    />
+                                    /> */}
 
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
-                                    {renderShiftPicker(getShiftData, shift, (val) => setShift(val))}
+                                    {/* {renderShiftPicker(getShiftData, shift, (val) => setShift(val))} */}
+                                    {renderShiftPicker(getShiftData, shift, (val) => {
+                                        setShift(val);
+                                        setForm((prev: any) => ({ ...prev, ShfCode: val }));   // 👈 NEW
+                                    })}
 
                                     <View
                                         style={{
@@ -1664,13 +2020,28 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                             isCompactScreen && styles.actionButtonStack,
                                         ]}
                                     >
-                                        <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={() => handleScannerList('S')}>
-                                            <Text style={checkingScannerStyles.submitText}>Scanner List</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={handleSubmitScan}>
+                                        <View style={{ flexDirection: 'row', gap: 5 }} >
+                                            <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={() => handleScannerList('S')}>
+                                                <Text style={checkingScannerStyles.submitText}>Scanner List</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={checkingScannerStyles.submitBtn1}
+                                                onPress={() => handleSaveFaults(form, FormState)}
+                                                disabled={faultsLoading}
+                                            >
+                                                <Text style={styles.buttonText}>
+                                                    {/* {faultsLoading ? 'Loading...' : `Select Faults [${form.d2?.length || 0}]`} */}
+                                                    {faultsLoading ? 'Loading...' : `Faults`}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        {/* <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={handleSubmitScan}>
                                             <Text style={checkingScannerStyles.submitText}>Save Entry</Text>
-                                        </TouchableOpacity>
+                                        </TouchableOpacity> */}
                                     </View>
+                                    <TouchableOpacity style={[{ marginTop: 12 }, checkingScannerStyles.submitBtn1]} onPress={handleSubmitScan}>
+                                        <Text style={checkingScannerStyles.submitText}>Save Entry</Text>
+                                    </TouchableOpacity>
 
                                     {getDataSaved && (
                                         <View style={{ marginTop: 12 }}>
@@ -1728,7 +2099,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         </View>
                                         <Text style={{ color: "#075985", fontWeight: "900", fontSize: 15, letterSpacing: 0.2 }}>FABRIC INFO</Text>
                                     </View>
-                                    <Text style={checkingScannerStyles.label}>Beam No <Text style={{ color: 'red' }}>*</Text></Text>
+                                    <Text style={checkingScannerStyles.label}> Beam No<Text style={{ color: 'red' }}>*</Text></Text>
                                     <PartyDropdown
                                         data={manualBeamData}
                                         placeholder="Select Beam No"
@@ -1739,6 +2110,16 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         type="beam"
                                         onSelect={(item) => {
                                             setSelectedBeam(item);
+                                            setForm((prev) => ({
+                                                ...prev.values,
+                                                BeamNo: item.BeamNo,
+                                                BeamUId: item.BeamUId,
+                                                UId: item.UId,
+                                                // YearNo: item.YearNo,
+                                                ChkDate: form?.ChkDate,
+                                                PrpCode: item.PrpCode,
+                                                YearNo: getCurrentFinancialYear(),
+                                            }));
                                             setFormState((prev) => ({
                                                 ...prev,
                                                 values: {
@@ -1881,7 +2262,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         }}
                                     />
 
-                                    <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
+                                    {/* <Text style={checkingScannerStyles.label}>Operator <Text style={{ color: "red" }}>*</Text></Text>
                                     <PartyDropdown
                                         data={manualOperatorData}
                                         placeholder="Choose operator."
@@ -1903,12 +2284,13 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                                 },
                                             }));
                                         }}
-                                    />
+                                    /> */}
 
                                     <Text style={checkingScannerStyles.label}>Shift <Text style={{ color: 'red' }}>*</Text></Text>
                                     {renderShiftPicker(manualShiftData, manualShift, (val) => {
                                         setManualShift(val);
                                         handleChange('ShfCode', val);
+                                        setForm((prev: any) => ({ ...prev, ShfCode: val }));
                                     })}
 
                                     <View
@@ -1953,40 +2335,63 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         {/* <TouchableOpacity style={[checkingScannerStyles.submitBtn1, { marginTop: 12, height: 50, width: '100%', alignSelf: 'stretch' }]} onPress={handlesave}>
                                                 <Text style={checkingScannerStyles.submitText}>Save</Text>
                                             </TouchableOpacity> */}
+                                        <View style={{ flexDirection: 'row', gap: 5 }} >
+                                            <TouchableOpacity
+                                                style={[
+                                                    checkingScannerStyles.submitBtn1,
+                                                    {
+                                                        marginTop: 12,
+                                                        height: 50,
+                                                        width: '100%',
+                                                        alignSelf: 'stretch',
+                                                        opacity: manualSaveLoading ? 0.7 : 1,
+                                                    },
+                                                ]}
+                                                onPress={() => handleSaveFaults(form, FormState)}
+                                                disabled={faultsLoading}
+                                            >
+                                                <Text style={styles.buttonText}>
+                                                    {/* {faultsLoading ? 'Loading...' : `Select Faults [${form.d2?.length || 0}]`} */}
+                                                    {faultsLoading ? 'Loading...' : `Faults`}
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[
+                                                    checkingScannerStyles.submitBtn1,
+                                                    {
+                                                        marginTop: 12,
+                                                        height: 50,
+                                                        width: '100%',
+                                                        alignSelf: 'stretch',
+                                                        opacity: manualSaveLoading ? 0.7 : 1,
+                                                    },
+                                                ]}
+                                                onPress={() => handlesave(form)}
+                                                disabled={manualSaveLoading}
+                                            >
+                                                {manualSaveLoading ? (
+                                                    <ActivityIndicator color="#fff" />
+                                                ) : (
+                                                    <Text style={checkingScannerStyles.submitText}>Save</Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
 
-                                        <TouchableOpacity
-                                            style={[
-                                                checkingScannerStyles.submitBtn1,
-                                                {
-                                                    marginTop: 12,
-                                                    height: 50,
-                                                    width: '100%',
-                                                    alignSelf: 'stretch',
-                                                    opacity: manualSaveLoading ? 0.7 : 1,
-                                                },
-                                            ]}
-                                            onPress={handlesave}
-                                            disabled={manualSaveLoading}
-                                        >
-                                            {manualSaveLoading ? (
-                                                <ActivityIndicator color="#fff" />
-                                            ) : (
-                                                <Text style={checkingScannerStyles.submitText}>Save</Text>
-                                            )}
-                                        </TouchableOpacity>
 
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 5 }} >
                                         <TouchableOpacity style={[checkingScannerStyles.submitBtn1, { backgroundColor: '#999' }, { marginTop: 12, height: 50, width: '100%', alignSelf: 'stretch' }]} onPress={handleClearForm}>
                                             <Text style={checkingScannerStyles.submitText}>Clear</Text>
                                         </TouchableOpacity>
-                                    </View>
 
-                                    <TouchableOpacity style={[checkingScannerStyles.submitBtn1, { marginTop: 12, height: 50, width: '100%', alignSelf: 'stretch' }]}
-                                        onPress={() => handleScannerList('M')}
-                                    >
-                                        <Text style={checkingScannerStyles.submitText}>
-                                            Scanner List (Manual)
-                                        </Text>
-                                    </TouchableOpacity>
+                                        <TouchableOpacity style={[checkingScannerStyles.submitBtn1, { marginTop: 12, height: 50, width: '100%', alignSelf: 'stretch' }]}
+                                            onPress={() => handleScannerList('M')}
+                                        >
+                                            <Text style={checkingScannerStyles.submitText}>
+                                                Scanner List
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </>
 
                             </View>
@@ -2006,7 +2411,50 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                     >
                         <View style={styles.modalOverlayBottom}>
                             <View style={styles.printerSheet}>
-                                <Text style={styles.modalTitle}>Select Printer</Text>
+                                <View
+                                    style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        marginBottom: 16,
+                                    }}
+                                >
+                                    <View style={{ width: 38 }} />
+
+                                    <Text
+                                        style={[
+                                            styles.modalTitle,
+                                            {
+                                                flex: 1,
+                                                textAlign: "center",
+                                            },
+                                        ]}
+                                    >
+                                        Select Printer
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setPrinterModalVisible(false);
+                                            setPendingPrintItem(null);
+                                            setPrinterSearch("");
+                                        }}
+                                        style={{
+                                            width: 38,
+                                            height: 38,
+                                            borderRadius: 19,
+                                            backgroundColor: "#F1F5F9",
+                                            justifyContent: "center",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <Icon
+                                            name="close"
+                                            size={24}
+                                            color="#374151"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
                                 <TextInput
                                     placeholder="Search printer..."
                                     value={printerSearch}
@@ -2054,8 +2502,130 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                         </View>
                     </Modal>
 
+                    <FaultsModal
+                        visible={showFaultsModal}
+                        data={faultsData}
+                        initialFilledData={form.d2 || []}
+                        cacheKey={form.UId || ''}
+                        fetchData={async (cacheKey: string) => {
+                            const params = {
+                                UId: cacheKey,
+                                SrNo: '0',
+                                BeamNo: form.BeamNo || '',
+                                ShfCode: FormState.values.ShfCode,
+                                ChkDate: form.ChkDate,
+                                PrpCode: form.PrpCode || '',
+                                yearno: form.YearNo,
+                                txntype: 'beam_checking',
+                            };
+                            const response = await axios.get(`${API}/api/get_checking_fault_help`, {
+                                headers: {
+                                    Authorization: `Bearer ${token}`,
+                                    'Content-Type': 'application/json',
+                                    Accept: 'application/json',
+                                },
+                                params,
+                            });
+                            return response.data.response.data;
+                        }}
+                        onClose={() => setShowFaultsModal(false)}
+                        // onOK={async (updatedData) => {
+
+                        //     try {
+
+                        //         setFaultSaveLoading(true);
+
+                        //         const payload = {
+                        //             ShfCode: form.ShfCode,
+                        //             ChkDate: form.ChkDate,
+                        //             MacGrp: form.MacGrp,
+                        //             PrpCode: form.PrpCode,
+                        //             yearno: getCurrentFinancialYear(),
+                        //             BeamNo: form.BeamNo,
+                        //             txntype: "beam_checking",
+
+                        //             d1: updatedData
+                        //         };
+
+                        //         console.log("Fault Payload", payload);
+
+                        //         const headers = {
+                        //             Authorization: `Bearer ${token}`,
+                        //             "Content-Type": "application/json",
+                        //             "X-Requested-With": "XMLHttpRequest",
+                        //         };
+
+                        //         const response = await axios.post(
+                        //             `${API}/api/add_checking_fault`,
+                        //             payload,
+                        //             { headers }
+                        //         );
+
+                        //         console.log(response.data);
+
+                        //         if (response.data.success) {
+
+                        //             setForm(prev => ({
+                        //                 ...prev,
+                        //                 d2: updatedData,
+                        //             }));
+
+                        //             setShowFaultsModal(false);
+
+                        //             showSuccess(
+                        //                 response.data.message || "Fault saved successfully",
+                        //                 {
+                        //                     text: "OK",
+                        //                     onPress: () => { }
+                        //                 }
+                        //             );
+
+                        //         } else {
+
+                        //             showError(
+                        //                 response.data.message || "Save failed",
+                        //                 {
+                        //                     text: "OK",
+                        //                     onPress: () => { }
+                        //                 }
+                        //             );
+
+                        //         }
+
+                        //     } catch (error) {
+
+                        //         console.log(error);
+
+                        //         showError(
+                        //             "Something went wrong",
+                        //             {
+                        //                 text: "OK",
+                        //                 onPress: () => { }
+                        //             }
+                        //         );
+
+                        //     } finally {
+
+                        //         setFaultSaveLoading(false);
+
+                        //     }
+
+                        // }}
+                        onOK={(updatedData) => { setForm((prev) => ({ ...prev, d2: updatedData })); setShowFaultsModal(false); }}
+                        loading={faultSaveLoading}
+                    />
+
+                    <ScannerFaultsModal
+                        visible={scannerFaultModal}
+                        token={token}
+                        rowData={selectedScannerRow}
+                        loading={scannerFaultLoading}
+                        onClose={() => setScannerFaultModal(false)}
+                        onOK={saveScannerFault}
+                    />
+
                     {/* Scanner list modal */}
-                    <Modal visible={scannerModal} animationType="slide" onRequestClose={() => setScannerModal(false)}>
+                    {/* <Modal visible={scannerModal} animationType="slide" onRequestClose={() => setScannerModal(false)}>
                         <View style={{ flex: 1, backgroundColor: '#fff' }}>
                             <View style={checkingScannerStyles.headerContainer}>
                                 <View>
@@ -2120,10 +2690,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
                                                 <Text style={checkingScannerStyles.subText}>
                                                     Linked Order No : {item.LinkedOrderNo}
-                                                </Text>
-                                                 <Text style={checkingScannerStyles.subText}>
-                                                    Operator : {item.OprName}
-                                                </Text>
+                                                </Text>                                             
                                             </View>
                                             <View>
                                                 <TouchableOpacity
@@ -2151,7 +2718,192 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                 />
                             )}
                         </View>
-                    </Modal>
+                    </Modal> */}
+
+                    {scannerModal && (
+                        <View
+                            style={{
+                                flex: 1,
+                                backgroundColor: "#fff",
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 999,
+                            }}
+                        >
+                            <View style={checkingScannerStyles.headerContainer}>
+                                <View>
+                                    <Text style={{ fontSize: 24, fontWeight: "900" }}>
+                                        Scanner List
+                                    </Text>
+                                    <Text style={{ color: "#777" }}>
+                                        {filteredData.length} items
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={checkingScannerStyles.closeButton}
+                                    onPress={() => setScannerModal(false)}
+                                >
+                                    <Icon name="close" size={24} color="#000" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={checkingScannerStyles.searchContainer}>
+                                <Icon name="search" size={22} color="#777" />
+
+                                <TextInput
+                                    placeholder="Search scanner data..."
+                                    value={searchText}
+                                    onChangeText={setSearchText}
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 10,
+                                        color: "#000",
+                                    }}
+                                />
+                            </View>
+
+                            {scannerLoading ? (
+                                <View style={styles.centered}>
+                                    <ActivityIndicator
+                                        size="large"
+                                        color="#007EA7"
+                                    />
+                                </View>
+                            ) : (
+                                <FlatList
+                                    data={filteredData}
+                                    keyExtractor={(item, index) =>
+                                        `${item.UId}_${item.SrNo}_${index}`
+                                    }
+                                    contentContainerStyle={{
+                                        padding: 16,
+                                        paddingBottom: 40,
+                                    }}
+                                    onEndReached={loadMoreData}
+                                    showsVerticalScrollIndicator={false}
+                                    renderItem={({ item }) => (
+                                        <View style={checkingScannerStyles.billCard}>
+                                            <View
+                                                style={[
+                                                    styles.measurementField,
+                                                    isCompactScreen &&
+                                                    styles.measurementFieldCompact,
+                                                ]}
+                                            >
+                                                <Text
+                                                    numberOfLines={1}
+                                                    style={checkingScannerStyles.title}
+                                                >
+                                                    {item.DsnName}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Beam No : {item.BeamNo}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Taka : {item.TakaNo}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Design : {item.OrdDsnName || item.DsnName}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Weight : {item.Wt}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Avg Weight : {item.AvgWt}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Grade : {item.GrdName}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Linked Order No : {item.LinkedOrderNo}
+                                                </Text>
+                                            </View>
+
+                                            <View>
+                                                <View style={{ flexDirection: "row", gap: 8, marginBottom: 8, alignContent: "center" }}>
+                                                    <TouchableOpacity
+                                                        // style={{
+                                                        //     backgroundColor: "#0369A1",
+                                                        //     padding: 8,
+                                                        //     borderRadius: 8,
+                                                        //     marginBottom: 8,
+                                                        // }}
+                                                        style={[
+                                                            checkingScannerStyles.printButton,
+                                                            // Number(item.islasttakatrack) === 1 && {
+                                                            //     backgroundColor: "#0369A1",
+                                                            //     opacity: 0.6,
+                                                            // },
+                                                        ]}
+                                                        onPress={() =>
+                                                            openPrinterForScannerRow(item)
+                                                        }
+                                                    >
+                                                        <Icon
+                                                            name="local-printshop"
+                                                            size={20}
+                                                            color="#fff"
+                                                        />
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        disabled={
+                                                            Number(item.islasttakatrack) === 1
+                                                        }
+                                                        style={[
+                                                            checkingScannerStyles.deleteButton,
+                                                            Number(item.islasttakatrack) === 1 && {
+                                                                backgroundColor: "#BDBDBD",
+                                                                opacity: 0.6,
+                                                            },
+                                                        ]}
+                                                        onPress={() => {
+                                                            setSelectedDeleteItem(item);
+                                                            setShowDeleteAlert(true);
+                                                        }}
+                                                    >
+                                                        <Icon
+                                                            name="delete-outline"
+                                                            size={20}
+                                                            color="#fff"
+                                                        />
+                                                    </TouchableOpacity>
+                                                </View>
+
+                                                <TouchableOpacity
+                                                    style={styles.faultButton}
+                                                    onPress={() => openScannerFault(item)}
+                                                >
+
+                                                    <Icon
+                                                        name="report-problem"
+                                                        size={18}
+                                                        color="#fff"
+                                                    />
+
+                                                    <Text style={styles.faultButtonText}>
+                                                        Faults
+                                                    </Text>
+
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                />
+                            )}
+                        </View>
+                    )}
 
                     {/* Delete confirm */}
                     <Modal transparent visible={showDeleteAlert} animationType="fade" onRequestClose={() => setShowDeleteAlert(false)}>
@@ -2174,14 +2926,21 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                     </Modal>
 
                     {isDeleteLoading && (
-                        <Modal transparent animationType="fade">
-                            <View style={styles.modalOverlayCenter}>
-                                <View style={styles.deleteBox}>
-                                    <ActivityIndicator size="large" color="#007EA7" />
-                                    <Text style={{ marginTop: 10, fontWeight: '700' }}>Deleting record...</Text>
-                                </View>
+                        <View
+                            style={{
+                                ...StyleSheet.absoluteFillObject,
+                                backgroundColor: 'rgba(0,0,0,0.45)',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                zIndex: 99999,
+                                elevation: 99999,
+                            }}
+                        >
+                            <View style={styles.deleteBox}>
+                                <ActivityIndicator size="large" color="#007EA7" />
+                                <Text style={{ marginTop: 10, fontWeight: '700' }}>Deleting record...</Text>
                             </View>
-                        </Modal>
+                        </View>
                     )}
 
                 </KeyboardAvoidingView>
@@ -2383,6 +3142,32 @@ const styles = StyleSheet.create({
 
         zIndex: 9999,
         elevation: 9999,
+    },
+    faultsButton: {
+        backgroundColor: '#007AFF',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+    faultButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#FF9800",
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+
+    faultButtonText: {
+        color: "#fff",
+        marginLeft: 6,
+        fontWeight: "700",
     },
 });
 

@@ -9,12 +9,13 @@
 //      Catalog and the list is force-refreshed.
 // ═══════════════════════════════════════════════════════════════
 import { useFocusEffect } from '@react-navigation/native';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     FlatList,
     Modal,
+    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -28,7 +29,10 @@ import { usePermission } from '../../core/permissions';
 import { T } from '../../theme';
 // ✅ CHANGED: import from the new lightweight client instead of legacyClient
 // import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
+import { TwoStepYarnHelp, type YarnHelpPurpose, } from '../../components/help/TwoStepYarnHelp';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -36,6 +40,7 @@ const r0 = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 const f1 = (n: number) => n > 0 ? n.toFixed(1) : '—';
 
 const DESIGN_TABS = [
+    // { key: 'Monthly Sales Target', label: 'Monthly Sales Target', resource: 'designs.monthlysalestarget' },
     { key: 'Aliases', label: 'Aliases', resource: 'designs.aliases' },
     { key: 'Catalog', label: 'Catalog', resource: 'designs.catalog' },
     { key: 'Design', label: 'Design', resource: 'designs.design' },
@@ -57,6 +62,7 @@ const getCurrentFinancialYear = () => {
 };
 
 const DEFAULT_PRPCODE = 'SIP';
+const DEFAULT_PRPTYPE = 'S';
 const DEFAULT_STRCODE = '002';
 const DEFAULT_YEARNO = getCurrentFinancialYear();
 
@@ -143,21 +149,164 @@ function calcSpec(d: any) {
     const finWidthM = finWidthIn * 0.0254;
     const finGSM = finWidthM > 0 ? finGLM / finWidthM : 0;
 
-    // ── fibre blend, weighted by grams contributed ─────────────
-    const fibreOf = (sys: string) =>
-        sys === 'Lea' ? 'Linen' : sys === 'Ne' ? 'Cotton'
-            : (sys === 'Den' || sys === 'Dtx') ? 'Polyester' : 'Other';
+    // ── fibre blend, weighted by actual yarn grams contributed ──
+    //
+    // A yarn such as COTTON/LINEN 45:55 is split into its actual
+    // fibre components. Because the yarn gram contribution depends on
+    // EPI/PPI, Fibre Blend updates immediately whenever EPI/PPI changes.
+    const normalizeFibreName = (value: string): string => {
+        const name = String(value || '').trim().toLowerCase();
+
+        if (!name) return 'Other';
+        if (name.includes('linen') || name.includes('flax')) return 'Linen';
+        if (name.includes('cotton')) return 'Cotton';
+        if (name.includes('polyester') || name === 'poly' || name === 'pes') return 'Polyester';
+        if (name.includes('viscose') || name.includes('rayon')) return 'Viscose';
+        if (name.includes('modal')) return 'Modal';
+        if (name.includes('lyocell') || name.includes('tencel')) return 'Lyocell';
+        if (name.includes('bamboo')) return 'Bamboo';
+        if (name.includes('wool')) return 'Wool';
+        if (name.includes('silk')) return 'Silk';
+        if (name.includes('nylon') || name.includes('polyamide')) return 'Nylon';
+        if (name.includes('acrylic')) return 'Acrylic';
+        if (name.includes('elastane') || name.includes('spandex') || name.includes('lycra')) return 'Elastane';
+
+        return value.trim() || 'Other';
+    };
+
+    const defaultFibreOf = (yarn: any): string => {
+        const sys = String(yarn?.sys || '').trim();
+
+        if (sys === 'Lea') return 'Linen';
+        if (sys === 'Ne') return 'Cotton';
+        if (sys === 'Den' || sys === 'Dtx') return 'Polyester';
+
+        return 'Other';
+    };
+
+    const extractNamedFibres = (yarn: any): string[] => {
+        const rawName = `${yarn?.name || ''} ${yarn?.itm_name || ''}`.toUpperCase();
+        const fibres: string[] = [];
+
+        const add = (fibre: string) => {
+            if (!fibres.includes(fibre)) fibres.push(fibre);
+        };
+
+        if (/\bCOTTON\b/.test(rawName)) add('Cotton');
+        if (/\bLINEN\b|\bFLAX\b/.test(rawName)) add('Linen');
+        if (/\bPOLYESTER\b|\bPES\b/.test(rawName)) add('Polyester');
+        if (/\bVISCOSE\b|\bRAYON\b/.test(rawName)) add('Viscose');
+        if (/\bMODAL\b/.test(rawName)) add('Modal');
+        if (/\bLYOCELL\b|\bTENCEL\b/.test(rawName)) add('Lyocell');
+        if (/\bBAMBOO\b/.test(rawName)) add('Bamboo');
+        if (/\bWOOL\b/.test(rawName)) add('Wool');
+        if (/\bSILK\b/.test(rawName)) add('Silk');
+        if (/\bNYLON\b|\bPOLYAMIDE\b/.test(rawName)) add('Nylon');
+        if (/\bACRYLIC\b/.test(rawName)) add('Acrylic');
+        if (/\bELASTANE\b|\bSPANDEX\b|\bLYCRA\b/.test(rawName)) add('Elastane');
+
+        // Common textile abbreviation: PC = Polyester/Cotton.
+        if (/\bPC\b/.test(rawName)) {
+            add('Polyester');
+            add('Cotton');
+        }
+
+        return fibres;
+    };
+
+    const parseBlendPercentages = (value: any): number[] => {
+        const raw = String(value ?? '').trim();
+
+        if (!raw) return [];
+
+        const values = raw
+            .replace(/%/g, '')
+            .split(/[:/,+-]/)
+            .map(part => Number(part.trim()))
+            .filter(part => Number.isFinite(part) && part >= 0);
+
+        if (values.length < 2) return [];
+
+        const total = values.reduce((sum, part) => sum + part, 0);
+        if (total <= 0) return [];
+
+        return values.map(part => part / total);
+    };
+
+    const resolveYarnFibreShares = (yarn: any): Array<{ fibre: string; share: number }> => {
+        const percentages = parseBlendPercentages(
+            yarn?.blend_ratio ?? yarn?.br ?? yarn?.w_blend_per
+        );
+        const namedFibres = extractNamedFibres(yarn);
+
+        if (percentages.length > 0 && namedFibres.length > 0) {
+            const resolved: Array<{ fibre: string; share: number }> = [];
+            const pairedCount = Math.min(percentages.length, namedFibres.length);
+
+            for (let index = 0; index < pairedCount; index += 1) {
+                resolved.push({
+                    fibre: normalizeFibreName(namedFibres[index]),
+                    share: percentages[index],
+                });
+            }
+
+            const assigned = resolved.reduce((sum, row) => sum + row.share, 0);
+            const balance = Math.max(0, 1 - assigned);
+
+            if (balance > 0.000001) {
+                const fallback = defaultFibreOf(yarn);
+                const existing = resolved.find(row => row.fibre === fallback);
+
+                if (existing) existing.share += balance;
+                else resolved.push({ fibre: fallback, share: balance });
+            }
+
+            return resolved;
+        }
+
+        return [{
+            fibre: defaultFibreOf(yarn),
+            share: 1,
+        }];
+    };
+
     const blendTotals: Record<string, number> = {};
+
+    const addYarnContribution = (yarn: any, grams: number) => {
+        if (!(grams > 0)) return;
+
+        resolveYarnFibreShares(yarn).forEach(({ fibre, share }) => {
+            if (!(share > 0)) return;
+
+            const key = normalizeFibreName(fibre);
+            blendTotals[key] = (blendTotals[key] ?? 0) + (grams * share);
+        });
+    };
+
     warpYarns.forEach((y) => {
-        const g = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
-        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+        const grams = (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
+        addYarnContribution(y, grams);
     });
+
     weftYarns.forEach((y) => {
-        const g = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
-        if (g > 0) blendTotals[fibreOf(y.sys)] = (blendTotals[fibreOf(y.sys)] ?? 0) + g;
+        const grams = (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
+        addYarnContribution(y, grams);
     });
+
     const blendGrand = Object.values(blendTotals).reduce((a, b) => a + b, 0);
-    const hasNaturalFibre = warpYarns.concat(weftYarns).some(y => y.sys === 'Lea');
+    const naturalFibres = new Set([
+        'Cotton',
+        'Linen',
+        'Viscose',
+        'Modal',
+        'Lyocell',
+        'Bamboo',
+        'Wool',
+        'Silk',
+    ]);
+    const hasNaturalFibre = Object.keys(blendTotals).some(
+        fibre => naturalFibres.has(fibre) && (blendTotals[fibre] ?? 0) > 0
+    );
 
     return {
         basis, reed, widthGreige, finWidthIn,
@@ -170,7 +319,19 @@ function calcSpec(d: any) {
 }
 
 const BLEND_COLORS: Record<string, string> = {
-    Linen: '#C8A96E', Cotton: '#A8C8A0', Polyester: '#A0B8C8', Other: '#C8A8B0',
+    Linen: '#C8A96E',
+    Cotton: '#A8C8A0',
+    Polyester: '#A0B8C8',
+    Viscose: '#B8A0C8',
+    Modal: '#9FC4B6',
+    Lyocell: '#8FBDB0',
+    Bamboo: '#AFC58A',
+    Wool: '#C4B29C',
+    Silk: '#D8C0A8',
+    Nylon: '#9EB5CD',
+    Acrylic: '#C6A3B8',
+    Elastane: '#9C9C9C',
+    Other: '#C8A8B0',
 };
 
 // ── TabBar ────────────────────────────────────────────────────
@@ -413,6 +574,31 @@ const ls = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════
 // SHARED: Server Search Yarn Picker Modal
 // ═══════════════════════════════════════════════════════════════
+type MainYarnHelpRow = {
+    row_type?: 'main';
+    selectable?: boolean;
+    mi_id: string;
+    itm_code: null;
+    m_itm_code: string;
+    main_yarn_code: string;
+    name: string;
+    prp_code: string;
+    str_code: string;
+    variant_count: number;
+    available_blends: string[];
+};
+
+type YarnItemHelpRow = YarnMaster & {
+    row_type?: 'item';
+    selectable?: boolean;
+    itm_code: string;
+    m_itm_code: string;
+    main_yarn_code: string;
+    is_main_yarn_item?: boolean;
+    blend_ratio?: string;
+    w_blend_per?: string;
+};
+
 function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: {
     visible: boolean;
     title?: string;
@@ -420,99 +606,462 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
     onClose: () => void;
 }) {
     const { prpcode, strcode, yearno } = useERP();
-    const [search, setSearch] = useState('');
-    const [yarns, setYarns] = useState<YarnMaster[]>([]);
-    const [loading, setLoading] = useState(false);
 
-    const loadYarns = useCallback(async (q = '') => {
-        if (!visible) return;
+    const [stage, setStage] = useState<'main' | 'items'>('main');
+    const [mainSearch, setMainSearch] = useState('');
+    const [itemSearch, setItemSearch] = useState('');
+    const [mainYarns, setMainYarns] = useState<MainYarnHelpRow[]>([]);
+    const [itemYarns, setItemYarns] = useState<YarnItemHelpRow[]>([]);
+    const [selectedMain, setSelectedMain] = useState<MainYarnHelpRow | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [errorText, setErrorText] = useState('');
+    const requestSequence = useRef(0);
+
+    const resetPicker = useCallback(() => {
+        requestSequence.current += 1;
+        setStage('main');
+        setMainSearch('');
+        setItemSearch('');
+        setMainYarns([]);
+        setItemYarns([]);
+        setSelectedMain(null);
+        setLoading(false);
+        setErrorText('');
+    }, []);
+
+    const closePicker = useCallback(() => {
+        resetPicker();
+        onClose();
+    }, [onClose, resetPicker]);
+
+    const goBackToMain = useCallback(() => {
+        requestSequence.current += 1;
+        setStage('main');
+        setItemSearch('');
+        setItemYarns([]);
+        setSelectedMain(null);
+        setErrorText('');
+        /*
+         * mainSearch and mainYarns are intentionally preserved so the user
+         * returns to the exact Main Yarn result list they were viewing.
+         */
+    }, []);
+
+    const loadMainYarns = useCallback(async (queryText = '') => {
+        if (!visible || stage !== 'main') return;
+
+        const requestId = ++requestSequence.current;
         setLoading(true);
+        setErrorText('');
+
         try {
-            const res = await (DesignAPI.yarns as any)({
-                yearno: yearno,
-                prpcode: prpcode,
-                strcode: strcode,
-                limit: 50,
-                search: q.trim() || undefined,
+            const response = await (DesignAPI.yarns as any)({
+                mode: 'main',
+                yearno,
+                prpcode,
+                strcode,
+                limit: 100,
+                search: queryText.trim() || undefined,
             });
-            setYarns(res?.data?.data || []);
-            console.log('YARN SEARCH OK', {
-                search: q,
-                count: res?.data?.data?.length || 0,
-                url: res?.config?.url,
-                baseURL: res?.config?.baseURL,
-                params: res?.config?.params,
+
+            if (requestId !== requestSequence.current) return;
+
+            if (response?.data?.success !== true) {
+                throw new Error(
+                    response?.data?.message || 'Unable to load Main Yarn help.'
+                );
+            }
+
+            setMainYarns(
+                Array.isArray(response?.data?.data)
+                    ? response.data.data
+                    : []
+            );
+        } catch (error: any) {
+            if (requestId !== requestSequence.current) return;
+
+            console.log('MAIN YARN HELP ERROR', {
+                message: error?.message,
+                status: error?.response?.status,
+                data: error?.response?.data,
+                url: error?.config?.url,
+                params: error?.config?.params,
             });
-        } catch (e: any) {
-            console.log('YARN SEARCH ERROR', {
-                message: e?.message,
-                code: e?.code,
-                status: e?.response?.status,
-                data: e?.response?.data,
-                baseURL: e?.config?.baseURL,
-                url: e?.config?.url,
-                params: e?.config?.params,
-            });
-            setYarns([]);
+
+            setMainYarns([]);
+            setErrorText(String(
+                error?.response?.data?.message ||
+                error?.message ||
+                'Unable to load Main Yarn help.'
+            ));
         } finally {
-            setLoading(false);
+            if (requestId === requestSequence.current) {
+                setLoading(false);
+            }
         }
-    }, [visible]);
+    }, [prpcode, stage, strcode, visible, yearno]);
+
+    const loadItemYarns = useCallback(async (
+        mainRow: MainYarnHelpRow,
+        queryText = ''
+    ) => {
+        if (!visible) return;
+
+        const requestId = ++requestSequence.current;
+        setLoading(true);
+        setErrorText('');
+
+        try {
+            const response = await (DesignAPI.yarns as any)({
+                mode: 'items',
+                yearno,
+                prpcode,
+                strcode,
+                main_yarn_code: mainRow.main_yarn_code,
+                limit: 250,
+                search: queryText.trim() || undefined,
+            });
+
+            if (requestId !== requestSequence.current) return;
+
+            if (response?.data?.success !== true) {
+                throw new Error(
+                    response?.data?.message || 'Unable to load Yarn Item help.'
+                );
+            }
+
+            setItemYarns(
+                Array.isArray(response?.data?.data)
+                    ? response.data.data
+                    : []
+            );
+        } catch (error: any) {
+            if (requestId !== requestSequence.current) return;
+
+            console.log('YARN ITEM HELP ERROR', {
+                main_yarn_code: mainRow.main_yarn_code,
+                message: error?.message,
+                status: error?.response?.status,
+                data: error?.response?.data,
+                url: error?.config?.url,
+                params: error?.config?.params,
+            });
+
+            setItemYarns([]);
+            setErrorText(String(
+                error?.response?.data?.message ||
+                error?.message ||
+                'Unable to load Yarn Item help.'
+            ));
+        } finally {
+            if (requestId === requestSequence.current) {
+                setLoading(false);
+            }
+        }
+    }, [prpcode, strcode, visible, yearno]);
 
     useEffect(() => {
-        if (!visible) return;
-        const t = setTimeout(() => loadYarns(search), search.trim() ? 350 : 0);
-        return () => clearTimeout(t);
-    }, [visible, search, loadYarns]);
+        if (!visible) {
+            resetPicker();
+            return;
+        }
 
-    const closePicker = () => {
-        onClose();
-        setSearch('');
-        setYarns([]);
-    };
+        if (stage !== 'main') return;
+
+        const timer = setTimeout(
+            () => void loadMainYarns(mainSearch),
+            mainSearch.trim() ? 350 : 0
+        );
+
+        return () => clearTimeout(timer);
+    }, [loadMainYarns, mainSearch, resetPicker, stage, visible]);
+
+    useEffect(() => {
+        if (!visible || stage !== 'items' || !selectedMain) return;
+
+        const timer = setTimeout(
+            () => void loadItemYarns(selectedMain, itemSearch),
+            itemSearch.trim() ? 350 : 0
+        );
+
+        return () => clearTimeout(timer);
+    }, [itemSearch, loadItemYarns, selectedMain, stage, visible]);
+
+    const openItemHelp = useCallback((mainRow: MainYarnHelpRow) => {
+        setSelectedMain(mainRow);
+        setStage('items');
+        setItemSearch('');
+        setItemYarns([]);
+        setErrorText('');
+    }, []);
+
+    const chooseItem = useCallback((item: YarnItemHelpRow) => {
+        const actualItemCode = String(item.itm_code || item.mi_id || '').trim();
+
+        if (!actualItemCode) {
+            Alert.alert(
+                'Invalid Yarn Item',
+                'The selected row does not contain an actual ItmCode.'
+            );
+            return;
+        }
+
+        onSelect({
+            ...item,
+            mi_id: actualItemCode,
+            itm_code: actualItemCode,
+            m_itm_code: String(
+                item.m_itm_code || item.main_yarn_code || ''
+            ),
+            main_yarn_code: String(
+                item.main_yarn_code || item.m_itm_code || ''
+            ),
+            blend_ratio: item.blend_ratio || null,
+        } as YarnMaster);
+
+        closePicker();
+    }, [closePicker, onSelect]);
+
+    const childTitle = selectedMain
+        ? `${selectedMain.main_yarn_code} · ${selectedMain.name}`
+        : 'Select Yarn Item';
 
     return (
-        <Modal visible={visible} animationType="slide" transparent onRequestClose={closePicker}>
+        <Modal
+            visible={visible}
+            animationType="slide"
+            transparent
+            onRequestClose={stage === 'items' ? goBackToMain : closePicker}
+        >
             <View style={yp.overlay}>
                 <View style={yp.sheet}>
                     <View style={yp.handle} />
+
                     <View style={yp.header}>
-                        <Text style={yp.title}>{title}</Text>
-                        <TouchableOpacity onPress={closePicker} style={yp.closeBtn}>
+                        {stage === 'items' ? (
+                            <TouchableOpacity
+                                onPress={goBackToMain}
+                                style={yp.backBtn}
+                            >
+                                <Text style={yp.backTxt}>‹ Main Yarn</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={yp.backPlaceholder} />
+                        )}
+
+                        <Text style={yp.title} numberOfLines={1}>
+                            {stage === 'main' ? title : 'Select Yarn Item'}
+                        </Text>
+
+                        <TouchableOpacity
+                            /*
+                             * In child help, close returns to Main Yarn Help as
+                             * requested. Only Main Yarn Help closes the modal.
+                             */
+                            onPress={stage === 'items' ? goBackToMain : closePicker}
+                            style={yp.closeBtn}
+                        >
                             <Text style={yp.closeTxt}>✕</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {stage === 'items' && selectedMain ? (
+                        <View style={yp.mainSelectionCard}>
+                            <Text style={yp.mainSelectionLabel}>MAIN YARN</Text>
+                            <Text style={yp.mainSelectionCode}>
+                                {selectedMain.main_yarn_code}
+                            </Text>
+                            <Text style={yp.mainSelectionName} numberOfLines={2}>
+                                {childTitle}
+                            </Text>
+                            {selectedMain.available_blends?.length > 0 ? (
+                                <Text style={yp.mainSelectionBlend} numberOfLines={2}>
+                                    Available blends: {selectedMain.available_blends.join(' · ')}
+                                </Text>
+                            ) : null}
+                        </View>
+                    ) : null}
+
                     <View style={yp.searchWrap}>
                         <TextInput
-                            value={search}
-                            onChangeText={setSearch}
-                            placeholder="Search yarn name / code / count..."
+                            value={stage === 'main' ? mainSearch : itemSearch}
+                            onChangeText={
+                                stage === 'main'
+                                    ? setMainSearch
+                                    : setItemSearch
+                            }
+                            placeholder={
+                                stage === 'main'
+                                    ? 'Search Main Yarn code / name...'
+                                    : 'Search Item Code / name / blend...'
+                            }
                             placeholderTextColor={T.muted}
                             style={yp.search}
                             autoFocus
+                            autoCorrect={false}
+                            autoCapitalize="characters"
+                            returnKeyType="search"
                         />
                     </View>
-                    {loading && <ActivityIndicator color={T.copper} style={{ paddingVertical: 10 }} />}
-                    <View style={yp.listFrame}>
-                        <FlatList
-                            data={yarns}
-                            keyExtractor={(y, idx) => `${y.mi_id}-${idx}`}
-                            keyboardShouldPersistTaps="handled"
-                            renderItem={({ item: y }) => (
-                                <TouchableOpacity style={yp.row} activeOpacity={0.7}
-                                    onPress={() => { onSelect(y); closePicker(); }}>
-                                    <Text style={yp.yarnName}>{y.name}</Text>
-                                    <Text style={yp.yarnSub}>
-                                        Code {y.mi_id} · {y.cnt}/1 {y.sys}{y.price > 0 ? ` · ₹${y.price}/kg` : ''}
-                                    </Text>
-                                </TouchableOpacity>
-                            )}
-                            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: T.border, marginLeft: 16 }} />}
-                            ListEmptyComponent={!loading ? <Text style={{ padding: 16, color: T.muted, textAlign: 'center' }}>
-                                {search.trim() ? 'No yarns found' : 'Type to search yarns, or choose from the first 50 results'}
-                            </Text> : null}
-                            contentContainerStyle={{ paddingBottom: 40 }}
+
+                    {errorText ? (
+                        <View style={yp.errorBox}>
+                            <Text style={yp.errorText}>{errorText}</Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    if (stage === 'main') {
+                                        void loadMainYarns(mainSearch);
+                                    } else if (selectedMain) {
+                                        void loadItemYarns(selectedMain, itemSearch);
+                                    }
+                                }}
+                            >
+                                <Text style={yp.retryText}>Retry</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
+
+                    {loading && (
+                        <ActivityIndicator
+                            color={T.copper}
+                            style={{ paddingVertical: 10 }}
                         />
+                    )}
+
+                    <View style={yp.listFrame}>
+                        {stage === 'main' ? (
+                            <FlatList
+                                data={mainYarns}
+                                keyExtractor={(row) => row.main_yarn_code}
+                                keyboardShouldPersistTaps="handled"
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={yp.row}
+                                        activeOpacity={0.7}
+                                        onPress={() => openItemHelp(item)}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={yp.yarnName}>
+                                                {item.main_yarn_code}
+                                            </Text>
+                                            <Text style={yp.yarnSub} numberOfLines={2}>
+                                                {item.name}
+                                            </Text>
+                                            <View style={yp.metaRow}>
+                                                <Text style={yp.metaText}>
+                                                    {item.variant_count} item
+                                                    {item.variant_count === 1 ? '' : 's'}
+                                                </Text>
+                                                {item.available_blends?.length > 0 ? (
+                                                    <Text
+                                                        style={yp.blendPreview}
+                                                        numberOfLines={1}
+                                                    >
+                                                        {item.available_blends.join(' · ')}
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                        <Text style={yp.chevron}>›</Text>
+                                    </TouchableOpacity>
+                                )}
+                                ItemSeparatorComponent={() => (
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: T.border,
+                                            marginLeft: 16,
+                                        }}
+                                    />
+                                )}
+                                ListEmptyComponent={!loading ? (
+                                    <Text style={yp.emptyText}>
+                                        {mainSearch.trim()
+                                            ? 'No Main Yarn found.'
+                                            : 'No Main Yarn is available.'}
+                                    </Text>
+                                ) : null}
+                                contentContainerStyle={{ paddingBottom: 40 }}
+                            />
+                        ) : (
+                            <FlatList
+                                data={itemYarns}
+                                keyExtractor={(row, index) =>
+                                    `${row.main_yarn_code || selectedMain?.main_yarn_code}:${row.itm_code || row.mi_id}:${index}`
+                                }
+                                keyboardShouldPersistTaps="handled"
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={yp.row}
+                                        activeOpacity={0.7}
+                                        onPress={() => chooseItem(item)}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <View style={yp.itemCodeRow}>
+                                                <Text style={yp.yarnName}>
+                                                    {item.itm_code || item.mi_id}
+                                                </Text>
+                                                {item.is_main_yarn_item ? (
+                                                    <View style={yp.mainBadge}>
+                                                        <Text style={yp.mainBadgeText}>
+                                                            MAIN
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+
+                                            <Text style={yp.yarnSub} numberOfLines={2}>
+                                                {item.name || item.itm_name}
+                                            </Text>
+
+                                            <View style={yp.metaRow}>
+                                                {item.blend_ratio ? (
+                                                    <Text style={yp.blendChip}>
+                                                        Blend {item.blend_ratio}
+                                                    </Text>
+                                                ) : null}
+
+                                                <Text style={yp.metaText}>
+                                                    {item.cnt || item.denier || 0}{' '}
+                                                    {item.sys || ''}
+                                                </Text>
+
+                                                {Number(item.price || 0) > 0 ? (
+                                                    <Text style={yp.metaText}>
+                                                        ₹{Number(item.price).toFixed(2)}/kg
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                )}
+                                ItemSeparatorComponent={() => (
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: T.border,
+                                            marginLeft: 16,
+                                        }}
+                                    />
+                                )}
+                                ListEmptyComponent={!loading ? (
+                                    <View style={yp.childEmptyBox}>
+                                        <Text style={yp.emptyText}>
+                                            No Yarn Item found under this Main Yarn.
+                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={goBackToMain}
+                                            style={yp.changeMainBtn}
+                                        >
+                                            <Text style={yp.changeMainTxt}>
+                                                Select another Main Yarn
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : null}
+                                contentContainerStyle={{ paddingBottom: 40 }}
+                            />
+                        )}
                     </View>
                 </View>
             </View>
@@ -701,6 +1250,61 @@ const yp = StyleSheet.create({
     yarnName: { fontSize: 14, fontWeight: '600', color: T.ink },
     yarnSub: { fontSize: 12, color: T.muted, marginTop: 2 },
     listFrame: { height: 430 },
+    backBtn: { minWidth: 88, paddingVertical: 4 },
+    backPlaceholder: { width: 88 },
+    backTxt: { fontSize: 12, fontWeight: '800', color: T.copper },
+    mainSelectionCard: {
+        marginHorizontal: 16,
+        marginTop: 10,
+        backgroundColor: T.sub,
+        borderWidth: 1,
+        borderColor: T.border,
+        borderRadius: 10,
+        padding: 10,
+    },
+    mainSelectionLabel: { fontSize: 8.5, fontWeight: '800', color: T.muted, letterSpacing: 0.6 },
+    mainSelectionCode: { marginTop: 2, fontSize: 15, fontWeight: '900', color: T.ink },
+    mainSelectionName: { marginTop: 2, fontSize: 11, color: T.muted },
+    mainSelectionBlend: { marginTop: 5, fontSize: 10, color: T.copper },
+    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 6 },
+    metaText: { fontSize: 10.5, color: T.muted },
+    blendPreview: { flex: 1, fontSize: 10.5, color: T.copper },
+    chevron: { marginLeft: 10, fontSize: 24, color: T.muted },
+    itemCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    mainBadge: { backgroundColor: '#E7F1EA', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2 },
+    mainBadgeText: { fontSize: 8.5, fontWeight: '900', color: T.green },
+    blendChip: {
+        fontSize: 10.5,
+        fontWeight: '700',
+        color: T.copper,
+        backgroundColor: T.copper + '18',
+        borderRadius: 10,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    errorBox: {
+        marginHorizontal: 16,
+        marginBottom: 6,
+        padding: 10,
+        borderRadius: 9,
+        backgroundColor: '#FFF1F0',
+        borderWidth: 1,
+        borderColor: '#F0C3C0',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    errorText: { flex: 1, fontSize: 11, color: '#8B302B' },
+    retryText: { marginLeft: 10, fontSize: 11, fontWeight: '800', color: '#8B302B' },
+    emptyText: { padding: 16, color: T.muted, textAlign: 'center' },
+    childEmptyBox: { alignItems: 'center', paddingVertical: 20 },
+    changeMainBtn: {
+        marginTop: 8,
+        borderRadius: 8,
+        backgroundColor: T.copper,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+    },
+    changeMainTxt: { color: '#fff', fontSize: 11, fontWeight: '800' },
 });
 
 // ── Yarn line row ──
@@ -715,7 +1319,13 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
             <View style={yl.row}>
                 <View style={{ flex: 1 }}>
                     <Text style={yl.name}>{yarn.name}</Text>
-                    <Text style={yl.sub}>{yarn.cnt}/1 {yarn.sys}</Text>
+                    <Text style={yl.sub}>
+                        Item {yarn.itm_code || yarn.mi_id}
+                        {yarn.main_yarn_code || yarn.m_itm_code
+                            ? ` · Main ${yarn.main_yarn_code || yarn.m_itm_code}`
+                            : ''}
+                        {yarn.cnt ? ` · ${yarn.cnt}/1 ${yarn.sys || ''}` : ''}
+                    </Text>
                 </View>
                 {type === 'warp' && (
                     <TouchableOpacity style={[yl.sizingChip, yarn.sizing && yl.sizingChipOn]}
@@ -734,7 +1344,8 @@ function YarnLineRow({ yarn, type, onChange, onRemove }: {
             <TextInput value={yarn.blend_ratio ?? ''}
                 onChangeText={v => onChange('blend_ratio', v.trim() || null)}
                 placeholder="Pure or ratio/sub-item, e.g. 65/35"
-                placeholderTextColor={T.muted} style={yl.blendInput} />
+                placeholderTextColor={T.muted} style={yl.blendInput}
+                editable={false} />
         </View>
     );
 }
@@ -1135,8 +1746,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     const addYarn = (y: YarnMaster, type: 'warp' | 'weft' | 'selvedge') => {
         const key = `${type}_yarns`;
         set(key, [...(form[key] ?? []), {
-            mi_id: y.mi_id, itm_code: y.itm_code, m_itm_code: y.m_itm_code, prp_code: y.prp_code, str_code: y.str_code, name: y.name, sys: y.sys, cnt: y.cnt, base_price: y.price,
-            blend_ratio: null,
+            mi_id: String(y.itm_code || y.mi_id),
+            itm_code: String(y.itm_code || y.mi_id),
+            m_itm_code: String(y.m_itm_code || (y as any).main_yarn_code || ''),
+            main_yarn_code: String((y as any).main_yarn_code || y.m_itm_code || ''),
+            prp_code: y.prp_code,
+            str_code: y.str_code,
+            name: y.name,
+            sys: y.sys,
+            cnt: y.cnt,
+            base_price: y.price,
+            blend_ratio: (y as any).blend_ratio || null,
             ...(type === 'warp' ? { epi: 60, sizing: false } : type === 'weft' ? { ppi: 52 } : { ends: 0 }),
         }]);
     };
@@ -1225,36 +1845,126 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 responseData: response.data,
             });
 
-            const saved = response?.data?.data;
+            /*
+             * Normalize all supported production response envelopes.
+             *
+             * Supported examples:
+             * 1. { success, id, design_id, data: { id } }
+             * 2. { success, data: { design_id, data: { id } } }
+             * 3. { response: { success, id, data: { id } } }
+             * 4. Axios interceptor already returned the JSON body.
+             */
+            const rawBody: any = response?.data ?? response;
 
-            if (
-                response?.data?.success !== true ||
-                !saved ||
-                !String(saved.id || '').trim()
-            ) {
+            const body: any =
+                rawBody?.response?.data ??
+                rawBody?.response ??
+                rawBody;
+
+            const nestedData: any =
+                body?.data?.data ??
+                body?.data ??
+                {};
+
+            const savedId = String(
+                nestedData?.id ??
+                nestedData?.design_id ??
+                nestedData?.engineering_design_id ??
+                body?.design_id ??
+                body?.engineering_design_id ??
+                body?.id ??
+                rawBody?.design_id ??
+                rawBody?.engineering_design_id ??
+                rawBody?.id ??
+                ''
+            ).trim();
+
+            const saveConfirmed =
+                body?.success === true ||
+                rawBody?.success === true ||
+                response?.status === 200 ||
+                response?.status === 201;
+
+            console.log('DESIGN SAVE NORMALIZED RESPONSE', {
+                status: response?.status,
+                baseURL: response?.config?.baseURL,
+                url: response?.config?.url,
+                rawBody,
+                body,
+                nestedData,
+                savedId,
+                saveConfirmed,
+            });
+
+            if (!saveConfirmed) {
                 throw new Error(
-                    'Server returned success without a saved engineering design ID.'
+                    String(
+                        body?.message ||
+                        rawBody?.message ||
+                        'Server did not confirm the design save.'
+                    )
                 );
             }
 
-            // Verify immediately by fetching the same record.
-            const verifyResponse = await DesignAPI.get(String(saved.id));
-            const verified = verifyResponse?.data?.data;
+            if (!savedId) {
+                throw new Error(
+                    'Server confirmed the save but did not return the engineering design ID.'
+                );
+            }
+
+            /*
+             * Verify the committed record immediately. Include ERP context
+             * explicitly so verification uses the same property/year context
+             * as the save request even if the lightweight client does not
+             * append these values automatically.
+             */
+            const verifyResponse = await client.get(
+                `/designs/${encodeURIComponent(savedId)}`,
+                {
+                    params: {
+                        yearno,
+                        YearNo: yearno,
+                        prpcode,
+                        PrpCode: prpcode,
+                        strcode,
+                        StrCode: strcode,
+                    },
+                }
+            );
+
+            const verifyRawBody: any =
+                verifyResponse?.data ??
+                verifyResponse;
+
+            const verifyBody: any =
+                verifyRawBody?.response?.data ??
+                verifyRawBody?.response ??
+                verifyRawBody;
+
+            const verified: any =
+                verifyBody?.data?.data ??
+                verifyBody?.data ??
+                null;
 
             console.log('DESIGN SAVE VERIFY RESPONSE', {
-                id: saved.id,
-                responseData: verifyResponse.data,
+                savedId,
+                status: verifyResponse?.status,
+                responseData: verifyResponse?.data,
+                verified,
             });
 
-            if (!verified || String(verified.id) !== String(saved.id)) {
+            if (
+                !verified ||
+                String(verified?.id || '').trim() !== savedId
+            ) {
                 throw new Error(
-                    `Design ${saved.id} was returned by save but could not be read back.`
+                    `Design ${savedId} was returned by save but could not be read back.`
                 );
             }
 
             Alert.alert(
                 'Saved',
-                `Design saved successfully.\n\nID: ${saved.id}`
+                `Design saved successfully.\n\nID: ${savedId}`
             );
 
             onRefresh();
@@ -1267,11 +1977,17 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 url: e?.config?.url,
             });
 
+            const errorBody =
+                e?.response?.data?.response?.data ??
+                e?.response?.data?.response ??
+                e?.response?.data ??
+                {};
+
             Alert.alert(
                 'Design save failed',
                 String(
-                    e?.response?.data?.message ||
-                    e?.response?.data?.error ||
+                    errorBody?.message ||
+                    errorBody?.error ||
                     e?.message ||
                     'Unable to save design'
                 )
@@ -1454,10 +2170,22 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
             </ScrollView>
-            <YarnPickerModal
+            {/* <YarnPickerModal
                 visible={pickerFor !== null}
                 title={pickerFor === 'warp' ? 'Select warp yarn' : pickerFor === 'weft' ? 'Select weft yarn' : 'Select selvedge yarn'}
                 onSelect={y => pickerFor && addYarn(y, pickerFor)}
+                onClose={() => setPickerFor(null)}
+            /> */}
+            <TwoStepYarnHelp
+                visible={pickerFor !== null}
+                purpose={pickerFor ?? 'warp'}
+                prpcode={prpcode}
+                strcode={strcode}
+                onSelect={(item) => {
+                    if (pickerFor) {
+                        addYarn(item, pickerFor);
+                    }
+                }}
                 onClose={() => setPickerFor(null)}
             />
             <CategoryPickerModal
@@ -2566,6 +3294,846 @@ type DesignAliasRow = {
 
 const unwrapAliasPayload = (payload: any) => payload?.data?.data ?? payload?.data ?? payload;
 
+// ═══════════════════════════════════════════════════════════════
+// TAB 1 — MONTHLY SALES TARGET
+// ═══════════════════════════════════════════════════════════════
+// Helper function to generate consistent color from name
+const getAvatarColor = (name: string) => {
+    const colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFBE0B', '#FB5607',
+        '#8338EC', '#3A86FF', '#FF006E', '#A5DD9B', '#F9C74F',
+        '#90BE6D', '#560BAD', '#4361EE', '#3F37C9', '#4895EF',
+        '#4CC9F0', '#F8961E', '#F0506E', '#6A0572', '#2E8B57'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
+
+function MonthlySalesTargetTab({ design }: { design: Design | null }) {
+    const { prpcode, strcode, yearno } = useERP();
+    const now = new Date();
+    const [month, setMonth] = useState(now.getMonth());
+    const [year, setYear] = useState(now.getFullYear());
+    const [periodPicked, setPeriodPicked] = useState(true);
+    const [pickerVisible, setPickerVisible] = useState(false);
+    const [pickerYear, setPickerYear] = useState(now.getFullYear());
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [rows, setRows] = useState<any[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [setAllValue, setSetAllValue] = useState('');
+    const [userType, setUserType] = useState<string>('');
+
+    // Load user type on mount
+    useEffect(() => {
+        const loadUserType = async () => {
+            const p = await AsyncStorage.getItem('user_prptype');
+            setUserType(p || prpcode);
+        };
+        loadUserType();
+    }, []);
+
+    const MONTH_NAMES = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+
+    const MONTH_SHORT = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+
+    const formatMonthYear = (month: number, year: number) => {
+        return `${MONTH_NAMES[month]} ${year}`;
+    };
+
+
+    const getFinancialYear = (year: number, month: number) => {
+        return month >= 3
+            ? String((year + 1) % 100).padStart(2, "0")
+            : String(year % 100).padStart(2, "0");
+    };
+
+    const loadTargetsForPeriod = async (month: number, year: number) => {
+        setLoading(true);
+        try {
+            const payload = {
+                prptype: userType || prpcode,
+                yearno: getFinancialYear(year, month),
+                monthno: String(month + 1).padStart(2, '0'),
+                txntype: "monthly_sales_target",
+            };
+
+            const response = await client.get('/monthly_sales_target_browse', {
+                params: payload,
+            });
+
+            if (response.data.success && response.data.data?.monthly_sales_target?.length > 0) {
+                const targets = response.data.data.monthly_sales_target.map((item: any) => ({
+                    ...item,
+                    id: item.sexe,
+                    target: item.target || "0",
+                    isSelected: true, // All rows are selected by default
+                }));
+                setRows(targets);
+            } else {
+                setRows([]);
+            }
+        } catch (error) {
+            console.log("Browse API Error:", error);
+            setRows([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const saveTargets = async () => {
+        // All rows with non-zero values are considered selected
+        const selectedRows = rows.filter((row) => parseFloat(row.target || "0") > 0);
+
+        const payload = {
+            prptype: userType || prpcode,
+            yearno: getFinancialYear(year, month),
+            monthno: String(month + 1).padStart(2, "0"),
+            d1: rows.map(row => ({
+                ...row,
+                target: row.target || "0"
+            })),
+        };
+
+        try {
+            const response = await client.post('/add_edit_monthly_sales_target', payload);
+            const message =
+                response.data?.message ||
+                response.data?.response?.message ||
+                "Operation completed.";
+
+            if (response.data?.success) {
+                Alert.alert(
+                    "Success",
+                    message,
+                    [
+                        {
+                            text: "OK",
+                            onPress: async () => {
+                                await loadTargetsForPeriod(month, year);
+                            },
+                        },
+                    ],
+                    { cancelable: false }
+                );
+            } else {
+                Alert.alert("Error", message);
+            }
+        } catch (error: any) {
+            const message =
+                error.response?.data?.message ||
+                error.response?.data?.response?.message ||
+                error.message;
+            Alert.alert("Error", message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!periodPicked) return;
+        setLoading(true);
+        loadTargetsForPeriod(month, year);
+    }, [month, year, periodPicked, userType]);
+
+    const shiftMonth = (delta: number) => {
+        setPeriodPicked(true);
+        let m = month + delta;
+        let y = year;
+        if (m < 0) {
+            m = 11;
+            y -= 1;
+        } else if (m > 11) {
+            m = 0;
+            y += 1;
+        }
+        setMonth(m);
+        setYear(y);
+    };
+
+    const openPicker = () => {
+        setPickerYear(year);
+        setPickerVisible(true);
+    };
+
+    const shiftPickerYear = (delta: number) => setPickerYear((y) => y + delta);
+
+    const selectMonthFromPicker = (m: number) => {
+        setMonth(m);
+        setYear(pickerYear);
+        setPeriodPicked(true);
+        setPickerVisible(false);
+    };
+
+    const handleSetAllChange = (value: string) => {
+        if (/^\d*\.?\d{0,2}$/.test(value)) {
+            setSetAllValue(value);
+        }
+    };
+
+    const handleApplyToAll = () => {
+        if (setAllValue === '') return;
+
+        setRows(prevRows => prevRows.map(row => ({
+            ...row,
+            target: setAllValue,
+            isSelected: true
+        })));
+        setSetAllValue('');
+    };
+
+    const handleChangeTarget = (id: string, value: string) => {
+        if (/^\d*\.?\d{0,2}$/.test(value)) {
+            setRows((prev) =>
+                prev.map((r) =>
+                    r.id === id ? { ...r, target: value, isSelected: true } : r
+                )
+            );
+        }
+    };
+
+    const handleResetTarget = (id: string) => {
+        setRows((prev) =>
+            prev.map((r) =>
+                r.id === id ? { ...r, target: "0", isSelected: true } : r
+            )
+        );
+    };
+
+    const filteredRows = useMemo(() => {
+        return rows.filter(row =>
+            row.sexename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            row.sexe.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [rows, searchQuery]);
+
+    const totalTarget = useMemo(() => {
+        return rows.reduce((sum, row) => sum + parseFloat(row.target || 0), 0);
+    }, [rows]);
+
+    const selectedCount = useMemo(() => {
+        return rows.filter(row => parseFloat(row.target || "0") > 0).length;
+    }, [rows]);
+
+    const renderRow = ({ item }: { item: any }) => {
+        return (
+            <View style={mst.row}>
+                <View style={[mst.avatar, { backgroundColor: getAvatarColor(item.sexename) }]}>
+                    <Text style={mst.avatarText}>{item.sexename.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={mst.rowInfo}>
+                    <Text style={mst.rowName}>{item.sexename}</Text>
+                    <Text style={mst.rowCode}>{item.sexe}</Text>
+                    <Text style={mst.lastMonth}>Last month: ₹{item.last_month_target || '0'}</Text>
+                </View>
+                <View style={mst.targetInputContainer}>
+                    <Text style={mst.rupeeSymbol}>₹</Text>
+                    <TextInput
+                        style={mst.targetInput}
+                        value={item.target}
+                        onChangeText={(v) => handleChangeTarget(item.id, v)}
+                        placeholder="0"
+                        placeholderTextColor="#7C93A6"
+                        keyboardType="numeric"
+                    />
+                    {parseFloat(item.target || "0") > 0 && (
+                        <TouchableOpacity
+                            style={mst.resetButton}
+                            onPress={() => handleResetTarget(item.id)}
+                        >
+                            <Ionicons name="close-circle" size={20} color="#ff3b30" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+        );
+    };
+
+    return (
+        <ScrollView
+            style={mst.container}
+            contentContainerStyle={mst.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+        >
+            {/* Month Picker */}
+            <View style={mst.monthPicker}>
+                <TouchableOpacity onPress={() => shiftMonth(-1)} style={mst.monthNav}>
+                    <Ionicons name="chevron-back" size={24} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={openPicker} style={mst.monthTextContainer}>
+                    <Text style={mst.monthText}>{formatMonthYear(month, year)}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => shiftMonth(1)} style={mst.monthNav}>
+                    <Ionicons name="chevron-forward" size={24} color="#666" />
+                </TouchableOpacity>
+            </View>
+
+            {/* Search Bar */}
+            <View style={mst.searchContainer}>
+                <Ionicons name="search" size={20} color="#999" style={mst.searchIcon} />
+                <TextInput
+                    style={mst.searchInput}
+                    placeholder="Search executive"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+
+            {/* Set All and Apply to All */}
+            <View style={mst.setAllContainer}>
+                <View style={mst.setAllInputContainer}>
+                    <Text style={mst.rupeeSymbol}>₹</Text>
+                    <TextInput
+                        style={mst.setAllInput}
+                        value={setAllValue}
+                        onChangeText={handleSetAllChange}
+                        placeholder="Set all"
+                        placeholderTextColor="#7C93A6"
+                        keyboardType="numeric"
+                    />
+                </View>
+                <TouchableOpacity
+                    style={mst.applyAllButton}
+                    onPress={handleApplyToAll}
+                >
+                    <Ionicons name="copy" size={18} color="#fff" />
+                    <Text style={mst.applyAllButtonText}>Apply to all</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* List of Executives */}
+            <View style={mst.listHeader}>
+                <Text style={mst.listTitle}>Executives ({filteredRows.length})</Text>
+            </View>
+
+            {loading ? (
+                <ActivityIndicator size="large" color="#6200ee" style={mst.loader} />
+            ) : filteredRows.length === 0 ? (
+                <Text style={mst.emptyText}>No executives found for this period.</Text>
+            ) : (
+                <FlatList
+                    data={filteredRows}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderRow}
+                    contentContainerStyle={mst.listContent}
+                    scrollEnabled={false}
+                />
+            )}
+
+            {/* Footer with Total and Save Button */}
+            <View style={mst.footer}>
+                <View style={mst.footerLeft}>
+                    <Text style={mst.footerLabel}>Total target</Text>
+                    <Text style={mst.footerValue}>₹{totalTarget.toFixed(2)}</Text>
+                </View>
+                <View style={mst.footerMiddle}>
+                    <Text style={mst.footerLabel}>Assigned</Text>
+                    <Text style={mst.footerValue}>{selectedCount}/{rows.length}</Text>
+                </View>
+                <TouchableOpacity
+                    style={mst.saveButton}
+                    onPress={saveTargets}
+                    disabled={saving}
+                >
+                    {saving ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <>
+                            <Ionicons name="checkmark" size={18} color="#fff" />
+                            <Text style={mst.saveButtonText}>Save targets</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            {/* Month Picker Modal */}
+            <Modal visible={pickerVisible} transparent animationType="fade" onRequestClose={() => setPickerVisible(false)}>
+                <Pressable style={mst.modalOverlay} onPress={() => setPickerVisible(false)}>
+                    <View style={mst.modalContent}>
+                        <View style={mst.modalHeader}>
+                            <TouchableOpacity onPress={() => shiftPickerYear(-1)}>
+                                <Ionicons name="chevron-back" size={24} color="#6200ee" />
+                            </TouchableOpacity>
+                            <Text style={mst.modalYear}>{pickerYear}</Text>
+                            <TouchableOpacity onPress={() => shiftPickerYear(1)}>
+                                <Ionicons name="chevron-forward" size={24} color="#6200ee" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={mst.monthGrid}>
+                            {MONTH_SHORT.map((label, m) => {
+                                const isActive = m === month && pickerYear === year;
+                                return (
+                                    <TouchableOpacity
+                                        key={label}
+                                        style={[mst.monthCell, isActive && mst.monthCellActive]}
+                                        onPress={() => selectMonthFromPicker(m)}
+                                    >
+                                        <Text style={[mst.monthCellText, isActive && mst.monthCellTextActive]}>
+                                            {label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                        <TouchableOpacity
+                            style={mst.modalCloseButton}
+                            onPress={() => setPickerVisible(false)}
+                        >
+                            <Text style={mst.modalCloseText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Pressable>
+            </Modal>
+        </ScrollView>
+    );
+}
+
+const mst = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
+    scrollContainer: {
+        padding: 16,
+        paddingBottom: 30,
+    },
+    monthPicker: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    monthNav: {
+        padding: 8,
+    },
+    monthTextContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    monthText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#333',
+    },
+    setAllContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 16,
+    },
+    setAllInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    setAllInput: {
+        flex: 1,
+        height: 40,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        paddingHorizontal: 8,
+        fontSize: 16,
+    },
+    applyAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: T.copper,
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    applyAllButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    listHeader: {
+        marginBottom: 8,
+    },
+    listTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    avatarText: {
+        color: '#fff',
+        fontWeight: '700',
+        fontSize: 16,
+    },
+    rowInfo: {
+        flex: 1,
+    },
+    rowName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 2,
+    },
+    rowCode: {
+        fontSize: 12,
+        color: '#666',
+        marginBottom: 4,
+    },
+    lastMonth: {
+        fontSize: 12,
+        color: '#999',
+    },
+    targetInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    rupeeSymbol: {
+        fontSize: 16,
+        color: '#333',
+    },
+    targetInput: {
+        width: 80,
+        height: 40,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        paddingHorizontal: 8,
+        fontSize: 16,
+        textAlign: 'right',
+    },
+    resetButton: {
+        padding: 4,
+    },
+    listContent: {
+        paddingBottom: 20,
+    },
+    loader: {
+        marginVertical: 20,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: '#999',
+        marginVertical: 20,
+    },
+    footer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    footerLeft: {
+        alignItems: 'flex-start',
+    },
+    footerMiddle: {
+        alignItems: 'center',
+    },
+    footerLabel: {
+        fontSize: 12,
+        color: '#666',
+    },
+    footerValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#6200ee',
+    },
+    saveButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: T.copper,
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 20,
+        width: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalYear: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#333',
+    },
+    monthGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    monthCell: {
+        width: '30%',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginBottom: 10,
+        backgroundColor: '#f5f5f5',
+    },
+    monthCellActive: {
+        backgroundColor: '#6200ee',
+    },
+    monthCellText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    monthCellTextActive: {
+        color: '#fff',
+    },
+    modalCloseButton: {
+        marginTop: 20,
+        alignItems: 'center',
+    },
+    modalCloseText: {
+        fontSize: 16,
+        color: '#6200ee',
+        fontWeight: '600',
+    },
+});
+
+// const mst = StyleSheet.create({
+//     filterCard: {
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//         justifyContent: 'space-between',
+//         paddingVertical: 10,
+//         paddingHorizontal: 10,
+//         marginHorizontal: 18,
+//         marginBottom: 14,
+//         backgroundColor: 'rgba(255,255,255,0.06)',
+//         borderRadius: 16,
+//         borderWidth: 1,
+//         borderColor: 'rgba(255,255,255,0.08)',
+//         shadowColor: '#000',
+//         shadowOpacity: 0.25,
+//         shadowRadius: 6,
+//         shadowOffset: { width: 0, height: 3 },
+//         elevation: 3,
+//     },
+//     chevronBtn: {
+//         width: 36,
+//         height: 36,
+//         borderRadius: 18,
+//         backgroundColor: 'rgba(255,255,255,0.08)',
+//         borderWidth: 1,
+//         borderColor: 'rgba(210,140,80,0.4)',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//     },
+//     filterCenter: {
+//         flex: 1,
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         paddingHorizontal: 8,
+//     },
+//     filterLabel: {
+//         color: '#fff',
+//         fontSize: 15,
+//         fontWeight: '800',
+//         textAlign: 'center',
+//     },
+//     filterSubLabel: {
+//         color: '#7C93A6',
+//         fontSize: 10,
+//         textAlign: 'center',
+//         marginTop: 2,
+//     },
+//     modalOverlay: {
+//         flex: 1,
+//         backgroundColor: 'rgba(0,0,0,0.55)',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         paddingHorizontal: 30,
+//     },
+//     modalCard: {
+//         width: '100%',
+//         maxWidth: 340,
+//         backgroundColor: T.nav,
+//         borderRadius: 20,
+//         padding: 18,
+//         borderWidth: 1,
+//         borderColor: 'rgba(255,255,255,0.1)',
+//     },
+//     modalYearRow: {
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         marginBottom: 16,
+//     },
+//     modalYearText: {
+//         color: '#fff',
+//         fontSize: 18,
+//         fontWeight: '900',
+//         marginHorizontal: 28,
+//         minWidth: 60,
+//         textAlign: 'center',
+//     },
+//     monthGrid: {
+//         flexDirection: 'row',
+//         flexWrap: 'wrap',
+//         justifyContent: 'space-between',
+//     },
+//     monthCell: {
+//         width: '31%',
+//         paddingVertical: 12,
+//         borderRadius: 12,
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         marginBottom: 10,
+//         backgroundColor: 'rgba(255,255,255,0.05)',
+//         borderWidth: 1,
+//         borderColor: 'transparent',
+//     },
+//     monthCellCurrent: { borderColor: 'rgba(210,140,80,0.5)' },
+//     monthCellActive: { backgroundColor: T.copper },
+//     monthCellText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700' },
+//     monthCellTextActive: { color: '#fff' },
+//     modalCloseBtn: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
+//     modalCloseText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700' },
+//     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
+//     hint: { color: '#A9C0D4', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+//     selectAllRow: {
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//         paddingHorizontal: 18,
+//         paddingBottom: 8,
+//     },
+//     selectAllText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700', marginLeft: 8 },
+//     listContent: { paddingHorizontal: 18, paddingBottom: 90 },
+//     row: {
+//         flexDirection: 'row',
+//         alignItems: 'center',
+//         backgroundColor: 'rgba(255,255,255,0.05)',
+//         borderRadius: 12,
+//         paddingHorizontal: 12,
+//         paddingVertical: 10,
+//         marginBottom: 8,
+//     },
+//     checkbox: { marginRight: 10 },
+//     checkboxBox: {
+//         width: 20,
+//         height: 20,
+//         borderRadius: 5,
+//         borderWidth: 1.5,
+//         borderColor: '#6F91AD',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//     },
+//     checkboxBoxChecked: { backgroundColor: T.copper, borderColor: T.copper },
+//     rowInfo: { flex: 1, marginRight: 10 },
+//     rowName: { color: '#fff', fontSize: 14, fontWeight: '700' },
+//     rowCode: { color: '#7C93A6', fontSize: 11, marginTop: 2 },
+//     targetInput: {
+//         width: 100,
+//         height: 40,
+//         borderRadius: 10,
+//         borderWidth: 1,
+//         borderColor: '#33506A',
+//         backgroundColor: 'rgba(0,0,0,0.2)',
+//         color: '#fff',
+//         paddingHorizontal: 10,
+//         fontSize: 14,
+//         textAlign: 'right',
+//     },
+//     targetInputError: { borderColor: '#E38B8B' },
+//     saveBtn: {
+//         position: 'absolute',
+//         left: 18,
+//         right: 18,
+//         bottom: 16,
+//         height: 52,
+//         borderRadius: 15,
+//         backgroundColor: T.copper,
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//     },
+//     btnDisabled: { opacity: 0.6 },
+//     saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+// });
+
 function AliasesDesignPickerModal({
     visible,
     onSelect,
@@ -3092,7 +4660,7 @@ function YarnsTab() {
                 <FlatList data={filtered} keyExtractor={(y, idx) => `${y.mi_id}-${idx}`} contentContainerStyle={{ padding: 14, paddingBottom: 24 }}
                     renderItem={({ item: y }) => (
                         <View style={yn.row}>
-                            <View style={[yn.badge, { backgroundColor: y.sys === 'Lea' ? '#E8F4E8' : y.sys === 'Ne' ? '#E8EEF4' : '#F4EEE8' }]}>        
+                            <View style={[yn.badge, { backgroundColor: y.sys === 'Lea' ? '#E8F4E8' : y.sys === 'Ne' ? '#E8EEF4' : '#F4EEE8' }]}>
                                 <Text style={[yn.badgeTxt, { color: y.sys === 'Lea' ? T.green : y.sys === 'Ne' ? T.blue : T.pd }]}>{y.sys}</Text>
                             </View>
                             <View style={{ flex: 1 }}>
@@ -3182,7 +4750,7 @@ export function DesignsScreen() {
     const { canAccess } = usePermission();
     const setHeaderExtras = useHeaderExtrasStore((state) => state.setHeaderExtras);
     const clearHeaderExtras = useHeaderExtrasStore((state) => state.clearHeaderExtras);
-    const [tab, setTab] = useState<Tab | null>('Catalog');
+    const [tab, setTab] = useState<Tab | null>('Aliases');
     const [selectedDesign, setSelected] = useState<Design | null>(null);
     const [detailDesign, setDetail] = useState<Design | null>(null);
     const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
@@ -3273,6 +4841,7 @@ export function DesignsScreen() {
                     <>
                         <TabBar active={tab} tabs={visibleTabs} onChange={openTab} />
                         <View style={{ flex: 1 }}>
+                            {/* {tab === 'Monthly Sales Target' && canAccess('designs.monthlysalestarget') && <MonthlySalesTargetTab design={detailDesign} />} */}
                             {tab === 'Aliases' && canAccess('designs.aliases') && <AliasesTab design={detailDesign} />}
                             {tab === 'Catalog' && canAccess('designs.catalog') && (
                                 <CatalogTab

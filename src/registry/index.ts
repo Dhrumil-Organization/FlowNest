@@ -7,6 +7,7 @@
  */
 import './modules/dashboard.permission';
 import './modules/designs.permission';
+import './modules/monthlySalesTarget.permission';
 import './modules/creel.permission';
 import './modules/beam.permission';
 import './modules/costing.permission';

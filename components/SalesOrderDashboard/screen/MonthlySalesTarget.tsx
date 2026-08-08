@@ -25,7 +25,11 @@
 //      to match your actual API's field names; everything else adapts
 //      automatically.
 // ─────────────────────────────────────────────────────────────
+import { API } from '@/common/API/dynamicAPI';
+import { T } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -40,12 +44,6 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from "axios";
-import { useAppSessionStore } from '@/src/stores/AppSessionStore';
-import { T } from '@/src/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@/src/api/client';
-import { API } from '@/common/API/dynamicAPI';
 
 // ---- Set to false if you want the list hidden until the user
 // explicitly interacts with the month/year stepper at least once. ----
@@ -135,6 +133,7 @@ export default function MonthlySalesTargetScreen({
     const [rows, setRows] = useState<TargetRow[]>([]);
     const [selected, setSelected] = useState<Record<string, boolean>>({});
     const [errors, setErrors] = useState<Record<string, boolean>>({});
+    const [search, setSearch] = useState("");
 
     let cancelToken: any;
 
@@ -173,7 +172,7 @@ export default function MonthlySalesTargetScreen({
                 // txntype: "monthly_sales_target"
             };
 
-            console.log("payload", payload);
+            console.log("mmm payload", payload);
 
             const response = await axios.get(
                 `${API}/api/monthly_sales_target_browse`,
@@ -182,7 +181,7 @@ export default function MonthlySalesTargetScreen({
                 }),
             );
 
-            console.log("response", response);
+            console.log("mmm response", response, API);
             if (
                 response.data.success && response.data.data?.monthly_sales_target?.length > 0) {
                 const targets = response.data.data.monthly_sales_target.map((item: any) => ({
@@ -365,25 +364,25 @@ export default function MonthlySalesTargetScreen({
             return;
         }
 
-        const invalidRow = selectedRows.find((r) => {
-            const value = (r.target || "").trim();
+        // const invalidRow = selectedRows.find((r) => {
+        //     const value = (r.target || "").trim();
 
-            return (
-                value === "" ||
-                value === ".00" ||
-                value === "0" ||
-                value === "0.0" ||
-                value === "0.00"
-            );
-        });
+        //     return (
+        //         value === "" ||
+        //         value === ".00" ||
+        //         value === "0" ||
+        //         value === "0.0" ||
+        //         value === "0.00"
+        //     );
+        // });
 
-        if (invalidRow) {
-            Alert.alert(
-                "Validation",
-                "Target value cannot be blank ."
-            );
-            return;
-        }
+        // if (invalidRow) {
+        //     Alert.alert(
+        //         "Validation",
+        //         "Target value cannot be blank ."
+        //     );
+        //     return;
+        // }
 
         setSaving(true);
         await saveTargets();
@@ -493,8 +492,31 @@ export default function MonthlySalesTargetScreen({
         );
     };
 
+    const filteredRows = useMemo(() => {
+        if (!search.trim()) return rows;
+
+        const keyword = search.trim().toLowerCase();
+
+        return rows.filter((row) =>
+            Object.values(row).some((value) => {
+                if (value === null || value === undefined) return false;
+
+                if (typeof value === "object") {
+                    return JSON.stringify(value)
+                        .toLowerCase()
+                        .includes(keyword);
+                }
+
+                return String(value)
+                    .toLowerCase()
+                    .includes(keyword);
+            })
+        );
+    }, [rows, search]);
+
     return (
-        <SafeAreaView style={styles.safe} edges={['top']} >
+        <>
+            <SafeAreaView style={styles.safe} edges={['top']} />
             {/* <Text style={styles.title}>Monthly Sales Target</Text> */}
 
             {/* Month / Year filter */}
@@ -508,7 +530,12 @@ export default function MonthlySalesTargetScreen({
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.filterCenter} onPress={openPicker} activeOpacity={0.75}>
-                    <Ionicons name="calendar-outline" size={16} color="#A9C0D4" style={{ marginRight: 8 }} />
+                    <Ionicons
+                        name="calendar-outline"
+                        size={20}
+                        color="#FFFFFF"
+                        style={{ marginRight: 14 }}
+                    />
                     <View>
                         <Text style={styles.filterLabel}>{formatMonthYear(month, year)}</Text>
                         <Text style={styles.filterSubLabel}>Tap to jump to a month</Text>
@@ -522,6 +549,33 @@ export default function MonthlySalesTargetScreen({
                 >
                     <Ionicons name="chevron-forward" size={18} color={T.copper} />
                 </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+                <Ionicons
+                    name="search"
+                    size={20}
+                    color="#000"
+                    style={{ marginRight: 8 }}
+                />
+
+                <TextInput
+                    placeholder="Search..."
+                    placeholderTextColor="#7C93A6"
+                    value={search}
+                    onChangeText={setSearch}
+                    style={styles.searchInput}
+                />
+
+                {search !== "" && (
+                    <TouchableOpacity onPress={() => setSearch("")}>
+                        <Ionicons
+                            name="close-circle"
+                            size={20}
+                            color="#7C93A6"
+                        />
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Quick-jump modal: pick a year, then tap a month */}
@@ -597,7 +651,7 @@ export default function MonthlySalesTargetScreen({
                     </View>
 
                     <FlatList
-                        data={rows}
+                        data={filteredRows}
                         keyExtractor={(item) => item.id}
                         renderItem={renderRow}
                         contentContainerStyle={styles.listContent}
@@ -624,12 +678,14 @@ export default function MonthlySalesTargetScreen({
                     </TouchableOpacity>
                 </>
             )}
-        </SafeAreaView>
+            {/* </SafeAreaView> */}
+        </>
+
     );
 }
 
 const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: T.nav },
+    safe: { flex: 0, backgroundColor: T.nav },
     title: {
         fontSize: 20,
         fontWeight: '900',
@@ -639,51 +695,51 @@ const styles = StyleSheet.create({
         paddingBottom: 8,
     },
     filterCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        marginHorizontal: 18,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+
+        backgroundColor: T.nav,
+
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+
+        marginHorizontal: 0,
         marginBottom: 14,
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-        shadowColor: '#000',
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 3,
+
+        borderRadius: 0,      // 👈 gap remove
+        elevation: 4,
     },
     chevronBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(210,140,80,0.4)',
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 25,
+        height: 25,
+        borderRadius: 25,
+
+        backgroundColor: "rgba(255,255,255,0.08)",
+
+        borderWidth: 1.5,
+        borderColor: "rgba(255,255,255,0.35)",
+
+        alignItems: "center",
+        justifyContent: "center",
     },
     filterCenter: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 8,
+        flex: 0,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
     },
     filterLabel: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '800',
-        textAlign: 'center',
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "700",
+        textAlign: "center",
     },
     filterSubLabel: {
-        color: '#7C93A6',
-        fontSize: 10,
-        textAlign: 'center',
-        marginTop: 2,
+        color: "rgba(255,255,255,0.75)",
+        fontSize: 14,
+        marginTop: 0,
+        textAlign: "center",
     },
     modalOverlay: {
         flex: 1,
@@ -733,7 +789,7 @@ const styles = StyleSheet.create({
     },
     monthCellCurrent: { borderColor: 'rgba(210,140,80,0.5)' },
     monthCellActive: { backgroundColor: T.copper },
-    monthCellText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700' },
+    monthCellText: { color: '#000', fontSize: 13, fontWeight: '700' },
     monthCellTextActive: { color: '#fff' },
     modalCloseBtn: { alignItems: 'center', paddingVertical: 10, marginTop: 4 },
     modalCloseText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700' },
@@ -745,7 +801,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 18,
         paddingBottom: 8,
     },
-    selectAllText: { color: '#A9C0D4', fontSize: 13, fontWeight: '700', marginLeft: 8 },
+    selectAllText: { color: '#000', fontSize: 13, fontWeight: '700', marginLeft: 8 },
     listContent: { paddingHorizontal: 18, paddingBottom: 90 },
     row: {
         flexDirection: 'row',
@@ -762,22 +818,22 @@ const styles = StyleSheet.create({
         height: 20,
         borderRadius: 5,
         borderWidth: 1.5,
-        borderColor: '#6F91AD',
+        borderColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
     },
     checkboxBoxChecked: { backgroundColor: T.copper, borderColor: T.copper },
     rowInfo: { flex: 1, marginRight: 10 },
-    rowName: { color: '#fff', fontSize: 14, fontWeight: '700' },
-    rowCode: { color: '#7C93A6', fontSize: 11, marginTop: 2 },
+    rowName: { color: '#000', fontSize: 14, fontWeight: '700' },
+    rowCode: { color: '#000', fontSize: 11, marginTop: 2 },
     targetInput: {
         width: 100,
         height: 40,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: '#33506A',
-        backgroundColor: 'rgba(0,0,0,0.2)',
-        color: '#fff',
+        backgroundColor: '#fff',
+        color: '#000',
         paddingHorizontal: 10,
         fontSize: 14,
         textAlign: 'right',
@@ -796,4 +852,22 @@ const styles = StyleSheet.create({
     },
     btnDisabled: { opacity: 0.6 },
     saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+    searchContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginHorizontal: 18,
+        marginBottom: 12,
+        paddingHorizontal: 12,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderWidth: 1,
+        borderColor: "#000",
+    },
+
+    searchInput: {
+        flex: 1,
+        color: "#000",
+        fontSize: 14,
+    },
 });

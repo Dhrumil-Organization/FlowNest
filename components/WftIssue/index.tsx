@@ -153,6 +153,31 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     const openItemDrawer = () => setIsItemVisible(true);
     const closeItemDrawer = () => setIsItemVisible(false);
 
+    // 🔥 FIX: mutual-exclusion openers.
+    // Previously each screen was opened by flipping ONE boolean while the
+    // other two Modals stayed mounted with whatever visible value they had
+    // last (sometimes still true). That is what caused "sometimes carton
+    // list, sometimes scanner list, sometimes item list" — more than one
+    // Modal could be visible={true} at the same time. These wrappers force
+    // exactly one screen to be open at any moment.
+    const openDetailDrawer = () => {
+        setIsItemVisible(false);
+        setisItemdetailvisible(false);
+        setIsDetailVisible(true);
+    };
+
+    const openItemDetailDrawer = () => {
+        setIsDetailVisible(false);
+        setIsItemVisible(false);
+        setisItemdetailvisible(true);
+    };
+
+    const openScannerDrawer = () => {
+        setIsDetailVisible(false);
+        setisItemdetailvisible(false);
+        setIsItemVisible(true);
+    };
+
     useEffect(() => {
         if (!searchText) {
             setFilteredData(data);
@@ -722,10 +747,21 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                             <Text style={styles.smallBox}>Qty: {item.CreelQty}</Text>
 
                             <TouchableOpacity style={styles.editBtn}
-                                onPress={() => {
-                                    setIsEditMode(true);
-                                    setMainUId(item.UId);
-                                    itemdetaildraweropen();
+                                onPress={async () => {
+                                    // 🔥 FIX: clear any leftover state from a
+                                    // previous add/edit session FIRST, then
+                                    // fetch THIS item's data, and only once
+                                    // it has arrived do we navigate. Previously
+                                    // isEditMode/mainUId were set and the
+                                    // screen opened immediately, while the
+                                    // actual fetch (handleViewClick) ran later
+                                    // inside a child useEffect keyed only on
+                                    // [isVisible] — a race that could show a
+                                    // stale item or land on the wrong screen.
+                                    resetAllData();
+                                    resetDrawerStates();
+                                    await handleViewClick(item);
+                                    openItemDetailDrawer();
                                 }}
                             >
                                 <Icon name="edit" size={18} color="#2563eb" />
@@ -755,9 +791,10 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
             <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
                 // onPress={detailopenDrawer}
                 onPress={() => {
-                    detailopenDrawer();
+									   
                     resetAllData();
                     resetDrawerStates();
+                    openDetailDrawer();
                 }}
             >
                 <Icon name="add" size={20} color="#fff" />
@@ -790,83 +827,91 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                 </View>
             </Modal>
 
-            <CustomDrawer
-                isVisible={isDrawerVisible}
-                onClose={closeDrawer}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                onLoadPress={handleLoadPress}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
-                setAllPropertyData={setAllPropertyData}
-                FormState={FormState}
-                setFormState={setFormState}
-                getAllYearData={getAllYearData}
-                setAllYearData={setAllYearData}
-                token={token}
-            />
+            {isDrawerVisible && (
+                <CustomDrawer
+                    isVisible={isDrawerVisible}
+                    onClose={closeDrawer}
+                    selectedYear={selectedYear}
+                    onYearChange={setSelectedYear}
+                    onLoadPress={handleLoadPress}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    getAllPropertyData={getAllPropertyData}
+                    setAllPropertyData={setAllPropertyData}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllYearData={getAllYearData}
+                    setAllYearData={setAllYearData}
+                    token={token}
+                />
+            )}
 
-            <AddWeftIssueDetail
-                isVisible={isDetailVisible}
-                onClose={detailcloseDrawer}
-                onNext={itemdetaildraweropen}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                onLoadPress={handleLoadPress}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
-                setAllPropertyData={setAllPropertyData}
-                FormState={FormState}
-                setFormState={setFormState}
-                getAllYearData={getAllYearData}
-                setAllYearData={setAllYearData}
-                token={token}
+            {isDetailVisible && (
+                <AddWeftIssueDetail
+                    isVisible={isDetailVisible}
+                    onClose={detailcloseDrawer}
+                    onNext={openItemDetailDrawer}
+                    selectedYear={selectedYear}
+                    onYearChange={setSelectedYear}
+                    onLoadPress={handleLoadPress}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    getAllPropertyData={getAllPropertyData}
+                    setAllPropertyData={setAllPropertyData}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllYearData={getAllYearData}
+                    setAllYearData={setAllYearData}
+                    token={token}
 
-                isEditMode={isEditMode}
-                mainUId={mainUId}
-                editData={editData}
-                isItemdetailvisible={isItemdetailvisible}
-                resetFlag={resetFlag}
-            />
+                    isEditMode={isEditMode}
+                    mainUId={mainUId}
+                    editData={editData}
+                    isItemdetailvisible={isItemdetailvisible}
+                    resetFlag={resetFlag}
+                />
+            )}
 
-            <AddWeftIssueItemDetail
-                isVisible={isItemdetailvisible}
-                onClose={itemdetaildrawerclose}
-                onNext={openItemDrawer}
-                selectedYear={selectedYear}
-                onYearChange={setSelectedYear}
-                onLoadPress={handleLoadPress}
-                isLoading={isLoading}
-                setIsLoading={setIsLoading}
-                getAllPropertyData={getAllPropertyData}
-                setAllPropertyData={setAllPropertyData}
-                FormState={FormState}
-                setFormState={setFormState}
-                getAllYearData={getAllYearData}
-                setAllYearData={setAllYearData}
-                token={token}
+            {isItemdetailvisible && (
+                <AddWeftIssueItemDetail
+                    isVisible={isItemdetailvisible}
+                    onClose={itemdetaildrawerclose}
+                    onNext={openScannerDrawer}
+                    selectedYear={selectedYear}
+                    onYearChange={setSelectedYear}
+                    onLoadPress={handleLoadPress}
+                    isLoading={isLoading}
+                    setIsLoading={setIsLoading}
+                    getAllPropertyData={getAllPropertyData}
+                    setAllPropertyData={setAllPropertyData}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    getAllYearData={getAllYearData}
+                    setAllYearData={setAllYearData}
+                    token={token}
 
-                isEditMode={isEditMode}
-                mainUId={mainUId}
-                handleclick={handleViewClick}
-                editData={editData}
-            />
+                    isEditMode={isEditMode}
+                    mainUId={mainUId}
+                    handleclick={handleViewClick}
+                    editData={editData}
+                />
+            )}
 
-            <WeftIssueItemDrawer
-                isVisible={isItemVisible}
-                onClose={closeItemDrawer}
-                FormState={FormState}
-                setFormState={setFormState}
-                token={token}
-                isEditMode={isEditMode}
-                mainUId={mainUId}
-                editData={editData}
-                resetAllData={resetAllData}
-                closeAllDrawers={closeAllDrawers}
-                fetchbrowse={fetchbrowse} // 🔥 yahi pass hoga
-            />
+            {isItemVisible && (
+                <WeftIssueItemDrawer
+                    isVisible={isItemVisible}
+                    onClose={closeItemDrawer}
+                    FormState={FormState}
+                    setFormState={setFormState}
+                    token={token}
+                    isEditMode={isEditMode}
+                    mainUId={mainUId}
+                    editData={editData}
+                    resetAllData={resetAllData}
+                    closeAllDrawers={closeAllDrawers}
+                    fetchbrowse={fetchbrowse} // 🔥 yahi pass hoga
+                />
+            )}
         </>
     );
 };

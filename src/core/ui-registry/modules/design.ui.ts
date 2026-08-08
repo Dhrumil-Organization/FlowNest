@@ -3,6 +3,7 @@ import { registerUiNodes } from '../uiRegistry';
 registerUiNodes([
   { id: 'nav.designs', kind: 'navigation', title: 'Designs', permission: 'designs', action: 'view', route: 'designs', icon: 'build', order: 20 },
   { id: 'screen.designs', kind: 'screen', title: 'Designs', permission: 'designs', action: 'view', order: 20 },
+  { id: 'designs.monthlysalestarget', kind: 'tab', parentId: 'screen.designs', title: 'Monthly Sales Target', permission: 'designs.monthlysalestarget', action: 'view', order: 10 },
   { id: 'designs.aliases', kind: 'tab', parentId: 'screen.designs', title: 'Aliases', permission: 'designs.aliases', action: 'view', order: 10 },
   { id: 'designs.catalog', kind: 'tab', parentId: 'screen.designs', title: 'Catalog', permission: 'designs.catalog', action: 'view', order: 20 },
   { id: 'designs.design', kind: 'tab', parentId: 'screen.designs', title: 'Design', permission: 'designs.design', action: 'view', order: 30 },

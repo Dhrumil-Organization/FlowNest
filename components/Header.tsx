@@ -100,9 +100,14 @@ export default function Header({
     };
 
     // go back function
+    // const goBack = () => {
+    //     if (router.canGoBack()) router.back();
+    //     else router.replace('/');
+    // };
     const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
+        // if (router.canGoBack()) router.back();
+        // else router.replace('/');
+        router.replace('/(tabs)');
     };
 
     useEffect(() => {
@@ -342,7 +347,7 @@ const styles = StyleSheet.create({
     modalOverlay: { height: '100%', justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.35)' },
     sheet: {
         backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 20,
+        padding: 20, height: '45%'
     },
     sheetName: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
     menuItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#eee' },

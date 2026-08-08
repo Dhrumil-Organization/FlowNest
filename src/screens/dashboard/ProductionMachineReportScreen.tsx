@@ -45,13 +45,13 @@ export default function ProductionMachineReportScreen() {
             <View style={s.shareBadge}><Text style={s.shareValue}>{share.toFixed(1)}%</Text><Text style={s.shareLabel}>of output</Text></View>
           </View>
           <View style={s.kpiRow}>
-            <Kpi label="TODAY" value={meters(today)} />
+            <Kpi label="YESTERDAY" value={meters(today)} />
             <Kpi label="THIS MONTH" value={meters(mtd)} />
             <Kpi label="SHARE" value={`${share.toFixed(1)}%`} />
           </View>
         </View>
 
-        <ChartCard title="⚙  PRODUCTION TREND" leftLabel="TODAY" leftValue={meters(today)} rightLabel="THIS MONTH" rightValue={meters(mtd)} data={daily} mode="line" />
+        <ChartCard title="⚙  PRODUCTION TREND" leftLabel="YESTERDAY" leftValue={meters(today)} rightLabel="THIS MONTH" rightValue={meters(mtd)} data={daily} mode="line" />
         <ChartCard title="▥  MONTH BY MONTH" data={monthly} mode="bar" />
       </ScrollView>
     </SafeAreaView>

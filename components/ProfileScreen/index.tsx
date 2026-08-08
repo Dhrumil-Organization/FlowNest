@@ -1,41 +1,40 @@
 // screens/ProfileScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import { API } from '@/common/API/dynamicAPI';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    ScrollView,
-    StyleSheet,
-    Dimensions,
-    Image,
-    StatusBar,
-    Animated,
-    Alert,
-    Switch,
-    Modal,
-    TextInput,
-    RefreshControl,
-    ActionSheetIOS,
-    Platform,
-    ActivityIndicator
-} from 'react-native';
+    captureProfileImage,
+    deleteAcoountSession,
+    getUserProfile,
+    logoutSession,
+    pickProfileImage,
+    updateProfileImage,
+    updateUserProfile,
+    UserProfile,
+} from '@/common/utils/profileStorage';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import * as Haptics from 'expo-haptics';
-import theme from '@/components/theme';
-import { API } from '@/common/API/dynamicAPI';
-import axios from 'axios';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    getUserProfile,
-    updateUserProfile,
-    updateProfileImage,
-    captureProfileImage,
-    pickProfileImage,
-    logoutSession,
-    UserProfile,
-    deleteAcoountSession,
-} from '@/common/utils/profileStorage';
+    ActionSheetIOS,
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -334,8 +333,9 @@ export default function ProfileScreen({ token }) {
     }
 
     const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
+        // if (router.canGoBack()) router.back();
+        // else router.replace('/');
+        router.replace('/(tabs)');
     };
 
 

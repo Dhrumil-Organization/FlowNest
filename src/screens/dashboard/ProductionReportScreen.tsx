@@ -61,7 +61,7 @@ export default function ProductionReportScreen() {
           <Text style={s.sub}>All machine groups · {date || 'selected date'}</Text>
 
           <View style={s.kpiRow}>
-            <Kpi label="TODAY" value={meters(production?.total?.today_meters)} />
+            <Kpi label="YESTERDAY" value={meters(production?.total?.today_meters)} />
             <Kpi label="THIS MONTH" value={meters(production?.total?.mtd_meters)} />
             <Kpi label="MACHINES" value={String(production?.by_machine?.length || 0)} />
           </View>
@@ -71,7 +71,7 @@ export default function ProductionReportScreen() {
           <View style={s.cardHeader}><Text style={s.cardHeaderText}>⚙  BY MACHINE</Text></View>
           <View style={s.tableHead}>
             <Text style={[s.th, { flex: 1 }]}>MACHINE</Text>
-            <Text style={s.th}>TODAY</Text>
+            <Text style={s.th}>YESTERDAY</Text>
             <Text style={s.th}>MONTH</Text>
           </View>
 

@@ -116,7 +116,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [selectedCreel, setSelectedCreel] = useState(null);
-    const [mainUId, setMainUId] = useState(null);
+    const [mainUId, setMainUId] = useState<number | null>(null);
+    const [sessionStatus, setSessionStatus] = useState<'DRAFT' | 'FINAL' | ''>('');
     const [isEditMode, setIsEditMode] = useState(false);
     const [propertyData, setPropertyData] = useState([]);
     const [selectedProperty, setSelectedProperty] = useState(null);
@@ -143,8 +144,18 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     console.log("getMachineData", getMachineData);
 
 
+    const safeAlertMessage = (msg, fallback) => {
+        if (typeof msg === 'string' && msg.trim() !== '') return msg;
+        if (typeof msg === 'number' || typeof msg === 'boolean') return String(msg);
+        return fallback;
+    };
 
     const styles = StyleSheet.create({
+        statusColumn: {
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            gap: 6,
+        },
         scannerCard: {
             marginHorizontal: 14,
             marginTop: 10,
@@ -867,11 +878,19 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             borderRadius: 10
         },
 
+        // statusBadge: {
+        //     paddingHorizontal: 10,
+        //     paddingVertical: 4,
+        //     borderRadius: 20,
+        //     borderWidth: 1
+        // },
         statusBadge: {
-            paddingHorizontal: 10,
-            paddingVertical: 4,
+            width: 80,
+            paddingVertical: 6,
             borderRadius: 20,
-            borderWidth: 1
+            borderWidth: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
         },
 
         filterInfoContainer: {
@@ -1245,29 +1264,125 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     // console.log("prptype", propertydata);
     console.log("stocktype", FormState.values.StkType);
 
+    // useEffect(() => {
+    //     const loadPreferenceData = async () => {
+
+    //         if (!token) return;
+
+    //         const saved = await loadDefaultPreference();
+
+    //         if (saved?.criteria) {
+
+    //             const criteria = normalizeCriteria(saved.criteria);
+
+    //             setFormState(prev => ({
+    //                 ...prev,
+    //                 values: {
+    //                     ...prev.values,
+    //                     ...criteria,
+    //                 }
+    //             }));
+    //         }
+    //     };
+
+    //     loadPreferenceData();
+    // }, []);
+
     useEffect(() => {
         const loadPreferenceData = async () => {
+            if (!token || !userid) return;
 
-            if (!token) return;
+            try {
+                console.log('🔵 Loading saved criteria...');
 
-            const saved = await loadDefaultPreference();
+                const saved = await loadDefaultPreference();
 
-            if (saved?.criteria) {
+                console.log('🟢 Saved Preference:', saved);
+
+                if (!saved?.criteria) {
+                    console.log('⚠️ No saved criteria found');
+                    return;
+                }
 
                 const criteria = normalizeCriteria(saved.criteria);
 
+                console.log('🟢 Normalized Criteria:', criteria);
+
+                // -------------------------------------------------
+                // 1. FORM STATE
+                // -------------------------------------------------
                 setFormState(prev => ({
                     ...prev,
                     values: {
                         ...prev.values,
-                        ...criteria,
+                        PrpCode: criteria.PrpCode,
+                        YearNo: criteria.YearNo,
+                        fromdate: criteria.fromdate,
+                        todate: criteria.todate,
+                        status: criteria.status,
+                        StkType: criteria.StkType,
                     }
                 }));
+
+                // -------------------------------------------------
+                // 2. PROPERTY DROPDOWN
+                // -------------------------------------------------
+                if (criteria.PrpCode) {
+                    const property = propertyData?.find(
+                        item =>
+                            String(item.PrpCode) ===
+                            String(criteria.PrpCode)
+                    );
+
+                    console.log("🏢 Saved Property Object:", property);
+
+                    if (property) {
+                        setSelectedProperty(property);
+                    }
+                }
+
+                // -------------------------------------------------
+                // 3. YEAR DROPDOWN
+                // -------------------------------------------------
+                if (criteria.YearNo) {
+                    const year = getAllYearData?.find(
+                        item =>
+                            String(item.YearNo) ===
+                            String(criteria.YearNo)
+                    );
+
+                    console.log("📅 Saved Year Object:", year);
+
+                    if (year) {
+                        setSelectedYear(year);
+                    }
+                }
+
+                // -------------------------------------------------
+                // 4. STOCK TYPE
+                // -------------------------------------------------
+                if (criteria.StkType) {
+                    const stock = getStockTypes?.find(
+                        item =>
+                            String(item.StkType) ===
+                            String(criteria.StkType)
+                    );
+
+                    console.log("📦 Saved Stock Type Object:", stock);
+
+                    if (stock) {
+                        setselectedstocktype(stock);
+                    }
+                }
+
+            } catch (error) {
+                console.log('❌ Preference Load Error:', error);
             }
         };
 
         loadPreferenceData();
-    }, []);
+
+    }, [token, userid, propertyData, getAllYearData]);
 
     const getRequestConfig = (props: any) => ({
         headers: {
@@ -1303,21 +1418,53 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     //     loadProperty();
     // }, [token]);
 
+    // useEffect(() => {
+    //     if (!token) return;
+
+    //     const load = async () => {
+    //         const data = await fetchPropertyData(token);
+
+    //         setPropertyData(data || []);
+
+    //         if (data?.length) {
+    //             setFormState(prev => ({
+    //                 ...prev,
+    //                 values: {
+    //                     ...prev.values,
+    //                     PrpCode: data[0].PrpCode,
+    //                     LngName: data[0].LngName,
+    //                 }
+    //             }));
+    //         }
+    //     };
+
+    //     load();
+    // }, [token]);
+
     useEffect(() => {
         if (!token) return;
 
         const load = async () => {
             const data = await fetchPropertyData(token);
-
             setPropertyData(data || []);
 
             if (data?.length) {
+                const prpCode = data[0].PrpCode;
+                const years = await fetchAllYeardata(token, prpCode);
+                setAllYearData(years);
+
+                const currentFY = getCurrentFinancialYear();
+                const currentYear =
+                    years.find(y => String(y.YearNo) === String(currentFY)) || years[0];
+
                 setFormState(prev => ({
                     ...prev,
                     values: {
                         ...prev.values,
-                        PrpCode: data[0].PrpCode,
+                        PrpCode: prpCode,
                         LngName: data[0].LngName,
+                        YearNo: currentYear?.YearNo || '',
+                        YearName: currentYear?.YearName || '',
                     }
                 }));
             }
@@ -1436,6 +1583,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 fromdate: FormState.values.fromdate || '',
                 todate: FormState.values.todate || '',
                 status: FormState.values.status || '',
+                include_drafts: 1,
 
             };
 
@@ -1529,7 +1677,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             };
             console.log("show Payload:", payload);
             const response = await axios.post(
-                `${API}/api/get_yarn_issue_show`,
+                `${API}/api/${String(item.SessionStatus || item.Status || '').toUpperCase() === 'DRAFT' ? 'resume_creel_session' : 'get_yarn_issue_show'}`,
                 payload,
                 { headers }
             );
@@ -1545,7 +1693,20 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                 const mainData = resData.main || [];
                 if (mainData.length > 0) {
-                    setCreelId(mainData[0].BatchNo || '');
+                    const header = mainData[0];
+                    setCreelId(header.BatchNo || '');
+                    setSessionStatus(String(header.Status || item.SessionStatus || 'FINAL').toUpperCase() as 'DRAFT' | 'FINAL');
+                    setShift(String(header.ImTag || ''));
+                    setstocktype(String(header.StkType || ''));
+                    setRemark(String(header.Remark || ''));
+                    setFormState(prev => ({
+                        ...prev,
+                        values: {
+                            ...prev.values,
+                            StkType: String(header.StkType || prev.values.StkType || ''),
+                            MacCode: String(header.IssTo || prev.values.MacCode || ''),
+                        },
+                    }));
                 }
 
                 // const mappedData = d2.map(d2Item => {
@@ -1949,39 +2110,309 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
     };
 
-    const handleAddCarton = () => {
+
+    /**
+     * Production-safe Laravel API response helpers.
+     *
+     * The ERP BaseController/sendResponse() normally returns:
+     * {
+     *   success: boolean,
+     *   response: ...,
+     *   message: string
+     * }
+     *
+     * Axios errors can instead expose the same Laravel payload at
+     * error.response.data.  These helpers deliberately read both shapes so
+     * business-validation messages from Laravel (duplicate carton, DRAFT
+     * session validation, stock errors, etc.) are never replaced by a generic
+     * React Native message.
+     */
+    const getLaravelResponsePayload = (source: any) => {
+        if (!source) return null;
+
+        // Axios rejected request / HTTP error.
+        if (source?.response?.data) {
+            return source.response.data;
+        }
+
+        // Axios successful HTTP response object.
+        if (source?.data) {
+            return source.data;
+        }
+
+        // Already-unwrapped Laravel payload.
+        return source;
+    };
+
+    const getLaravelApiMessage = (source: any, fallback: string) => {
+        const payload = getLaravelResponsePayload(source);
+        const nested = payload?.response;
+
+        const errorCode = String(
+            payload?.error_code ??
+            nested?.error_code ??
+            nested?.data?.error_code ??
+            ''
+        ).trim().toUpperCase();
+
+        const cartNo = String(
+            payload?.CartNo ??
+            nested?.CartNo ??
+            nested?.data?.CartNo ??
+            ''
+        ).trim();
+
+        /*
+         * Some ERP endpoints currently return business failures like:
+         *
+         * {
+         *   success: true,
+         *   response: {
+         *     error: true,
+         *     error_code: 'DUPLICATE_CARTON',
+         *     CartNo: '261690614',
+         *     message: false
+         *   },
+         *   message: false
+         * }
+         *
+         * In that case Laravel has given us a reliable error code and carton
+         * number but no string message. Build the precise business message
+         * rather than showing a generic error or treating the request as saved.
+         */
+        if (errorCode === 'DUPLICATE_CARTON') {
+            return cartNo
+                ? `Carton ${cartNo} is already issued.`
+                : 'This carton is already issued.';
+        }
+
+        const candidates = [
+            payload?.message,
+            nested?.message,
+            nested?.data?.message,
+            payload?.error,
+            nested?.error_message,
+            nested?.data?.error_message,
+            payload?.errors?.message,
+            source?.message,
+        ];
+
+        for (const candidate of candidates) {
+            if (typeof candidate === 'string' && candidate.trim() !== '') {
+                return candidate.trim();
+            }
+        }
+
+        // Laravel validation errors may be returned as:
+        // errors: { FieldName: ["message"] }
+        if (payload?.errors && typeof payload.errors === 'object') {
+            for (const value of Object.values(payload.errors) as any[]) {
+                if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+                    return value[0];
+                }
+
+                if (typeof value === 'string' && value.trim() !== '') {
+                    return value.trim();
+                }
+            }
+        }
+
+        if (nested?.errors && typeof nested.errors === 'object') {
+            for (const value of Object.values(nested.errors) as any[]) {
+                if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+                    return value[0];
+                }
+
+                if (typeof value === 'string' && value.trim() !== '') {
+                    return value.trim();
+                }
+            }
+        }
+
+        return fallback;
+    };
+
+    const getLaravelErrorCode = (source: any) => {
+        const payload = getLaravelResponsePayload(source);
+
+        return String(
+            payload?.error_code ??
+            payload?.response?.error_code ??
+            payload?.response?.data?.error_code ??
+            ''
+        ).trim().toUpperCase();
+    };
+
+    const isLaravelSuccess = (response: any) => {
+        const payload = getLaravelResponsePayload(response);
+        const nested = payload?.response;
+
+        const errorCode = String(
+            payload?.error_code ??
+            nested?.error_code ??
+            nested?.data?.error_code ??
+            ''
+        ).trim().toUpperCase();
+
+        const duplicate =
+            payload?.duplicate === true ||
+            nested?.duplicate === true ||
+            nested?.data?.duplicate === true ||
+            errorCode === 'DUPLICATE_CARTON';
+
+        /*
+         * Duplicate is always a hard failure, even when the ERP response
+         * wrapper incorrectly says success:true.
+         */
+        if (duplicate) {
+            return false;
+        }
+
+        /*
+         * Strong saved-row evidence.
+         *
+         * YarnStockIssueController@add_single_carton_scan returns these values
+         * only after the D2 insert, stock update and session update complete:
+         *   uid/UId, SrNo, SubSr, CartonCount, TotalQty, carton
+         *
+         * If this shape is present, treat it as SUCCESS before interpreting
+         * legacy/generic wrapper flags. This prevents a committed carton from
+         * being removed from the UI with a false "Unable to save carton" alert.
+         */
+        const savedPayload = nested?.data && typeof nested.data === 'object'
+            ? nested.data
+            : nested;
+
+        const hasSavedRowEvidence =
+            savedPayload &&
+            typeof savedPayload === 'object' &&
+            (
+                savedPayload?.SrNo !== undefined ||
+                savedPayload?.SubSr !== undefined ||
+                savedPayload?.carton !== undefined
+            ) &&
+            (
+                savedPayload?.UId !== undefined ||
+                savedPayload?.uid !== undefined
+            );
+
+        if (hasSavedRowEvidence) {
+            return true;
+        }
+
+        /*
+         * Known business-error signals. Do not treat every non-empty error_code
+         * as failure because legacy ERP wrappers may populate metadata codes
+         * even on successful responses.
+         */
+        const knownFailureCodes = [
+            'CARTON_VALIDATION_ERROR',
+            'INVALID_CARTON_WEIGHT',
+            'INVALID_CARTON_CHEES',
+            'CARTON_SAVE_FAILED',
+            'SESSION_ERROR',
+            'VALIDATION_ERROR',
+        ];
+
+        const hasKnownBusinessError =
+            knownFailureCodes.includes(errorCode) ||
+            payload?.error === true ||
+            nested?.error === true ||
+            nested?.data?.error === true;
+
+        if (hasKnownBusinessError) {
+            return false;
+        }
+
+        /*
+         * Fall back to the top-level Laravel success flag.
+         */
+        return payload?.success === true;
+    };
+
+    const showCartonSaveError = (source: any, fallback = 'Please scan again.') => {
+        const message = getLaravelApiMessage(source, fallback);
+        const errorCode = getLaravelErrorCode(source);
+        const normalized = message.toLowerCase();
+
+        const isDuplicate =
+            errorCode === 'DUPLICATE_CARTON' ||
+            normalized.includes('already issued') ||
+            normalized.includes('already added') ||
+            normalized.includes('duplicate carton');
+
+        const isSessionError =
+            normalized.includes('creel session') ||
+            normalized.includes('draft creel') ||
+            normalized.includes('only a draft');
+
+        const isValidationError =
+            errorCode.includes('VALIDATION') ||
+            normalized.includes('is required') ||
+            normalized.includes('must be greater') ||
+            normalized.includes('property mismatch');
+
+        const title = isDuplicate
+            ? 'Duplicate Carton'
+            : isSessionError
+                ? 'Session Error'
+                : isValidationError
+                    ? 'Validation Error'
+                    : 'Carton Not Saved';
+
+        Alert.alert(title, message);
+    };
+
+    const handleAddCarton = async () => {
         if (!CartonNo) {
             Alert.alert("Error", "Please scan carton first");
             return;
         }
 
-        const isDuplicate = cartonSummary.some(
-            item => item.cartonNo === CartonNo
-        );
-
-        if (isDuplicate) {
-            Alert.alert("Duplicate Error", `Carton No ${CartonNo} already added.`);
+        if (!mainUId) {
+            Alert.alert(
+                "Session Error",
+                "Creel session is not started. Please go back and tap Save & Next again."
+            );
             return;
         }
 
-        // const enteredChees = parseFloat(getchees);
-        // const enteredQty = parseFloat(getavgwt);
+        if (sessionStatus === 'FINAL') {
+            Alert.alert(
+                "Completed",
+                "This creel is already FINAL and cannot accept more cartons."
+            );
+            return;
+        }
 
-        const enteredChees = parseFloat(getchees || 0);
-        const enteredQty = parseFloat(getavgwt || 0);
+        /*
+         * UI-level duplicate protection.
+         *
+         * This only protects against a carton already visible in the current
+         * React Native session. Laravel/POYIssueD2 remains the final authority
+         * because the same physical carton may already have been issued in
+         * another UID/session.
+         */
+        const normalizedCartonNo = String(CartonNo || '').trim();
 
+        const isDuplicate = cartonSummary.some(
+            item => String(item?.cartonNo ?? item?.CartNo ?? '').trim() === normalizedCartonNo
+        );
 
-        const availableCheesValue = getScannedObj?.Chees;
-        const availableQtyValue = getScannedObj?.Wt;
+        if (isDuplicate) {
+            Alert.alert(
+                "Duplicate Carton",
+                `Carton ${normalizedCartonNo} is already added in this creel.`
+            );
+            return;
+        }
 
-        const availableChees = parseFloat(getScannedObj?.Chees || 0);
-        const availableQty = parseFloat(getScannedObj?.Wt || 0);
+        const enteredChees = parseFloat(getchees || '0');
+        const enteredQty = parseFloat(getavgwt || '0');
+        const availableChees = parseFloat(getScannedObj?.Chees || '0');
+        const availableQty = parseFloat(getScannedObj?.Wt || '0');
 
-        // if (enteredChees > availableChees) {
-        if (
-            availableChees > 0 &&
-            enteredChees > availableChees
-        ) {
+        if (availableChees > 0 && enteredChees > availableChees) {
             Alert.alert(
                 "Validation Error",
                 `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableChees}).`
@@ -1989,55 +2420,218 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             return;
         }
 
-        // if (enteredQty > availableQty) {
-        if (enteredQty > 0 && enteredQty > availableQty) {
+        if (availableQty > 0 && enteredQty > availableQty) {
             Alert.alert(
                 "Validation Error",
-                `Entered Quantity (${enteredQty}) Cannot not be greater than Available Quantity (${availableQty}).`
+                `Entered Quantity (${enteredQty}) cannot be greater than Available Quantity (${availableQty}).`
             );
             return;
         }
 
-        if (enteredChees <= 0) {
+        if (!Number.isFinite(enteredChees) || enteredChees <= 0) {
             Alert.alert("Validation Error", "Chees must be greater than 0.");
             return;
         }
 
-        if (enteredQty <= 0) {
+        if (!Number.isFinite(enteredQty) || enteredQty <= 0) {
             Alert.alert("Validation Error", "Qty must be greater than 0.");
             return;
         }
 
-        const newCarton = {
-            cartonNo: CartonNo,
-            chees: getchees,
-            qty: getavgwt,
+        /*
+         * Keep exactly the carton structure expected by
+         * YarnStockIssueController@add_single_carton_scan.
+         */
+        const cartonPayload = {
+            PrpCode: getScannedObj?.PrpCode || FormState.values.PrpCode || '',
+            CartNo: normalizedCartonNo,
+            Chees: enteredChees,
+            Wt: enteredQty,
             PUId: getScannedObj?.PUId,
             PSrNo: getScannedObj?.PSrNo,
             PSubSr: getScannedObj?.PSubSr,
             TranType: getScannedObj?.TranType,
             ItmCode: getScannedObj?.ItmCode,
-            ItmName: getScannedObj?.ItmName,
             MerCode: getScannedObj?.MerCode,
-            MerName: getScannedObj?.MerName,
             GrdCode: getScannedObj?.GrdCode,
-            GrdName: getScannedObj?.GrdName,
             ShdCode: getScannedObj?.ShdCode,
-            ShdName: getScannedObj?.ShdName,
-            Denier: getScannedObj?.Denier,
-            yearNo: getScannedObj?.yearNo,
-            SrNo: getScannedObj.SrNo,
-            SubSr: getScannedObj.SubSr,
-            PrpCode: getScannedObj.PrpCode,
-            Rate: getScannedObj.Rate,
-            UId: mainUId?.UId,
+            Denier: getScannedObj?.Denier || 0,
+            Rate: getScannedObj?.Rate || 0,
+            ExpProdQty: 0,
+            DsnRcpSrNo: getScannedObj?.DsnRcpSrNo || 0,
+            DsnCode: getScannedObj?.DsnCode || 0,
         };
-        setCartonSummary(prev => [...prev, newCarton]);
+
+        /*
+         * Preserve the scanned display values before clearing the input UI.
+         * If Laravel rejects the carton, the optimistic row is removed and
+         * the authoritative Laravel message is displayed.
+         */
+        const scannedSnapshot = { ...getScannedObj };
+
+        const optimisticKey =
+            `pending-${Date.now()}-${normalizedCartonNo}`;
+
+        const optimisticRow = {
+            optimisticKey,
+            cartonNo: normalizedCartonNo,
+            CartNo: normalizedCartonNo,
+            chees: enteredChees,
+            qty: enteredQty,
+            ...scannedSnapshot,
+            UId: mainUId,
+            isPending: true,
+        };
+
+        setCartonSummary(prev => [...prev, optimisticRow]);
+
         setCartonNo('');
         setchees('');
         setavgwt('');
-        setSearchResults({});
+        setSearchResults([]);
         setScannedObj({});
+
+        console.log("optimisticRow", optimisticRow);
+
+        try {
+            const response = await axios.post(
+                `${API}/api/add_single_carton_scan`,
+                {
+                    uid: mainUId,
+                    prpcode: FormState.values.PrpCode,
+                    yearno:
+                        FormState.values.YearNo ||
+                        getCurrentFinancialYear(),
+                    carton: cartonPayload,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json',
+                        'X-Requested-with': 'XMLHttpRequest',
+                    },
+                }
+            );
+
+            console.log(
+                "cartonPayload",
+                cartonPayload,
+                mainUId,
+                FormState.values.PrpCode,
+                FormState.values.YearNo
+            );
+
+            console.log("scan carton response", response);
+
+            /*
+             * IMPORTANT:
+             * BaseController/sendResponse() may return HTTP 200 even when
+             * success=false. Axios therefore does NOT necessarily enter catch.
+             * Always inspect Laravel's application-level success flag.
+             */
+            if (!isLaravelSuccess(response)) {
+                /*
+                 * Throw the whole response, not only a newly-created Error.
+                 * This preserves response.data.response/error_code/message for
+                 * the catch block and gives the user Laravel's exact message.
+                 */
+                throw response;
+            }
+
+            const rawSaved = response?.data?.response || {};
+            const saved =
+                rawSaved?.data &&
+                    typeof rawSaved.data === 'object' &&
+                    (
+                        rawSaved.data?.SrNo !== undefined ||
+                        rawSaved.data?.SubSr !== undefined ||
+                        rawSaved.data?.carton !== undefined
+                    )
+                    ? rawSaved.data
+                    : rawSaved;
+
+            const savedCarton = saved?.carton || cartonPayload;
+
+            setCartonSummary(prev =>
+                prev.map(item =>
+                    item.optimisticKey === optimisticKey
+                        ? {
+                            ...optimisticRow,
+                            ...savedCarton,
+                            cartonNo:
+                                savedCarton.CartNo ||
+                                optimisticRow.cartonNo,
+                            CartNo:
+                                savedCarton.CartNo ||
+                                optimisticRow.CartNo,
+                            chees:
+                                savedCarton.Chees ??
+                                optimisticRow.chees,
+                            qty:
+                                savedCarton.Wt ??
+                                savedCarton.Qty ??
+                                optimisticRow.qty,
+                            SrNo:
+                                saved.SrNo ??
+                                savedCarton.SrNo,
+                            d1SrNo: String(
+                                saved.SrNo ??
+                                savedCarton.SrNo ??
+                                ''
+                            ),
+                            SubSr:
+                                saved.SubSr ??
+                                savedCarton.SubSr,
+                            SubSrNo:
+                                saved.SubSr ??
+                                savedCarton.SubSr,
+                            UId: mainUId,
+                            isPending: false,
+                            optimisticKey: undefined,
+                        }
+                        : item
+                )
+            );
+
+        } catch (error: any) {
+            /*
+             * Never leave a failed carton looking saved.
+             */
+            setCartonSummary(prev =>
+                prev.filter(
+                    item => item.optimisticKey !== optimisticKey
+                )
+            );
+
+            console.log(
+                'add_single_carton_scan failed',
+                getLaravelResponsePayload(error)
+            );
+
+            /*
+             * Show exactly what Laravel returned whenever possible.
+             * Examples from YarnStockIssueController:
+             *   Carton 261690614 is already issued.
+             *   Creel session was not found.
+             *   Creel session property mismatch.
+             *   Only a DRAFT creel session can accept cartons.
+             *   Carton <field> is required.
+             *   Carton weight must be greater than zero.
+             *   Carton chees must be greater than zero.
+             */
+            showCartonSaveError(
+                error,
+                `Unable to save carton ${normalizedCartonNo}. Please scan again.`
+            );
+
+        } finally {
+            /*
+             * Defensive scanner release. handleBarcodeScanned already manages
+             * its own debounce/lock, but a failed API call must never leave the
+             * next carton permanently blocked.
+             */
+            scanLock.current = false;
+        }
     };
 
     {
@@ -2048,25 +2642,349 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         )
     }
 
-    const handleFinalSubmit = () => {
-        console.log("isEditMode:", isEditMode);
-        console.log("mainUId:", mainUId);
-
-        if (isEditMode && mainUId !== null) {
-            handleSubmitScan();   // MODIFY
-        } else {
-            handleaddCreel();     // ADD
+    const handleFinalSubmit = async () => {
+        if (!mainUId) {
+            Alert.alert('Session Error', 'Creel session UID is missing.');
+            return;
         }
+        if (cartonSummary.some(item => item.isPending)) {
+            Alert.alert('Please Wait', 'One or more carton scans are still being saved.');
+            return;
+        }
+        if (cartonSummary.length === 0) {
+            Alert.alert('Validation', 'At least one carton is required.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const response = await axios.post(`${API}/api/finalize_creel_session`, {
+                uid: mainUId,
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+            }, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response?.data?.success) {
+                throw new Error(response?.data?.message || 'Unable to finalize creel.');
+            }
+            setSessionStatus('FINAL');
+            setDataSaved(true);
+            setSuccessMessage(response.data.message || 'Creel submitted successfully.');
+            setShowSuccess(true);
+        } catch (error: any) {
+            Snackbar.show({
+                text: error?.response?.data?.message || error?.message || 'Unable to finalize creel.',
+                duration: Snackbar.LENGTH_LONG,
+                backgroundColor: '#000',
+                textColor: '#fff',
+                action: { text: 'OK', textColor: 'yellow' },
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // const discardDraftSession = () => {
+    //     if (!mainUId || sessionStatus !== 'DRAFT') return;
+
+    //     Alert.alert(
+    //         'Discard Draft Creel',
+    //         'This will reverse stock for every scanned carton and permanently delete this draft. Continue?',
+    //         [
+    //             { text: 'Cancel', style: 'cancel' },
+    //             {
+    //                 text: 'Discard',
+    //                 style: 'destructive',
+    //                 onPress: async () => {
+    //                     setIsDelete(true);
+    //                     try {
+    //                         // const response = await axios.post(`${API}/api/discard_creel_session`, {
+    //                         //     uid: mainUId,
+    //                         //     prpcode: FormState.values.PrpCode,
+    //                         //     yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+    //                         //     txntype: 'creel_yarn_issue',
+    //                         // }, {
+    //                         //     headers: {
+    //                         //         Authorization: `Bearer ${getToken()}`,
+    //                         //         'Content-Type': 'application/json',
+    //                         //         'X-Requested-with': 'XMLHttpRequest',
+    //                         //     },
+    //                         // });
+
+    //                         const params = {
+    //                             uid: mainUId,
+    //                             prpcode: FormState.values.PrpCode,
+    //                             yearno: FormState.values.YearNo || getCurrentFinancialYear(),
+    //                             txntype: 'creel_yarn_issue',
+    //                         };
+
+    //                         console.log('🚀 Discard Creel Params:', params);
+
+    //                         const response = await axios.post(
+    //                             `${API}/api/discard_creel_session`,
+    //                             params,
+    //                             {
+    //                                 headers: {
+    //                                     Authorization: `Bearer ${getToken()}`,
+    //                                     'Content-Type': 'application/json',
+    //                                     'X-Requested-with': 'XMLHttpRequest',
+    //                                 },
+    //                             }
+    //                         );
+
+    //                         console.log('✅ Discard Creel Response:', response);
+    //                         console.log('📦 Discard Creel Response Data:', response?.data);
+
+    //                         if (!response?.data?.success) {
+    //                             throw new Error(response?.data?.message || 'Unable to discard draft.');
+    //                         }
+
+    //                         setIsScanModalVisible(false);
+    //                         setShowList(false);
+    //                         setCartonSummary([]);
+    //                         setMainUId(null);
+    //                         setSessionStatus('');
+    //                         resetAllFields();
+    //                         await fetchBrowseData();
+    //                         Alert.alert('Draft Discarded', response.data.message || 'Draft creel discarded successfully.');
+    //                     } catch (error: any) {
+    //                         Alert.alert('Discard Failed', error?.response?.data?.message || error?.message || 'Unable to discard draft.');
+    //                     } finally {
+    //                         setIsDelete(false);
+    //                     }
+    //                 },
+    //             },
+    //         ],
+    //     );
+    // };
+
+
+    const discardDraftSession = () => {
+        if (!mainUId || sessionStatus !== 'DRAFT') return;
+
+        Alert.alert(
+            'Discard Draft Creel',
+            'This will reverse stock for every scanned carton and permanently delete this draft. Continue?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Discard',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsDelete(true);
+
+                        try {
+                            const params = {
+                                uid: mainUId,
+                                prpcode: FormState.values.PrpCode,
+                                yearno:
+                                    FormState.values.YearNo ||
+                                    getCurrentFinancialYear(),
+                                txntype: 'creel_yarn_issue',
+                            };
+
+                            console.log(
+                                '🚀 Discard Creel Params:',
+                                params
+                            );
+
+                            const response = await axios.post(
+                                `${API}/api/discard_creel_session`,
+                                params,
+                                {
+                                    headers: {
+                                        Authorization: `Bearer ${getToken()}`,
+                                        'Content-Type': 'application/json',
+                                        'X-Requested-with': 'XMLHttpRequest',
+                                    },
+                                }
+                            );
+
+                            console.log(
+                                '✅ Discard Creel Response:',
+                                response?.data
+                            );
+
+                            // ==========================================
+                            // ACTUAL API MESSAGE
+                            // ==========================================
+                            const apiMessage =
+                                response?.data?.response?.message ||
+                                response?.data?.message ||
+                                'Unable to discard draft.';
+
+                            console.log(
+                                '📢 Discard API Message:',
+                                apiMessage
+                            );
+
+                            console.log(
+                                '📢 Discard Message Type:',
+                                typeof apiMessage
+                            );
+
+                            // ==========================================
+                            // SUCCESS TRUE
+                            // ==========================================
+                            if (response?.data?.success === true) {
+
+                                // IMPORTANT:
+                                // Yaha modal/drawer CLOSE NAHI karna.
+                                // Pehle API ka success message dikhega.
+
+                                Alert.alert(
+                                    'Draft Discarded',
+                                    String(apiMessage),
+                                    [
+                                        {
+                                            text: 'OK',
+                                            style: 'default',
+
+                                            onPress: async () => {
+                                                try {
+                                                    // ==================================
+                                                    // STEP 1
+                                                    // Scan modal close
+                                                    // ==================================
+                                                    setIsScanModalVisible(false);
+
+                                                    // ==================================
+                                                    // STEP 2
+                                                    // List / drawer close
+                                                    // ==================================
+                                                    setShowList(false);
+
+                                                    // ==================================
+                                                    // STEP 3
+                                                    // Modal animation complete hone do
+                                                    // ==================================
+                                                    await new Promise(resolve =>
+                                                        setTimeout(
+                                                            resolve,
+                                                            Platform.OS === 'android'
+                                                                ? 350
+                                                                : 250
+                                                        )
+                                                    );
+
+                                                    // ==================================
+                                                    // STEP 4
+                                                    // Reset all data
+                                                    // ==================================
+                                                    setCartonSummary([]);
+                                                    setMainUId(null);
+                                                    setSessionStatus('');
+                                                    setIsEditMode(false);
+                                                    setSelectedCreel(null);
+
+                                                    resetAllFields();
+
+                                                    // ==================================
+                                                    // STEP 5
+                                                    // Browse API call
+                                                    // ==================================
+                                                    console.log(
+                                                        '🔄 Calling Browse API after OK...'
+                                                    );
+
+                                                    await fetchBrowseData();
+
+                                                    console.log(
+                                                        '✅ Browse API completed'
+                                                    );
+
+                                                } catch (browseError) {
+                                                    console.log(
+                                                        '❌ Browse Refresh Error:',
+                                                        browseError
+                                                    );
+                                                } finally {
+                                                    setIsDelete(false);
+                                                }
+                                            },
+                                        },
+                                    ]
+                                );
+
+                            } else {
+
+                                // ==========================================
+                                // SUCCESS FALSE
+                                // ==========================================
+                                // Yaha bhi actual response.message show hoga.
+                                // Top-level message true/false show nahi hoga.
+
+                                Alert.alert(
+                                    'Discard Failed',
+                                    String(apiMessage),
+                                    [
+                                        {
+                                            text: 'OK',
+                                            style: 'default',
+
+                                            onPress: () => {
+                                                setIsDelete(false);
+                                            },
+                                        },
+                                    ]
+                                );
+                            }
+
+                        } catch (error: any) {
+
+                            console.log(
+                                '❌ Discard Error:',
+                                error
+                            );
+
+                            // ==========================================
+                            // ERROR MESSAGE
+                            // ==========================================
+                            const errorMessage =
+                                error?.response?.data?.response?.message ||
+                                error?.response?.data?.message ||
+                                error?.message ||
+                                'Unable to discard draft.';
+
+                            Alert.alert(
+                                'Discard Failed',
+                                String(errorMessage),
+                                [
+                                    {
+                                        text: 'OK',
+                                        style: 'default',
+
+                                        onPress: () => {
+                                            setIsDelete(false);
+                                        },
+                                    },
+                                ]
+                            );
+
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const getToken = () => {
         return token;
     };
 
-    const getShifts = async (prpCode: string) => {
+    const getShifts = async (prpCode) => {
 
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
@@ -2101,10 +3019,10 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
     }
 
-    const getMachine = async (prpCode: string) => {
+    const getMachine = async (prpCode) => {
 
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
@@ -2141,8 +3059,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     const getcreelid = async (macCode) => {
 
-        if (cancelToken?.cancel) cancelToken.cancel();
-        cancelToken = axios.CancelToken.source();
+        // if (cancelToken?.cancel) cancelToken.cancel();
+        // cancelToken = axios.CancelToken.source();
 
         try {
             let yno = await AsyncStorage.getItem('yno');
@@ -2305,6 +3223,52 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             //console.log("API sendScannedValue error:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const startCreelSession = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            const response = await axios.post(`${API}/api/start_creel_session`, {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo || getCurrentFinancialYear(),
+                txntype: 'creel_yarn_issue',
+                CreelId: creelId,
+                SetupDate: setupDate.toISOString().split('T')[0],
+                Shift: shift,
+                Remark: Remark || '',
+                StkType: FormState.values.StkType || stocktype || '',
+                RecipeUId: 1,
+                BeamUId: 0,
+                DsnCode: 0,
+                IssTo: FormState.values.MacCode,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                },
+            });
+
+            if (!response?.data?.success) {
+                throw new Error(response?.data?.message || 'Unable to start creel session.');
+            }
+            const data = response?.data?.response || {};
+            const uid = Number(data.uid || data.UId || 0);
+            if (!uid) throw new Error('Server did not return the creel session UID.');
+
+            setMainUId(uid);
+            setCreelId(data.CreelId || data.BatchNo || creelId);
+            setSessionStatus('DRAFT');
+            setIsEditMode(true);
+            setCartonSummary([]);
+            setIsCreelModalVisible(false);
+            setIsScanModalVisible(true);
+        } catch (error: any) {
+            Alert.alert('Unable to Start', error?.response?.data?.message || error?.message || 'Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -2538,7 +3502,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 'X-Requested-with': 'XMLHttpRequest',
             };
 
-            const response = await axios.post(`${API}/api/delete_creel_data`, payloadObj, { headers });
+            const response = await axios.post(`${API}/api/discard_creel_session`, payloadObj, { headers });
 
             console.log("delete response", response);
 
@@ -2610,9 +3574,17 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
 
                 setDataSaved(true);
-                setSuccessMessage(successMsg);
-                setShowSuccess(true);
-                // resetAllFields();
+                setCartonSummary(prev => prev.filter(row => !(
+                    String(row.UId) === String(item.UId) &&
+                    String(row.SrNo) === String(item.SrNo) &&
+                    String(row.SubSrNo ?? row.SubSr) === String(item.SubSrNo ?? item.SubSr)
+                )));
+                Snackbar.show({
+                    text: successMsg || 'Carton deleted successfully.',
+                    duration: Snackbar.LENGTH_SHORT,
+                    backgroundColor: '#000',
+                    textColor: '#fff',
+                });
 
             }
             else {
@@ -2662,6 +3634,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const resetAllFields = () => {
         setIsEditMode(false);   // 🔥 VERY IMPORTANT
         setMainUId(null);
+        setSessionStatus('');
         // Creel modal fields
         setCreelId('');
         setShift('');
@@ -2812,6 +3785,33 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         load();
     }, [token]);
 
+    const lastMachineShiftPrp = useRef('');
+
+    useEffect(() => {
+        const { PrpCode, YearNo } = FormState.values;
+
+        if (!token || !PrpCode || !YearNo) {
+            console.log("⏳ Machine API waiting...", {
+                token: !!token,
+                PrpCode,
+                YearNo
+            });
+            return;
+        }
+
+        console.log(
+            "🔄 Property/Year available, loading Machine + Shift...",
+            {
+                PrpCode,
+                YearNo
+            }
+        );
+
+        getMachine(PrpCode);
+        getShifts(PrpCode);
+
+    }, [token, FormState.values.PrpCode, FormState.values.YearNo]);
+
     return (
         <>
 
@@ -2889,14 +3889,13 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                         return (
                             <View style={styles.card}>
-                                <View style={styles.cardHeader}>
+                                {/* <View style={styles.cardHeader}>
                                     <View>
                                         <Text style={styles.voucher}>
                                             Creel ID : {item.CreelId}
                                         </Text>
                                     </View>
 
-                                    {/* STATUS */}
                                     <View style={[
                                         styles.statusBadge,
                                         {
@@ -2912,6 +3911,72 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                             {status}
                                         </Text>
                                     </View>
+
+                                    <View style={[
+                                        styles.statusBadge,
+                                        {
+                                            backgroundColor: item.SessionStatus === 'DRAFT' ? '#fff7ed' : '#ecfdf5',
+                                            borderColor: item.SessionStatus === 'DRAFT' ? '#f59e0b' : '#16a34a'
+                                        }
+                                    ]}>
+                                        <Text style={{
+                                            color: item.SessionStatus === 'DRAFT' ? '#f59e0b' : '#16a34a',
+                                            fontSize: 12,
+                                            fontWeight: '600'
+                                        }}>
+                                            {item.SessionStatus}
+                                        </Text>
+                                    </View>
+
+                                </View> */}
+
+                                <View style={styles.cardHeader}>
+
+                                    <View>
+                                        <Text style={styles.voucher}>
+                                            Creel ID : {item.CreelId}
+                                        </Text>
+                                    </View>
+
+                                    {/* STATUS COLUMN - Pending upar, FINAL niche */}
+                                    <View style={styles.statusColumn}>
+
+                                        {/* Pending / Complete */}
+                                        <View style={[
+                                            styles.statusBadge,
+                                            {
+                                                backgroundColor: status === 'Pending' ? '#fff7ed' : '#ecfdf5',
+                                                borderColor: status === 'Pending' ? '#f59e0b' : '#16a34a'
+                                            }
+                                        ]}>
+                                            <Text style={{
+                                                color: status === 'Pending' ? '#f59e0b' : '#16a34a',
+                                                fontSize: 12,
+                                                fontWeight: '600'
+                                            }}>
+                                                {status}
+                                            </Text>
+                                        </View>
+
+                                        {/* Draft / Final */}
+                                        <View style={[
+                                            styles.statusBadge,
+                                            {
+                                                backgroundColor: item.SessionStatus === 'DRAFT' ? '#fff7ed' : '#ecfdf5',
+                                                borderColor: item.SessionStatus === 'DRAFT' ? '#f59e0b' : '#16a34a'
+                                            }
+                                        ]}>
+                                            <Text style={{
+                                                color: item.SessionStatus === 'DRAFT' ? '#f59e0b' : '#16a34a',
+                                                fontSize: 12,
+                                                fontWeight: '600'
+                                            }}>
+                                                {item.SessionStatus}
+                                            </Text>
+                                        </View>
+
+                                    </View>
+
                                 </View>
                                 <View style={styles.middleRow}>
                                     <Text style={styles.label}>
@@ -3235,8 +4300,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         );
                                                         return;
                                                     }
-                                                    setIsCreelModalVisible(false);
-                                                    setIsScanModalVisible(true);
+                                                    startCreelSession();
                                                 }}
                                             >
                                                 <Text style={styles.btnText}>Save & Next</Text>
@@ -3266,7 +4330,15 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 visible={isScanModalVisible}
                 animationType="slide"
                 transparent={false}
-                onRequestClose={() => setIsScanModalVisible(false)}
+                // onRequestClose={() => { setIsScanModalVisible(false); setShowList(false); fetchBrowseData(); }}
+                onRequestClose={() => {
+                    setIsScanModalVisible(false);
+
+                    setTimeout(() => {
+                        setShowList(false);
+                        fetchBrowseData();
+                    }, Platform.OS === 'android' ? 350 : 250);
+                }}
             >
                 <SafeAreaView
                     edges={['top']}
@@ -3288,7 +4360,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             <TouchableOpacity
                                 onPress={() => {
                                     setIsScanModalVisible(false);
-                                    setIsCreelModalVisible(true);
+                                    setShowList(false);
+                                    fetchBrowseData();
                                 }}
                             >
                                 <Icon
@@ -4067,9 +5140,8 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
                                                 {/* RIGHT SIDE */}
                                                 <View style={styles.rightSection}>
-                                                    <TouchableOpacity
+                                                    {sessionStatus === 'DRAFT' && <TouchableOpacity
                                                         style={styles.deleteIcon}
-                                                        // onPress={() => confirmcartondelete(item)}
                                                         onPress={() => {
                                                             if (item?.UId) {
                                                                 confirmcartondelete(item);
@@ -4079,7 +5151,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                         }}
                                                     >
                                                         <Text style={{ fontSize: 16 }}>🗑️</Text>
-                                                    </TouchableOpacity>
+                                                    </TouchableOpacity>}
 
                                                     <Text style={styles.qtyText}>
                                                         Qty: {item.qty}
@@ -4121,10 +5193,23 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                         >
                                             <Text style={styles.backText}>＋ Add More</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity style={styles.submitBtn}
+                                        {sessionStatus === 'DRAFT' && (
+                                            <TouchableOpacity
+                                                style={[styles.submitBtn, { backgroundColor: '#b91c1c' }]}
+                                                onPress={discardDraftSession}
+                                                disabled={isDelete || isSaving}
+                                            >
+                                                <Text style={styles.submitText}>Discard</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        <TouchableOpacity
+                                            style={styles.submitBtn}
                                             onPress={handleFinalSubmit}
+                                            disabled={sessionStatus !== 'DRAFT' || isSaving || isDelete}
                                         >
-                                            <Text style={styles.submitText}>✈ Submit All</Text>
+                                            <Text style={styles.submitText}>
+                                                {sessionStatus === 'FINAL' ? '✓ Final' : '✈ Submit All'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
 
@@ -4175,7 +5260,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                             <Text style={styles.okText}>OK....</Text>
                         </TouchableOpacity> */}
 
-                        <TouchableOpacity
+                        {/* <TouchableOpacity
                             style={styles.okButton}
                             onPress={() => {
                                 setShowSuccess(false);
@@ -4205,6 +5290,38 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 //     }
                                 // });
                                 fetchBrowseData();
+                            }}
+                        >
+                            <Text style={styles.okText}>OK</Text>
+                        </TouchableOpacity> */}
+
+                        <TouchableOpacity
+                            style={styles.okButton}
+                            onPress={() => {
+                                setShowSuccess(false);
+                                setIsScanModalVisible(false);
+                                setIsCreelModalVisible(false);
+
+                                // Modal dismiss animation poora hone do, phir heavy reset + fetch.
+                                setTimeout(() => {
+                                    setCartonSummary([]);
+                                    setCartonNo('');
+                                    setchees('');
+                                    setavgwt('');
+                                    setScannedObj({});
+                                    setSearchText('');
+                                    setSearchResults([]);
+                                    setSelectedItem(null);
+                                    setShowManualSearch(null);
+                                    setIsScanning(false);
+                                    setCreelId('');
+                                    setShift('');
+                                    setRemark('');
+                                    setstocktype('');
+                                    setSetupDate(new Date());
+
+                                    fetchBrowseData();
+                                }, Platform.OS === 'android' ? 350 : 250);
                             }}
                         >
                             <Text style={styles.okText}>OK</Text>

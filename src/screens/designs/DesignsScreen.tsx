@@ -32,7 +32,6 @@ import { T } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
-import { TwoStepYarnHelp, type YarnHelpPurpose, } from '../../components/help/TwoStepYarnHelp';
 
 const SHORT = (c: string) =>
     c === 'Linen Shirting' ? 'Shirting' : c === 'Linen Suiting' ? 'Suiting' : c;
@@ -414,7 +413,7 @@ function LiveSpecPanel({ design }: { design: any }) {
 
     return (
         <View style={ls.wrap}>
-            <Text style={ls.title}>LIVE SPEC</Text>
+            <Text style={ls.title}>LIVE FABRIC SPECIFICATION</Text>
 
             {/* ── dark reed / total ends card ── */}
             <View style={ls.darkCard}>
@@ -467,31 +466,37 @@ function LiveSpecPanel({ design }: { design: any }) {
 
             {/* ── GSM / GLM grid ── */}
             {hasWeight && (
-                <View style={ls.gsmGrid}>
-                    <View style={ls.gsmBox}>
-                        <Text style={ls.gsmLabel}>Greige GSM</Text>
-                        <Text style={ls.gsmVal}>{Math.round(spec.greigGSM)}</Text>
+                <>
+                    <Text style={ls.weightHeading}>FABRIC WEIGHT · LIVE</Text>
+                    <View style={ls.gsmGrid}>
+                        <View style={ls.gsmBox}>
+                            <Text style={ls.gsmLabel}>Greige GSM</Text>
+                            <Text style={ls.gsmVal}>{Math.round(spec.greigGSM)}</Text>
+                        </View>
+                        <View style={ls.gsmBox}>
+                            <Text style={ls.gsmLabel}>Greige GLM</Text>
+                            <Text style={ls.gsmVal}>{spec.greigGLM.toFixed(1)} g/m</Text>
+                        </View>
+                        <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
+                            <Text style={ls.gsmLabel}>Finished GSM</Text>
+                            <Text style={ls.gsmVal}>{Math.round(spec.finGSM)}</Text>
+                            {spec.finWidthEntered && <Text style={ls.gsmNote}>{spec.finWidthIn}" fin</Text>}
+                        </View>
+                        <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
+                            <Text style={ls.gsmLabel}>Finished GLM</Text>
+                            <Text style={ls.gsmVal}>{spec.finGLM.toFixed(1)} g/m</Text>
+                        </View>
                     </View>
-                    <View style={ls.gsmBox}>
-                        <Text style={ls.gsmLabel}>Greige GLM</Text>
-                        <Text style={ls.gsmVal}>{spec.greigGLM.toFixed(1)} g/m</Text>
-                    </View>
-                    <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
-                        <Text style={ls.gsmLabel}>Finished GSM</Text>
-                        <Text style={ls.gsmVal}>{Math.round(spec.finGSM)}</Text>
-                        {spec.finWidthEntered && <Text style={ls.gsmNote}>{spec.finWidthIn}" fin</Text>}
-                    </View>
-                    <View style={[ls.gsmBox, ls.gsmBoxBorder]}>
-                        <Text style={ls.gsmLabel}>Finished GLM</Text>
-                        <Text style={ls.gsmVal}>{spec.finGLM.toFixed(1)} g/m</Text>
-                    </View>
-                </View>
+                </>
             )}
 
             {/* ── fibre blend bar ── */}
             {spec.blendGrand > 0 && (
                 <View style={{ marginTop: 14 }}>
-                    <Text style={ls.sec}>FIBRE BLEND</Text>
+                    <Text style={ls.sec}>FINAL FABRIC COMPOSITION</Text>
+                    <Text style={ls.blendHint}>
+                        Recalculates automatically from selected yarn blend + EPI/PPI.
+                    </Text>
                     <View style={ls.blendBar}>
                         {Object.entries(spec.blendTotals).map(([k, v]) => (
                             <View key={k} style={{ flex: v / spec.blendGrand, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
@@ -501,8 +506,9 @@ function LiveSpecPanel({ design }: { design: any }) {
                         {Object.entries(spec.blendTotals).map(([k, v]) => (
                             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BLEND_COLORS[k] ?? '#888' }} />
-                                <Text style={{ fontSize: 10, color: T.muted }}>
-                                    {k} {Math.round(v / spec.blendGrand * 100)}%
+                                <Text style={ls.blendLegendName}>{k}</Text>
+                                <Text style={ls.blendLegendPct}>
+                                    {Math.round(v / spec.blendGrand * 100)}%
                                 </Text>
                             </View>
                         ))}
@@ -557,13 +563,17 @@ const ls = StyleSheet.create({
     tdLabel: { textAlign: 'left', fontWeight: '600', flex: 1.2 },
     tdGreige: { fontWeight: '700', color: T.ink },
     tdFin: { fontWeight: '700', color: T.copper },
+    weightHeading: { fontSize: 9, fontWeight: '800', color: T.muted, letterSpacing: 0.6, marginTop: 12, marginBottom: -2 },
     gsmGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, borderWidth: 1, borderColor: T.border, borderRadius: 8, overflow: 'hidden' },
     gsmBox: { width: '50%', backgroundColor: T.sub, padding: 10 },
     gsmBoxBorder: { borderTopWidth: 1, borderTopColor: T.border },
     gsmLabel: { fontSize: 9, color: T.muted, fontWeight: '600', letterSpacing: 0.3 },
     gsmVal: { fontSize: 16, fontWeight: '800', color: T.ink, marginTop: 2 },
     gsmNote: { fontSize: 9, color: T.muted },
-    sec: { fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.5, marginBottom: 6 },
+    sec: { fontSize: 9, fontWeight: '800', color: T.ink, letterSpacing: 0.6, marginBottom: 4 },
+    blendHint: { fontSize: 10, color: T.muted, marginBottom: 7, lineHeight: 14 },
+    blendLegendName: { fontSize: 10, color: T.muted },
+    blendLegendPct: { fontSize: 10, fontWeight: '800', color: T.ink },
     blendBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
     formulaBox: { backgroundColor: T.sub, borderRadius: 8, padding: 10, marginTop: 6 },
     formulaTxt: { fontSize: 10, color: T.muted, lineHeight: 15 },
@@ -586,6 +596,9 @@ type MainYarnHelpRow = {
     str_code: string;
     variant_count: number;
     available_blends: string[];
+    is_blended_family: boolean;
+    requires_sub_item: boolean;
+    direct_item: YarnItemHelpRow | null;
 };
 
 type YarnItemHelpRow = YarnMaster & {
@@ -822,6 +835,34 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
         closePicker();
     }, [closePicker, onSelect]);
 
+    /**
+     * Phase 2 decision:
+     * - ordinary Main Yarn selects direct_item immediately;
+     * - blended Main Yarn opens the child help for exact ItmCode + blend %.
+     */
+    const chooseMainYarn = useCallback((mainRow: MainYarnHelpRow) => {
+        if (
+            mainRow.requires_sub_item === true ||
+            (
+                mainRow.is_blended_family === true &&
+                Number(mainRow.variant_count || 0) > 1
+            )
+        ) {
+            openItemHelp(mainRow);
+            return;
+        }
+
+        if (mainRow.direct_item) {
+            chooseItem(mainRow.direct_item);
+            return;
+        }
+
+        Alert.alert(
+            'Yarn item unavailable',
+            'This Main Yarn does not contain a directly selectable item. Please refresh the help and try again.'
+        );
+    }, [chooseItem, openItemHelp]);
+
     const childTitle = selectedMain
         ? `${selectedMain.main_yarn_code} · ${selectedMain.name}`
         : 'Select Yarn Item';
@@ -938,7 +979,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                     <TouchableOpacity
                                         style={yp.row}
                                         activeOpacity={0.7}
-                                        onPress={() => openItemHelp(item)}
+                                        onPress={() => chooseMainYarn(item)}
                                     >
                                         <View style={{ flex: 1 }}>
                                             <Text style={yp.yarnName}>
@@ -962,7 +1003,11 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
                                                 ) : null}
                                             </View>
                                         </View>
-                                        <Text style={yp.chevron}>›</Text>
+                                        {item.requires_sub_item ? (
+                                            <Text style={yp.chevron}>›</Text>
+                                        ) : (
+                                            <Text style={yp.directSelectText}>Select</Text>
+                                        )}
                                     </TouchableOpacity>
                                 )}
                                 ItemSeparatorComponent={() => (
@@ -1263,13 +1308,14 @@ const yp = StyleSheet.create({
         padding: 10,
     },
     mainSelectionLabel: { fontSize: 8.5, fontWeight: '800', color: T.muted, letterSpacing: 0.6 },
-    mainSelectionCode: { marginTop: 2, fontSize: 15, fontWeight: '900', color: T.ink },
-    mainSelectionName: { marginTop: 2, fontSize: 11, color: T.muted },
+    mainSelectionCode: { marginTop: 2, fontSize: 11, color: T.ink },
+    mainSelectionName: { marginTop: 2, fontSize: 15, fontWeight: '900', color: T.muted },
     mainSelectionBlend: { marginTop: 5, fontSize: 10, color: T.copper },
     metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 6 },
     metaText: { fontSize: 10.5, color: T.muted },
     blendPreview: { flex: 1, fontSize: 10.5, color: T.copper },
     chevron: { marginLeft: 10, fontSize: 24, color: T.muted },
+    directSelectText: { marginLeft: 10, fontSize: 11, fontWeight: '800', color: T.copper },
     itemCodeRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
     mainBadge: { backgroundColor: '#E7F1EA', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2 },
     mainBadgeText: { fontSize: 8.5, fontWeight: '900', color: T.green },
@@ -2170,17 +2216,15 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                     <Text style={fm.saveTxt}>{saving ? 'Saving…' : design ? 'Update design' : 'Create design'}</Text>
                 </TouchableOpacity>
             </ScrollView>
-            {/* <YarnPickerModal
+            <YarnPickerModal
                 visible={pickerFor !== null}
-                title={pickerFor === 'warp' ? 'Select warp yarn' : pickerFor === 'weft' ? 'Select weft yarn' : 'Select selvedge yarn'}
-                onSelect={y => pickerFor && addYarn(y, pickerFor)}
-                onClose={() => setPickerFor(null)}
-            /> */}
-            <TwoStepYarnHelp
-                visible={pickerFor !== null}
-                purpose={pickerFor ?? 'warp'}
-                prpcode={prpcode}
-                strcode={strcode}
+                title={
+                    pickerFor === 'warp'
+                        ? 'Select warp yarn'
+                        : pickerFor === 'weft'
+                            ? 'Select weft yarn'
+                            : 'Select selvedge yarn'
+                }
                 onSelect={(item) => {
                     if (pickerFor) {
                         addYarn(item, pickerFor);

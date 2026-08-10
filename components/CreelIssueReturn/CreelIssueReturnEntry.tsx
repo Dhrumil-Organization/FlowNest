@@ -599,7 +599,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                     data: [getSavedData],
                     IskgQty: 0,
                     printype: "Print",
-                    PrintFormat: 5,
+                    PrintFormat: 3,
                     printerName: printer ? printer : '',
                     txntype: "creel_issue_return"
                 };

@@ -54,9 +54,9 @@ export default function LoginScreen() {
             if (token && l === 'NEW') {
                 navigation.navigate('Main')
             } else
-             if (token && l !== 'NEW') {
-                router.replace('/');
-            }
+                if (token && l !== 'NEW') {
+                    router.replace('/');
+                }
         };
 
         check();
@@ -184,6 +184,21 @@ export default function LoginScreen() {
                 const yno = response.data.response?.year?.YearNo || '';
                 const role1 = response.data.response?.role1;
                 const user_id = response.data.response?.user?.id || 0;
+
+                // 🔔 Latest notification token
+                const latestNotiToken = getNotitoken;
+
+                if (latestNotiToken) {
+                    await AsyncStorage.setItem(
+                        'notification_token',
+                        latestNotiToken
+                    );
+
+                    console.log(
+                        '💾 Notification token cached:',
+                        latestNotiToken
+                    );
+                }
                 // const role1 = response.data.response?.role1;
                 if (response.data.success === true) {
                     // if (token && user_details && user_menu_apps) {

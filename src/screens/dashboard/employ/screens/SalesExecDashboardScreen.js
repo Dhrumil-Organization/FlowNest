@@ -12,7 +12,7 @@
 //   View,
 // } from "react-native";
 // import { api, formatAmount } from "../api/api";
-// import MiniLineChart from "../components/MiniLineChart";
+// import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 // import SalesExecDashboardSkeleton from "../components/SalesExecDashboardSkeleton";
 // import {
 //   AvatarCircle,
@@ -272,8 +272,7 @@
 //   const collectionByParty = safeArray(collection?.by_party);
 //   const outstandingByParty = safeArray(collection?.outstanding_by_party);
 
-//   const salesTrend = salesDailyTrend.map((item) => safeNumber(item?.amount));
-//   const collectionTrend = collectionDailyTrend.map((item) =>
+// //   const collectionTrend = collectionDailyTrend.map((item) =>
 //     safeNumber(item?.amount)
 //   );
 //   const collectedToday = safeNumber(collectionTotal?.today);
@@ -668,7 +667,7 @@ import {
 } from "react-native";
 import { SubScreenHeader } from "../../../../components/layout/SubScreenHeader";
 import { api, formatAmount } from "../api/api";
-import MiniLineChart from "../components/MiniLineChart";
+import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 import SalesExecDashboardSkeleton from "../components/SalesExecDashboardSkeleton";
 import {
   AvatarCircle,
@@ -961,10 +960,6 @@ export default function SalesExecDashboardScreen({
   const collectionByParty = safeArray(collection?.by_party);
   const outstandingByParty = safeArray(collection?.outstanding_by_party);
 
-  const salesTrend = salesDailyTrend.map((item) => safeNumber(item?.amount));
-  const collectionTrend = collectionDailyTrend.map((item) =>
-    safeNumber(item?.amount)
-  );
   const collectedToday = safeNumber(collectionTotal?.today);
   const amountDue = safeNumber(collectionTotal?.due);
   const collectionBase = collectedToday + amountDue;
@@ -1106,20 +1101,18 @@ export default function SalesExecDashboardScreen({
 
             <View style={styles.chartWrap}>
               <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={salesTrend}
+              <InteractiveDailyTrendChart
+                data={salesDailyTrend}
+                valueKey="amount"
+                labelKey="day"
                 color={COLORS.teal}
                 fillColor={COLORS.teal}
-                width={340}
-                height={50}
+                height={64}
+                pointGap={54}
+                valueFormatter={value => formatAmount(Number(value || 0))}
+                showBaseline
+                showHint
               />
-              <View style={styles.chartAxisRow}>
-                {salesDailyTrend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
             </View>
 
             <Text style={styles.subHeader}>TOP CUSTOMERS BY SALES</Text>
@@ -1184,20 +1177,18 @@ export default function SalesExecDashboardScreen({
 
             <View style={styles.chartWrap}>
               <Text style={styles.trendLabel}>COLLECTION TREND</Text>
-              <MiniLineChart
-                data={collectionTrend}
+              <InteractiveDailyTrendChart
+                data={collectionDailyTrend}
+                valueKey="amount"
+                labelKey="day"
                 color={COLORS.green}
                 fillColor={COLORS.green}
-                width={340}
-                height={50}
+                height={64}
+                pointGap={54}
+                valueFormatter={value => formatAmount(Number(value || 0))}
+                showBaseline
+                showHint
               />
-              <View style={styles.chartAxisRow}>
-                {collectionDailyTrend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
             </View>
 
             {/* Collections highest first */}

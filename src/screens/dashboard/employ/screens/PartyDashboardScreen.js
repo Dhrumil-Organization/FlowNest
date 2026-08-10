@@ -406,7 +406,7 @@ import {
   View,
 } from "react-native";
 import { api, formatAmount } from "../api/api";
-import MiniLineChart from "../components/MiniLineChart";
+import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 import PartyDashboardSkeleton from "../components/PartyDashboardSkeleton";
 import {
   AvatarCircle,
@@ -790,23 +790,18 @@ export default function PartyDashboardScreen({ username }) {
 
             <View style={styles.chartWrap}>
               <Text style={styles.trendLabel}>DAILY SALES — LAST 11 DAYS</Text>
-              <MiniLineChart
-                data={salesData}
+              <InteractiveDailyTrendChart
+                data={salesTrendRows}
+                valueKey="amount"
+                labelKey="label"
                 color={COLORS.teal}
                 fillColor={COLORS.teal}
-                width={340}
-                height={60}
+                height={70}
+                pointGap={54}
+                valueFormatter={value => formatAmount(Number(value || 0))}
                 showBaseline
+                showHint
               />
-              <View style={styles.chartAxisRow}>
-                {salesLabels
-                  .filter((_, index) => index % 2 === 0)
-                  .map((label, index) => (
-                    <Text key={`${label}-${index}`} style={styles.axisLabel}>
-                      {label}
-                    </Text>
-                  ))}
-              </View>
             </View>
           </SectionCard>
 
@@ -853,23 +848,18 @@ export default function PartyDashboardScreen({ username }) {
               <Text style={styles.trendLabel}>
                 COLLECTION TREND — LAST 11 DAYS
               </Text>
-              <MiniLineChart
-                data={collectionData}
+              <InteractiveDailyTrendChart
+                data={collectionTrendRows}
+                valueKey="amount"
+                labelKey="label"
                 color={COLORS.green}
                 fillColor={COLORS.green}
-                width={340}
-                height={60}
+                height={70}
+                pointGap={54}
+                valueFormatter={value => formatAmount(Number(value || 0))}
                 showBaseline
+                showHint
               />
-              <View style={styles.chartAxisRow}>
-                {(collectionLabels.length > 0 ? collectionLabels : salesLabels)
-                  .filter((_, index) => index % 2 === 0)
-                  .map((label, index) => (
-                    <Text key={`${label}-${index}`} style={styles.axisLabel}>
-                      {label}
-                    </Text>
-                  ))}
-              </View>
             </View>
           </SectionCard>
 

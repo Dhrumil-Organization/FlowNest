@@ -330,6 +330,7 @@ export default function AvgPicksSection({
   month,
   expanded,
   context,
+  refresh
 }) {
   const [mode, setMode] = useState("view"); // 'view' | 'edit'  (mirrors web's route type)
   const [loading, setLoading] = useState(false);
@@ -719,6 +720,7 @@ export default function AvgPicksSection({
     }
 
     const finalRowsToSend = mergePayloadWithMain(payloadRows, mainResponse);
+    refresh();
     SaveMonthData(finalRowsToSend);
   }, [
     currentKeys,

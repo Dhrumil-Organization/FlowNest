@@ -3880,6 +3880,7 @@ export default function ExpenseScreen({ token, apiBase }) {
           month={m}
           expanded={avgPicksOpen}
           context={context}
+          refresh={refresh}
         />
 
         {/* Loading */}

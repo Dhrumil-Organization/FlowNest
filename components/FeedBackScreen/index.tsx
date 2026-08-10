@@ -1,35 +1,35 @@
 // screens/FeedbackScreen.tsx
-import React, { useState, useEffect, useRef } from 'react';
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    ScrollView,
-    StyleSheet,
-    Dimensions,
-    Animated,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StatusBar,
-    Image,
-    RefreshControl,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import * as Haptics from 'expo-haptics';
-import theme from '@/components/theme';
-import {
-    saveFeedback,
-    getFeedbacksByUsername,
-    getOrCreateUsername,
-    getOrCreateUserId,
     deleteFeedback,
     Feedback,
     FeedbackCategory,
+    getFeedbacksByUsername,
+    getOrCreateUserId,
+    getOrCreateUsername,
+    saveFeedback,
 } from '@/common/utils/feedbackStorage';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -367,9 +367,10 @@ export default function FeedbackScreen() {
         );
     };
 
-     const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
+    const goBack = () => {
+        // if (router.canGoBack()) router.back();
+        // else router.replace('/');
+        router.replace('/(tabs)');
     };
 
     return (

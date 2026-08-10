@@ -2586,243 +2586,157 @@ const Tr = StyleSheet.create({
 
 function SummaryTab({ token }) {
     const MONTHS = (() => {
-        const N = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const now = new Date(); let m = now.getMonth(), y = now.getFullYear();
+        const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const now = new Date();
+        let monthIndex = now.getMonth();
+        let year = now.getFullYear();
+
         return Array.from({ length: 6 }, () => {
-            const label = `${N[m]} '${String(y).slice(-2)}`;
-            const key = `${String(m + 1).padStart(2, '0')}${y}`;
-            const r = { label, key, month: m + 1, year: y };
-            m--; if (m < 0) { m = 11; y--; }
-            return r;
+            const result = {
+                label: `${names[monthIndex]} '${String(year).slice(-2)}`,
+                key: `${String(monthIndex + 1).padStart(2, '0')}${year}`,
+                month: monthIndex + 1,
+                year,
+            };
+
+            monthIndex -= 1;
+            if (monthIndex < 0) {
+                monthIndex = 11;
+                year -= 1;
+            }
+
+            return result;
         });
     })();
 
     const [selMonth, setSelMonth] = useState(MONTHS[0]);
-    const [summary, setSummary] = useState(null);
+    const [summaryOrders, setSummaryOrders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
+    // One UI, two grouping modes.
+    const [groupMode, setGroupMode] = useState('design'); // design | customer
+
+    // Dataset-driven filters. No master help is called for Summary filters.
     const [filterCust, setFilterCust] = useState('');
     const [filterCustName, setFilterCustName] = useState('');
-
     const [filterDesign, setFilterDesign] = useState('');
     const [filterDesignName, setFilterDesignName] = useState('');
+    const [smartSearch, setSmartSearch] = useState('');
+
     const [showCustPicker, setShowCustPicker] = useState(false);
     const [showDsnPicker, setShowDsnPicker] = useState(false);
     const [custSearch, setCustSearch] = useState('');
     const [dsnSearch, setDsnSearch] = useState('');
+
+    // Keep expansion compact: one group and one SO can be open at a time.
+    const [expandedGroupKey, setExpandedGroupKey] = useState('');
+    const [expandedOrderKey, setExpandedOrderKey] = useState('');
+
     const [prpcode, setPrpCode] = useState('');
     const [yearno, setYearNo] = useState('');
-    const [fromDate, setFromDate] = useState(null);
-    const [toDate, setToDate] = useState(null);
-    const [partyLoading, setPartyLoading] = useState(false);
-    const [parties, setParties] = useState([]);
-    const [designList, setDesignList] = useState([]);
-    const [designLoading, setDesignLoading] = useState(false);
-
-    const getConfig = (params) => ({
-        headers: authHdr(token),
-        params,
-    });
 
     useEffect(() => {
         const loadFilterData = async () => {
             const code = await AsyncStorage.getItem('selected_prpcode');
             const year = await AsyncStorage.getItem('selectedyear');
             setPrpCode(code || '');
-            setYearNo(year ? `${year.slice(-2)}` : '');
-            console.log("Read PrpCode =", code);
-            console.log("Read year =", year);
+            setYearNo(year ? String(year).slice(-2) : '');
         };
+
         loadFilterData();
     }, []);
 
-    const loadParties = useCallback(async () => {
-        const yno = (await AsyncStorage.getItem('selectedyear'))?.slice(-2) || '';
-        if (!prpcode) return;
+    const normalized = value =>
+        String(value ?? '')
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, ' ');
 
-        try {
-            setPartyLoading(true);
-            const userPtype = await AsyncStorage.getItem('user_prptype');
-            const res = await axios.get(`${API}/api/accountbasic`, getConfig({
-                prpcode,
-                prptype: userPtype,
-                yearno: yno,
-                strcode: '012',
-                txntype: 'sales_order',
-                partytype: 'p',
-                type: 'S',
-                page: '',
-                limit: '',
-                search: '',
-                isceo: '',
-                partype: '',
-                grntype: '',
-                fetch: '',
-                acccode: '',
-                billdate: '',
-                strtype: '',
-                isfaint: '',
-            }));
-            setParties(res.data?.response?.data || []);
-            console.log("Party data", res)
-        } catch (e) { setParties([]); }
-        finally { setPartyLoading(false); }
-    }, [prpcode, token]);
+    const orderKey = order =>
+        String(order?.UId || `${order?.PrpCode || ''}-${order?.SONo || ''}-${order?.SODate || ''}`);
 
+    const getOrderLines = order =>
+        Array.isArray(order?.d1)
+            ? order.d1
+            : Array.isArray(order?.Items)
+                ? order.Items
+                : [];
 
-    const loadDesigns = useCallback(async () => {
-        const yno = (await AsyncStorage.getItem('selectedyear'))?.slice(-2) || '';
-        if (!prpcode) return;
-        try {
-            setDesignLoading(true);
-            const res = await axios.get(`${API}/api/getdesign`, getConfig({
-                prpcode,
-                strcode: '012',
-                yearno: yno,
-            }));
-            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
-            console.log("res", res);
-            setDesignList(Array.isArray(data) ? data : []);
-        } catch (e) { setDesignList([]); }
-        finally { setDesignLoading(false); }
-    }, [prpcode, token]);
+    const getOrderQty = order =>
+        getOrderLines(order).reduce((sum, line) => sum + num(line?.Qty), 0);
 
-    useEffect(() => {
-        if (!token) return;
-        if (prpcode) {
-            loadParties();
-            loadDesigns();
+    const getStatusMeta = order => {
+        const auth = normalized(order?.AuthStatus);
+        const isAuth = String(order?.IsAuth ?? '') === '1';
+
+        if (isAuth || auth === 'AUTHORISED' || auth === 'AUTHORIZED') {
+            return {
+                label: 'Authorized',
+                bg: '#ECFDF3',
+                fg: '#027A48',
+                dot: '#48B47A',
+            };
         }
-    }, [prpcode, token]);
 
-    // const load = useCallback(async (mo, isRefresh = false) => {
-    //     try {
-    //         isRefresh ? setRefreshing(true) : setLoading(true);
-    //         const userPtype = await AsyncStorage.getItem('user_prptype');
-    //         const code = await AsyncStorage.getItem('selected_prpcode');
-    //         const yno = (await AsyncStorage.getItem('selectedyear'))?.slice(-2) || '';
-    //         console.log("State PrpCode =", prpcode);
-    //         const params = {
-    //             prptype: userPtype,
-    //             strcode: '012',
-    //             fromdate: ymd(fromDate),
-    //             todate: ymd(toDate),
-    //             strtype: 'g',
-    //             txntype: 'sales_order',
-    //             referrer: 'mob_dashboard',
-    //             yearno: yno,
-    //             prpcode: code,
-    //             prpcodes: [],
-    //             search: '',
-    //         };
+        return {
+            label: auth && auth !== 'PENDING' ? order.AuthStatus : 'Pending Auth',
+            bg: '#FFF4E8',
+            fg: '#B85E12',
+            dot: '#F08A32',
+        };
+    };
 
-    //         console.log('API PARAMS =>', params);
-    //         console.log('API PARAMS JSON =>', JSON.stringify(params, null, 2));
+    const lineMatchesDesign = (line, designCode) =>
+        !designCode || String(line?.DsnCode ?? '') === String(designCode);
 
-    //         const res = await axios.get(`${API}/api/sosortbrowse`, {
-    //             headers: authHdr(token),
-    //             params,
-    //         });
+    const orderMatchesParty = (order, partyCode) =>
+        !partyCode || String(order?.ParCode ?? '') === String(partyCode);
 
-    //         console.log('API RESPONSE =>', res.data);
 
-    //         const dataArray = res.data?.response?.data || [];
-    //         const grouped = {};
+    const smartMatchingLines = (order, searchText, sourceLines = getOrderLines(order)) => {
+        const tokens = normalized(searchText)
+            .split(' ')
+            .map(x => x.trim())
+            .filter(Boolean);
 
-    //         dataArray.forEach(order => {
+        if (!tokens.length) return sourceLines;
 
-    //             const designs = [
-    //                 ...new Set(
-    //                     (order.d1 || []).map(x => x.DsnCode)
-    //                 )
-    //             ];
+        const orderHeader = normalized([
+            order?.ParName,
+            order?.ParCode,
+            order?.SONo,
+            order?.PONo,
+            order?.SODate,
+        ].filter(Boolean).join(' '));
 
-    //             designs.forEach(dsnCode => {
+        return sourceLines.filter(line => {
+            const lineHaystack = normalized([
+                line?.DsnName,
+                line?.DsnCode,
+                line?.ShdName,
+                line?.ShadeName,
+                line?.ShdCode,
+                line?.ItmName,
+                line?.ItmCode,
+            ].filter(Boolean).join(' '));
 
-    //                 const designItems = (order.d1 || []).filter(
-    //                     x => x.DsnCode === dsnCode
-    //                 );
+            const combined = `${orderHeader} ${lineHaystack}`.trim();
+            return tokens.every(token => combined.includes(token));
+        });
+    };
 
-    //                 if (!designItems.length) return;
 
-    //                 const firstItem = designItems[0];
 
-    //                 if (!grouped[dsnCode]) {
-    //                     grouped[dsnCode] = {
-    //                         DsnCode: dsnCode,
-    //                         DsnName: firstItem.DsnName,
-    //                         orders: [],
-    //                     };
-    //                 }
-
-    //                 grouped[dsnCode].orders.push({
-    //                     ...order,
-
-    //                     OrderQty: designItems.reduce(
-    //                         (sum, item) => sum + num(item.Qty),
-    //                         0
-    //                     ),
-
-    //                     Items: designItems,
-    //                 });
-    //             });
-    //         });
-
-    //         // =========================
-    //         // DESIGN SUMMARY
-    //         // =========================
-    //         const designGroups = Object.values(grouped).map(g => {
-
-    //             const shadeMap = {};
-
-    //             g.orders.forEach(order => {
-
-    //                 (order.Items || []).forEach(item => {
-
-    //                     const key = item.ShdCode;
-
-    //                     if (!shadeMap[key]) {
-    //                         shadeMap[key] = {
-    //                             ShdCode: item.ShdCode,
-    //                             ShdName: item.ShdName,
-    //                             ShdColor: item.ShdColor,
-    //                             TotalQty: 0,
-    //                         };
-    //                     }
-
-    //                     shadeMap[key].TotalQty += num(item.Qty);
-    //                 });
-    //             });
-
-    //             return {
-    //                 ...g,
-
-    //                 totalQty: g.orders.reduce(
-    //                     (sum, order) => sum + num(order.OrderQty),
-    //                     0
-    //                 ),
-
-    //                 shadeAgg: Object.values(shadeMap),
-    //             };
-    //         });
-
-    //         console.log("GROUPED =", grouped);
-    //         console.log("DESIGN GROUPS =", designGroups);
-
-    //         setSummary(designGroups);
-
-    //         console.log("Summary", summary);
-    //     } catch (e) {
-
-    //         console.log('summary err', e?.message);
-
-    //         setSummary(null);
-    //     } finally {
-    //         setLoading(false);
-    //         setRefreshing(false);
-    //     }
-    // }, [token, fromDate, toDate, prpcode]);
+    const uniqueBy = (rows, keyGetter) => {
+        const seen = new Set();
+        return rows.filter(row => {
+            const key = String(keyGetter(row) ?? '');
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    };
 
     const load = useCallback(async (mo, isRefresh = false) => {
         try {
@@ -2830,329 +2744,437 @@ function SummaryTab({ token }) {
 
             const userPtype = await AsyncStorage.getItem('user_prptype');
             const code = await AsyncStorage.getItem('selected_prpcode');
-            const yno = (await AsyncStorage.getItem('selectedyear'))?.slice(-2) || '';
+            const selectedYear = await AsyncStorage.getItem('selectedyear');
+            const yno = selectedYear ? String(selectedYear).slice(-2) : yearno;
 
-            console.log("State PrpCode =", prpcode);
+            const firstDay = new Date(mo.year, mo.month - 1, 1);
+            const lastDay = new Date(mo.year, mo.month, 0);
 
             const params = {
                 prptype: userPtype,
                 strcode: '012',
-                fromdate: ymd(fromDate),
-                todate: ymd(toDate),
+                fromdate: ymd(firstDay),
+                todate: ymd(lastDay),
                 strtype: 'g',
                 txntype: 'sales_order',
                 referrer: 'mob_dashboard',
                 yearno: yno,
-                prpcode: code,
+                prpcode: code || prpcode,
                 prpcodes: [],
                 search: '',
             };
-
-            console.log('API PARAMS =>', params);
 
             const res = await axios.get(`${API}/api/sosortbrowse`, {
                 headers: authHdr(token),
                 params,
             });
 
-            console.log('API RESPONSE =>', res.data);
-
             const dataArray = res.data?.response?.data || [];
 
-            const filteredData = dataArray.filter(order => {
-                if (!order.SODate) return false;
+            // Defensive month guard. The API already receives from/to dates,
+            // but older endpoints can return wider ranges.
+            const monthOrders = (Array.isArray(dataArray) ? dataArray : []).filter(order => {
+                if (!order?.SODate) return false;
 
-                const [day, month, year] = order.SODate
-                    .split('/')
-                    .map(Number);
+                const parts = String(order.SODate).split('/').map(Number);
+                if (parts.length !== 3) return false;
 
-                return (
-                    month === mo.month &&
-                    year === mo.year
-                );
+                return parts[1] === mo.month && parts[2] === mo.year;
             });
 
-            console.log("Selected Month =", mo.label);
-            console.log("API Total Records =", dataArray.length);
-            console.log("Month Filter Records =", filteredData.length);
-
-            console.log(
-                "Filtered SOs =>",
-                filteredData.map(x => ({
-                    SONo: x.SONo,
-                    SODate: x.SODate,
-                }))
-            );
-
-            const grouped = {};
-
-            filteredData.forEach(order => {
-
-                const designs = [
-                    ...new Set(
-                        (order.d1 || []).map(x => x.DsnCode)
-                    )
-                ];
-
-                designs.forEach(dsnCode => {
-
-                    const designItems = (order.d1 || []).filter(
-                        x => x.DsnCode === dsnCode
-                    );
-
-                    if (!designItems.length) return;
-
-                    const firstItem = designItems[0];
-
-                    if (!grouped[dsnCode]) {
-                        grouped[dsnCode] = {
-                            DsnCode: dsnCode,
-                            DsnName: firstItem.DsnName,
-                            orders: [],
-                        };
-                    }
-
-                    grouped[dsnCode].orders.push({
-                        ...order,
-
-                        OrderQty: designItems.reduce(
-                            (sum, item) => sum + num(item.Qty),
-                            0
-                        ),
-
-                        Items: designItems,
-                    });
-                });
-            });
-            const designGroups = Object.values(grouped).map(g => {
-
-                const shadeMap = {};
-
-                g.orders.forEach(order => {
-
-                    (order.Items || []).forEach(item => {
-
-                        const key = item.ShdCode;
-
-                        if (!shadeMap[key]) {
-                            shadeMap[key] = {
-                                ShdCode: item.ShdCode,
-                                ShdName: item.ShdName,
-                                ShdColor: item.ShdColor,
-                                TotalQty: 0,
-                            };
-                        }
-
-                        shadeMap[key].TotalQty += num(item.Qty);
-                    });
-                });
-
-                return {
-                    ...g,
-
-                    totalQty: g.orders.reduce(
-                        (sum, order) => sum + num(order.OrderQty),
-                        0
-                    ),
-
-                    shadeAgg: Object.values(shadeMap),
-                };
-            });
-
-            console.log("GROUPED =", grouped);
-            console.log("DESIGN GROUPS =", designGroups);
-
-            setSummary(designGroups);
-
+            setSummaryOrders(monthOrders);
         } catch (e) {
-
-            console.log('summary err', e);
-
-            setSummary([]);
-
+            console.log('summary err', e?.response?.data || e?.message || e);
+            setSummaryOrders([]);
         } finally {
-
             setLoading(false);
             setRefreshing(false);
         }
-    }, [token, fromDate, toDate, prpcode]);
+    }, [token, prpcode, yearno]);
 
     useEffect(() => {
         if (!token) return;
         load(selMonth);
-    }, [selMonth, token]);
+    }, [selMonth, token, load]);
+
+    // Reset expansion when the hierarchy itself changes.
+    useEffect(() => {
+        setExpandedGroupKey('');
+        setExpandedOrderKey('');
+    }, [groupMode, filterCust, filterDesign, smartSearch, selMonth.key]);
+
+    // ── Faceted dropdown data ──────────────────────────────────────
+    // Party list respects selected DESIGN + universal search.
+    // It intentionally does not apply its own party filter so the user
+    // can still switch to another party without clearing first.
+    const partyFacetOrders = summaryOrders.filter(order => {
+        const designLines = getOrderLines(order).filter(line =>
+            lineMatchesDesign(line, filterDesign)
+        );
+
+        return smartMatchingLines(order, smartSearch, designLines).length > 0;
+    });
+
+    const partyOptions = uniqueBy(
+        partyFacetOrders
+            .map(order => ({
+                code: String(order?.ParCode ?? ''),
+                name: String(order?.ParName ?? '').trim(),
+            }))
+            .filter(row => row.code || row.name),
+        row => row.code || normalized(row.name),
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    // Design list respects selected PARTY + universal search.
+    // It intentionally does not apply its own design filter.
+    const designFacetOrders = summaryOrders.filter(order =>
+        orderMatchesParty(order, filterCust)
+    );
+
+    const designOptions = uniqueBy(
+        designFacetOrders.flatMap(order =>
+            smartMatchingLines(order, smartSearch).map(line => ({
+                code: String(line?.DsnCode ?? ''),
+                name: String(line?.DsnName ?? '').trim(),
+                itemName: String(line?.ItmName ?? '').trim(),
+            }))
+        ).filter(row => row.code || row.name),
+        row => row.code || normalized(row.name),
+    ).sort((a, b) => a.name.localeCompare(b.name));
+
+    // If one facet makes another selected value impossible, clear only
+    // the invalid selection. This avoids a filter state that can never match.
+    useEffect(() => {
+        if (
+            filterCust &&
+            !partyOptions.some(p => String(p.code) === String(filterCust))
+        ) {
+            setFilterCust('');
+            setFilterCustName('');
+        }
+    }, [filterDesign, smartSearch, summaryOrders]);
 
     useEffect(() => {
-        if (!token) return;
-        console.log("SUMMARY STATE =", summary);
-    }, [summary, token]);
+        if (
+            filterDesign &&
+            !designOptions.some(d => String(d.code) === String(filterDesign))
+        ) {
+            setFilterDesign('');
+            setFilterDesignName('');
+        }
+    }, [filterCust, smartSearch, summaryOrders]);
 
-    // ── Filter option lists (from unfiltered data) ──
-    const allGroups = summary || [];
-    const custList = [...new Set(allGroups.flatMap(g => (g.orders || []).map(o => o.ParName)))].filter(Boolean);
-    const dsnList = [...new Set(allGroups.map(g => g.DsnName))].filter(Boolean);
-
-    console.log("allGroups =", allGroups);
-
-
-    // ── Apply filters + recompute totals client-side ──
-    // const visibleGroups = allGroups
-    //     .filter(g => !filterDesign || g.DsnName === filterDesign)
-    //     .map(g => {
-    //         const orders = (g.orders || []).filter(o => !filterCust || o.ParName === filterCust);
-    //         const totalQty = orders.reduce((s, o) => s + num(o.OrderQty), 0);
-    //         // aggregate shade chips from the visible orders' items
-    //         const shadeMap = {};
-    //         orders.forEach(o => (o.Items || []).forEach(it => {
-    //             const k = it.ShdCode || it.ShdName || it.ShadeName;
-    //             if (!shadeMap[k]) {
-    //                 shadeMap[k] = {
-    //                     ShdName: it.ShdName || it.ShadeName,
-    //                     ShdColor: it.ShdColor,
-    //                     TotalQty: 0,
-    //                 };
-    //             }
-    //             shadeMap[k].TotalQty += num(it.Qty);
-    //         }));
-    //         return { ...g, orders, totalQty, shadeAgg: Object.values(shadeMap) };
-    //     })
-    //     .filter(g => g.orders.length > 0);
-
-    // const totalM = visibleGroups.reduce((s, g) => s + g.totalQty, 0);
-    // const totalSOs = visibleGroups.reduce((s, g) => s + g.orders.length, 0);
-
-    const visibleGroups = allGroups
-        .filter(g =>
-            !filterDesign ||
-            g.DsnCode === filterDesign
-        )
-        .map(g => {
-            const orders = (g.orders || [])
-                .filter(o =>
-                    !filterCust ||
-                    o.ParCode === filterCust
-                );
-
-            const totalQty = orders.reduce(
-                (s, o) => s + num(o.OrderQty),
-                0
+    // ── Apply active filters to orders/lines ───────────────────────
+    const filteredOrders = summaryOrders
+        .filter(order => orderMatchesParty(order, filterCust))
+        .map(order => {
+            const designLines = getOrderLines(order).filter(line =>
+                lineMatchesDesign(line, filterDesign)
             );
 
-            const shadeMap = {};
+            const lines = smartMatchingLines(order, smartSearch, designLines);
 
-            orders.forEach(o =>
-                (o.Items || []).forEach(it => {
+            return {
+                ...order,
+                __lines: lines,
+                __qty: lines.reduce((sum, line) => sum + num(line?.Qty), 0),
+            };
+        })
+        .filter(order => order.__lines.length > 0);
 
-                    const k = it.ShdCode;
+    const uniqueSOCount = new Set(filteredOrders.map(orderKey)).size;
+    const totalM = filteredOrders.reduce((sum, order) => sum + num(order.__qty), 0);
 
-                    if (!shadeMap[k]) {
-                        shadeMap[k] = {
-                            ShdName: it.ShdName,
-                            ShdColor: it.ShdColor,
-                            TotalQty: 0,
+    const aggregateShades = lines => {
+        const map = {};
+
+        lines.forEach(line => {
+            const key = String(line?.ShdCode || line?.ShdName || line?.ShadeName || 'NO_SHADE');
+
+            if (!map[key]) {
+                map[key] = {
+                    ShdCode: line?.ShdCode,
+                    ShdName: line?.ShdName || line?.ShadeName || '—',
+                    ShdColor: line?.ShdColor,
+                    TotalQty: 0,
+                };
+            }
+
+            map[key].TotalQty += num(line?.Qty);
+        });
+
+        return Object.values(map);
+    };
+
+    // ── Build the same UI hierarchy in either grouping mode ───────
+    const groupedRows = (() => {
+        const map = {};
+
+        if (groupMode === 'design') {
+            filteredOrders.forEach(order => {
+                const byDesign = {};
+
+                order.__lines.forEach(line => {
+                    const key = String(line?.DsnCode || line?.DsnName || 'NO_DESIGN');
+                    if (!byDesign[key]) byDesign[key] = [];
+                    byDesign[key].push(line);
+                });
+
+                Object.entries(byDesign).forEach(([key, lines]) => {
+                    const first = lines[0] || {};
+
+                    if (!map[key]) {
+                        map[key] = {
+                            key: `D:${key}`,
+                            mode: 'design',
+                            title: first.DsnName || 'Unnamed design',
+                            code: String(first.DsnCode || ''),
+                            subtitle: first.ItmName || '',
+                            orders: [],
+                            allLines: [],
                         };
                     }
 
-                    shadeMap[k].TotalQty += num(it.Qty);
-                })
-            );
+                    map[key].orders.push({
+                        ...order,
+                        __lines: lines,
+                        __qty: lines.reduce((sum, line) => sum + num(line?.Qty), 0),
+                    });
+                    map[key].allLines.push(...lines);
+                });
+            });
+        } else {
+            filteredOrders.forEach(order => {
+                const key = String(order?.ParCode || order?.ParName || 'NO_PARTY');
 
-            return {
-                ...g,
-                orders,
-                totalQty,
-                shadeAgg: Object.values(shadeMap),
-            };
-        })
-        .filter(g => g.orders.length > 0);
+                if (!map[key]) {
+                    map[key] = {
+                        key: `P:${key}`,
+                        mode: 'customer',
+                        title: order?.ParName || 'Unnamed customer',
+                        code: String(order?.ParCode || ''),
+                        subtitle: '',
+                        orders: [],
+                        allLines: [],
+                    };
+                }
 
-    const totalM = visibleGroups.reduce(
-        (s, g) => s + g.totalQty,
-        0
-    );
+                map[key].orders.push(order);
+                map[key].allLines.push(...order.__lines);
+            });
+        }
 
-    const totalSOs = visibleGroups.length;
+        return Object.values(map)
+            .map(group => {
+                const distinctDesigns = uniqueBy(
+                    group.allLines.map(line => ({
+                        code: String(line?.DsnCode ?? ''),
+                        name: String(line?.DsnName ?? '').trim(),
+                    })),
+                    row => row.code || normalized(row.name),
+                );
 
-    console.log("visibleGroups =", visibleGroups);
+                const totalQty = group.orders.reduce(
+                    (sum, order) => sum + num(order.__qty),
+                    0,
+                );
 
-    // ── Design group card ──
-    const renderGroup = (g, gi) => (
-        <View key={gi} style={SU.groupCard}>
-            {/* group header */}
-            <View style={SU.groupHead}>
-                <View style={SU.dsnBadge}>
-                    <Text style={SU.dsnBadgeText}>{(g.DsnName || '—').split(' ')[0]}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text style={SU.dsnName}>
-                        {g.DsnName}
-                        <Text style={SU.dsnCode}>  · {g.DsnCode}</Text>
-                    </Text>
-                    <Text style={SU.dsnMeta}>
-                        {g.FabricType || ''} · {g.orders.length} SO · {g.shadeAgg.length} charts
-                    </Text>
-                </View>
-                <Text style={SU.dsnQty}>{fmtIN(g.totalQty)} m</Text>
+                const shadeAgg = aggregateShades(group.allLines);
+
+                return {
+                    ...group,
+                    totalQty,
+                    shadeAgg,
+                    designCount: distinctDesigns.length,
+                    soCount: new Set(group.orders.map(orderKey)).size,
+                };
+            })
+            .sort((a, b) => b.totalQty - a.totalQty);
+    })();
+
+    const groupCountLabel = groupMode === 'design'
+        ? `${groupedRows.length} designs`
+        : `${groupedRows.length} customers`;
+
+    const renderShadeRows = lines => (
+        <View style={SU.shadeTable}>
+            <View style={SU.shadeTableHead}>
+                <Text style={SU.shadeTableHeadText}>SHADE / COLOUR</Text>
+                <Text style={SU.shadeTableHeadText}>ORDER QTY (M)</Text>
             </View>
 
-            {/* aggregated shade chips */}
-            <View style={SU.chipRow}>
-                {g.shadeAgg.map((sh, si) => (
-                    <View key={si} style={SU.shChip}>
-                        <View style={[SU.shDot, { backgroundColor: sh.ShdColor || '#94A3B8' }]} />
-                        <Text style={SU.shChipName}>{sh.ShdName}</Text>
-                        <Text style={SU.shChipQty}>{fmtIN(sh.TotalQty)}</Text>
+            {lines.map((line, index) => (
+                <View
+                    key={`${line?.ShdCode || line?.ShdName || 'shade'}-${line?.DsnCode || ''}-${index}`}
+                    style={SU.shadeRow}
+                >
+                    <View style={SU.shadeLeft}>
+                        <View
+                            style={[
+                                SU.shadeSwatch,
+                                { backgroundColor: line?.ShdColor || '#B9B5AE' },
+                            ]}
+                        />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={SU.shadeName} numberOfLines={1}>
+                                {line?.ShdName || line?.ShadeName || '—'}
+                            </Text>
+                            {!!line?.ShdCode && (
+                                <Text style={SU.shadeCode}>Code {line.ShdCode}</Text>
+                            )}
+                        </View>
+                    </View>
+                    <Text style={SU.shadeQty}>{fmtIN(line?.Qty)} m</Text>
+                </View>
+            ))}
+        </View>
+    );
+
+    const renderCustomerOrderContents = order => {
+        const designMap = {};
+
+        order.__lines.forEach(line => {
+            const key = String(line?.DsnCode || line?.DsnName || 'NO_DESIGN');
+            if (!designMap[key]) {
+                designMap[key] = {
+                    DsnCode: line?.DsnCode,
+                    DsnName: line?.DsnName || 'Unnamed design',
+                    ItmName: line?.ItmName || '',
+                    lines: [],
+                };
+            }
+            designMap[key].lines.push(line);
+        });
+
+        const designs = Object.values(designMap);
+
+        return (
+            <View>
+                {designs.map((design, index) => (
+                    <View
+                        key={`${design.DsnCode || design.DsnName}-${index}`}
+                        style={index > 0 ? SU.orderDesignBlockBorder : SU.orderDesignBlock}
+                    >
+                        <View style={SU.orderDesignHead}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={SU.orderDesignName} numberOfLines={1}>
+                                    {design.DsnName}
+                                    {!!design.DsnCode && (
+                                        <Text style={SU.orderDesignCode}> · {design.DsnCode}</Text>
+                                    )}
+                                </Text>
+                                {!!design.ItmName && (
+                                    <Text style={SU.orderDesignMeta}>{design.ItmName}</Text>
+                                )}
+                            </View>
+                            <Text style={SU.orderDesignQty}>
+                                {fmtIN(design.lines.reduce((s, line) => s + num(line?.Qty), 0))} m
+                            </Text>
+                        </View>
+                        {renderShadeRows(design.lines)}
                     </View>
                 ))}
             </View>
+        );
+    };
 
-            {/* SO rows */}
-            {g.orders.map((o, oi) => {
-                const authorised = o.AuthStatus === 'Authorised';
-                return (
-                    <View key={oi} style={SU.soBlock}>
-                        <View style={SU.soTopRow}>
-                            <Text style={SU.soNo}>{o.SONo}</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <View style={[SU.soBadge, { backgroundColor: authorised ? '#ECFDF3' : '#FEF3C7' }]}>
-                                    <Text style={[SU.soBadgeText, { color: authorised ? '#027A48' : '#92400E' }]}>
-                                        {authorised ? 'Authorised' : 'Pending Auth'}
-                                    </Text>
-                                </View>
-                                <Text style={SU.soQty}>{fmtIN(o.OrderQty)} m</Text>
-                            </View>
-                        </View>
-                        <Text style={SU.soSub}>
-                            {o.SODate}
-                            {/* party shown only when not already filtered to one customer */}
-                            {/* {!filterCust && o.ParName ? ` · ${o.ParName}` : ''} */}
-                            {o.ParName ? ` · ${o.ParName}` : ''}
-                            {` · deliver ${o.DeliveryDate || '—'}`}
-                        </Text>
+    const renderGroup = group => {
+        const groupExpanded = expandedGroupKey === group.key;
+        const metaText = group.mode === 'design'
+            ? `${group.subtitle ? `${group.subtitle} · ` : ''}${group.soCount} ${group.soCount === 1 ? 'SO' : 'SOs'} · ${group.shadeAgg.length} ${group.shadeAgg.length === 1 ? 'Shade' : 'Shades'}`
+            : `${group.soCount} ${group.soCount === 1 ? 'SO' : 'SOs'} · ${group.designCount} ${group.designCount === 1 ? 'Design' : 'Designs'} · ${group.shadeAgg.length} ${group.shadeAgg.length === 1 ? 'Shade' : 'Shades'}`;
 
-                        {(o.Items || []).map((it, ii) => (
-                            <View key={ii} style={SU.soShadeRow}>
-                                <View style={[SU.shDotLg, { backgroundColor: it.ShdColor || '#94A3B8' }]} />
-                                <View style={{ flex: 1 }}>
-                                    <Text style={SU.soShadeName}>{it.ShdName || it.ShadeName}</Text>
-                                    <Text style={SU.soShadeSub}>
-                                        {[it.WarpColorName || it.WarpColor, it.WeftColorName || it.WeftColor]
-                                            .filter(Boolean).join(' · ') || '—'}
-                                    </Text>
-                                </View>
-                                <Text style={SU.soShadeQty}>{fmtIN(it.Qty)} m</Text>
-                            </View>
-                        ))}
+        return (
+            <View key={group.key} style={SU.groupCard}>
+                <TouchableOpacity
+                    style={[SU.groupHead, groupExpanded && SU.groupHeadExpanded]}
+                    activeOpacity={0.78}
+                    onPress={() => {
+                        setExpandedGroupKey(current => current === group.key ? '' : group.key);
+                        setExpandedOrderKey('');
+                    }}
+                >
+                    <View style={SU.expandBox}>
+                        <Text style={SU.expandBoxText}>{groupExpanded ? '⌄' : '›'}</Text>
                     </View>
-                );
-            })}
-        </View>
-    );
+
+                    <View style={SU.groupIdentity}>
+                        <View style={SU.groupMarker} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={SU.groupTitle} numberOfLines={1}>
+                                {group.title}
+                                {!!group.code && (
+                                    <Text style={SU.groupCode}> · {group.code}</Text>
+                                )}
+                            </Text>
+                            <Text style={SU.groupMeta} numberOfLines={1}>{metaText}</Text>
+                        </View>
+                    </View>
+
+                    <Text style={SU.groupQty}>{fmtIN(group.totalQty)} m</Text>
+                </TouchableOpacity>
+
+                {groupExpanded && (
+                    <View style={SU.groupBody}>
+                        {group.orders.map((order, index) => {
+                            const soKey = `${group.key}:${orderKey(order)}`;
+                            const orderExpanded = expandedOrderKey === soKey;
+                            const status = getStatusMeta(order);
+
+                            return (
+                                <View
+                                    key={soKey}
+                                    style={[
+                                        SU.soCard,
+                                        index === group.orders.length - 1 && SU.soCardLast,
+                                    ]}
+                                >
+                                    <TouchableOpacity
+                                        style={SU.soHead}
+                                        activeOpacity={0.78}
+                                        onPress={() => setExpandedOrderKey(current => current === soKey ? '' : soKey)}
+                                    >
+                                        <View style={[SU.statusDot, { backgroundColor: status.dot }]} />
+                                        <View style={{ flex: 1, minWidth: 0 }}>
+                                            <Text style={SU.soNo} numberOfLines={1}>
+                                                SO {order.SONo || '—'}
+                                            </Text>
+                                            <Text style={SU.soMeta} numberOfLines={1}>
+                                                {order.SODate || '—'}
+                                                {group.mode === 'design' && order.ParName ? ` · ${order.ParName}` : ''}
+                                                {group.mode === 'customer' && order.BAccName ? ` · ${order.BAccName}` : ''}
+                                            </Text>
+                                            <View style={SU.statusLine}>
+                                                <View style={[SU.statusBadge, { backgroundColor: status.bg }]}>
+                                                    <Text style={[SU.statusBadgeText, { color: status.fg }]}>{status.label}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                        <Text style={SU.soQty}>{fmtIN(order.__qty)} m</Text>
+                                        <Text style={SU.soChevron}>{orderExpanded ? '⌃' : '⌄'}</Text>
+                                    </TouchableOpacity>
+
+                                    {orderExpanded && (
+                                        <View style={SU.soDetails}>
+                                            {group.mode === 'design'
+                                                ? renderShadeRows(order.__lines)
+                                                : renderCustomerOrderContents(order)}
+                                        </View>
+                                    )}
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
+            </View>
+        );
+    };
 
     return (
         <>
             <ScrollView
-                contentContainerStyle={{ padding: 14, paddingBottom: 30 }}
+                contentContainerStyle={SU.screenContent}
+                keyboardShouldPersistTaps="handled"
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -3161,26 +3183,73 @@ function SummaryTab({ token }) {
                     />
                 }
             >
-                {/* month pills */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                        {MONTHS.map(mo => {
-                            const on = selMonth.key === mo.key;
-                            return (
-                                <TouchableOpacity
-                                    key={mo.key}
-                                    onPress={() => setSelMonth(mo)}
-                                    style={[SU.pill, on && SU.pillOn]}
-                                >
-                                    <Text style={[SU.pillText, on && SU.pillTextOn]}>{mo.label}</Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                {/* Month selector */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={SU.monthScroll}
+                    contentContainerStyle={SU.monthScrollContent}
+                >
+                    {MONTHS.map(mo => {
+                        const active = selMonth.key === mo.key;
+                        return (
+                            <TouchableOpacity
+                                key={mo.key}
+                                onPress={() => setSelMonth(mo)}
+                                style={[SU.monthPill, active && SU.monthPillActive]}
+                            >
+                                <Text style={[SU.monthPillText, active && SU.monthPillTextActive]}>
+                                    {mo.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </ScrollView>
 
-                {/* filter dropdowns */}
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {/* Design-wise / Customer-wise — same UI, one-tap regroup */}
+                <View style={SU.modeSwitch}>
+                    <TouchableOpacity
+                        style={[SU.modeBtn, groupMode === 'design' && SU.modeBtnActive]}
+                        onPress={() => setGroupMode('design')}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[SU.modeBtnText, groupMode === 'design' && SU.modeBtnTextActive]}>
+                            Design wise
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[SU.modeBtn, groupMode === 'customer' && SU.modeBtnActive]}
+                        onPress={() => setGroupMode('customer')}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[SU.modeBtnText, groupMode === 'customer' && SU.modeBtnTextActive]}>
+                            Customer wise
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Universal smart search */}
+                <View style={SU.smartSearchBox}>
+                    <Icon name="search" size={18} color="#7B8490" />
+                    <TextInput
+                        value={smartSearch}
+                        onChangeText={setSmartSearch}
+                        placeholder="Search party / design / shade / SO / item..."
+                        placeholderTextColor="#9AA0A8"
+                        style={SU.smartSearchInput}
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                        returnKeyType="search"
+                    />
+                    {!!smartSearch && (
+                        <TouchableOpacity onPress={() => setSmartSearch('')} style={SU.searchClearBtn}>
+                            <Text style={SU.searchClearText}>×</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Faceted filters — values come ONLY from Summary response */}
+                <View style={SU.filterRow}>
                     <TouchableOpacity
                         style={SU.filterBox}
                         onPress={() => setShowCustPicker(true)}
@@ -3189,8 +3258,9 @@ function SummaryTab({ token }) {
                         <Text style={SU.filterText} numberOfLines={1}>
                             {filterCustName || 'All customers'}
                         </Text>
-                        <Text style={SU.filterArrow}>▾</Text>
+                        <Text style={SU.filterArrow}>⌄</Text>
                     </TouchableOpacity>
+
                     <TouchableOpacity
                         style={SU.filterBox}
                         onPress={() => setShowDsnPicker(true)}
@@ -3199,76 +3269,70 @@ function SummaryTab({ token }) {
                         <Text style={SU.filterText} numberOfLines={1}>
                             {filterDesignName || 'All designs'}
                         </Text>
-                        <Text style={SU.filterArrow}>▾</Text>
+                        <Text style={SU.filterArrow}>⌄</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* dark summary header */}
+                {/* Compact Claude-style summary header */}
                 <View style={SU.summaryHeader}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <Text style={SU.summaryLabel}>MONTHLY DESIGN · SO SUMMARY</Text>
-                        <Text style={SU.summaryQty}>{fmtIN(totalM)} m</Text>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={SU.summaryLabel}>
+                            MONTHLY {groupMode === 'design' ? 'DESIGN' : 'CUSTOMER'} · SO SUMMARY
+                        </Text>
+                        <Text style={SU.summaryMonth}>{selMonth.label}</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                        <Text style={SU.summaryMonth}>
-                            {selMonth.label}{filterCust ? ` · ${filterCust}` : ''}
-                        </Text>
-                        <Text style={SU.summaryMeta}>
-                            {visibleGroups.length} designs · {totalSOs} SOs
-                        </Text>
+                    <View style={SU.summaryRight}>
+                        <Text style={SU.summaryQty}>{fmtIN(totalM)} m</Text>
+                        <Text style={SU.summaryMeta}>{groupCountLabel} · {uniqueSOCount} SOs</Text>
                     </View>
                 </View>
 
-                {loading && <ActivityIndicator color="#13879A" style={{ marginTop: 20 }} />}
+                <View style={SU.helperRow}>
+                    <Text style={SU.helperText}>
+                        Tap a {groupMode === 'design' ? 'design' : 'customer'} to view sales orders · tap an SO to view {groupMode === 'design' ? 'shades' : 'designs & shades'}
+                    </Text>
+                </View>
 
-                {!loading && visibleGroups.map(renderGroup)}
+                {loading && (
+                    <View style={SU.loadingBox}>
+                        <ActivityIndicator color="#13879A" />
+                    </View>
+                )}
 
-                {!loading && visibleGroups.length === 0 && (
-                    <View style={{ padding: 40, alignItems: 'center' }}>
-                        <Text style={{ color: '#9ca3af' }}>
-                            No summary data for {selMonth.label}
-                            {filterCust ? ` · ${filterCust}` : ''}
-                            {filterDesign ? ` · ${filterDesign}` : ''}
+                {!loading && groupedRows.map(renderGroup)}
+
+                {!loading && groupedRows.length === 0 && (
+                    <View style={SU.emptyBox}>
+                        <Text style={SU.emptyTitle}>No matching sales orders</Text>
+                        <Text style={SU.emptyText}>
+                            Try changing the month or clearing the current search/filter.
                         </Text>
                     </View>
                 )}
             </ScrollView>
 
-            {/* Customer filter picker */}
-            {/* <PickerSheet
-                visible={showCustPicker}
-                title="Customer"
-                items={[
-                    { Code: '', Name: 'All customers' },
-                    ...custList.map(c => ({ Code: c, Name: c })),
-                ]}
-                keyField="Code"
-                labelField="Name"
-                search={custSearch}
-                setSearch={setCustSearch}
-                loading={false}
-                onSelect={item => setFilterCust(item.Code)}
-                onClose={() => { setShowCustPicker(false); setCustSearch(''); }}
-            /> */}
+            {/* Response-only Customer picker */}
             <PickerSheet
                 visible={showCustPicker}
                 title="Customer"
                 items={[
-                    {
-                        acccode: '',
-                        accountname: 'All Customers',
-                    },
-                    ...parties,
+                    { code: '', name: 'All Customers', meta: `${partyOptions.length} in this result` },
+                    ...partyOptions.map(item => ({
+                        ...item,
+                        meta: item.code ? `Code ${item.code}` : '',
+                    })),
                 ]}
-                keyField="acccode"
-                labelField="accountname"
+                keyField="code"
+                labelField="name"
+                subField="meta"
                 search={custSearch}
                 setSearch={setCustSearch}
-                loading={partyLoading}
-                onSelect={(item) => {
-                    setFilterCust(item.acccode);          // filter code
-                    setFilterCustName(item.accountname);  // display name
+                loading={false}
+                onSelect={item => {
+                    setFilterCust(item.code || '');
+                    setFilterCustName(item.code ? item.name : '');
                     setShowCustPicker(false);
+                    setCustSearch('');
                 }}
                 onClose={() => {
                     setShowCustPicker(false);
@@ -3276,41 +3340,28 @@ function SummaryTab({ token }) {
                 }}
             />
 
-            {/* Design filter picker */}
-            {/* <PickerSheet
-                visible={showDsnPicker}
-                title="Design"
-                items={[
-                    { Code: '', Name: 'All designs' },
-                    ...dsnList.map(d => ({ Code: d, Name: d })),
-                ]}
-                keyField="Code"
-                labelField="Name"
-                search={dsnSearch}
-                setSearch={setDsnSearch}
-                loading={false}
-                onSelect={item => setFilterDesign(item.Code)}
-                onClose={() => { setShowDsnPicker(false); setDsnSearch(''); }}
-            /> */}
+            {/* Response-only Design picker */}
             <PickerSheet
                 visible={showDsnPicker}
                 title="Design"
                 items={[
-                    {
-                        DsnCode: '',
-                        DsnName: 'All Designs',
-                    },
-                    ...designList,
+                    { code: '', name: 'All Designs', meta: `${designOptions.length} in this result` },
+                    ...designOptions.map(item => ({
+                        ...item,
+                        meta: [item.code ? `Code ${item.code}` : '', item.itemName].filter(Boolean).join(' · '),
+                    })),
                 ]}
-                keyField="DsnCode"
-                labelField="DsnName"
+                keyField="code"
+                labelField="name"
+                subField="meta"
                 search={dsnSearch}
                 setSearch={setDsnSearch}
-                loading={designLoading}
-                onSelect={(item) => {
-                    setFilterDesign(item.DsnCode);      // filter code
-                    setFilterDesignName(item.DsnName);  // display name
+                loading={false}
+                onSelect={item => {
+                    setFilterDesign(item.code || '');
+                    setFilterDesignName(item.code ? item.name : '');
                     setShowDsnPicker(false);
+                    setDsnSearch('');
                 }}
                 onClose={() => {
                     setShowDsnPicker(false);
@@ -3322,114 +3373,446 @@ function SummaryTab({ token }) {
 }
 
 // ── Summary styles ───────────────────────────────────────────────
-
 const SU = StyleSheet.create({
-    // month pills
-    pill: {
-        paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999,
-        backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB',
+    screenContent: {
+        padding: 14,
+        paddingBottom: 32,
     },
-    pillOn: { backgroundColor: '#13879A', borderColor: '#13879A' },
-    pillText: { fontSize: 12, color: '#000', fontWeight: '600' },
-    pillTextOn: { color: '#fff', fontWeight: '700' },
 
-    // filter dropdowns
+    monthScroll: {
+        marginBottom: 10,
+    },
+    monthScrollContent: {
+        gap: 8,
+        paddingRight: 8,
+    },
+    monthPill: {
+        borderRadius: 18,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#DED9D2',
+    },
+    monthPillActive: {
+        backgroundColor: '#D77A2D',
+        borderColor: '#D77A2D',
+    },
+    monthPillText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#665F58',
+    },
+    monthPillTextActive: {
+        color: '#FFFFFF',
+    },
+
+    modeSwitch: {
+        flexDirection: 'row',
+        backgroundColor: '#E9E5DF',
+        borderRadius: 12,
+        padding: 3,
+        marginBottom: 10,
+    },
+    modeBtn: {
+        flex: 1,
+        minHeight: 38,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modeBtnActive: {
+        backgroundColor: '#102334',
+    },
+    modeBtnText: {
+        color: '#756D65',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    modeBtnTextActive: {
+        color: '#FFFFFF',
+    },
+
+    smartSearchBox: {
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 9,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 11,
+        borderWidth: 1,
+        borderColor: '#DED9D2',
+        paddingHorizontal: 12,
+        marginBottom: 10,
+    },
+    smartSearchInput: {
+        flex: 1,
+        paddingVertical: 10,
+        color: '#17212B',
+        fontSize: 13,
+    },
+    searchClearBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F2F0ED',
+    },
+    searchClearText: {
+        color: '#76706A',
+        fontSize: 18,
+        lineHeight: 20,
+    },
+
+    filterRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 12,
+    },
     filterBox: {
-        flex: 1, height: 46, backgroundColor: '#fff', borderRadius: 12,
-        borderWidth: 1, borderColor: '#E5E7EB', flexDirection: 'row',
-        alignItems: 'center', paddingHorizontal: 14,
+        flex: 1,
+        minWidth: 0,
+        minHeight: 43,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 11,
+        borderWidth: 1,
+        borderColor: '#DED9D2',
+        paddingHorizontal: 12,
     },
-    filterText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#111827' },
-    filterArrow: { fontSize: 11, color: '#000' },
+    filterText: {
+        flex: 1,
+        minWidth: 0,
+        color: '#242A30',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    filterArrow: {
+        marginLeft: 8,
+        color: '#7F7770',
+        fontSize: 16,
+    },
 
-    // dark summary header
     summaryHeader: {
-        backgroundColor: '#1E2A38', borderRadius: 14, padding: 16, marginBottom: 12,
+        minHeight: 82,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#102334',
+        borderRadius: 14,
+        paddingHorizontal: 15,
+        paddingVertical: 13,
+        marginBottom: 8,
     },
-    summaryLabel: { fontSize: 9, color: '#8A97A6', letterSpacing: 1, fontWeight: '700' },
+    summaryLabel: {
+        color: '#91A1AE',
+        fontSize: 9,
+        letterSpacing: 0.7,
+        fontWeight: '800',
+    },
+    summaryMonth: {
+        marginTop: 4,
+        color: '#FFFFFF',
+        fontSize: 19,
+        fontWeight: '900',
+    },
+    summaryRight: {
+        marginLeft: 12,
+        alignItems: 'flex-end',
+    },
     summaryQty: {
-        fontSize: 18, fontWeight: '800', color: '#E0A864',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+        color: '#E07C2E',
+        fontSize: 20,
+        fontWeight: '900',
+        fontVariant: ['tabular-nums'],
     },
-    summaryMonth: { fontSize: 17, fontWeight: '700', color: '#fff', marginTop: 6 },
-    summaryMeta: { fontSize: 11, color: '#8A97A6' },
+    summaryMeta: {
+        marginTop: 3,
+        color: '#B7C0C8',
+        fontSize: 10,
+        fontWeight: '600',
+    },
 
-    // design group card
+    helperRow: {
+        paddingHorizontal: 3,
+        paddingVertical: 8,
+        marginBottom: 4,
+    },
+    helperText: {
+        color: '#777E85',
+        fontSize: 10,
+        lineHeight: 15,
+    },
+
     groupCard: {
-        backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12,
-        elevation: 2, shadowColor: '#000', shadowOpacity: 0.05,
-        shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#DDD8D1',
+        overflow: 'hidden',
+        marginBottom: 10,
     },
-    groupHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    dsnBadge: {
-        backgroundColor: '#FCEAD9', borderRadius: 8,
-        paddingHorizontal: 9, paddingVertical: 5,
+    groupHead: {
+        minHeight: 70,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 11,
+        backgroundColor: '#FFFFFF',
     },
-    dsnBadgeText: {
-        fontSize: 10, fontWeight: '700', color: '#C2823A',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    groupHeadExpanded: {
+        backgroundColor: '#FBF8F4',
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E0D9',
     },
-    dsnName: { fontSize: 15, fontWeight: '800', color: '#111827' },
-    dsnCode: { fontSize: 11, fontWeight: '600', color: '#9CA3AF' },
-    dsnMeta: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
-    dsnQty: {
-        fontSize: 15, fontWeight: '800', color: '#C2823A',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    expandBox: {
+        width: 29,
+        height: 29,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F7EFE6',
+        marginRight: 10,
+    },
+    expandBoxText: {
+        color: '#17212B',
+        fontSize: 18,
+        fontWeight: '800',
+        marginTop: -1,
+    },
+    groupIdentity: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    groupMarker: {
+        width: 18,
+        height: 18,
+        borderRadius: 5,
+        backgroundColor: '#BDB8B1',
+        marginRight: 9,
+    },
+    groupTitle: {
+        color: '#141C24',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    groupCode: {
+        color: '#79818A',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    groupMeta: {
+        marginTop: 3,
+        color: '#8C8A87',
+        fontSize: 10,
+    },
+    groupQty: {
+        marginLeft: 10,
+        color: '#DA7427',
+        fontSize: 14,
+        fontWeight: '900',
+        fontVariant: ['tabular-nums'],
+    },
+    groupBody: {
+        paddingLeft: 12,
+        backgroundColor: '#FFFFFF',
     },
 
-    // aggregated shade chips
-    chipRow: {
-        flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-        marginTop: 12, paddingBottom: 12,
-        borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
+    soCard: {
+        borderBottomWidth: 1,
+        borderBottomColor: '#EDE9E4',
+        paddingRight: 12,
     },
-    shChip: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999,
-        paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#FAFAFA',
+    soCardLast: {
+        borderBottomWidth: 0,
     },
-    shDot: { width: 14, height: 14, borderRadius: 7 },
-    shDotLg: { width: 20, height: 20, borderRadius: 10 },
-    shChipName: { fontSize: 11, fontWeight: '700', color: '#111827' },
-    shChipQty: {
-        fontSize: 11, fontWeight: '700', color: '#C2823A',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    soHead: {
+        minHeight: 73,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 11,
     },
-
-    // SO block
-    soBlock: {
-        paddingTop: 12, marginTop: 2,
-        borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 10,
-    },
-    soTopRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    statusDot: {
+        width: 9,
+        height: 9,
+        borderRadius: 5,
+        marginRight: 10,
     },
     soNo: {
-        fontSize: 13, fontWeight: '800', color: '#111827',
+        color: '#18222D',
+        fontSize: 13,
+        fontWeight: '900',
         fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
-    soBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-    soBadgeText: {
-        fontSize: 9, fontWeight: '700',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    soMeta: {
+        marginTop: 3,
+        color: '#858B91',
+        fontSize: 10,
+    },
+    statusLine: {
+        flexDirection: 'row',
+        marginTop: 5,
+    },
+    statusBadge: {
+        borderRadius: 5,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    statusBadgeText: {
+        fontSize: 8,
+        fontWeight: '800',
     },
     soQty: {
-        fontSize: 13, fontWeight: '800', color: '#111827',
+        marginLeft: 8,
+        color: '#18222D',
+        fontSize: 13,
+        fontWeight: '900',
         fontVariant: ['tabular-nums'],
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     },
-    soSub: { fontSize: 11, color: '#9CA3AF', marginTop: 3 },
+    soChevron: {
+        width: 20,
+        marginLeft: 4,
+        color: '#5A6670',
+        textAlign: 'right',
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    soDetails: {
+        paddingBottom: 11,
+    },
 
-    soShadeRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10,
+    shadeTable: {
+        borderWidth: 1,
+        borderColor: '#E5E0D9',
+        borderRadius: 10,
+        overflow: 'hidden',
+        marginBottom: 1,
     },
-    soShadeName: { fontSize: 13, fontWeight: '700', color: '#111827' },
-    soShadeSub: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
-    soShadeQty: {
-        fontSize: 12, fontWeight: '700', color: '#374151',
-        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    shadeTableHead: {
+        minHeight: 34,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FAF8F5',
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E8E4DF',
+    },
+    shadeTableHeadText: {
+        color: '#727B84',
+        fontSize: 8,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+    },
+    shadeRow: {
+        minHeight: 52,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#E8E4DF',
+    },
+    shadeLeft: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    shadeSwatch: {
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        marginRight: 10,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: '#CFC9C2',
+    },
+    shadeName: {
+        color: '#1D252D',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    shadeCode: {
+        marginTop: 2,
+        color: '#92979C',
+        fontSize: 8,
+    },
+    shadeQty: {
+        color: '#1D252D',
+        fontSize: 12,
+        fontWeight: '800',
+        fontVariant: ['tabular-nums'],
+    },
+
+    orderDesignBlock: {
+        marginBottom: 10,
+    },
+    orderDesignBlockBorder: {
+        marginTop: 11,
+        paddingTop: 11,
+        borderTopWidth: 1,
+        borderTopColor: '#E5E0D9',
+    },
+    orderDesignHead: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 7,
+        paddingHorizontal: 2,
+    },
+    orderDesignName: {
+        color: '#1C252E',
+        fontSize: 12,
+        fontWeight: '900',
+    },
+    orderDesignCode: {
+        color: '#7E858C',
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    orderDesignMeta: {
+        color: '#93979C',
+        fontSize: 9,
+        marginTop: 2,
+    },
+    orderDesignQty: {
+        color: '#D7752B',
+        fontSize: 11,
+        fontWeight: '900',
+        marginLeft: 8,
+    },
+
+    loadingBox: {
+        paddingVertical: 28,
+        alignItems: 'center',
+    },
+    emptyBox: {
+        marginTop: 10,
+        paddingVertical: 34,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#DDD8D1',
+        borderRadius: 14,
+    },
+    emptyTitle: {
+        color: '#26313A',
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    emptyText: {
+        marginTop: 5,
+        color: '#8B8F93',
+        fontSize: 10,
+        lineHeight: 15,
+        textAlign: 'center',
     },
 });
+
 
 
 // ── ─────────────────────────────────────────────────────────────

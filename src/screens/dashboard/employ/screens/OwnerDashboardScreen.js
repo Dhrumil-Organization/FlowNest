@@ -13,7 +13,7 @@
 // // // } from 'react-native';
 // // // import { api, formatAmount } from '../api/api';
 // // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// // // import MiniLineChart from '../components/MiniLineChart';
+// // // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // // import {
 // // //   ColHeader,
 // // //   COLORS,
@@ -130,10 +130,7 @@
 
 // // //   const { sales, production, collection, outstanding } = data;
 
-// // //   const salesTrend = sales.daily_trend.map(d => d.amount);
-// // //   const productionTrend = production.daily_trend.map(d => d.meters);
-// // //   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // // // // // // // 
 // // //   return (
 // // //     <>
 // // //       <SafeAreaView style={styles.safe}>
@@ -575,7 +572,7 @@
 // // } from 'react-native';
 // // import { api, formatAmount } from '../api/api';
 // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// // import MiniLineChart from '../components/MiniLineChart';
+// // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // import SalesDashboardCard from '../components/SalesDashboardCard';
 // // import {
 // //   ColHeader,
@@ -693,10 +690,7 @@
 
 // //   const { sales, production, collection, outstanding } = data;
 
-// //   const salesTrend = sales.daily_trend.map(d => d.amount);
-// //   const productionTrend = production.daily_trend.map(d => d.meters);
-// //   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // // // // 
 // //   return (
 // //     <>
 // //       <SafeAreaView style={styles.safe}>
@@ -1063,7 +1057,7 @@
 // // } from 'react-native';
 // // import { api, formatAmount } from '../api/api';
 // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// // import MiniLineChart from '../components/MiniLineChart';
+// // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // import {
 // //   ColHeader,
 // //   COLORS,
@@ -1180,10 +1174,7 @@
 
 // //   const { sales, production, collection, outstanding } = data;
 
-// //   const salesTrend = sales.daily_trend.map(d => d.amount);
-// //   const productionTrend = production.daily_trend.map(d => d.meters);
-// //   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // // // // 
 // //   return (
 // //     <>
 // //       <SafeAreaView style={styles.safe}>
@@ -1625,7 +1616,7 @@
 // } from 'react-native';
 // import { api, formatAmount } from '../api/api';
 // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// import MiniLineChart from '../components/MiniLineChart';
+// import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // import SalesDashboardCard from '../components/SalesDashboardCard';
 // import {
 //   ColHeader,
@@ -1743,10 +1734,7 @@
 
 //   const { sales, production, collection, outstanding } = data;
 
-//   const salesTrend = sales.daily_trend.map(d => d.amount);
-//   const productionTrend = production.daily_trend.map(d => d.meters);
-//   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // 
 //   const openProductionReport = () => {
 //     router.push({
 //       pathname: '/new/(tabs)/reports/production',
@@ -2146,7 +2134,7 @@
 // } from 'react-native';
 // import { api, formatAmount } from '../api/api';
 // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// import MiniLineChart from '../components/MiniLineChart';
+// import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // import {
 //   ColHeader,
 //   COLORS,
@@ -2263,10 +2251,7 @@
 
 //   const { sales, production, collection, outstanding } = data;
 
-//   const salesTrend = sales.daily_trend.map(d => d.amount);
-//   const productionTrend = production.daily_trend.map(d => d.meters);
-//   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // 
 //   return (
 //     <>
 //       <SafeAreaView style={styles.safe}>
@@ -2708,7 +2693,7 @@ import {
 } from 'react-native';
 import { api, formatAmount } from '../api/api';
 import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-import MiniLineChart from '../components/MiniLineChart';
+import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 import SalesDashboardCard from '../components/SalesDashboardCard';
 import {
   ColHeader,
@@ -2827,9 +2812,6 @@ export default function OwnerDashboardScreen({
 
   const { sales, production, collection, outstanding } = data;
 
-  const salesTrend = sales.daily_trend.map(d => d.amount);
-  const productionTrend = production.daily_trend.map(d => d.meters);
-  const collectionTrend = collection.daily_trend.map(d => d.amount);
 
   const openProductionReport = () => {
     router.push({
@@ -2943,20 +2925,22 @@ export default function OwnerDashboardScreen({
 
             <View style={styles.chartWrap}>
               <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={productionTrend}
+              <InteractiveDailyTrendChart
+                data={production.daily_trend}
+                valueKey="meters"
+                labelKey="day"
                 color="#AB47BC"
                 fillColor="#AB47BC"
-                width={340}
-                height={55}
+                height={68}
+                pointGap={54}
+                valueFormatter={value =>
+                  `${Number(value || 0).toLocaleString('en-IN', {
+                    maximumFractionDigits: 1,
+                  })} m`
+                }
+                showBaseline
+                showHint
               />
-              <View style={styles.chartAxisRow}>
-                {production.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
             </View>
 
             <ColHeader label1="MACHINE" label2="YESTERDAY" label3="MTD" />
@@ -3002,20 +2986,18 @@ export default function OwnerDashboardScreen({
 
             <View style={styles.chartWrap}>
               <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={collectionTrend}
+              <InteractiveDailyTrendChart
+                data={collection.daily_trend}
+                valueKey="amount"
+                labelKey="day"
                 color={COLORS.green}
                 fillColor={COLORS.green}
-                width={340}
-                height={55}
+                height={68}
+                pointGap={54}
+                valueFormatter={value => formatAmount(Number(value || 0))}
+                showBaseline
+                showHint
               />
-              <View style={styles.chartAxisRow}>
-                {collection.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
             </View>
 
             <Text style={styles.subHeader}>

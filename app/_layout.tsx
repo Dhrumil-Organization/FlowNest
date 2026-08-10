@@ -258,7 +258,7 @@
 //   );
 // }
 
-// function setupNotificationHandlers(handleNotification) {
+// function setup s(handleNotification) {
 //   // 🔔 Foreground
 //   Notifications.addNotificationReceivedListener(notification => {
 //     console.log('📩 Foreground Notification:', notification);
@@ -289,6 +289,7 @@
 // });
 
 import { initAPI, initAPIForPrinterList, initAPIForSticker } from '@/common/API/dynamicAPI';
+import { NotificationProvider } from '@/common/context/NotificationContext';
 import { initDB } from '@/common/utils/chatDB';
 import { registerSnackbar } from '@/common/utils/snackbar';
 import { initGlobalCacheDB } from '@/common/utils/sqliteCacheManager';
@@ -471,35 +472,37 @@ export default function RootLayout() {
   // 🔥 FINAL ROUTING — sirf top-level route groups register karo.
   // Konsa dikhega ye upar wala router.replace() effect decide karta hai.
   return (
-    <AppCoreProvider>
-      <SalesOrderProvider>
-        <View style={styles.rootContainer}>
-          <Stack screenOptions={{ headerShown: false }}>
-            {isAllowed ? (
-              <>
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="new" />
-              </>
-            ) : (
-              <>
-                <Stack.Screen name="(all)" />
-                <Stack.Screen name="(auth)/login" />
-              </>
-            )}
-          </Stack>
-          <View style={styles.snackbarHost} pointerEvents="box-none">
-            <Snackbar
-              visible={snackbar.visible}
-              message={snackbar.message}
-              type={snackbar.type}
-              action={snackbar.action}
-              duration={snackbar.duration}
-              onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
-            />
+    <NotificationProvider>
+      <AppCoreProvider>
+        <SalesOrderProvider>
+          <View style={styles.rootContainer}>
+            <Stack screenOptions={{ headerShown: false }}>
+              {isAllowed ? (
+                <>
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="new" />
+                </>
+              ) : (
+                <>
+                  <Stack.Screen name="(all)" />
+                  <Stack.Screen name="(auth)/login" />
+                </>
+              )}
+            </Stack>
+            <View style={styles.snackbarHost} pointerEvents="box-none">
+              <Snackbar
+                visible={snackbar.visible}
+                message={snackbar.message}
+                type={snackbar.type}
+                action={snackbar.action}
+                duration={snackbar.duration}
+                onHide={() => setSnackbar((s) => ({ ...s, visible: false }))}
+              />
+            </View>
           </View>
-        </View>
-      </SalesOrderProvider>
-    </AppCoreProvider>
+        </SalesOrderProvider>
+      </AppCoreProvider>
+    </NotificationProvider>
   );
 }
 

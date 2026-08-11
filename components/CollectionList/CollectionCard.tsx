@@ -1,29 +1,29 @@
 /* CollectionCard.tsx — left-swipe preview + label-value single-line + full remark display */
+import Footer from '@/components/Footer';
+import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    SafeAreaView,
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    StyleSheet,
-    Modal,
-    Alert,
-    Image,
-    Dimensions,
-    Platform,
-    TextInput,
     ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    Image,
+    Modal,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
 import { Swipeable } from 'react-native-gesture-handler';
-import theme from '@/components/theme';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import ChequePreviewModal, { SwipePreview } from './ChequePreview';
-import Footer from '@/components/Footer';
 import { API } from '../../common/API/dynamicAPI';
+import ChequePreviewModal, { SwipePreview } from './ChequePreview';
 
 type POTItem = { [k: string]: any };
 const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
@@ -748,6 +748,8 @@ const CollectionCard: React.FC<{
     // Use the correct total based on condition
     const footerTotal = isToday ? todayDataTotal : allDataTotal;
     const footerText = isToday ? 'Today\'s Amount' : 'Total Amount';
+
+    console.log('footerTotal', footerTotal);
 
     return (
         <>

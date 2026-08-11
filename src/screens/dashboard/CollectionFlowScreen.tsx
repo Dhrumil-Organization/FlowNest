@@ -63,6 +63,9 @@ export default function CollectionFlowScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: 'target' | 'actual'; direction: 'asc' | 'desc'; }>({
+    key: 'target', direction: 'desc',
+  });
 
   const load = useCallback(async (pull = false) => {
     pull ? setRefreshing(true) : setLoading(true);
@@ -96,6 +99,22 @@ export default function CollectionFlowScreen() {
   }), { target: 0, actual: 0, remaining: 0 }), [rows]);
 
   const totalPct = totals.target > 0 ? (totals.actual / totals.target) * 100 : 0;
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a: any, b: any) => {
+      const aValue = Number(
+        sortConfig.key === 'target' ? a.target || 0 : a.actual || 0
+      );
+
+      const bValue = Number(
+        sortConfig.key === 'target' ? b.target || 0 : b.actual || 0
+      );
+
+      return sortConfig.direction === 'asc'
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+  }, [rows, sortConfig]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -155,7 +174,28 @@ export default function CollectionFlowScreen() {
             <View><Text style={styles.panelKicker}>COLLECTION BREAKDOWN</Text><Text style={styles.panelTitle}>By Party</Text></View>
             <View style={styles.count}><Text style={styles.countText}>{rows.length}</Text></View>
           </View>
-          <View style={styles.columns}><Text style={styles.columnName}>PARTY</Text><Text style={styles.columnValue}>TARGET · ACTUAL</Text></View>
+          <View style={styles.columns}>
+            <Text style={styles.columnName}>PARTY</Text>
+            {/* <Text style={styles.columnValue}>TARGET · ACTUAL</Text> */}
+            <TouchableOpacity
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() =>
+                setSortConfig(prev => ({
+                  key: prev.key === 'target' ? 'actual' : 'target',
+                  direction:
+                    prev.key === 'target' && prev.direction === 'asc'
+                      ? 'desc'
+                      : 'asc',
+                }))
+              }
+            >
+              <Text style={styles.columnValue}>
+                TARGET · ACTUAL
+                {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {loading ? (
             <View style={styles.state}><ActivityIndicator size="large" color={T.nav} /><Text style={styles.stateText}>Loading party collection…</Text></View>
@@ -163,7 +203,8 @@ export default function CollectionFlowScreen() {
             <View style={styles.state}><Text style={styles.errorTitle}>Unable to load report</Text><Text style={styles.stateText}>{error}</Text><TouchableOpacity onPress={() => load()} style={styles.retry}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>
           ) : rows.length === 0 ? (
             <View style={styles.state}><Text style={styles.emptyTitle}>No collection records</Text><Text style={styles.stateText}>No party-wise collection data is available for this executive and month.</Text></View>
-          ) : rows.map((row, index) => {
+          // ) : rows.map((row, index) => {
+          ) : sortedRows.map((row, index) => {
             const pct = Number(row.achievement_pct || 0);
             const tone = achievementTone(pct);
             return (

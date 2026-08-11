@@ -100,7 +100,43 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
   const [dimension, setDimension] = useState(sales?.default_dimension || 'category');
   const [expandedKey, setExpandedKey] = useState(null);
 
+  const [sortConfig, setSortConfig] = useState({
+    field: 'mtd_amount',
+    direction: 'desc',
+  });
+
   const rows = useMemo(() => sales?.dimensions?.[dimension] || [], [sales, dimension]);
+
+  const sortedRows = useMemo(() => {
+    const data = [...rows];
+
+    if (!sortConfig.field) return data;
+
+    return data.sort((a, b) => {
+      const aValue = Number(a?.[sortConfig.field] || 0);
+      const bValue = Number(b?.[sortConfig.field] || 0);
+
+      return sortConfig.direction === 'asc'
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+  }, [rows, sortConfig]);
+
+
+  const toggleSort = () => {
+    setSortConfig(prev => ({
+      field: prev.field === 'mtd_qty'
+        ? 'mtd_amount'
+        : 'mtd_qty',
+
+      direction:
+        prev.field === 'mtd_qty' &&
+          prev.direction === 'desc'
+          ? 'asc'
+          : 'desc',
+    }));
+  };
+
   const dailyTrend = useMemo(() => sales?.daily_trend || [], [sales]);
 
   const chooseDimension = next => {
@@ -171,10 +207,16 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
 
       <View style={styles.columnHeader}>
         <Text style={styles.columnTitle}>{dimension.toUpperCase()}</Text>
-        <Text style={styles.columnMetric}>QTY   AMOUNT</Text>
+        {/* <Text style={styles.columnMetric}>QTY   AMOUNT</Text> */}
+        <TouchableOpacity onPress={toggleSort}>
+          <Text style={styles.columnMetric}>
+            QTY   AMOUNT ▼
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {rows.map((row, index) => {
+      {/* {rows.map((row, index) => { */}
+      {sortedRows.map((row, index) => {
         const key = `${dimension}:${row.code || row.name}`;
         const expanded = expandedKey === key;
         const childEntries = Object.entries(row.children || {});
@@ -187,7 +229,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
                   <Text style={styles.avatarText}>{String(row.name || '?').charAt(0).toUpperCase()}</Text>
                 </View>
               )}
-              {dimension !== 'executive' && <View style={[styles.rankDot, { backgroundColor: ['#255C85','#7440B7','#168274','#2563EB','#B55E10','#0A9B6C','#D98200'][index % 7] }]} />}
+              {dimension !== 'executive' && <View style={[styles.rankDot, { backgroundColor: ['#255C85', '#7440B7', '#168274', '#2563EB', '#B55E10', '#0A9B6C', '#D98200'][index % 7] }]} />}
               <Text numberOfLines={1} style={styles.parentName}>{row.name}</Text>
               <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} />
             </TouchableOpacity>
@@ -215,8 +257,16 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total</Text>
         <MetricValue
-          quantity={rows.reduce((sum, row) => sum + Number(row.mtd_qty || 0), 0)}
-          amount={rows.reduce((sum, row) => sum + Number(row.mtd_amount || 0), 0)}
+          // quantity={rows.reduce((sum, row) => sum + Number(row.mtd_qty || 0), 0)}
+          quantity={sortedRows.reduce(
+            (sum, row) => sum + Number(row.mtd_qty || 0),
+            0
+          )}
+          // amount={rows.reduce((sum, row) => sum + Number(row.mtd_amount || 0), 0)}
+          amount={sortedRows.reduce(
+            (sum, row) => sum + Number(row.mtd_amount || 0),
+            0
+          )}
         />
       </View>
       <Text style={styles.footerNote}>Toggle the view · tap any row to expand its breakdown. Qty in metres, amount in ₹.</Text>

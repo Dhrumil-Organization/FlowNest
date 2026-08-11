@@ -325,47 +325,19 @@ export function NewOrderTab({ token, userid }: Props) {
                 )}
 
 
-                {step === 2 && (
-                    <View style={ns.stepBody}>
-                        {/* <SearchableDropdown
-                            label="Select customer"
-                            placeholder="Search by name or city…"
-                            value={custId}
-                            items={DUMMY_CUSTOMERS}
-                            onSelect={item => { setCustId(item.id); }}
-                        /> */}
-                        {partyLoading ? (
-                            <ActivityIndicator color={T.copper} />
-                        ) : (
-                            <SearchableDropdown
-                                label="Select customer"
-                                placeholder="Search by name or city..."
-                                value={custId}
-                                items={customerItems}
-                                onSelect={(item) => {
-                                    setCustId(item.id);
-                                }}
-                            />
-                        )}
-                        {custId && (
-                            <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(2)}>
-                                <Text style={ns.nextBtnTxt}>Next →</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                )}
+
             </Card>
 
             <Card style={ns.card}>
                 <TouchableOpacity style={ns.stepHead} onPress={() => setStep(2)} activeOpacity={0.7}>
-                    <StepDot n={1} done={!!custId} />
+                    <StepDot n={2} done={!!custId} />
                     <View style={{ flex: 1 }}>
                         <Text style={ns.stepTitle}>Customer</Text>
                         {cust && <Text style={ns.stepSub}>{cust.label}</Text>}
                     </View>
                     <Text style={ns.chevron}>{step === 2 ? '▾' : '›'}</Text>
                 </TouchableOpacity>
-               
+
                 {step === 2 && (
                     <View style={ns.stepBody}>
                         {/* <SearchableDropdown

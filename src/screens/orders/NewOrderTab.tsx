@@ -288,13 +288,44 @@ export function NewOrderTab({ token, userid }: Props) {
                 <TouchableOpacity style={ns.stepHead} onPress={() => setStep(1)} activeOpacity={0.7}>
                     <StepDot n={1} done={!!custId} />
                     <View style={{ flex: 1 }}>
-                        <Text style={ns.stepTitle}>Customer</Text>
+                        <Text style={ns.stepTitle}>Property</Text>
                         {cust && <Text style={ns.stepSub}>{cust.label}</Text>}
                     </View>
                     <Text style={ns.chevron}>{step === 1 ? '▾' : '›'}</Text>
                 </TouchableOpacity>
 
                 {step === 1 && (
+                    <View style={ns.stepBody}>
+                        {/* <SearchableDropdown
+                            label="Select customer"
+                            placeholder="Search by name or city…"
+                            value={custId}
+                            items={DUMMY_CUSTOMERS}
+                            onSelect={item => { setCustId(item.id); }}
+                        /> */}
+                        {partyLoading ? (
+                            <ActivityIndicator color={T.copper} />
+                        ) : (
+                            <SearchableDropdown
+                                label="Select property"
+                                placeholder="Search by name or city..."
+                                value={custId}
+                                items={customerItems}
+                                onSelect={(item) => {
+                                    setCustId(item.id);
+                                }}
+                            />
+                        )}
+                        {custId && (
+                            <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(2)}>
+                                <Text style={ns.nextBtnTxt}>Next →</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
+
+                {step === 2 && (
                     <View style={ns.stepBody}>
                         {/* <SearchableDropdown
                             label="Select customer"
@@ -323,7 +354,18 @@ export function NewOrderTab({ token, userid }: Props) {
                         )}
                     </View>
                 )}
+            </Card>
 
+            <Card style={ns.card}>
+                <TouchableOpacity style={ns.stepHead} onPress={() => setStep(2)} activeOpacity={0.7}>
+                    <StepDot n={1} done={!!custId} />
+                    <View style={{ flex: 1 }}>
+                        <Text style={ns.stepTitle}>Customer</Text>
+                        {cust && <Text style={ns.stepSub}>{cust.label}</Text>}
+                    </View>
+                    <Text style={ns.chevron}>{step === 2 ? '▾' : '›'}</Text>
+                </TouchableOpacity>
+               
                 {step === 2 && (
                     <View style={ns.stepBody}>
                         {/* <SearchableDropdown

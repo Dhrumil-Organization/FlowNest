@@ -1741,12 +1741,13 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
                     colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
                     style={{
                         position: "absolute",
-                        bottom: 0,
+                        bottom: 65,
                         left: 0,
                         right: 0,
                         padding: screenWidth <= 400 ? 10 : 12,
-                        borderTopLeftRadius: 12,
-                        borderTopRightRadius: 12,
+                        // borderTopLeftRadius: 12,
+                        // borderTopRightRadius: 12,
+                        borderRadius: 12,
                         elevation: 8,
                         shadowColor: "#000",
                         shadowOpacity: 0.2,

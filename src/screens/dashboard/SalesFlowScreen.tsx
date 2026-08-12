@@ -84,6 +84,10 @@ export default function SalesFlowScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [periodTitle, setPeriodTitle] = useState('Monthly Sales');
+  const [sortConfig, setSortConfig] = useState<{ key: 'qty' | 'amount'; direction: 'asc' | 'desc' }>({
+    key: 'amount',
+    direction: 'desc',
+  });
 
   const request = useMemo(() => ({
     metric,
@@ -136,6 +140,24 @@ export default function SalesFlowScreen() {
     }
   };
 
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a: any, b: any) => {
+      const aValue =
+        sortConfig.key === 'qty'
+          ? Number(a.qty || 0)
+          : Number(a.amount ?? a.actual ?? 0);
+
+      const bValue =
+        sortConfig.key === 'qty'
+          ? Number(b.qty || 0)
+          : Number(b.amount ?? b.actual ?? 0);
+
+      return sortConfig.direction === 'asc'
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+  }, [rows, sortConfig]);
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -172,7 +194,34 @@ export default function SalesFlowScreen() {
 
         <View style={styles.panel}>
           <View style={styles.panelHeader}><Text style={styles.panelHeaderText}>{LEVEL_LABEL[level].toUpperCase()}</Text></View>
-          <View style={styles.columnHeader}><Text style={styles.columnLeft}>NAME / REFERENCE</Text><Text style={styles.columnRight}>QTY · AMOUNT</Text></View>
+          {/* <View style={styles.columnHeader}><Text style={styles.columnLeft}>
+            NAME / REFERENCE</Text><Text style={styles.columnRight}>
+              QTY · AMOUNT</Text>
+          </View> */}
+          <View style={styles.columnHeader}>
+            <Text style={styles.columnLeft}>
+              NAME / REFERENCE
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() =>
+                setSortConfig(prev => ({
+                  key: prev.key === 'amount' ? 'qty' : 'amount',
+                  direction:
+                    prev.key === 'amount' && prev.direction === 'asc'
+                      ? 'desc'
+                      : 'asc',
+                }))
+              }
+            >
+              <Text style={styles.columnRight}>
+                QTY · AMOUNT
+                {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {loading ? (
             <View style={styles.state}><ActivityIndicator color={T.nav} size="large" /><Text style={styles.stateText}>Loading sales flow…</Text></View>
@@ -180,7 +229,8 @@ export default function SalesFlowScreen() {
             <View style={styles.state}><Text style={styles.errorTitle}>Unable to load report</Text><Text style={styles.stateText}>{error}</Text><TouchableOpacity onPress={() => load()} style={styles.retry}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>
           ) : rows.length === 0 ? (
             <View style={styles.state}><Text style={styles.emptyTitle}>No records found</Text><Text style={styles.stateText}>No data is available for the selected month and filters.</Text></View>
-          ) : rows.map((row: any, index) => {
+            // ) : rows.map((row: any, index) => {
+          ) : sortedRows.map((row: any, index) => {
             const primary = level === 'parties' ? row.party_name : level === 'designs' ? (row.design_name || row.design_code) : level === 'documents' ? (row.document_no || row.document_uid) : (row.design_name || row.design_code || `Line ${row.line_no}`);
             const secondary = level === 'parties' ? row.party_code : level === 'designs' ? `${row.design_code || ''} · ${row.document_count || 0} docs` : level === 'documents' ? `${row.prp_code || ''} · ${dateText(row.document_date)}` : `${row.document_no || ''} · Line ${row.line_no ?? ''}`;
             const amount = Number(row.amount ?? row.actual ?? 0);

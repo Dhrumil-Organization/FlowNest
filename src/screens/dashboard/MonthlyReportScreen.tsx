@@ -115,10 +115,35 @@ function ReportPanel({
   const meta = METRIC_META[metric];
   const pct = Math.max(0, Number(card?.achievement_pct || 0));
   const configured = Boolean(card?.target_configured);
+  const [sortConfig, setSortConfig] = useState<{
+    key: 'actual' | 'ach';
+    direction: 'asc' | 'desc';
+  }>({
+    key: 'actual',
+    direction: 'desc',
+  });
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const aValue =
+        sortConfig.key === 'actual'
+          ? Number(a.actual || 0)
+          : Number(a.achievement_pct || 0);
+
+      const bValue =
+        sortConfig.key === 'actual'
+          ? Number(b.actual || 0)
+          : Number(b.achievement_pct || 0);
+
+      return sortConfig.direction === 'asc'
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+  }, [rows, sortConfig]);
 
   return (
     <View style={styles.panel}>
-      <View style={[styles.panelHeader, { backgroundColor: meta.tone }]}> 
+      <View style={[styles.panelHeader, { backgroundColor: meta.tone }]}>
         <Text style={styles.panelHeaderText}>{meta.title.toUpperCase()}</Text>
       </View>
 
@@ -150,12 +175,31 @@ function ReportPanel({
 
         <View style={styles.tableTitleRow}>
           <Text style={styles.tableTitle}>BY EXECUTIVE</Text>
-          <Text style={styles.tableTitle}>ACTUAL · ACH</Text>
+          {/* <Text style={styles.tableTitle}>ACTUAL · ACH</Text> */}
+          <TouchableOpacity
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() =>
+              setSortConfig(prev => ({
+                key: prev.key === 'actual' ? 'ach' : 'actual',
+                direction:
+                  prev.key === 'actual' && prev.direction === 'asc'
+                    ? 'desc'
+                    : 'asc',
+              }))
+            }
+          >
+            <Text style={styles.tableTitle}>
+              ACTUAL · ACH
+              {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {rows.length === 0 ? (
           <View style={styles.emptyBox}><Text style={styles.emptyText}>No executive records for this month.</Text></View>
-        ) : rows.map((row, index) => {
+        // ) : rows.map((row, index) => {
+         ) : sortedRows.map((row, index) => {
           const avatarTone = [T.yd, T.green, T.purple, T.copper, T.blue][index % 5];
           return (
             <TouchableOpacity key={row.executive_code} onPress={() => onExecutive(row)} activeOpacity={0.82} style={styles.executiveRow}>

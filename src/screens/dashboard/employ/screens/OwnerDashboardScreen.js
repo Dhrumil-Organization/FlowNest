@@ -13,7 +13,7 @@
 // // // } from 'react-native';
 // // // import { api, formatAmount } from '../api/api';
 // // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// // // import MiniLineChart from '../components/MiniLineChart';
+// // // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // // import {
 // // //   ColHeader,
 // // //   COLORS,
@@ -130,10 +130,7 @@
 
 // // //   const { sales, production, collection, outstanding } = data;
 
-// // //   const salesTrend = sales.daily_trend.map(d => d.amount);
-// // //   const productionTrend = production.daily_trend.map(d => d.meters);
-// // //   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // // // // // // // 
 // // //   return (
 // // //     <>
 // // //       <SafeAreaView style={styles.safe}>
@@ -575,7 +572,7 @@
 // // } from 'react-native';
 // // import { api, formatAmount } from '../api/api';
 // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// // import MiniLineChart from '../components/MiniLineChart';
+// // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // import SalesDashboardCard from '../components/SalesDashboardCard';
 // // import {
 // //   ColHeader,
@@ -693,10 +690,7 @@
 
 // //   const { sales, production, collection, outstanding } = data;
 
-// //   const salesTrend = sales.daily_trend.map(d => d.amount);
-// //   const productionTrend = production.daily_trend.map(d => d.meters);
-// //   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // // // // 
 // //   return (
 // //     <>
 // //       <SafeAreaView style={styles.safe}>
@@ -1063,7 +1057,7 @@
 // // } from 'react-native';
 // // import { api, formatAmount } from '../api/api';
 // // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// // import MiniLineChart from '../components/MiniLineChart';
+// // import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // // import {
 // //   ColHeader,
 // //   COLORS,
@@ -1180,10 +1174,7 @@
 
 // //   const { sales, production, collection, outstanding } = data;
 
-// //   const salesTrend = sales.daily_trend.map(d => d.amount);
-// //   const productionTrend = production.daily_trend.map(d => d.meters);
-// //   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // // // // 
 // //   return (
 // //     <>
 // //       <SafeAreaView style={styles.safe}>
@@ -1625,7 +1616,7 @@
 // } from 'react-native';
 // import { api, formatAmount } from '../api/api';
 // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// import MiniLineChart from '../components/MiniLineChart';
+// import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // import SalesDashboardCard from '../components/SalesDashboardCard';
 // import {
 //   ColHeader,
@@ -1743,10 +1734,7 @@
 
 //   const { sales, production, collection, outstanding } = data;
 
-//   const salesTrend = sales.daily_trend.map(d => d.amount);
-//   const productionTrend = production.daily_trend.map(d => d.meters);
-//   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // 
 //   const openProductionReport = () => {
 //     router.push({
 //       pathname: '/new/(tabs)/reports/production',
@@ -2146,7 +2134,7 @@
 // } from 'react-native';
 // import { api, formatAmount } from '../api/api';
 // import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-// import MiniLineChart from '../components/MiniLineChart';
+// import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 // import {
 //   ColHeader,
 //   COLORS,
@@ -2263,10 +2251,7 @@
 
 //   const { sales, production, collection, outstanding } = data;
 
-//   const salesTrend = sales.daily_trend.map(d => d.amount);
-//   const productionTrend = production.daily_trend.map(d => d.meters);
-//   const collectionTrend = collection.daily_trend.map(d => d.amount);
-
+// // // 
 //   return (
 //     <>
 //       <SafeAreaView style={styles.safe}>
@@ -2704,11 +2689,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
+  TouchableOpacity
 } from 'react-native';
 import { api, formatAmount } from '../api/api';
 import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
-import MiniLineChart from '../components/MiniLineChart';
+import InteractiveDailyTrendChart from '../components/InteractiveDailyTrendChart';
 import SalesDashboardCard from '../components/SalesDashboardCard';
 import {
   ColHeader,
@@ -2774,6 +2760,13 @@ export default function OwnerDashboardScreen({
   const dateString = date.toISOString().split('T')[0];
   const [showTour, setShowTour] = useState(false);
 
+  const [collectionSort, setCollectionSort] = useState({
+    field: 'today',
+    direction: 'desc',
+  });
+
+  const [outstandingSort, setOutstandingSort] = useState('desc');
+
   const load = useCallback(
     async getUserPrptype => {
       try {
@@ -2827,9 +2820,6 @@ export default function OwnerDashboardScreen({
 
   const { sales, production, collection, outstanding } = data;
 
-  const salesTrend = sales.daily_trend.map(d => d.amount);
-  const productionTrend = production.daily_trend.map(d => d.meters);
-  const collectionTrend = collection.daily_trend.map(d => d.amount);
 
   const openProductionReport = () => {
     router.push({
@@ -2858,6 +2848,49 @@ export default function OwnerDashboardScreen({
         }),
       },
     });
+  };
+
+
+  const sortedCollection = [...collection.by_exec].sort((a, b) => {
+    const aValue = Number(a?.[collectionSort.field] || 0);
+    const bValue = Number(b?.[collectionSort.field] || 0);
+
+    return collectionSort.direction === 'asc'
+      ? aValue - bValue
+      : bValue - aValue;
+  });
+
+  const toggleCollectionSort = () => {
+    setCollectionSort(prev => {
+      if (prev.field === 'today' && prev.direction === 'desc') {
+        return { field: 'today', direction: 'asc' };
+      }
+
+      if (prev.field === 'today' && prev.direction === 'asc') {
+        return { field: 'mtd', direction: 'desc' };
+      }
+
+      if (prev.field === 'mtd' && prev.direction === 'desc') {
+        return { field: 'mtd', direction: 'asc' };
+      }
+
+      return { field: 'today', direction: 'desc' };
+    });
+  };
+
+  const sortedOutstanding = [...outstanding.by_exec].sort((a, b) => {
+    const aValue = Number(a?.outstanding || 0);
+    const bValue = Number(b?.outstanding || 0);
+
+    return outstandingSort === 'asc'
+      ? aValue - bValue
+      : bValue - aValue;
+  });
+
+  const toggleOutstandingSort = () => {
+    setOutstandingSort(prev =>
+      prev === 'desc' ? 'asc' : 'desc'
+    );
   };
 
   return (
@@ -2920,161 +2953,220 @@ export default function OwnerDashboardScreen({
 
           {/* ── PRODUCTION SECTION ── */}
           {visibleSections.production && (
-          <SectionCard>
-            <SectionHeader
-              icon="⚙️"
-              title="PRODUCTION"
-              bgColor={COLORS.prodBg}
-              rightText={dateString}
-              action="Full report"
-              onAction={openProductionReport}
-            />
-
-            <TotalRow
-              leftLabel="YESTERDAY (m)"
-              leftValue={production.total.today_meters.toLocaleString('en-IN')}
-              tealLeft
-              rightLabel="MTD (m)"
-              rightValue={production.total.mtd_meters.toLocaleString('en-IN')}
-              rawLeftValue={production.total.today_meters}
-              rawRightValue={production.total.mtd_meters}
-              tooltipPrefix=""
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={productionTrend}
-                color="#AB47BC"
-                fillColor="#AB47BC"
-                width={340}
-                height={55}
+            <SectionCard>
+              <SectionHeader
+                icon="⚙️"
+                title="PRODUCTION"
+                bgColor={COLORS.prodBg}
+                rightText={dateString}
+                action="Full report"
+                onAction={openProductionReport}
               />
-              <View style={styles.chartAxisRow}>
-                {production.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
 
-            <ColHeader label1="MACHINE" label2="YESTERDAY" label3="MTD" />
-            <TableWrapper rowCount={production.by_machine.length}>
-              {production.by_machine.map((m, i) => (
-                <RankRow
-                  key={`${m.prpcode || ''}-${m.macgrp || ''}-${i}`}
-                  rank={i + 1}
-                  name={m.machine}
-                  leftVal={`${(Number(m.target || m.today_meters || 0) / 1000).toFixed(0)}K m`}
-                  rightVal={`${(Number(m.today || m.mtd_meters || 0) / 1000).toFixed(1)}K m`}
-                  rawLeftVal={Number(m.target || m.today_meters || 0)}
-                  rawRightVal={Number(m.today || m.mtd_meters || 0)}
-                  trendUp={m.achievement === 'up'}
-                  onPress={() => openProductionMachineReport(m, i)}
+              <TotalRow
+                leftLabel="YESTERDAY (m)"
+                leftValue={production.total.today_meters.toLocaleString('en-IN')}
+                tealLeft
+                rightLabel="MTD (m)"
+                rightValue={production.total.mtd_meters.toLocaleString('en-IN')}
+                rawLeftValue={production.total.today_meters}
+                rawRightValue={production.total.mtd_meters}
+                tooltipPrefix=""
+              />
+
+              <View style={styles.chartWrap}>
+                <Text style={styles.trendLabel}>DAILY TREND</Text>
+                <InteractiveDailyTrendChart
+                  data={production.daily_trend}
+                  valueKey="meters"
+                  labelKey="day"
+                  color="#AB47BC"
+                  fillColor="#AB47BC"
+                  height={68}
+                  pointGap={54}
+                  valueFormatter={value =>
+                    `${Number(value || 0).toLocaleString('en-IN', {
+                      maximumFractionDigits: 1,
+                    })} m`
+                  }
+                  showBaseline
+                  showHint
                 />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+              </View>
+
+              <ColHeader label1="MACHINE" label2="YESTERDAY" label3="MTD" />
+              <TableWrapper rowCount={production.by_machine.length}>
+                {production.by_machine.map((m, i) => (
+                  <RankRow
+                    key={`${m.prpcode || ''}-${m.macgrp || ''}-${i}`}
+                    rank={i + 1}
+                    name={m.machine}
+                    leftVal={`${(Number(m.target || m.today_meters || 0) / 1000).toFixed(0)}K m`}
+                    rightVal={`${(Number(m.today || m.mtd_meters || 0) / 1000).toFixed(1)}K m`}
+                    rawLeftVal={Number(m.target || m.today_meters || 0)}
+                    rawRightVal={Number(m.today || m.mtd_meters || 0)}
+                    trendUp={m.achievement === 'up'}
+                    onPress={() => openProductionMachineReport(m, i)}
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
           )}
 
           {/* ── PAYMENT COLLECTION SECTION ── */}
           {visibleSections.collection && (
-          <SectionCard>
-            <SectionHeader
-              icon="💰"
-              title="PAYMENT COLLECTION"
-              bgColor={COLORS.collBg}
-              rightText={dateString}
-              action="Full report"
-              onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
-            />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(collection.total.today)}
-              tealLeft
-              rightLabel="TOTAL MTD"
-              rightValue={formatAmount(collection.total.mtd)}
-              rawLeftValue={collection.total.today}
-              rawRightValue={collection.total.mtd}
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={collectionTrend}
-                color={COLORS.green}
-                fillColor={COLORS.green}
-                width={340}
-                height={55}
+            <SectionCard>
+              <SectionHeader
+                icon="💰"
+                title="PAYMENT COLLECTION"
+                bgColor={COLORS.collBg}
+                rightText={dateString}
+                action="Full report"
+                onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
               />
-              <View style={styles.chartAxisRow}>
-                {collection.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
 
-            <Text style={styles.subHeader}>
-              BY SALES EXECUTIVE · TODAY · MTD
-            </Text>
-            <ColHeader label1="EXECUTIVE" label2="TODAY" label3="MTD" />
-            <TableWrapper rowCount={collection.by_exec.length}>
-              {collection.by_exec.map(exec => (
-                <RankRow
-                  key={exec.exec_id}
-                  name={exec.name}
-                  avatarColor={exec.avatar_color}
-                  leftVal={formatAmount(exec.today)}
-                  rightVal={formatAmount(exec.mtd)}
-                  rawLeftVal={exec.today}
-                  rawRightVal={exec.mtd}
-                  onPress={() => goToExec(exec)}
+              <TotalRow
+                leftLabel="TODAY"
+                leftValue={formatAmount(collection.total.today)}
+                tealLeft
+                rightLabel="TOTAL MTD"
+                rightValue={formatAmount(collection.total.mtd)}
+                rawLeftValue={collection.total.today}
+                rawRightValue={collection.total.mtd}
+              />
+
+              <View style={styles.chartWrap}>
+                <Text style={styles.trendLabel}>DAILY TREND</Text>
+                <InteractiveDailyTrendChart
+                  data={collection.daily_trend}
+                  valueKey="amount"
+                  labelKey="day"
+                  color={COLORS.green}
+                  fillColor={COLORS.green}
+                  height={68}
+                  pointGap={54}
+                  valueFormatter={value => formatAmount(Number(value || 0))}
+                  showBaseline
+                  showHint
                 />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+              </View>
+
+              {/* <Text style={styles.subHeader}>
+                BY SALES EXECUTIVE · TODAY · MTD
+              </Text>
+              <ColHeader label1="EXECUTIVE" label2="TODAY" label3="MTD" /> */}
+              <Text style={styles.subHeader}>
+                BY SALES EXECUTIVE · TODAY · MTD
+              </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ColHeader
+                  label1="EXECUTIVE"
+                  label2="TODAY"
+                  label3="MTD"
+                />
+
+                <TouchableOpacity
+                  onPress={toggleCollectionSort}
+                  style={{
+                    marginLeft: -12,
+                    paddingLeft: 0,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      color: '#8C837B',
+                    }}
+                  >
+                    ▼
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* <TableWrapper rowCount={collection.by_exec.length}> */}
+              <TableWrapper rowCount={sortedCollection.length}>
+                {/* {collection.by_exec.map(exec => ( */}
+                {sortedCollection.map(exec => (
+                  <RankRow
+                    key={exec.exec_id}
+                    name={exec.name}
+                    avatarColor={exec.avatar_color}
+                    leftVal={formatAmount(exec.today)}
+                    rightVal={formatAmount(exec.mtd)}
+                    rawLeftVal={exec.today}
+                    rawRightVal={exec.mtd}
+                    onPress={() => goToExec(exec)}
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
           )}
 
           {/* ── OUTSTANDING SECTION ── */}
           {visibleSections.outstanding && (
-          <SectionCard>
-            <SectionHeader
-              icon="⚠️"
-              title="OUTSTANDING"
-              bgColor={COLORS.outsBg}
-            />
-
-            <View style={styles.outsTotalRow}>
-              <Text style={styles.outsTotalLabel}>Total Due</Text>
-              <LongPressValue
-                rawValue={outstanding.total_due}
-                formattedValue={formatAmount(outstanding.total_due)}
-                style={styles.outsTotalValue}
+            <SectionCard>
+              <SectionHeader
+                icon="⚠️"
+                title="OUTSTANDING"
+                bgColor={COLORS.outsBg}
               />
-            </View>
 
-            <Text style={styles.subHeader}>
-              BY SALES EXECUTIVE · HIGHEST FIRST
-            </Text>
-            <ColHeader label1="EXECUTIVE" label2="" label3="OUTSTANDING" />
-            <TableWrapper rowCount={outstanding.by_exec.length}>
-              {outstanding.by_exec.map(exec => (
-                <RankRow
-                  key={exec.exec_id}
-                  name={exec.name}
-                  avatarColor={exec.avatar_color}
-                  rightVal={formatAmount(exec.outstanding)}
-                  rawRightVal={exec.outstanding}
-                  trendUp={false}
-                  onPress={() => goToExec(exec)}
+              <View style={styles.outsTotalRow}>
+                <Text style={styles.outsTotalLabel}>Total Due</Text>
+                <LongPressValue
+                  rawValue={outstanding.total_due}
+                  formattedValue={formatAmount(outstanding.total_due)}
+                  style={styles.outsTotalValue}
                 />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+              </View>
+
+              {/* <Text style={styles.subHeader}>
+                BY SALES EXECUTIVE · HIGHEST FIRST
+              </Text>
+              <ColHeader label1="EXECUTIVE" label2="" label3="OUTSTANDING" /> */}
+
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ColHeader
+                  label1="EXECUTIVE"
+                  label2=""
+                  label3="OUTSTANDING"
+                />
+
+                <TouchableOpacity
+                  onPress={toggleOutstandingSort}
+                  style={{
+                    marginLeft: -12,
+                    paddingLeft: 0,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      color: '#8C837B',
+                    }}
+                  >
+                    ▼
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* <TableWrapper rowCount={outstanding.by_exec.length}>
+                {outstanding.by_exec.map(exec => ( */}
+              <TableWrapper rowCount={sortedOutstanding.length}>
+                {sortedOutstanding.map(exec => (
+                  <RankRow
+                    key={exec.exec_id}
+                    name={exec.name}
+                    avatarColor={exec.avatar_color}
+                    rightVal={formatAmount(exec.outstanding)}
+                    rawRightVal={exec.outstanding}
+                    trendUp={false}
+                    onPress={() => goToExec(exec)}
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
           )}
         </ScrollView>
       </SafeAreaView>

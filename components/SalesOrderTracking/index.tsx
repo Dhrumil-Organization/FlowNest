@@ -1,41 +1,39 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    FlatList,
-    Dimensions,
-    ActivityIndicator,
-    Alert,
-    Modal,
-    TextInput,
-} from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
+import { crlimtreq_styles } from '@/common/Style';
+import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
-import axios from 'axios';
-import { API } from '../../common/API/dynamicAPI';
-import CustomDrawer from './CustomDrawer';
-import data from './data.json';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { crlimtreq_styles } from '@/common/Style';
+// import Clipboard from '@react-native-clipboard/clipboard';
+import axios from 'axios';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ExeData,
-    DesignData,
-    ItemData,
-    POTData,
-    ItemStatus,
-    CardPayload,
-    WiseStatus,
-} from './Modal';
-import FullScreenLoader from '@/components/FullScreenLoader';
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { API } from '../../common/API/dynamicAPI';
 import {
     generateFinancialYearOptions,
     getCurrentFinancialYearMain,
 } from '../../common/API/Functions';
-import { useRouter } from 'expo-router';
+import CustomDrawer from './CustomDrawer';
+import {
+    DesignData,
+    ExeData,
+    ItemData,
+    ItemStatus,
+    WiseStatus
+} from './Modal';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 600;
@@ -163,6 +161,36 @@ const SalesOrderTracking: React.FC<{
     const [sortOrder2, setSortOrder2] = useState<'asc' | 'desc'>('asc');
     const [selectedSalesExes, setSelectedSalesExes] = useState([]);
     const [salesExeData, setSalesExeData] = useState([]);
+    // 
+    // ===== JOB CHART / ALLOCATION STATES =====
+    // ===== JOB CHART / ALLOCATION STATES =====
+    const [jobChartVisible, setJobChartVisible] = useState(false);
+    const [jobChartLoading, setJobChartLoading] = useState(false);
+    const [jobChartSaving, setJobChartSaving] = useState(false);
+    const [jobChartRef, setJobChartRef] = useState<{
+        orderUId: string;
+        itmCode: string;
+        dsnCode: string;
+        dsnName: string;
+        prpcode: string;
+        strcode: string;
+        yearno: string;
+        srno: string;
+        grdcode: string;
+        grdname: string;
+        sono?: string;
+        status?: string;
+    } | null>(null);
+    const [allocations, setAllocations] = useState<any[]>([]);
+    // 👇 NEW: shade picker is now a separate full modal, not inline dropdown
+    const [shadePickerVisible, setShadePickerVisible] = useState(false);
+    const [shadeQuery, setShadeQuery] = useState('');
+    const [shadeResults, setShadeResults] = useState<{ Code: string; Name: string }[]>([]);
+    const [shadeSearchLoading, setShadeSearchLoading] = useState(false);
+    const [selectedShade, setSelectedShade] = useState<{ Code: string; Name: string } | null>(null);
+    const [addQty, setAddQty] = useState('');
+    const qtyInputRef = useRef<TextInput>(null);
+    let shadeSearchDebounce: any;
 
     const toggleSortOrder = () => {
         setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -173,6 +201,232 @@ const SalesOrderTracking: React.FC<{
     const toggleSortOrder2 = () => {
         setSortOrder2(prev => (prev === 'asc' ? 'desc' : 'asc'));
     };
+
+    // //////////////////////////////////////////////////////////////
+    // ===== JOB CHART / ALLOCATION LOGIC =====
+
+    const getAllocRequestConfig = (params: any) => ({
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+        params,
+    });
+
+    // Open job chart for a design-level item (from Main Design Details or Sub Design Details card)
+    const openJobChart = async (item: any) => {
+        console.log('🔵 payload JOB CHART', item);
+        const orderUId =
+            item?.suid || '';
+
+        if (!orderUId) {
+            Alert.alert('Error', 'Order reference (UId) not found on this item.');
+            return;
+        }
+
+        console.log('🔵 orderUId', orderUId, selectedYear.split('-')[1].substring(2));
+
+        const ref = {
+            orderUId: String(orderUId),
+            itmCode: String(item?.itmcode || ''),
+            dsnCode: String(item?.dsncode || ''),
+            dsnName: item?.Dsnname || '',
+            // 👇 dynamic with fallback — update fallback once field names confirmed
+            prpcode: item?.prpcode || '',
+            strcode: item?.strcode || '',
+            yearno: selectedYear ? selectedYear.split('-')[1].substring(2) : '',
+            srno: item?.OrderSrNo || item?.SrNo || item?.srno || '1 ',
+            grdcode: item?.grdcode || '1',
+            grdname: item?.GrdName || item?.grdname || '',
+            sono: item?.sono || '',
+            status: item?.status || '',
+        };
+
+        setJobChartRef(ref);
+        setAllocations([]);
+        setSelectedShade(null);
+        setAddQty('');
+        setShadeQuery('');
+        setShadeResults([]);
+        setJobChartVisible(true);
+        await fetchAllocations(ref);
+    };
+
+    const fetchAllocations = async (ref: typeof jobChartRef) => {
+        if (!ref) return;
+        setJobChartLoading(true);
+        try {
+            const response = await axios.get(
+                `${API}/api/so-allocation`,
+                getAllocRequestConfig({
+                    prpcode: ref.prpcode,
+                    yearno: ref.yearno,
+                    strcode: ref.strcode,
+                    order_uid: ref.orderUId,
+                }),
+            );
+            console.log('🔵 so-allocation GET response:', ref, response.data);
+            if (response.data.success) {
+                setAllocations(response.data.response.data || []);
+            } else {
+                setAllocations([]);
+            }
+        } catch (error) {
+            console.error('fetchAllocations error:', error);
+            Alert.alert('Error', 'Failed to load allocation details.');
+        } finally {
+            setJobChartLoading(false);
+        }
+    };
+
+    const searchShades = (query: string) => {
+        setShadeQuery(query);
+        if (shadeSearchDebounce) clearTimeout(shadeSearchDebounce);
+        shadeSearchDebounce = setTimeout(async () => {
+            if (!jobChartRef) return;
+            setShadeSearchLoading(true);
+            try {
+                const response = await axios.get(
+                    `${API}/api/so-allocation/lookup`,
+                    getAllocRequestConfig({
+                        prpcode: jobChartRef.prpcode,
+                        yearno: jobChartRef.yearno,
+                        strcode: jobChartRef.strcode,
+                        type: 'shade',
+                        search: query || '',
+                    }),
+                );
+                if (response.data.success) {
+                    setShadeResults(response.data.response.data || []);
+                } else {
+                    setShadeResults([]);
+                }
+            } catch (error) {
+                console.error('searchShades error:', error);
+                setShadeResults([]);
+            } finally {
+                setShadeSearchLoading(false);
+            }
+        }, 300);
+    };
+
+    // 👇 opens the dedicated shade picker modal
+    const openShadePicker = () => {
+        setShadeQuery('');
+        setShadeResults([]);
+        setShadePickerVisible(true);
+        searchShades(''); // load initial list
+    };
+
+    // 👇 called when user taps a shade in the picker
+    const handleSelectShade = (s: { Code: string; Name: string }) => {
+        setSelectedShade(s);
+        setShadePickerVisible(false);
+        // focus qty input right after picking shade, small delay to let modal close first
+        setTimeout(() => qtyInputRef.current?.focus(), 300);
+    };
+
+    const handleAddAllocationRow = () => {
+        if (!selectedShade) {
+            Alert.alert('Error', 'Please select a shade first.');
+            return;
+        }
+        if (!addQty || parseFloat(addQty) <= 0) {
+            Alert.alert('Error', 'Please enter a valid quantity.');
+            return;
+        }
+
+        const newRow = {
+            AllocationId: 0,
+            OrderSrNo: jobChartRef?.srno || '1',
+            StrCode: jobChartRef?.strcode || '5',
+            ItmCode: jobChartRef?.itmCode || '',
+            DsnCode: jobChartRef?.dsnCode || '',
+            GrdCode: jobChartRef?.grdcode || '1',
+            GrdName: jobChartRef?.grdname || '1st',
+            ShdCode: selectedShade.Code,
+            ShdName: selectedShade.Name,
+            AllocationQty: addQty,
+            ChallanQty: 0,
+            IsLocked: 0,
+            Remark: '',
+        };
+
+        setAllocations(prev => [...prev, newRow]);
+        setSelectedShade(null);
+        setAddQty('');
+    };
+
+    const handleRemoveAllocationRow = (index: number) => {
+        setAllocations(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSaveAllocations = async () => {
+        if (!jobChartRef) return;
+        setJobChartSaving(true);
+        try {
+            const payload = {
+                ReplaceAll: 1,
+                PrpCode: jobChartRef.prpcode,
+                YearNo: jobChartRef.yearno,
+                StrCode: jobChartRef.strcode,
+                prpcode: jobChartRef.prpcode,
+                yearno: jobChartRef.yearno,
+                strcode: jobChartRef.strcode,
+                OrderUId: jobChartRef.orderUId,
+                items: [
+                    {
+                        SrNo: jobChartRef.srno,
+                        Qty: '.000',
+                        ItmCode: jobChartRef.itmCode,
+                        DsnCode: jobChartRef.dsnCode,
+                        Allocations: allocations,
+                    },
+                ],
+            };
+
+            const headers = {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(
+                `${API}/api/so-allocation/sync`,
+                payload,
+                { headers },
+            );
+            console.log('🔵 so-allocation/sync response:', response.data);
+
+            if (response.data.success) {
+                setAllocations(response.data.response.data || []);
+                Alert.alert('Success', response.data.response.message || 'Allocation saved.');
+            } else {
+                Alert.alert('Error', response.data.message || 'Failed to save allocation.');
+            }
+        } catch (error) {
+            console.error('handleSaveAllocations error:', error);
+            Alert.alert('Error', 'Failed to save allocation.');
+        } finally {
+            setJobChartSaving(false);
+        }
+    };
+
+    const getJobChartTotal = () =>
+        allocations
+            .reduce((sum, a) => sum + (parseFloat(a.AllocationQty) || 0), 0)
+            .toFixed(0);
+
+    // const copyJobChartText = () => {
+    //     const lines = allocations.map(
+    //         a => `${a.ShdName?.trim()} : ${formatNumber(String(a.AllocationQty))} m`,
+    //     );
+    //     const text = `REF: ${jobChartRef?.dsnCode || ''}\nDESIGN: ${jobChartRef?.dsnName || ''}\n\n${lines.join('\n')}\n\nTOTAL: ${formatNumber(getJobChartTotal())} m`;
+    //     Clipboard.setString(text);
+    //     Alert.alert('Copied', 'Job chart text copied to clipboard.');
+    // };
+    // ///////////////////////////////////////////////////////////////////
 
     // useEffect(() => {
     //     if (selectedDesignData) {
@@ -817,7 +1071,11 @@ const SalesOrderTracking: React.FC<{
 
             })
 
-
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -838,7 +1096,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
 
@@ -940,7 +1198,11 @@ const SalesOrderTracking: React.FC<{
                 seArrCntr++;
 
             })
-
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -962,7 +1224,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: dsnCodes,
@@ -1035,6 +1297,12 @@ const SalesOrderTracking: React.FC<{
 
             })
 
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
+
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1055,7 +1323,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: [],
@@ -1154,7 +1422,7 @@ const SalesOrderTracking: React.FC<{
             wise:
                 selectedItemStatus1 === 'Party Wise'
                     ? 'party'
-                    : selectedItemStatus1 === 'Item Wise'
+                    : selectedItemStatus1 === 'Design Wise'
                         ? 'design'
                         : '',
             dsncodes: customPayload.dsncodes,
@@ -1245,7 +1513,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: item?.dsncode ? [item?.dsncode] : [],
@@ -1273,24 +1541,19 @@ const SalesOrderTracking: React.FC<{
                 );
                 await AsyncStorage.setItem(
                     'parties_tracking_details_party_name',
-                    selectedItemStatus1 === 'Item Wise'
+                    selectedItemStatus1 === 'Design Wise'
                         ? dsnname.dsnname
                         : parname.parname,
                 );
                 // await AsyncStorage.setItem('parties_tracking_details_sub_design_name', dsnname.dsnname);
                 await saveLastViewedToCache(getDData.parcode);
                 setLastViewedParcode(getDData.parcode);
-                // navigation.navigate('SOPartyDetails', {
-                //     party:
-                //     selectedItemStatus1 === 'Item Wise'
-                //         ? dsnname.dsnname
-                //         : parname.parname,
-                // selectedSalesExes: seArr
-                // });
+                console.log('🔵 customPayload: ', customPayload);
+
                 router.push({
                     pathname: '/SOPartyDetails',
                     params: {
-                        party: selectedItemStatus1 === 'Item Wise'
+                        party: selectedItemStatus1 === 'Design Wise'
                             ? dsnname.dsnname
                             : parname.parname,
                         selectedSalesExes: seArr
@@ -1623,7 +1886,7 @@ const SalesOrderTracking: React.FC<{
                                 <TouchableOpacity
                                     key={index}
                                     style={
-                                        selectedItemStatus1 === 'Item Wise'
+                                        selectedItemStatus1 === 'Design Wise'
                                             ? styles.summaryCard123
                                             : styles.summaryCard
                                     }
@@ -1637,12 +1900,12 @@ const SalesOrderTracking: React.FC<{
                                         setisALL(true);
                                     }}
                                 >
-                                    {selectedItemStatus1 === 'Item Wise' ? null : (
+                                    {selectedItemStatus1 === 'Design Wise' ? null : (
                                         <Text style={styles.partyNameInSummary}>
                                             Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
                                         </Text>
                                     )}
-                                    {selectedItemStatus1 === 'Item Wise' ? (
+                                    {selectedItemStatus1 === 'Design Wise' ? (
                                         <>
                                             <View style={styles.summaryContainer}>
                                                 <View
@@ -1781,6 +2044,16 @@ const SalesOrderTracking: React.FC<{
                                             <Text style={styles.designName}>{item.Dsnname}</Text>
                                             <Text style={styles.designCode}>{item.dsncode}</Text>
                                         </View>
+                                        {/* 👇 ADD THIS */}
+                                        {/* <TouchableOpacity
+                                            style={styles.jobChartBtn}
+                                            onPress={(e) => {
+                                                openJobChart(item);
+                                            }}
+                                        >
+                                            <Icon name="receipt-long" size={14} color={theme.BRAND_GRADIENT_END} />
+                                            <Text style={styles.jobChartBtnText}>Job Chart</Text>
+                                        </TouchableOpacity> */}
                                         <View style={styles.designValues}>
                                             <View style={styles.valueRow}>
                                                 <View style={styles.valueItem}>
@@ -1842,7 +2115,7 @@ const SalesOrderTracking: React.FC<{
                             {!isAll ? (
                                 <>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Sub Design Summary</Text>
+                                        <Text style={styles.modalTitle}>Sub Design Summary1</Text>
                                         <TouchableOpacity
                                             onPress={() => setIsPartyDetailsModalVisible(false)}
                                         >
@@ -1884,7 +2157,7 @@ const SalesOrderTracking: React.FC<{
                                                 );
                                             }}
                                         >
-                                            {selectedItemStatus1 === 'Item Wise' ? null : (
+                                            {selectedItemStatus1 === 'Design Wise' ? null : (
                                                 <Text style={styles.partyNameInSummary}>
                                                     Party:{' '}
                                                     {selectedPartyDetails?.designdetails[0]?.partyname || ''}
@@ -1925,7 +2198,7 @@ const SalesOrderTracking: React.FC<{
                             ) : (
                                 <View>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Sub Design Summary</Text>
+                                        <Text style={styles.modalTitle}>Sub Design Summary12</Text>
                                         <TouchableOpacity
                                             onPress={() => setIsPartyDetailsModalVisible(false)}
                                         >
@@ -2034,6 +2307,15 @@ const SalesOrderTracking: React.FC<{
                                             <Text style={styles.designName}>{item.Dsnname}</Text>
                                             <Text style={styles.designCode}>{item.dsncode}</Text>
                                         </View>
+                                        <TouchableOpacity
+                                            style={styles.jobChartBtn}
+                                            onPress={(e) => {
+                                                openJobChart(item);
+                                            }}
+                                        >
+                                            <Icon name="receipt-long" size={14} color={theme.BRAND_GRADIENT_END} />
+                                            <Text style={styles.jobChartBtnText}>Job Chart</Text>
+                                        </TouchableOpacity>
                                         <View style={styles.designValues}>
                                             <View style={styles.valueRow}>
                                                 <View style={styles.valueItem}>
@@ -2096,6 +2378,174 @@ const SalesOrderTracking: React.FC<{
                         </View>
                     </View>
                 </View>
+            )}
+
+            {/* JOB CHART MODAL */}
+            {jobChartVisible && (
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={styles.jobChartOverlay}
+                >
+                    <View style={styles.jobChartSheet}>
+                        <View style={styles.jobChartHandle} />
+                        <View style={styles.jobChartHeaderRow}>
+                            <Text style={styles.jobChartTitle}>Job chart</Text>
+                            <TouchableOpacity onPress={() => setJobChartVisible(false)}>
+                                <Icon name="close" size={22} color="#333" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {jobChartLoading ? (
+                            <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} style={{ marginTop: 30 }} />
+                        ) : (
+                            <>
+                                <FlatList
+                                    data={allocations}
+                                    keyExtractor={(_, i) => `alloc-${i}`}
+                                    style={{ maxHeight: 260 }}
+                                    ListHeaderComponent={
+                                        <>
+                                            <View style={styles.jobChartRefRow}>
+                                                <View>
+                                                    <Text style={styles.jobChartRefLabel}>REF</Text>
+                                                    <Text style={styles.jobChartRefValue}>{jobChartRef?.dsnCode}</Text>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end' }}>
+                                                    <Text style={styles.jobChartRefLabel}>DESIGN</Text>
+                                                    <Text style={styles.jobChartRefValue}>{jobChartRef?.dsnName}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.jobChartSectionLabel}>SHADE / COLOUR</Text>
+                                        </>
+                                    }
+                                    renderItem={({ item, index }) => (
+                                        <View style={styles.jobChartRow}>
+                                            <Text style={styles.jobChartRowLabel}>{item.ShdName?.trim()}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <Text style={styles.jobChartRowValue}>
+                                                    {formatNumber(String(item.AllocationQty))} m
+                                                </Text>
+                                                {!item.IsLocked ? (
+                                                    <TouchableOpacity
+                                                        onPress={() => handleRemoveAllocationRow(index)}
+                                                        style={{ marginLeft: 10 }}
+                                                    >
+                                                        <Icon name="close" size={16} color="#E65100" />
+                                                    </TouchableOpacity>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    )}
+                                    ListEmptyComponent={
+                                        <Text style={{ color: '#999', paddingVertical: 10 }}>
+                                            No allocation added yet.
+                                        </Text>
+                                    }
+                                    ListFooterComponent={
+                                        <View style={styles.jobChartTotalRow}>
+                                            <Text style={styles.jobChartTotalLabel}>TOTAL</Text>
+                                            <Text style={styles.jobChartTotalValue}>
+                                                {formatNumber(getJobChartTotal())} m
+                                            </Text>
+                                        </View>
+                                    }
+                                />
+
+                                {/* ADD NEW SHADE ROW — shade field is a BUTTON, opens picker overlay */}
+                                <View style={styles.jobChartAddRow}>
+                                    <TouchableOpacity
+                                        style={[styles.searchInput, styles.shadeSelectBtn]}
+                                        onPress={openShadePicker}
+                                    >
+                                        <Text
+                                            style={selectedShade ? styles.shadeSelectText : styles.shadeSelectPlaceholder}
+                                            numberOfLines={1}
+                                        >
+                                            {selectedShade ? selectedShade.Name : 'Tap to select shade'}
+                                        </Text>
+                                        <Icon name="search" size={18} color="#999" />
+                                    </TouchableOpacity>
+                                    <TextInput
+                                        ref={qtyInputRef}
+                                        style={[styles.searchInput, { width: 80, marginLeft: 8, marginBottom: 0 }]}
+                                        placeholder="Qty"
+                                        keyboardType="numeric"
+                                        value={addQty}
+                                        onChangeText={setAddQty}
+                                        returnKeyType="done"
+                                        onSubmitEditing={handleAddAllocationRow}
+                                    />
+                                    <TouchableOpacity style={styles.jobChartAddBtn} onPress={handleAddAllocationRow}>
+                                        <Icon name="add" size={20} color="#fff" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={styles.jobChartHint}>
+                                    Job chart carries no customer or pricing information.
+                                </Text>
+
+                                <TouchableOpacity
+                                    style={styles.jobChartSaveBtn}
+                                    onPress={handleSaveAllocations}
+                                    disabled={jobChartSaving}
+                                >
+                                    {jobChartSaving ? (
+                                        <ActivityIndicator size="small" color="#fff" />
+                                    ) : (
+                                        <Text style={styles.jobChartSaveBtnText}>Save Allocation</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+
+                    {/* SHADE PICKER — separate overlay ABOVE job chart sheet, own keyboard space, no nested Modal */}
+                    {shadePickerVisible && (
+                        <View style={styles.shadePickerOverlay}>
+                            <View style={styles.shadePickerSheet}>
+                                <View style={styles.jobChartHandle} />
+                                <View style={styles.jobChartHeaderRow}>
+                                    <Text style={styles.jobChartTitle}>Select Shade</Text>
+                                    <TouchableOpacity onPress={() => setShadePickerVisible(false)}>
+                                        <Icon name="close" size={22} color="#333" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search shade..."
+                                    value={shadeQuery}
+                                    autoFocus
+                                    onChangeText={searchShades}
+                                />
+
+                                {shadeSearchLoading ? (
+                                    <ActivityIndicator size="small" color={theme.BRAND_GRADIENT_END} style={{ marginTop: 10 }} />
+                                ) : (
+                                    <FlatList
+                                        data={shadeResults}
+                                        keyExtractor={(s) => s.Code}
+                                        keyboardShouldPersistTaps="handled"
+                                        style={{ maxHeight: 320 }}
+                                        renderItem={({ item: s }) => (
+                                            <TouchableOpacity
+                                                style={styles.shadePickerRow}
+                                                onPress={() => handleSelectShade(s)}
+                                            >
+                                                <Text style={styles.shadePickerRowText}>{s.Name}</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        ListEmptyComponent={
+                                            <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>
+                                                No shades found.
+                                            </Text>
+                                        }
+                                    />
+                                )}
+                            </View>
+                        </View>
+                    )}
+                </KeyboardAvoidingView>
             )}
         </>
     );
@@ -2427,6 +2877,234 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
+    },
+    jobChartBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        borderWidth: 1,
+        borderColor: theme.BRAND_GRADIENT_END,
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginBottom: 8,
+    },
+    jobChartBtnText: {
+        color: theme.BRAND_GRADIENT_END,
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    jobChartOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 500,
+        justifyContent: 'flex-end',
+    },
+    jobChartSheet: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 16,
+        maxHeight: '85%',
+    },
+    jobChartHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#ddd',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 10,
+    },
+    jobChartHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    jobChartTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    jobChartRefCard: {
+        borderWidth: 1,
+        borderColor: '#eee',
+        borderRadius: 10,
+        padding: 14,
+        marginBottom: 12,
+    },
+    jobChartRefRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    jobChartRefLabel: {
+        fontSize: 10,
+        color: '#999',
+        fontWeight: '600',
+    },
+    jobChartRefValue: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#E65100',
+    },
+    jobChartSectionLabel: {
+        fontSize: 11,
+        color: '#999',
+        backgroundColor: '#f5f5f5',
+        padding: 6,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    jobChartRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    jobChartRowLabel: {
+        fontSize: 13,
+        color: '#333',
+    },
+    jobChartRowValue: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    jobChartTotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 10,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    jobChartTotalLabel: {
+        fontSize: 12,
+        color: '#999',
+        fontWeight: '600',
+    },
+    jobChartTotalValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#E65100',
+    },
+    jobChartAddRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+        marginBottom: 8,
+    },
+    jobChartAddBtn: {
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    shadeDropdown: {
+        position: 'absolute',
+        top: 42,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        maxHeight: 180,
+        zIndex: 999,
+        elevation: 5,
+    },
+    shadeDropdownItem: {
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    jobChartHint: {
+        fontSize: 11,
+        color: '#999',
+        textAlign: 'center',
+        marginVertical: 8,
+    },
+    jobChartCopyBtn: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    jobChartCopyBtnText: {
+        color: '#333',
+        fontWeight: '600',
+    },
+    jobChartSaveBtn: {
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginBottom: 50,
+    },
+    jobChartSaveBtnText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+    // 
+    shadePickerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        zIndex: 999, // higher than jobChartOverlay's 500, sits on top of job chart sheet
+        justifyContent: 'flex-end',
+    },
+    shadePickerSheet: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 16,
+        maxHeight: '80%',
+        minHeight: '50%',
+    },
+    shadeSelectBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 0,
+    },
+    shadeSelectText: {
+        color: '#333',
+        fontSize: 14,
+        flex: 1,
+        marginRight: 6,
+    },
+    shadeSelectPlaceholder: {
+        color: '#999',
+        fontSize: 14,
+        flex: 1,
+        marginRight: 6,
+    },
+    shadePickerRow: {
+        paddingVertical: 14,
+        paddingHorizontal: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    shadePickerRowText: {
+        fontSize: 15,
+        color: '#333',
     },
 });
 

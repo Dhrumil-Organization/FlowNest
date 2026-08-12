@@ -14,6 +14,7 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert,
 import { SalesOrderAPI } from '@/src/api/legacyClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
+import { fetchAllPropertyData } from '@/src/api/legacyFunctions';
 
 // ─── Dummy data (replace with real API calls when backend is ready) ───────────
 // These arrays simulate 10k+ parties, 50k+ designs, 100k+ shades.
@@ -136,8 +137,13 @@ export function NewOrderTab({ token, userid }: Props) {
         ScreenName: 'Sales Order Entry',
         token,
     });
+
     const [parties, setParties] = useState<any[]>([]);
     const [partyLoading, setPartyLoading] = useState(false);
+
+    const [property, setProperty] = useState<any[]>([]);
+    const [propertyLoading, setPropertyLoading] = useState(false);
+
     const [step, setStep] = useState(1);
     const [custId, setCustId] = useState('');
     const [mdId, setMdId] = useState('');
@@ -148,12 +154,21 @@ export function NewOrderTab({ token, userid }: Props) {
     const [designLoading, setDesignLoading] = useState(false);
     const [prpcode, setPrpCode] = useState('');
     const [yearno, setYearNo] = useState('');
+    const [propertyData, setPropertyData] = useState([]);
+    const [yearOptions, setYearOptions] = useState([]);
 
     // Multi-color lines: each has a shadeId + qty
     const [colorLines, setColorLines] = useState<{ shadeId: string; shadeName: string; qty: string }[]>([
         { shadeId: '', shadeName: '', qty: '' },
     ]);
 
+    const propertyItems: DropdownItem[] = useMemo(() => {
+        return propertyData.map((item: any) => ({
+            id: item.PrpCode,
+            label: item.LngName,
+            sub: item.ShtName,
+        }));
+    }, [propertyData]);
 
     const design = DUMMY_DESIGNS.find(d => d.id === mdId);
 
@@ -190,15 +205,37 @@ export function NewOrderTab({ token, userid }: Props) {
         setColorLines(prev => prev.filter((_, j) => j !== i));
     }
 
+
     useEffect(() => {
-        const loadFilterData = async () => {
-            const code = await AsyncStorage.getItem('selected_prpcode');
-            const year = await AsyncStorage.getItem('selected_yearno');
-            setPrpCode(code || '');
-            setYearNo(year ? `${year.slice(-2)}` : '');
+        if (!token) return;
+
+        const loadPropertyData = async () => {
+            try {
+                const response = await fetchAllPropertyData(token);
+
+                console.log('PROPERTY API RESPONSE:', response);
+                console.log('PROPERTY API RESPONSE JSON:', JSON.stringify(response, null, 2));
+
+                setPropertyData(response || []);
+            } catch (error) {
+                console.error('PROPERTY API ERROR:', error);
+                setPropertyData([]);
+            }
         };
-        loadFilterData();
-    }, []);
+
+        loadPropertyData();
+
+        const y = new Date().getFullYear();
+        const arr = Array.from(
+            { length: 5 },
+            (_, i) => `${y - i}-${y - i + 1}`
+        );
+
+
+        console.log('YEAR OPTIONS:', arr);        
+        setYearOptions(arr);
+        setYearNo(arr[0]);
+    }, [token]);
 
     const loadParties = useCallback(async () => {
         // if (!prpcode) return;
@@ -285,75 +322,125 @@ export function NewOrderTab({ token, userid }: Props) {
     return (
         <ScrollView contentContainerStyle={ns.scroll} keyboardShouldPersistTaps="handled">
             <Card style={ns.card}>
-                <TouchableOpacity style={ns.stepHead} onPress={() => setStep(1)} activeOpacity={0.7}>
-                    <StepDot n={1} done={!!custId} />
+
+                <TouchableOpacity
+                    style={ns.stepHead}
+                    onPress={() => setStep(1)}
+                    activeOpacity={0.7}
+                >
+                    <StepDot
+                        n={1}
+                        done={!!prpcode && !!yearno}
+                    />
+
                     <View style={{ flex: 1 }}>
-                        <Text style={ns.stepTitle}>Customer</Text>
-                        {cust && <Text style={ns.stepSub}>{cust.label}</Text>}
+                        <Text style={ns.stepTitle}>
+                            Property & Year
+                        </Text>
+
+                        {prpcode && yearno && (
+                            <Text style={ns.stepSub}>
+                                {prpcode} · {yearno}
+                            </Text>
+                        )}
                     </View>
-                    <Text style={ns.chevron}>{step === 1 ? '▾' : '›'}</Text>
+
+                    <Text style={ns.chevron}>
+                        {step === 1 ? '▾' : '›'}
+                    </Text>
                 </TouchableOpacity>
 
                 {step === 1 && (
                     <View style={ns.stepBody}>
-                        {/* <SearchableDropdown
-                            label="Select customer"
-                            placeholder="Search by name or city…"
-                            value={custId}
-                            items={DUMMY_CUSTOMERS}
-                            onSelect={item => { setCustId(item.id); }}
-                        /> */}
-                        {partyLoading ? (
-                            <ActivityIndicator color={T.copper} />
-                        ) : (
-                            <SearchableDropdown
-                                label="Select customer"
-                                placeholder="Search by name or city..."
-                                value={custId}
-                                items={customerItems}
-                                onSelect={(item) => {
-                                    setCustId(item.id);
-                                }}
-                            />
-                        )}
-                        {custId && (
-                            <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(2)}>
-                                <Text style={ns.nextBtnTxt}>Next →</Text>
+
+                        <View style={ns.propertyYearRow}>
+
+                            {/* PROPERTY */}
+                            <View style={{ flex: 1.45 }}>
+                                <SearchableDropdown
+                                    label="Property"
+                                    placeholder="Select property"
+                                    value={prpcode}
+                                    items={propertyItems}
+                                    onSelect={(item) => {
+                                        setPrpCode(item.id);
+                                    }}
+                                />
+                            </View>
+
+                            {/* YEAR */}
+                            <View style={{ flex: 1 }}>
+                                <SearchableDropdown
+                                    label="Year"
+                                    placeholder="Select year"
+                                    value={yearno}
+                                    items={yearOptions}
+                                    onSelect={(item) => {
+                                        setYearNo(item.id);
+                                    }}
+                                />
+                            </View>
+
+                        </View>
+
+                        {prpcode && yearno && (
+                            <TouchableOpacity
+                                style={ns.nextBtn}
+                                onPress={() => setStep(2)}
+                            >
+                                <Text style={ns.nextBtnTxt}>
+                                    Next →
+                                </Text>
                             </TouchableOpacity>
                         )}
+
                     </View>
                 )}
 
-                {step === 2 && (
-                    <View style={ns.stepBody}>
-                        {/* <SearchableDropdown
+            </Card>
+
+            {prpcode && yearno && (
+                <Card style={ns.card}>
+                    <TouchableOpacity style={ns.stepHead} onPress={() => setStep(2)} activeOpacity={0.7}>
+                        <StepDot n={2} done={!!custId} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={ns.stepTitle}>Customer</Text>
+                            {cust && <Text style={ns.stepSub}>{cust.label}</Text>}
+                        </View>
+                        <Text style={ns.chevron}>{step === 2 ? '▾' : '›'}</Text>
+                    </TouchableOpacity>
+
+                    {step === 2 && (
+                        <View style={ns.stepBody}>
+                            {/* <SearchableDropdown
                             label="Select customer"
                             placeholder="Search by name or city…"
                             value={custId}
                             items={DUMMY_CUSTOMERS}
                             onSelect={item => { setCustId(item.id); }}
                         /> */}
-                        {partyLoading ? (
-                            <ActivityIndicator color={T.copper} />
-                        ) : (
-                            <SearchableDropdown
-                                label="Select customer"
-                                placeholder="Search by name or city..."
-                                value={custId}
-                                items={customerItems}
-                                onSelect={(item) => {
-                                    setCustId(item.id);
-                                }}
-                            />
-                        )}
-                        {custId && (
-                            <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(2)}>
-                                <Text style={ns.nextBtnTxt}>Next →</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                )}
-            </Card>
+                            {partyLoading ? (
+                                <ActivityIndicator color={T.copper} />
+                            ) : (
+                                <SearchableDropdown
+                                    label="Select customer"
+                                    placeholder="Search by name or city..."
+                                    value={custId}
+                                    items={customerItems}
+                                    onSelect={(item) => {
+                                        setCustId(item.id);
+                                    }}
+                                />
+                            )}
+                            {custId && (
+                                <TouchableOpacity style={ns.nextBtn} onPress={() => setStep(2)}>
+                                    <Text style={ns.nextBtnTxt}>Next →</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
+                </Card>
+            )}
 
             {/* ── Step 2: Design & fabric ── */}
             {custId && (
@@ -583,6 +670,12 @@ const ns = StyleSheet.create({
     marginLabel: { fontSize: 9, fontWeight: '700', color: T.muted, letterSpacing: 0.5 },
     marginAmt: { fontSize: 16, fontWeight: '800', marginTop: 3 },
     marginSub: { fontSize: 10, color: T.muted, marginTop: 2 },
+    propertyYearRow: {
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'flex-start',
+        marginBottom: 4,
+    },
 
     // Shade lines
     shadeLine: { flexDirection: 'row', gap: 10, marginBottom: 8, alignItems: 'flex-start' },

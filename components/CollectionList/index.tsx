@@ -1,32 +1,26 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import {
-    View,
-    Text,
-    FlatList,
-    TextInput,
-    TouchableOpacity,
-    Alert,
-    TextInput as RNTextInput,
-    Modal,
-    ActivityIndicator,
-    Linking,
-} from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Alert,
+    FlatList,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 // import { encode as base64_encode } from 'react-native-base64';
-import FullScreenLoader from '@/components/FullScreenLoader';
 import { crlimtreq_styles } from '@/common/Style';
+import FullScreenLoader from '@/components/FullScreenLoader';
 // import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
 // import HeaderBar from '../HeaderBar/HeaderBar';
 import HeaderBar from '@/components/Header';
-import ChequeForm from './ChequeForm';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fetchPropertyData, fetchCurrentYearData, getCurrentFinancialYearMain, generateFinancialYearOptions } from '../../common/API/Functions';
-import CustomDrawer from './CustomDrawer';
-import CollectionCard from './CollectionCard';
 import { API } from '../../common/API/dynamicAPI';
+import { fetchCurrentYearData, fetchPropertyData, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
+import CollectionCard from './CollectionCard';
+import CustomDrawer from './CustomDrawer';
 
 interface CardData {
     [key: string]: string;

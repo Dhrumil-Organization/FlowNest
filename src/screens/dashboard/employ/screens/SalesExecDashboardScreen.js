@@ -12,7 +12,7 @@
 //   View,
 // } from "react-native";
 // import { api, formatAmount } from "../api/api";
-// import MiniLineChart from "../components/MiniLineChart";
+// import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 // import SalesExecDashboardSkeleton from "../components/SalesExecDashboardSkeleton";
 // import {
 //   AvatarCircle,
@@ -272,8 +272,7 @@
 //   const collectionByParty = safeArray(collection?.by_party);
 //   const outstandingByParty = safeArray(collection?.outstanding_by_party);
 
-//   const salesTrend = salesDailyTrend.map((item) => safeNumber(item?.amount));
-//   const collectionTrend = collectionDailyTrend.map((item) =>
+// //   const collectionTrend = collectionDailyTrend.map((item) =>
 //     safeNumber(item?.amount)
 //   );
 //   const collectedToday = safeNumber(collectionTotal?.today);
@@ -668,7 +667,7 @@ import {
 } from "react-native";
 import { SubScreenHeader } from "../../../../components/layout/SubScreenHeader";
 import { api, formatAmount } from "../api/api";
-import MiniLineChart from "../components/MiniLineChart";
+import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 import SalesExecDashboardSkeleton from "../components/SalesExecDashboardSkeleton";
 import {
   AvatarCircle,
@@ -786,6 +785,8 @@ export default function SalesExecDashboardScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [showTour, setShowTour] = useState(false);
+
+  const [outstandingSort, setOutstandingSort] = useState("desc");
 
   console.log('Sales activeTab: ', activeTab);
 
@@ -961,15 +962,26 @@ export default function SalesExecDashboardScreen({
   const collectionByParty = safeArray(collection?.by_party);
   const outstandingByParty = safeArray(collection?.outstanding_by_party);
 
-  const salesTrend = salesDailyTrend.map((item) => safeNumber(item?.amount));
-  const collectionTrend = collectionDailyTrend.map((item) =>
-    safeNumber(item?.amount)
-  );
   const collectedToday = safeNumber(collectionTotal?.today);
   const amountDue = safeNumber(collectionTotal?.due);
   const collectionBase = collectedToday + amountDue;
   const collectionPct =
     collectionBase > 0 ? (collectedToday / collectionBase) * 100 : 0;
+
+
+  const sortedOutstanding = [...outstandingByParty].sort((a, b) => {
+    const aValue = Number(a?.amount || 0);
+    const bValue = Number(b?.amount || 0);
+
+    return outstandingSort === "asc"
+      ? aValue - bValue
+      : bValue - aValue;
+  });
+
+  const toggleOutstandingSort = () => {
+    setOutstandingSort(prev => (prev === "desc" ? "asc" : "desc"));
+  };
+
 
   return (
     <>
@@ -991,7 +1003,7 @@ export default function SalesExecDashboardScreen({
           already built for exactly this case (sub-screen + back button). */}
       <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
         {activeTab !== "myview" && (
-        <SubScreenHeader backLabel="Back" title={exec_info.name || execName || "Executive"} />
+          <SubScreenHeader backLabel="Back" title={exec_info.name || execName || "Executive"} />
         )}
         {/* Dead code below kept commented for reference; no longer used.
         <View style={styles.header}>
@@ -1085,175 +1097,197 @@ export default function SalesExecDashboardScreen({
 
           {/* ─── SALES SECTION ─── */}
           {visibleSections.sales && (
-          <SectionCard>
-            <SectionHeader
-              icon="📊"
-              title="SALES"
-              bgColor={COLORS.salesBg}
-              action="Full report"
-              onAction={() => router.push("/new/(tabs)/reports/monthly-report")}
-            />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(safeNumber(salesTotal.today))}
-              tealLeft
-              rightLabel="US MTD"
-              rightValue={formatAmount(safeNumber(salesTotal.mtd))}
-              rawLeftValue={safeNumber(salesTotal.today)}
-              rawRightValue={safeNumber(salesTotal.mtd)}
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={salesTrend}
-                color={COLORS.teal}
-                fillColor={COLORS.teal}
-                width={340}
-                height={50}
+            <SectionCard>
+              <SectionHeader
+                icon="📊"
+                title="SALES"
+                bgColor={COLORS.salesBg}
+                action="Full report"
+                onAction={() => router.push("/new/(tabs)/reports/monthly-report")}
               />
-              <View style={styles.chartAxisRow}>
-                {salesDailyTrend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
 
-            <Text style={styles.subHeader}>TOP CUSTOMERS BY SALES</Text>
-            <ColHeader label1="CUSTOMER" label2="TODAY" label3="BILLED" />
-            <TableWrapper rowCount={salesByParty.length}>
-              {salesByParty.map((p) => (
-                <RankRow
-                  key={p.party_id}
-                  rank={p.rank}
-                  name={p.party_name}
-                  leftVal={formatAmount(p.today)}
-                  rightVal={formatAmount(p.mtd)}
-                  rawLeftVal={p.today}
-                  rawRightVal={p.mtd}
-                  onPress={() => goToParty(p)}
+              <TotalRow
+                leftLabel="TODAY"
+                leftValue={formatAmount(safeNumber(salesTotal.today))}
+                tealLeft
+                rightLabel="US MTD"
+                rightValue={formatAmount(safeNumber(salesTotal.mtd))}
+                rawLeftValue={safeNumber(salesTotal.today)}
+                rawRightValue={safeNumber(salesTotal.mtd)}
+              />
+
+              <View style={styles.chartWrap}>
+                <Text style={styles.trendLabel}>DAILY TREND</Text>
+                <InteractiveDailyTrendChart
+                  data={salesDailyTrend}
+                  valueKey="amount"
+                  labelKey="day"
+                  color={COLORS.teal}
+                  fillColor={COLORS.teal}
+                  height={64}
+                  pointGap={54}
+                  valueFormatter={value => formatAmount(Number(value || 0))}
+                  showBaseline
+                  showHint
                 />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+              </View>
+
+              <Text style={styles.subHeader}>TOP CUSTOMERS BY SALES</Text>
+              <ColHeader label1="CUSTOMER" label2="TODAY" label3="BILLED" />
+              <TableWrapper rowCount={salesByParty.length}>
+                {salesByParty.map((p) => (
+                  <RankRow
+                    key={p.party_id}
+                    rank={p.rank}
+                    name={p.party_name}
+                    leftVal={formatAmount(p.today)}
+                    rightVal={formatAmount(p.mtd)}
+                    rawLeftVal={p.today}
+                    rawRightVal={p.mtd}
+                    onPress={() => goToParty(p)}
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
           )}
 
           {/* ─── PAYMENT COLLECTION SECTION ─── */}
           {visibleSections.collection && (
-          <SectionCard>
-            <SectionHeader
-              icon="💰"
-              title="PAYMENT COLLECTION"
-              bgColor={COLORS.collBg}
-              action="Full report"
-              onAction={() => router.push("/new/(tabs)/reports/monthly-report")}
-            />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(collectedToday)}
-              tealLeft
-              rightLabel="DUE"
-              rightValue={formatAmount(amountDue)}
-              rawLeftValue={collectedToday}
-              rawRightValue={amountDue}
-            />
-
-            {/* Progress bar: collected vs due */}
-            <View style={styles.progressWrap}>
-              <ProgressBar
-                pct={collectionPct}
-                color={COLORS.teal}
+            <SectionCard>
+              <SectionHeader
+                icon="💰"
+                title="PAYMENT COLLECTION"
+                bgColor={COLORS.collBg}
+                action="Full report"
+                onAction={() => router.push("/new/(tabs)/reports/monthly-report")}
               />
-              <View style={styles.progressLabels}>
-                <Text style={styles.progressLabelLeft}>
-                  Collected{" "}
-                  {collectionPct.toFixed(1)}
-                  %
-                </Text>
-                <Text style={styles.progressLabelRight}>
-                  Pending{" "}
-                  {(100 - collectionPct).toFixed(1)}
-                  %
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>COLLECTION TREND</Text>
-              <MiniLineChart
-                data={collectionTrend}
-                color={COLORS.green}
-                fillColor={COLORS.green}
-                width={340}
-                height={50}
+              <TotalRow
+                leftLabel="TODAY"
+                leftValue={formatAmount(collectedToday)}
+                tealLeft
+                rightLabel="DUE"
+                rightValue={formatAmount(amountDue)}
+                rawLeftValue={collectedToday}
+                rawRightValue={amountDue}
               />
-              <View style={styles.chartAxisRow}>
-                {collectionDailyTrend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
 
-            {/* Collections highest first */}
-            <Text style={styles.subHeader}>COLLECTIONS — HIGHEST FIRST</Text>
-            <ColHeader label1="CUSTOMER" label2="TODAY" label3="TOTAL" />
-            <TableWrapper rowCount={collectionByParty.length}>
-              {collectionByParty.map((p) => (
-                <RankRow
-                  key={p.party_id}
-                  rank={p.rank}
-                  name={p.party_name}
-                  leftVal={formatAmount(p.today)}
-                  rightVal={formatAmount(p.total_collected)}
-                  rawLeftVal={p.today}
-                  rawRightVal={p.total_collected}
-                  onPress={() =>
-                    goToParty({
-                      party_id: p.party_id,
-                      party_name: p.party_name,
-                    })
-                  }
+              {/* Progress bar: collected vs due */}
+              <View style={styles.progressWrap}>
+                <ProgressBar
+                  pct={collectionPct}
+                  color={COLORS.teal}
                 />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+                <View style={styles.progressLabels}>
+                  <Text style={styles.progressLabelLeft}>
+                    Collected{" "}
+                    {collectionPct.toFixed(1)}
+                    %
+                  </Text>
+                  <Text style={styles.progressLabelRight}>
+                    Pending{" "}
+                    {(100 - collectionPct).toFixed(1)}
+                    %
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.chartWrap}>
+                <Text style={styles.trendLabel}>COLLECTION TREND</Text>
+                <InteractiveDailyTrendChart
+                  data={collectionDailyTrend}
+                  valueKey="amount"
+                  labelKey="day"
+                  color={COLORS.green}
+                  fillColor={COLORS.green}
+                  height={64}
+                  pointGap={54}
+                  valueFormatter={value => formatAmount(Number(value || 0))}
+                  showBaseline
+                  showHint
+                />
+              </View>
+
+              {/* Collections highest first */}
+              <Text style={styles.subHeader}>COLLECTIONS — HIGHEST FIRST</Text>
+              <ColHeader label1="CUSTOMER" label2="TODAY" label3="TOTAL" />
+              <TableWrapper rowCount={collectionByParty.length}>
+                {collectionByParty.map((p) => (
+                  <RankRow
+                    key={p.party_id}
+                    rank={p.rank}
+                    name={p.party_name}
+                    leftVal={formatAmount(p.today)}
+                    rightVal={formatAmount(p.total_collected)}
+                    rawLeftVal={p.today}
+                    rawRightVal={p.total_collected}
+                    onPress={() =>
+                      goToParty({
+                        party_id: p.party_id,
+                        party_name: p.party_name,
+                      })
+                    }
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
           )}
 
           {/* ─── OUTSTANDING SECTION ─── */}
           {visibleSections.outstanding && (
-          <SectionCard>
-            <SectionHeader
-              icon="⚠️"
-              title="OUTSTANDING"
-              bgColor={COLORS.outsBg}
-            />
-            <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
-            <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" />
-            <TableWrapper rowCount={outstandingByParty.length}>
-              {outstandingByParty.map((p) => (
-                <RankRow
-                  key={p.party_id}
-                  rank={p.rank}
-                  name={p.party_name}
-                  rightVal={formatAmount(p.amount)}
-                  rawRightVal={p.amount}
-                  trendUp={false}
-                  onPress={() =>
-                    goToParty({
-                      party_id: p.party_id,
-                      party_name: p.party_name,
-                    })
-                  }
+            <SectionCard>
+              <SectionHeader
+                icon="⚠️"
+                title="OUTSTANDING"
+                bgColor={COLORS.outsBg}
+              />
+              <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
+              {/* <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" /> */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ColHeader
+                  label1="CUSTOMER"
+                  label2=""
+                  label3="AMOUNT"
                 />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+
+                <TouchableOpacity
+                  onPress={toggleOutstandingSort}
+                  style={{
+                    marginLeft: -12,
+                    paddingLeft: 0,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      color: "#8C837B",
+                    }}
+                  >
+                    ▼
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {/* <TableWrapper rowCount={outstandingByParty.length}>
+                {outstandingByParty.map((p) => ( */}
+              <TableWrapper rowCount={outstandingByParty.length}>
+                {sortedOutstanding.map((p) => (
+                  <RankRow
+                    key={p.party_id}
+                    rank={p.rank}
+                    name={p.party_name}
+                    rightVal={formatAmount(p.amount)}
+                    rawRightVal={p.amount}
+                    trendUp={false}
+                    onPress={() =>
+                      goToParty({
+                        party_id: p.party_id,
+                        party_name: p.party_name,
+                      })
+                    }
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
           )}
         </ScrollView>
       </SafeAreaView>

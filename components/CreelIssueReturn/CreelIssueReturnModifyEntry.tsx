@@ -767,7 +767,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     data: [temppayloadObj],
                     IskgQty: 0,
                     printype: "Print",
-                    PrintFormat: 5,
+                    PrintFormat: 3,
                     printerName: printer ? printer : '',
                     txntype: "beam_weft_issue_return"
                 };

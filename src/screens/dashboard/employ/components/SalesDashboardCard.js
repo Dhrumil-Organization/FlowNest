@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   LayoutAnimation,
-  PanResponder,
   Platform,
   StyleSheet,
   Text,
@@ -11,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { formatAmount } from '../api/api';
-import MiniLineChart from './MiniLineChart';
+import InteractiveDailyTrendChart from './InteractiveDailyTrendChart';
 import { COLORS, SectionCard, SectionHeader } from './SharedComponents';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -33,9 +32,6 @@ const CHILD_LABELS = {
 };
 
 
-const CHART_WIDTH = 340;
-const CHART_HEIGHT = 38;
-const TOOLTIP_WIDTH = 96;
 
 const formatQty = value => {
   const amount = Number(value || 0);
@@ -81,173 +77,20 @@ function ChildSection({ type, rows }) {
 }
 
 function InteractiveSalesChart({ dailyTrend }) {
-  const [selectedIndex, setSelectedIndex] = useState(null);
-
-  const points = useMemo(
-    () =>
-      (Array.isArray(dailyTrend) ? dailyTrend : []).map(item => ({
-        ...item,
-        amount: Number(item.amount || 0),
-      })),
-    [dailyTrend],
-  );
-
-  const values = useMemo(
-    () => points.map(item => item.amount),
-    [points],
-  );
-
-  const minValue = values.length ? Math.min(...values) : 0;
-  const maxValue = values.length ? Math.max(...values) : 0;
-
-  const selectNearestPoint = locationX => {
-    if (!points.length) return;
-
-    const safeX = Math.max(
-      0,
-      Math.min(CHART_WIDTH, Number(locationX || 0)),
-    );
-
-    if (points.length === 1) {
-      setSelectedIndex(0);
-      return;
-    }
-
-    const nextIndex = Math.round(
-      (safeX / CHART_WIDTH) * (points.length - 1),
-    );
-
-    setSelectedIndex(
-      Math.max(0, Math.min(points.length - 1, nextIndex)),
-    );
-  };
-
-  const responder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-
-      onPanResponderGrant: event => {
-        selectNearestPoint(event.nativeEvent.locationX);
-      },
-
-      onPanResponderMove: event => {
-        selectNearestPoint(event.nativeEvent.locationX);
-      },
-
-      onPanResponderRelease: () => {
-        setSelectedIndex(null);
-      },
-
-      onPanResponderTerminate: () => {
-        setSelectedIndex(null);
-      },
-    }),
-  ).current;
-
-  const selectedPoint =
-    selectedIndex === null ? null : points[selectedIndex];
-
-  const xPosition =
-    selectedIndex === null
-      ? null
-      : points.length <= 1
-        ? CHART_WIDTH / 2
-        : (selectedIndex / (points.length - 1)) * CHART_WIDTH;
-
-  const yPosition =
-    !selectedPoint || maxValue === minValue
-      ? CHART_HEIGHT / 2
-      : CHART_HEIGHT -
-        ((selectedPoint.amount - minValue) /
-          (maxValue - minValue)) *
-          CHART_HEIGHT;
-
-  const tooltipLeft =
-    xPosition === null
-      ? 0
-      : Math.max(
-          0,
-          Math.min(
-            CHART_WIDTH - TOOLTIP_WIDTH,
-            xPosition - TOOLTIP_WIDTH / 2,
-          ),
-        );
-
-  const axisItems = useMemo(
-    () =>
-      points.filter(
-        (_, index, all) =>
-          index === 0 ||
-          index === all.length - 1 ||
-          index %
-            Math.max(1, Math.floor(all.length / 3)) ===
-            0,
-      ),
-    [points],
-  );
-
   return (
     <View style={styles.chartWrap}>
-      <View
-        style={styles.chartTouchArea}
-        {...responder.panHandlers}
-      >
-        <MiniLineChart
-          data={values}
-          color="#0D2234"
-          fillColor="#0D2234"
-          width={CHART_WIDTH}
-          height={CHART_HEIGHT}
-        />
-
-        {selectedPoint && xPosition !== null ? (
-          <>
-            <View
-              pointerEvents="none"
-              style={[styles.chartGuide, { left: xPosition }]}
-            />
-
-            <View
-              pointerEvents="none"
-              style={[
-                styles.chartDot,
-                {
-                  left: xPosition - 5,
-                  top: yPosition - 5,
-                },
-              ]}
-            />
-
-            <View
-              pointerEvents="none"
-              style={[
-                styles.chartTooltip,
-                { left: tooltipLeft },
-              ]}
-            >
-              <Text style={styles.tooltipDay}>
-                {selectedPoint.day}
-              </Text>
-
-              <Text style={styles.tooltipValue}>
-                {cleanAmount(selectedPoint.amount)}
-              </Text>
-            </View>
-          </>
-        ) : null}
-      </View>
-
-      <View style={styles.axisRow}>
-        {axisItems.map((item, index) => (
-          <Text
-            key={`${item.day}-${index}`}
-            style={styles.axisText}
-          >
-            {item.day}
-          </Text>
-        ))}
-      </View>
+      <InteractiveDailyTrendChart
+        data={dailyTrend}
+        valueKey="amount"
+        labelKey="day"
+        color="#0D2234"
+        fillColor="#0D2234"
+        height={62}
+        pointGap={54}
+        valueFormatter={value => cleanAmount(value)}
+        showBaseline
+        showHint
+      />
     </View>
   );
 }
@@ -257,7 +100,43 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
   const [dimension, setDimension] = useState(sales?.default_dimension || 'category');
   const [expandedKey, setExpandedKey] = useState(null);
 
+  const [sortConfig, setSortConfig] = useState({
+    field: 'mtd_amount',
+    direction: 'desc',
+  });
+
   const rows = useMemo(() => sales?.dimensions?.[dimension] || [], [sales, dimension]);
+
+  const sortedRows = useMemo(() => {
+    const data = [...rows];
+
+    if (!sortConfig.field) return data;
+
+    return data.sort((a, b) => {
+      const aValue = Number(a?.[sortConfig.field] || 0);
+      const bValue = Number(b?.[sortConfig.field] || 0);
+
+      return sortConfig.direction === 'asc'
+        ? aValue - bValue
+        : bValue - aValue;
+    });
+  }, [rows, sortConfig]);
+
+
+  const toggleSort = () => {
+    setSortConfig(prev => ({
+      field: prev.field === 'mtd_qty'
+        ? 'mtd_amount'
+        : 'mtd_qty',
+
+      direction:
+        prev.field === 'mtd_qty' &&
+          prev.direction === 'desc'
+          ? 'asc'
+          : 'desc',
+    }));
+  };
+
   const dailyTrend = useMemo(() => sales?.daily_trend || [], [sales]);
 
   const chooseDimension = next => {
@@ -328,10 +207,16 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
 
       <View style={styles.columnHeader}>
         <Text style={styles.columnTitle}>{dimension.toUpperCase()}</Text>
-        <Text style={styles.columnMetric}>QTY   AMOUNT</Text>
+        {/* <Text style={styles.columnMetric}>QTY   AMOUNT</Text> */}
+        <TouchableOpacity onPress={toggleSort}>
+          <Text style={styles.columnMetric}>
+            QTY   AMOUNT ▼
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {rows.map((row, index) => {
+      {/* {rows.map((row, index) => { */}
+      {sortedRows.map((row, index) => {
         const key = `${dimension}:${row.code || row.name}`;
         const expanded = expandedKey === key;
         const childEntries = Object.entries(row.children || {});
@@ -344,7 +229,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
                   <Text style={styles.avatarText}>{String(row.name || '?').charAt(0).toUpperCase()}</Text>
                 </View>
               )}
-              {dimension !== 'executive' && <View style={[styles.rankDot, { backgroundColor: ['#255C85','#7440B7','#168274','#2563EB','#B55E10','#0A9B6C','#D98200'][index % 7] }]} />}
+              {dimension !== 'executive' && <View style={[styles.rankDot, { backgroundColor: ['#255C85', '#7440B7', '#168274', '#2563EB', '#B55E10', '#0A9B6C', '#D98200'][index % 7] }]} />}
               <Text numberOfLines={1} style={styles.parentName}>{row.name}</Text>
               <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} />
             </TouchableOpacity>
@@ -372,8 +257,16 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total</Text>
         <MetricValue
-          quantity={rows.reduce((sum, row) => sum + Number(row.mtd_qty || 0), 0)}
-          amount={rows.reduce((sum, row) => sum + Number(row.mtd_amount || 0), 0)}
+          // quantity={rows.reduce((sum, row) => sum + Number(row.mtd_qty || 0), 0)}
+          quantity={sortedRows.reduce(
+            (sum, row) => sum + Number(row.mtd_qty || 0),
+            0
+          )}
+          // amount={rows.reduce((sum, row) => sum + Number(row.mtd_amount || 0), 0)}
+          amount={sortedRows.reduce(
+            (sum, row) => sum + Number(row.mtd_amount || 0),
+            0
+          )}
         />
       </View>
       <Text style={styles.footerNote}>Toggle the view · tap any row to expand its breakdown. Qty in metres, amount in ₹.</Text>
@@ -388,14 +281,6 @@ const styles = StyleSheet.create({
   todayValue: { marginTop: 3, fontSize: 17, color: '#16633C', fontWeight: '800' },
   monthValue: { marginTop: 3, fontSize: 17, color: '#121417', fontWeight: '800' },
   chartWrap: { paddingHorizontal: 12, paddingBottom: 6, overflow: 'visible' },
-  chartTouchArea: { width: CHART_WIDTH, height: CHART_HEIGHT, position: 'relative', overflow: 'visible' },
-  chartGuide: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: '#7D8A93' },
-  chartDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#0D2234' },
-  chartTooltip: { position: 'absolute', top: -48, width: TOOLTIP_WIDTH, minHeight: 40, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#1E2327', alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOpacity: 0.18, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
-  tooltipDay: { color: '#C8CFD4', fontSize: 8.5, fontWeight: '700' },
-  tooltipValue: { marginTop: 1, color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' },
-  axisRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -2 },
-  axisText: { fontSize: 8, color: '#9D958D' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 12, paddingVertical: 10 },
   tab: { paddingHorizontal: 14, height: 34, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEEAE6' },
   tabActive: { backgroundColor: '#0C1F31' },

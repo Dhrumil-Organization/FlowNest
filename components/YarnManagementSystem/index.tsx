@@ -1,23 +1,25 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
     Platform,
-    KeyboardAvoidingView
+    ScrollView,
+    Text, TextInput, TouchableOpacity,
+    View
 } from 'react-native';
 // import theme from '../../android/app/src/theme';
+import { yarnmanagementsystemstyle } from '@/common/Style';
+import HeaderBarwithBack from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { yarnmanagementsystemstyle } from '@/common/Style';
-import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
-import HeaderBarwithBack from '@/components/Header';
-import { ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import CustomDrawer from './CustomDrawer';
-import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
+import { API } from '../../common/API/dynamicAPI';
+
 import PartyDropdown from '@/Shared/PartyDropdown';
-import { LinearGradient } from 'expo-linear-gradient';
 import PartyDropdownYarn from '@/Shared/PartyDropdownYarn';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import CustomDrawer from './CustomDrawer';
 interface Props {
     token: string;
     username: string;
@@ -1777,6 +1779,18 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         ["#3A7BD5", "#5A9BD5"],
     ];
 
+    const filteredData = useMemo(() => {
+        const search = cardSearch.trim().toLowerCase();
+
+        if (!search) return data;
+
+        return data.filter(item =>
+            Object.values(item || {}).some(value =>
+                String(value ?? '').toLowerCase().includes(search)
+            )
+        );
+    }, [data, cardSearch]);
+
     if (showSubItemCard) {
         return (
             <View style={{ flex: 1 }}>
@@ -2777,17 +2791,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     //     soshow();
     // }, []);
 
-    const filteredData = useMemo(() => {
-        const search = cardSearch.trim().toLowerCase();
-
-        if (!search) return data;
-
-        return data.filter(item =>
-            Object.values(item || {}).some(value =>
-                String(value ?? '').toLowerCase().includes(search)
-            )
-        );
-    }, [data, cardSearch]);
+    
 
     return (
         <>

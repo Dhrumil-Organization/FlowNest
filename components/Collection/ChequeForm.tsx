@@ -1,30 +1,29 @@
 // ChequeForm.tsx (updated with initial blocking modal)
-import React, { useMemo, useState, useEffect } from 'react';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-    View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    StyleSheet,
-    Image,
-    Alert,
-    ScrollView,
-    Modal,
-    Platform,
-    ActivityIndicator,
-    Animated,
+    View,
 } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
 // import { launchImageLibrary } from 'react-native-image-picker';
-import * as ImagePicker from 'expo-image-picker';
 import theme from '@/components/theme';
+import * as ImagePicker from 'expo-image-picker';
 // import CameraPage from './CameraPage'; // modal camera component
-import SearchableDropdown from '@/Shared/SearchableDropdown';
 import PartyDropdown from '@/Shared/PartyDropdown';
-import PartyDropdownType from '@/Shared/PartyDropdownType';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import PartyDropdownAdj from '@/Shared/PartyDropdownAdj';
+import PartyDropdownType from '@/Shared/PartyDropdownType';
+import SearchableDropdown from '@/Shared/SearchableDropdown';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 interface PropertyData {
     PrpCode: string;
@@ -1375,7 +1374,7 @@ const styles = StyleSheet.create({
     col: { flex: 1, marginRight: 8 },
     col1: { width: '48%', marginRight: 8 },
     label: { color: theme.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', marginBottom: 6 },
-    input: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10, color: theme.BRAND_DARK },
+    input: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10, color: 'black' },
     dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
     dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
 

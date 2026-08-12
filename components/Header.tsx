@@ -509,7 +509,11 @@ export default function Header({
                         <Image source={logo} style={styles.logo} resizeMode="contain" />
                         {headerConnectAnimation ? (
                             <View>
-                                <Text style={styles.pageTitle}>
+                                <Text
+                                    style={styles.pageTitle}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                >
                                     {breadcrumb || breadcrumbWithNoHome || 'FlowNest'}
                                 </Text>
                                 <Animated.View

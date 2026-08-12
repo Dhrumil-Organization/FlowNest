@@ -781,6 +781,58 @@ const WeftIssueItemDrawer = ({
     // });
 
     // ✅ REPLACE with this function:
+    // const handleBarCodeScanned = (result: BarcodeScanningResult) => {
+    //     // Prevent multiple scans
+    //     if (scanLock.current) return;
+    //     scanLock.current = true;
+    //     setTimeout(() => (scanLock.current = false), 2000);
+
+    //     const value = result?.data || '';
+    //     console.log("📦 Raw QR Value 👉", value);
+
+    //     try {
+    //         const parts = value.split("~");
+    //         if (parts.length < 13) {
+    //             throw new Error("Invalid format");
+    //         }
+    //         const parsed = {
+    //             PUId: parts[0],
+    //             PSrNo: parts[1],
+    //             PSubSr: parts[2],
+    //             TranType: parts[3],
+    //             CartNo: parts[4],
+    //             ItmCode: parts[5],
+    //             MerCode: parts[6],
+    //             GrdCode: parts[7],
+    //             ShdCode: parts[8],
+    //             Denier: parts[9],
+    //             Wt: parts[10],
+    //             Chees: parts[11],
+    //             yearNo: parts[12]
+    //         };
+
+    //         console.log("✅ Parsed 👉", parsed);
+    //         setScannedObj(parsed);
+    //         setCartonNo(parsed.CartNo || '');
+    //         setYearNo(parsed.yearNo || '');
+    //         setchees('');
+    //         setavgwt('');
+
+    //         // setchees(parsed.Chees || '');
+    //         // setavgwt(parsed.Wt || '');
+
+    //         setAvailableChees(parsed.Chees || '');
+    //         setAvailableQty(parsed.Wt || '');
+
+    //         fetchitmgrdshdname(parsed);
+    //         sendScannedValue(value);
+    //     } catch (err) {
+    //         Alert.alert("Invalid QR", "QR format not valid");
+    //     }
+    //     setIsScanning(false);
+    // };
+
+
     const handleBarCodeScanned = (result: BarcodeScanningResult) => {
         // Prevent multiple scans
         if (scanLock.current) return;
@@ -792,26 +844,91 @@ const WeftIssueItemDrawer = ({
 
         try {
             const parts = value.split("~");
-            if (parts.length < 13) {
+            let parsed = {};
+
+            if (parts.length === 16) {
+                parsed = {
+                    PUId: parts[0] || '',
+                    PSrNo: parts[1] || '',
+                    PSubSr: parts[2] || '',
+                    TranType: parts[3] || '',
+                    CartNo: parts[4] || '',
+                    ItmCode: parts[5] || '',
+                    ItmName: parts[6] || '',
+                    MerCode: parts[7] || '',
+                    MerName: parts[8] || '',
+                    GrdCode: parts[9] || '',
+                    GrdName: parts[10] || '',
+                    ShdCode: parts[11] || '',
+                    ShdName: parts[12] || '',
+                    Wt: parts[13] || 0,
+                    Chees: parts[14] || 0,
+                    yearNo: parts[15] || ''
+                };
+
+                console.log("✅ Parsed New Format 👉", parsed);
+            } else if (parts.length >= 13) {
+                // Full format
+                parsed = {
+                    PrpCode: parts[0] || '',
+                    PUId: parts[1] || '',
+                    PSrNo: parts[2] || '',
+                    PSubSr: parts[3] || '',
+                    TranType: parts[4] || '',
+                    CartNo: parts[5] || '',
+                    ItmCode: parts[6] || '',
+                    MerCode: parts[7] || '',
+                    GrdCode: parts[8] || '',
+                    ShdCode: parts[9] || '',
+                    Denier: parts[10] || '',
+                    Wt: parts[11] || 0,
+                    Chees: parts[12] || 0,
+                    Rate: parts[13] || 0,
+                    yearNo: parts[14] || ''
+                };
+                console.log("✅ Parsed 1111 👉", parsed);
+            } else if (parts.length >= 11) {
+                // Short format (without Chees)
+                parsed = {
+                    PUId: parts[0] || '',
+                    PSrNo: parts[1] || '',
+                    PSubSr: parts[2] || '',
+                    TranType: parts[3] || '',
+                    CartNo: parts[4] || '',
+                    ItmCode: parts[5] || '',
+                    MerCode: parts[6] || '',
+                    GrdCode: parts[7] || '',
+                    ShdCode: parts[8] || '',
+                    Denier: parts[9] || '',
+                    Wt: parts[10] || 0,
+                    Chees: 0,
+                    yearNo: parts[11] || ''
+                };
+                console.log("✅ Parsed 22", parsed);
+            } else {
                 throw new Error("Invalid format");
             }
-            const parsed = {
-                PUId: parts[0],
-                PSrNo: parts[1],
-                PSubSr: parts[2],
-                TranType: parts[3],
-                CartNo: parts[4],
-                ItmCode: parts[5],
-                MerCode: parts[6],
-                GrdCode: parts[7],
-                ShdCode: parts[8],
-                Denier: parts[9],
-                Wt: parts[10],
-                Chees: parts[11],
-                yearNo: parts[12]
-            };
+            // const parsed = {}
+            // if (parts.length < 13) {
+            //     throw new Error("Invalid format");
+            // } else
+            //     parsed = {
+            //         PUId: parts[0],
+            //         PSrNo: parts[1],
+            //         PSubSr: parts[2],
+            //         TranType: parts[3],
+            //         CartNo: parts[4],
+            //         ItmCode: parts[5],
+            //         MerCode: parts[6],
+            //         GrdCode: parts[7],
+            //         ShdCode: parts[8],
+            //         Denier: parts[9],
+            //         Wt: parts[10],
+            //         Chees: parts[11],
+            //         yearNo: parts[12]
+            //     };
 
-            console.log("✅ Parsed 👉", parsed);
+
             setScannedObj(parsed);
             setCartonNo(parsed.CartNo || '');
             setYearNo(parsed.yearNo || '');

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
-    Platform
+    Platform,
+    KeyboardAvoidingView
 } from 'react-native';
 // import theme from '../../android/app/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -29,7 +30,7 @@ type GridItem = {
 };
 
 const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
-    
+
     const [isLoading, setIsLoading] = useState(false);
     const [getDataSaved, setDataSaved] = useState(false)
     const [setupDate, setSetupDate] = useState(new Date());
@@ -163,6 +164,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     const [selectedparty, setselectedparty] = useState([]);
     const [btnLoading, setBtnLoading] = useState(false);
     const [browserpartydata, setbrowserpartydata] = useState([]);
+    const [cardSearch, setCardSearch] = useState('');
+
 
     // console.log("browserpartydata", browserpartydata)
 
@@ -833,7 +836,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     // };
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         if (FormState.values.prpcode && FormState.values.yarnstrcode) {
             fetchBlenddata();
             fetchBlendcount();
@@ -908,6 +911,14 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             .join(' '); // ✅ clean string
     };
 
+
+    const roundDenier = (value: number) => {
+        if (!Number.isFinite(value)) return '';
+
+        // Always round UP to nearest 5
+        return String(Math.ceil(value / 5) * 5);
+    };
+
     const calculateDenier = (values, formula) => {
         const count = parseFloat(values.count_no);
         const ply = parseFloat(values.ply);
@@ -921,9 +932,13 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 .replace(/ply/g, ply);
 
             // evaluate expression
+            // const result = eval(expr);
+
+            // return Number(result).toFixed(2);
+
             const result = eval(expr);
 
-            return Number(result).toFixed(2);
+            return roundDenier(Number(result));
 
         } catch (e) {
             console.log("Formula error:", e);
@@ -952,9 +967,13 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 .replace(/ply/g, ply);
 
             // evaluate expression
+            // const result = eval(expr);
+
+            // return Number(result).toFixed(2);
+
             const result = eval(expr);
 
-            return Number(result).toFixed(2);
+            return roundDenier(Number(result));
 
         } catch (e) {
             console.log("Formula error:", e);
@@ -1006,11 +1025,50 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
 
+    // const calculateSubitemDenier = (values) => {
+    //     const count = Number(values.count_no);
+    //     const ply = Number(values.ply);
+    //     if (!count || !ply) return '';
+    //     return (count * ply).toString();
+    // };
+
+
     const calculateSubitemDenier = (values) => {
         const count = Number(values.count_no);
         const ply = Number(values.ply);
+
         if (!count || !ply) return '';
-        return (count * ply).toString();
+
+        const countType = countdata?.find(
+            ct => String(ct.id) === String(values.WCounttype)
+        );
+
+        const formula = countType?.formula;
+
+        console.log("Sub Item Count:", count);
+        console.log("Sub Item Ply:", ply);
+        console.log("Sub Item WCounttype:", values.WCounttype);
+        console.log("Sub Item Formula:", formula);
+
+        if (!formula) return '';
+
+        try {
+            const expr = formula
+                .replace(/Count/g, count)
+                .replace(/ply/g, ply);
+
+            // const result = eval(expr);
+
+            // return Number(result).toFixed(2);
+
+            const result = eval(expr);
+
+            return roundDenier(Number(result));
+
+        } catch (error) {
+            console.log("Sub Item Formula Error:", error);
+            return '';
+        }
     };
 
     const handleLoadPress = () => {
@@ -1293,6 +1351,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleAddClick = async () => {
+        setCardSearch('');
         if (activeTab === 'Spun') {
             await soshow(); // ✅ ab valid hai
 
@@ -1697,7 +1756,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     // }, [activeTab]);
 
     useEffect(() => {
-        if(!token) return;
+        if (!token) return;
         const loadData = async () => {
             await soshow();              // ✅ pehle
             await fetchbrowse(activeTab); // ✅ baad mein
@@ -1721,13 +1780,65 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     if (showSubItemCard) {
         return (
             <View style={{ flex: 1 }}>
-                {isLoading && <FullScreenLoader />}
+                {/* {isLoading && <FullScreenLoader />} */}
+                {isLoading && (
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+
+                            justifyContent: 'center',
+                            alignItems: 'center',
+
+                            backgroundColor: 'rgba(255,255,255,0.45)',
+
+                            zIndex: 9999,
+                            elevation: 9999,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 70,
+                                height: 70,
+                                borderRadius: 35,
+                                backgroundColor: '#fff',
+
+                                justifyContent: 'center',
+                                alignItems: 'center',
+
+                                elevation: 8,
+
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                    width: 0,
+                                    height: 3,
+                                },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 6,
+                            }}
+                        >
+                            <ActivityIndicator
+                                size="large"
+                                color="#0788A8"
+                            />
+                        </View>
+                    </View>
+                )}
+                {/* <HeaderBarwithBack
+                    userName={username}
+                    header={'Create Sub Item'}
+                    subHeader={'Fill details to generate yarn sub item'}
+                /> */}
+
                 <HeaderBarwithBack
                     userName={username}
                     header={'Create Sub Item'}
                     subHeader={'Fill details to generate yarn sub item'}
+                    SearchBar={false}
                 />
-
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     style={{ marginTop: 0 }}
@@ -2221,7 +2332,53 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     if (showbrwosecard) {
         return (
             <View style={{ flex: 1 }}>
-                {isLoading && <FullScreenLoader />}
+                {/* {isLoading && <FullScreenLoader />} */}
+                {isLoading && (
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+
+                            justifyContent: 'center',
+                            alignItems: 'center',
+
+                            backgroundColor: 'rgba(255,255,255,0.45)',
+
+                            zIndex: 9999,
+                            elevation: 9999,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 70,
+                                height: 70,
+                                borderRadius: 35,
+                                backgroundColor: '#fff',
+
+                                justifyContent: 'center',
+                                alignItems: 'center',
+
+                                elevation: 8,
+
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                    width: 0,
+                                    height: 3,
+                                },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 6,
+                            }}
+                        >
+                            <ActivityIndicator
+                                size="large"
+                                color="#0788A8"
+                            />
+                        </View>
+                    </View>
+                )}
                 <View style={yarnmanagementsystemstyle.topHeader}>
                     <TouchableOpacity onPress={() => setshowbrwosecard(false)}>
                         <Icon name="arrow-back" size={22} color="#fff" />
@@ -2326,7 +2483,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                         }}
                         onPress={() => setshowbrwosecard(false)}
                     >
-                        <Text style={{ fontWeight: '600',color:'#000' }}>Cancel</Text>
+                        <Text style={{ fontWeight: '600', color: '#000' }}>Cancel</Text>
                     </TouchableOpacity>
 
                 </View>
@@ -2340,7 +2497,53 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     if (partycard) {
         return (
             <View style={{ flex: 1 }}>
-                {isLoading && <FullScreenLoader />}
+                {/* {isLoading && <FullScreenLoader />} */}
+                {isLoading && (
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+
+                            justifyContent: 'center',
+                            alignItems: 'center',
+
+                            backgroundColor: 'rgba(255,255,255,0.45)',
+
+                            zIndex: 9999,
+                            elevation: 9999,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 70,
+                                height: 70,
+                                borderRadius: 35,
+                                backgroundColor: '#fff',
+
+                                justifyContent: 'center',
+                                alignItems: 'center',
+
+                                elevation: 8,
+
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                    width: 0,
+                                    height: 3,
+                                },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 6,
+                            }}
+                        >
+                            <ActivityIndicator
+                                size="large"
+                                color="#0788A8"
+                            />
+                        </View>
+                    </View>
+                )}
                 {/* <View style={yarnmanagementsystemstyle.topHeader}>
                     <Text style={yarnmanagementsystemstyle.topHeaderTitle}>
                         Sub Item: {browseParentItem?.WNameCode || '-'}
@@ -2574,15 +2777,80 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     //     soshow();
     // }, []);
 
+    const filteredData = useMemo(() => {
+        const search = cardSearch.trim().toLowerCase();
+
+        if (!search) return data;
+
+        return data.filter(item =>
+            Object.values(item || {}).some(value =>
+                String(value ?? '').toLowerCase().includes(search)
+            )
+        );
+    }, [data, cardSearch]);
+
     return (
         <>
-            {isLoading && <FullScreenLoader />}
+            {/* {isLoading && <FullScreenLoader />} */}
+            {isLoading && (
+                <View
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
 
+                        justifyContent: 'center',
+                        alignItems: 'center',
+
+                        backgroundColor: 'rgba(255,255,255,0.45)',
+
+                        zIndex: 9999,
+                        elevation: 9999,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: 70,
+                            height: 70,
+                            borderRadius: 35,
+                            backgroundColor: '#fff',
+
+                            justifyContent: 'center',
+                            alignItems: 'center',
+
+                            elevation: 8,
+
+                            shadowColor: '#000',
+                            shadowOffset: {
+                                width: 0,
+                                height: 3,
+                            },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 6,
+                        }}
+                    >
+                        <ActivityIndicator
+                            size="large"
+                            color="#0788A8"
+                        />
+                    </View>
+                </View>
+            )}
+            {/* <HeaderBarwithBack
+                userName={username}
+                header={'Yarn Managment System'}
+                subHeader={'Manage Your Yarn Items And Create Sub Items'}
+            /> */}
             <HeaderBarwithBack
                 userName={username}
                 header={'Yarn Managment System'}
                 subHeader={'Manage Your Yarn Items And Create Sub Items'}
+                breadcrumb={'Yarn managment system'}
+                SearchBar={false}
             />
+
             <View style={yarnmanagementsystemstyle.container}>
                 <View style={yarnmanagementsystemstyle.mainCard}>
                     <View style={yarnmanagementsystemstyle.tabContainer}>
@@ -2630,6 +2898,64 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                     </View>
 
+                    {/* Common Search - Spun + Filament */}
+                    {!showSpunCard && !showFilamentCard && (
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: '#fff',
+                                borderWidth: 1,
+                                borderColor: '#D9E2EC',
+                                borderRadius: 12,
+                                marginTop: 10,
+                                marginBottom: 10,
+                                paddingHorizontal: 12,
+                                height: 46,
+                                elevation: 2,
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                    width: 0,
+                                    height: 2,
+                                },
+                                shadowOpacity: 0.08,
+                                shadowRadius: 4,
+                            }}
+                        >
+                            <Icon
+                                name="search"
+                                size={22}
+                                color="#64748B"
+                            />
+
+                            <TextInput
+                                style={{
+                                    flex: 1,
+                                    marginLeft: 8,
+                                    color: '#111827',
+                                    fontSize: 14,
+                                }}
+                                placeholder="Search all fields..."
+                                placeholderTextColor="#94A3B8"
+                                value={cardSearch}
+                                onChangeText={setCardSearch}
+                            />
+
+                            {cardSearch.length > 0 && (
+                                <TouchableOpacity
+                                    onPress={() => setCardSearch('')}
+                                >
+                                    <Icon
+                                        name="close"
+                                        size={20}
+                                        color="#64748B"
+                                    />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
+
+
                     {activeTab === 'Spun' && (
                         <>
                             {!showSpunCard && (
@@ -2648,7 +2974,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                         contentContainerStyle={{ paddingBottom: 20 }}
                                         showsVerticalScrollIndicator={false}
                                     >
-                                        {data.length === 0 ? (
+                                        {/* {data.length === 0 ? ( */}
+                                        {filteredData.length === 0 ? (
                                             <View style={yarnmanagementsystemstyle.emptyBox}>
                                                 <Text style={yarnmanagementsystemstyle.emptyText}>
                                                     No items yet..
@@ -2658,7 +2985,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 </Text>
                                             </View>
                                         ) : (
-                                            data.map((item, index) => (
+                                            // data.map((item, index) => (
+                                            filteredData.map((item, index) => (
                                                 <View key={item.id || index} style={yarnmanagementsystemstyle.cardWrapper}>
 
                                                     <LinearGradient
@@ -2741,7 +3069,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                                         WNameCode: item?.WNameCode || '',
                                                                         WBlend: selectedBlendId || '',
                                                                         WYarnType: item?.WYarnType || '',
-                                                                        mitmcode: item?.mitmcode || ''
+                                                                        mitmcode: item?.mitmcode || '',
+                                                                        WCounttype: item?.WCounttype || ''
                                                                     }));
 
                                                                     setShowSubItemCard(true);
@@ -2756,7 +3085,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                                 activeOpacity={0.8}
                                                                 style={yarnmanagementsystemstyle.smallButton}
                                                                 onPress={() => {
-                                                                    console.log("Clicked item:", item);  // 👈 check this
+                                                                    console.log("Clicked item:", item);
                                                                     fetchbrowsedata(item);
                                                                 }}
 
@@ -2778,53 +3107,58 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                             {showSpunCard && (
                                 <View style={{ flex: 1 }}>
-                                    <ScrollView
-                                        showsVerticalScrollIndicator={false}
-                                        style={{ marginTop: 10 }}
-                                        contentContainerStyle={{ paddingBottom: 100 }}
+                                    <KeyboardAvoidingView
+                                        // style={{ flex: 1 }}
+                                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                                        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                                     >
-                                        <View style={yarnmanagementsystemstyle.formCard}>
+                                        <ScrollView
+                                            showsVerticalScrollIndicator={false}
+                                            style={{ marginTop: 10 }}
+                                            contentContainerStyle={{ paddingBottom: 100 }}
+                                        >
+                                            <View style={yarnmanagementsystemstyle.formCard}>
 
-                                            <Text style={yarnmanagementsystemstyle.formTitle}>
-                                                Add Spun Main Item
-                                            </Text>
-
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Blend <Text style={{ color: 'red' }}>*</Text>
+                                                <Text style={yarnmanagementsystemstyle.formTitle}>
+                                                    Add Spun Main Item
                                                 </Text>
-                                                <PartyDropdownYarn
-                                                    data={blenddata}
-                                                    placeholder="Choose blend..."
-                                                    labelKey={["name", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedblend ?? []}
-                                                    selected={selectedblend ?? []}
-                                                    type="blend"
-                                                    multiple={true}
-                                                    onSelect={(items) => {
-                                                        console.log("selected items:", items);
-                                                        setselectedblend(items);
 
-                                                        const selectedIds = items.map(i => i.id);
-                                                        const selectedNames = items.map(i => i.name);
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Blend <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <PartyDropdownYarn
+                                                        data={blenddata}
+                                                        placeholder="Choose blend..."
+                                                        labelKey={["name", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedblend ?? []}
+                                                        selected={selectedblend ?? []}
+                                                        type="blend"
+                                                        multiple={true}
+                                                        onSelect={(items) => {
+                                                            console.log("selected items:", items);
+                                                            setselectedblend(items);
 
-                                                        setSpunForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                blend_id: selectedIds,   // array
-                                                                blend: selectedNames     // array
-                                                            };
+                                                            const selectedIds = items.map(i => i.id);
+                                                            const selectedNames = items.map(i => i.name);
 
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: buildMainItem(updated)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                                {/* <SearchableDropdown
+                                                            setSpunForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    blend_id: selectedIds,   // array
+                                                                    blend: selectedNames     // array
+                                                                };
+
+                                                                return {
+                                                                    ...updated,
+                                                                    linkitmcode: buildMainItem(updated)
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                    {/* <SearchableDropdown
                                                     data={blenddata}
                                                     // labelKey="PrpName"
                                                     labelKey={["name", "id"]}
@@ -2842,129 +3176,129 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                     multiple={true} // Enable multi-select
                                                     emptyMessage="No properties available"
                                                 /> */}
-                                            </View>
+                                                </View>
 
-                                            {/* Count */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Count Type <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
+                                                {/* Count */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Count Type <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
 
-                                                <PartyDropdown
-                                                    data={countdata}
-                                                    placeholder="Choose blend..."
-                                                    labelKey={["name", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedcount ?? null}
-                                                    selected={selectedcount ?? null}
-                                                    type="count"
-                                                    onSelect={(item) => {
-                                                        setselectedcount(item);
-                                                        setSpunForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                count_id: item?.id || '',
-                                                                count: item?.name || '',
-                                                                formula: item?.formula || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: buildMainItem(updated),
-                                                                denier: calculateDenier(updated, item?.formula)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                            </View>
-
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Count <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Count..."
-                                                        value={spunForm.count_no || ''}
-                                                        editable={true}
-                                                        // onChangeText={(text) => {
-                                                        //     setSpunForm(prev => ({
-                                                        //         ...prev,
-                                                        //         count: text
-                                                        //     }));
-                                                        // }}
-                                                        onChangeText={(text) => {
-                                                            const regex = /^[0-9]*$/;
-
-                                                            if (!regex.test(text)) return;
-
-                                                            // if (text !== '' && parseInt(text, 10) > 100) return;
-
+                                                    <PartyDropdown
+                                                        data={countdata}
+                                                        placeholder="Choose blend..."
+                                                        labelKey={["name", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedcount ?? null}
+                                                        selected={selectedcount ?? null}
+                                                        type="count"
+                                                        onSelect={(item) => {
+                                                            setselectedcount(item);
                                                             setSpunForm(prev => {
                                                                 const updated = {
                                                                     ...prev,
-                                                                    count_no: text
+                                                                    count_id: item?.id || '',
+                                                                    count: item?.name || '',
+                                                                    formula: item?.formula || ''
                                                                 };
-
-                                                                // 👇 calculation sirf textbox value se
                                                                 return {
                                                                     ...updated,
-                                                                    denier: calculateDenier(updated, prev.formula),
-                                                                    linkitmcode: buildMainItem(updated)
+                                                                    linkitmcode: buildMainItem(updated),
+                                                                    denier: calculateDenier(updated, item?.formula)
                                                                 };
                                                             });
-
-                                                        }}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
                                                         }}
                                                     />
                                                 </View>
-                                            </View>
+
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Count <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Count..."
+                                                            value={spunForm.count_no || ''}
+                                                            editable={true}
+                                                            // onChangeText={(text) => {
+                                                            //     setSpunForm(prev => ({
+                                                            //         ...prev,
+                                                            //         count: text
+                                                            //     }));
+                                                            // }}
+                                                            onChangeText={(text) => {
+                                                                const regex = /^[0-9]*$/;
+
+                                                                if (!regex.test(text)) return;
+
+                                                                // if (text !== '' && parseInt(text, 10) > 100) return;
+
+                                                                setSpunForm(prev => {
+                                                                    const updated = {
+                                                                        ...prev,
+                                                                        count_no: text
+                                                                    };
+
+                                                                    // 👇 calculation sirf textbox value se
+                                                                    return {
+                                                                        ...updated,
+                                                                        denier: calculateDenier(updated, prev.formula),
+                                                                        linkitmcode: buildMainItem(updated)
+                                                                    };
+                                                                });
+
+                                                            }}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
+                                                </View>
 
 
 
-                                            {/* Ply */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Ply <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
+                                                {/* Ply */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Ply <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
 
-                                                <PartyDropdown
-                                                    data={plydata}
-                                                    placeholder="Choose Ply..."
-                                                    labelKey={["ply", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedply ?? null}
-                                                    selected={selectedply ?? null}
-                                                    type="ply"
-                                                    onSelect={(item) => {
-                                                        setselectedply(item);
-                                                        setSpunForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                ply_id: item?.id || '',
-                                                                ply: item?.ply || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: buildMainItem(updated),
-                                                                denier: calculateDenier(updated, prev.formula)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                            </View>
+                                                    <PartyDropdown
+                                                        data={plydata}
+                                                        placeholder="Choose Ply..."
+                                                        labelKey={["ply", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedply ?? null}
+                                                        selected={selectedply ?? null}
+                                                        type="ply"
+                                                        onSelect={(item) => {
+                                                            setselectedply(item);
+                                                            setSpunForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    ply_id: item?.id || '',
+                                                                    ply: item?.ply || ''
+                                                                };
+                                                                return {
+                                                                    ...updated,
+                                                                    linkitmcode: buildMainItem(updated),
+                                                                    denier: calculateDenier(updated, prev.formula)
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                </View>
 
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Other
-                                                    {/* <Text style={{ color: 'red' }}>*</Text> */}
-                                                </Text>
-                                                {/* <PartyDropdown
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Other
+                                                        {/* <Text style={{ color: 'red' }}>*</Text> */}
+                                                    </Text>
+                                                    {/* <PartyDropdown
                                                     data={othersdata}
                                                     placeholder="Choose Others..."
                                                     labelKey={["name", "id"]}
@@ -2988,7 +3322,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                         });
                                                     }}
                                                 /> */}
-                                                {/* <View style={yarnmanagementsystemstyle.inputBox}>
+                                                    {/* <View style={yarnmanagementsystemstyle.inputBox}>
                                                     <TextInput
                                                         placeholder="Other..."
                                                         value={spunForm.others || ''}
@@ -3007,87 +3341,87 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                         }}
                                                     />
                                                 </View> */}
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Other..."
-                                                        value={spunForm.others || ''}
-                                                        editable={true}
-                                                        onChangeText={(text) =>
-                                                            // setFilamentForm(prev => ({
-                                                            //     ...prev,
-                                                            //     others: text
-                                                            // }))
-                                                            setSpunForm(prev => {
-                                                                const updated = {
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Other..."
+                                                            value={spunForm.others || ''}
+                                                            editable={true}
+                                                            onChangeText={(text) =>
+                                                                // setFilamentForm(prev => ({
+                                                                //     ...prev,
+                                                                //     others: text
+                                                                // }))
+                                                                setSpunForm(prev => {
+                                                                    const updated = {
+                                                                        ...prev,
+                                                                        others: text
+                                                                    };
+                                                                    return {
+                                                                        ...updated,
+                                                                        // denier: calculateDenier(updated),
+                                                                        linkitmcode: buildMainItem(updated),
+                                                                    };
+                                                                })
+                                                            }
+                                                            maxLength={200}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                                {/* Main Item */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Main Item <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Main Item..."
+                                                            value={spunForm.linkitmcode || ''}
+                                                            editable={true}
+                                                            onChangeText={(text) => {
+                                                                setSpunForm(prev => ({
                                                                     ...prev,
-                                                                    others: text
-                                                                };
-                                                                return {
-                                                                    ...updated,
-                                                                    // denier: calculateDenier(updated),
-                                                                    linkitmcode: buildMainItem(updated),
-                                                                };
-                                                            })
-                                                        }
-                                                        maxLength={200}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
+                                                                    linkitmcode: text
+                                                                }));
+
+                                                            }}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
                                                 </View>
-                                            </View>
 
-                                            {/* Main Item */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Main Item <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
+                                                {/* Denier */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Denier <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
 
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Main Item..."
-                                                        value={spunForm.linkitmcode || ''}
-                                                        editable={true}
-                                                        onChangeText={(text) => {
-                                                            setSpunForm(prev => ({
-                                                                ...prev,
-                                                                linkitmcode: text
-                                                            }));
-
-                                                        }}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Denier..."
+                                                            value={spunForm.denier}
+                                                            editable={false}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
                                                 </View>
-                                            </View>
 
-                                            {/* Denier */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Denier <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Denier..."
-                                                        value={spunForm.denier}
-                                                        editable={false}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
-                                                </View>
-                                            </View>
-
-                                            {/* Link Item */}
-                                            {/* <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                {/* Link Item */}
+                                                {/* <View style={yarnmanagementsystemstyle.inputGroup}>
                                                 <Text style={yarnmanagementsystemstyle.label}>
                                                     Link Item
                                                 </Text>
@@ -3112,8 +3446,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 />
                                             </View> */}
 
-                                        </View>
-                                    </ScrollView>
+                                            </View>
+                                        </ScrollView>
+                                    </KeyboardAvoidingView>
                                     <View style={{
                                         position: 'absolute',
                                         bottom: 0,
@@ -3203,7 +3538,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                         contentContainerStyle={{ paddingBottom: 20 }}
                                         showsVerticalScrollIndicator={false}
                                     >
-                                        {data.length === 0 ? (
+                                        {/* {data.length === 0 ? ( */}
+                                        {filteredData.length === 0 ? (
                                             <View style={yarnmanagementsystemstyle.emptyBox}>
                                                 <Text style={yarnmanagementsystemstyle.emptyText}>
                                                     No items yet..
@@ -3213,7 +3549,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 </Text>
                                             </View>
                                         ) : (
-                                            data.map((item, index) => (
+                                            // data.map((item, index) => (
+                                            filteredData.map((item, index) => (
                                                 <View key={item.id || index} style={yarnmanagementsystemstyle.cardWrapper}>
 
                                                     <LinearGradient
@@ -3297,7 +3634,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                                         WNameCode: item?.WNameCode || '',
                                                                         WBlend: selectedBlendId || '',
                                                                         WYarnType: item?.WYarnType || '',
-                                                                        mitmcode: item?.mitmcode || ''
+                                                                        mitmcode: item?.mitmcode || '',
+                                                                        WCounttype: item?.WCounttype || ''
                                                                     }));
                                                                     setShowSubItemCard(true);
                                                                 }}
@@ -3338,19 +3676,24 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                             {showFilamentCard && (
                                 <View style={{ flex: 1 }}>
-                                    <ScrollView
-                                        showsVerticalScrollIndicator={false}
-                                        style={{ marginTop: 0 }}
-                                        contentContainerStyle={{ paddingBottom: 100 }}
+                                    <KeyboardAvoidingView
+                                        // style={{ flex: 1 }}
+                                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                                        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
                                     >
-                                        <View style={yarnmanagementsystemstyle.formCard}>
+                                        <ScrollView
+                                            showsVerticalScrollIndicator={false}
+                                            style={{ marginTop: 0 }}
+                                            contentContainerStyle={{ paddingBottom: 100 }}
+                                        >
+                                            <View style={yarnmanagementsystemstyle.formCard}>
 
-                                            {/* 🔹 Heading */}
-                                            <Text style={yarnmanagementsystemstyle.formTitle}>
-                                                Add Filament Main Item
-                                            </Text>
+                                                {/* 🔹 Heading */}
+                                                <Text style={yarnmanagementsystemstyle.formTitle}>
+                                                    Add Filament Main Item
+                                                </Text>
 
-                                            {/* <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                {/* <View style={yarnmanagementsystemstyle.inputGroup}>
                                                 <Text style={yarnmanagementsystemstyle.label}>
                                                     Blend <Text style={{ color: 'red' }}>*</Text>
                                                 </Text>
@@ -3380,42 +3723,42 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 />
                                             </View> */}
 
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Blend <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <PartyDropdownYarn
-                                                    data={blenddata}
-                                                    placeholder="Choose blend..."
-                                                    labelKey={["name", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedfilamentblend ?? []}
-                                                    selected={selectedfilamentblend ?? []}
-                                                    type="blend"
-                                                    multiple={true}
-                                                    onSelect={(items) => {
-                                                        console.log("selected items:", items);
-                                                        setselectedblend(items);
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Blend <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <PartyDropdownYarn
+                                                        data={blenddata}
+                                                        placeholder="Choose blend..."
+                                                        labelKey={["name", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedfilamentblend ?? []}
+                                                        selected={selectedfilamentblend ?? []}
+                                                        type="blend"
+                                                        multiple={true}
+                                                        onSelect={(items) => {
+                                                            console.log("selected items:", items);
+                                                            setselectedblend(items);
 
-                                                        const selectedIds = items.map(i => i.id);
-                                                        const selectedNames = items.map(i => i.name);
+                                                            const selectedIds = items.map(i => i.id);
+                                                            const selectedNames = items.map(i => i.name);
 
-                                                        setFilamentForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                blend_id: selectedIds,   // array
-                                                                blend: selectedNames     // array
-                                                            };
+                                                            setFilamentForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    blend_id: selectedIds,   // array
+                                                                    blend: selectedNames     // array
+                                                                };
 
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: filamentbuildMainItem(updated)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                                {/* <SearchableDropdown
+                                                                return {
+                                                                    ...updated,
+                                                                    linkitmcode: filamentbuildMainItem(updated)
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                    {/* <SearchableDropdown
                                                     data={blenddata}
                                                     // labelKey="PrpName"
                                                     labelKey={["name", "id"]}
@@ -3433,186 +3776,186 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                     multiple={true} // Enable multi-select
                                                     emptyMessage="No properties available"
                                                 /> */}
-                                            </View>
+                                                </View>
 
-                                            {/* Count */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Count Type<Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
+                                                {/* Count */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Count Type<Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
 
-                                                <PartyDropdown
-                                                    data={countdata}
-                                                    placeholder="Choose blend..."
-                                                    labelKey={["name", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedfilamentcount ?? null}
-                                                    selected={selectedfilamentcount ?? null}
-                                                    type="count"
-                                                    onSelect={(item) => {
-                                                        setselectedfilamentcount(item);
-                                                        setFilamentForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                count_id: item?.id || '',
-                                                                count: item?.name || '',
-                                                                formula: item?.formula || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: filamentbuildMainItem(updated),
-                                                                denier: calculatefilamentDenier(updated, item?.formula)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                            </View>
-
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Count <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Count..."
-                                                        value={filamentForm.count_no || ''}
-                                                        editable={true}
-                                                        // onChangeText={(text) => {
-                                                        //     setSpunForm(prev => ({
-                                                        //         ...prev,
-                                                        //         count: text
-                                                        //     }));
-                                                        // }}
-                                                        onChangeText={(text) => {
-                                                            const regex = /^[0-9]*$/;
-
-                                                            if (!regex.test(text)) return;
-
-                                                            // if (text !== '' && parseInt(text, 10) > 100) return;
-
+                                                    <PartyDropdown
+                                                        data={countdata}
+                                                        placeholder="Choose blend..."
+                                                        labelKey={["name", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedfilamentcount ?? null}
+                                                        selected={selectedfilamentcount ?? null}
+                                                        type="count"
+                                                        onSelect={(item) => {
+                                                            setselectedfilamentcount(item);
                                                             setFilamentForm(prev => {
                                                                 const updated = {
                                                                     ...prev,
-                                                                    count_no: text
+                                                                    count_id: item?.id || '',
+                                                                    count: item?.name || '',
+                                                                    formula: item?.formula || ''
                                                                 };
+                                                                return {
+                                                                    ...updated,
+                                                                    linkitmcode: filamentbuildMainItem(updated),
+                                                                    denier: calculatefilamentDenier(updated, item?.formula)
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                </View>
 
-                                                                // 👇 calculation sirf textbox value se
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Count <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Count..."
+                                                            value={filamentForm.count_no || ''}
+                                                            editable={true}
+                                                            // onChangeText={(text) => {
+                                                            //     setSpunForm(prev => ({
+                                                            //         ...prev,
+                                                            //         count: text
+                                                            //     }));
+                                                            // }}
+                                                            onChangeText={(text) => {
+                                                                const regex = /^[0-9]*$/;
+
+                                                                if (!regex.test(text)) return;
+
+                                                                // if (text !== '' && parseInt(text, 10) > 100) return;
+
+                                                                setFilamentForm(prev => {
+                                                                    const updated = {
+                                                                        ...prev,
+                                                                        count_no: text
+                                                                    };
+
+                                                                    // 👇 calculation sirf textbox value se
+                                                                    return {
+                                                                        ...updated,
+                                                                        linkitmcode: filamentbuildMainItem(updated),
+                                                                        denier: calculatefilamentDenier(updated, prev.formula)
+                                                                    };
+                                                                });
+
+                                                            }}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                                {/* Ply */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Ply <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <PartyDropdown
+                                                        data={plydata}
+                                                        placeholder="Choose Ply..."
+                                                        labelKey={["ply", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedfilamentply ?? null}
+                                                        selected={selectedfilamentply ?? null}
+                                                        type="ply"
+                                                        onSelect={(item) => {
+                                                            setselectedfilamentply(item);
+                                                            setFilamentForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    ply_id: item?.id || '',
+                                                                    ply: item?.ply || ''
+                                                                };
                                                                 return {
                                                                     ...updated,
                                                                     linkitmcode: filamentbuildMainItem(updated),
                                                                     denier: calculatefilamentDenier(updated, prev.formula)
                                                                 };
                                                             });
-
-                                                        }}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
                                                         }}
                                                     />
                                                 </View>
-                                            </View>
 
-                                            {/* Ply */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Ply <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <PartyDropdown
-                                                    data={plydata}
-                                                    placeholder="Choose Ply..."
-                                                    labelKey={["ply", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedfilamentply ?? null}
-                                                    selected={selectedfilamentply ?? null}
-                                                    type="ply"
-                                                    onSelect={(item) => {
-                                                        setselectedfilamentply(item);
-                                                        setFilamentForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                ply_id: item?.id || '',
-                                                                ply: item?.ply || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: filamentbuildMainItem(updated),
-                                                                denier: calculatefilamentDenier(updated, prev.formula)
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                            </View>
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Filament Type <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <PartyDropdown
+                                                        data={typedata}
+                                                        placeholder="Choose Type..."
+                                                        labelKey={["type", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedtype ?? null}
+                                                        selected={selectedtype ?? null}
+                                                        type="type"
+                                                        onSelect={(item) => {
+                                                            setselectedtype(item);
+                                                            setFilamentForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    type_id: item?.id || '',
+                                                                    type: item?.type || ''
+                                                                };
+                                                                return {
+                                                                    ...updated,
+                                                                    linkitmcode: filamentbuildMainItem(updated),
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                </View>
 
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Filament Type <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <PartyDropdown
-                                                    data={typedata}
-                                                    placeholder="Choose Type..."
-                                                    labelKey={["type", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedtype ?? null}
-                                                    selected={selectedtype ?? null}
-                                                    type="type"
-                                                    onSelect={(item) => {
-                                                        setselectedtype(item);
-                                                        setFilamentForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                type_id: item?.id || '',
-                                                                type: item?.type || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: filamentbuildMainItem(updated),
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                            </View>
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Lustre <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+                                                    <PartyDropdown
+                                                        data={lustredata}
+                                                        placeholder="Choose lustre..."
+                                                        labelKey={["lustre", "id"]}
+                                                        valueKey="id"
+                                                        pageSize={12}
+                                                        initialValue={selectedlustre ?? null}
+                                                        selected={selectedlustre ?? null}
+                                                        type="lustre"
+                                                        onSelect={(item) => {
+                                                            setselectedlustre(item);
+                                                            setFilamentForm(prev => {
+                                                                const updated = {
+                                                                    ...prev,
+                                                                    lustre_id: item?.id || '',
+                                                                    lustre: item?.lustre || ''
+                                                                };
+                                                                return {
+                                                                    ...updated,
+                                                                    linkitmcode: filamentbuildMainItem(updated),
+                                                                };
+                                                            });
+                                                        }}
+                                                    />
+                                                </View>
 
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Lustre <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-                                                <PartyDropdown
-                                                    data={lustredata}
-                                                    placeholder="Choose lustre..."
-                                                    labelKey={["lustre", "id"]}
-                                                    valueKey="id"
-                                                    pageSize={12}
-                                                    initialValue={selectedlustre ?? null}
-                                                    selected={selectedlustre ?? null}
-                                                    type="lustre"
-                                                    onSelect={(item) => {
-                                                        setselectedlustre(item);
-                                                        setFilamentForm(prev => {
-                                                            const updated = {
-                                                                ...prev,
-                                                                lustre_id: item?.id || '',
-                                                                lustre: item?.lustre || ''
-                                                            };
-                                                            return {
-                                                                ...updated,
-                                                                linkitmcode: filamentbuildMainItem(updated),
-                                                            };
-                                                        });
-                                                    }}
-                                                />
-                                            </View>
-
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Other
-                                                    {/* <Text style={{ color: 'red' }}>*</Text> */}
-                                                </Text>
-                                                {/* <PartyDropdown
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Other
+                                                        {/* <Text style={{ color: 'red' }}>*</Text> */}
+                                                    </Text>
+                                                    {/* <PartyDropdown
                                                     data={othersdata}
                                                     placeholder="Choose Others..."
                                                     labelKey={["name", "id"]}
@@ -3636,86 +3979,86 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                         });
                                                     }}
                                                 /> */}
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Other..."
-                                                        value={filamentForm.others || ''}
-                                                        editable={true}
-                                                        onChangeText={(text) =>
-                                                            // setFilamentForm(prev => ({
-                                                            //     ...prev,
-                                                            //     others: text
-                                                            // }))
-                                                            setFilamentForm(prev => {
-                                                                const updated = {
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Other..."
+                                                            value={filamentForm.others || ''}
+                                                            editable={true}
+                                                            onChangeText={(text) =>
+                                                                // setFilamentForm(prev => ({
+                                                                //     ...prev,
+                                                                //     others: text
+                                                                // }))
+                                                                setFilamentForm(prev => {
+                                                                    const updated = {
+                                                                        ...prev,
+                                                                        others: text
+                                                                    };
+                                                                    return {
+                                                                        ...updated,
+                                                                        // denier: calculateDenier(updated),
+                                                                        linkitmcode: filamentbuildMainItem(updated)
+                                                                    };
+                                                                })
+                                                            }
+                                                            maxLength={200}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
+                                                </View>
+
+                                                {/* Main Item */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Main Item <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
+
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Main Item..."
+                                                            value={filamentForm.linkitmcode || ''}
+                                                            editable={true}
+                                                            onChangeText={(text) =>
+                                                                setFilamentForm(prev => ({
                                                                     ...prev,
-                                                                    others: text
-                                                                };
-                                                                return {
-                                                                    ...updated,
-                                                                    // denier: calculateDenier(updated),
-                                                                    linkitmcode: filamentbuildMainItem(updated)
-                                                                };
-                                                            })
-                                                        }
-                                                        maxLength={200}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
+                                                                    linkitmcode: text
+                                                                }))
+                                                            }
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
                                                 </View>
-                                            </View>
 
-                                            {/* Main Item */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Main Item <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
+                                                {/* Denier */}
+                                                <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                    <Text style={yarnmanagementsystemstyle.label}>
+                                                        Denier <Text style={{ color: 'red' }}>*</Text>
+                                                    </Text>
 
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Main Item..."
-                                                        value={filamentForm.linkitmcode || ''}
-                                                        editable={true}
-                                                        onChangeText={(text) =>
-                                                            setFilamentForm(prev => ({
-                                                                ...prev,
-                                                                linkitmcode: text
-                                                            }))
-                                                        }
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
+                                                    <View style={yarnmanagementsystemstyle.inputBox}>
+                                                        <TextInput
+                                                            placeholder="Denier..."
+                                                            value={filamentForm.denier}
+                                                            editable={false}
+                                                            style={{
+                                                                color: '#000',
+                                                                opacity: 1,
+                                                                height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                                            }}
+                                                        />
+                                                    </View>
                                                 </View>
-                                            </View>
 
-                                            {/* Denier */}
-                                            <View style={yarnmanagementsystemstyle.inputGroup}>
-                                                <Text style={yarnmanagementsystemstyle.label}>
-                                                    Denier <Text style={{ color: 'red' }}>*</Text>
-                                                </Text>
-
-                                                <View style={yarnmanagementsystemstyle.inputBox}>
-                                                    <TextInput
-                                                        placeholder="Denier..."
-                                                        value={filamentForm.denier}
-                                                        editable={false}
-                                                        style={{
-                                                            color: '#000',
-                                                            opacity: 1,
-                                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                                        }}
-                                                    />
-                                                </View>
-                                            </View>
-
-                                            {/* Link Item */}
-                                            {/* <View style={yarnmanagementsystemstyle.inputGroup}>
+                                                {/* Link Item */}
+                                                {/* <View style={yarnmanagementsystemstyle.inputGroup}>
                                                 <Text style={yarnmanagementsystemstyle.label}>
                                                     Link Item
                                                 </Text>
@@ -3739,9 +4082,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 />
                                             </View> */}
 
-                                        </View>
-                                    </ScrollView>
-
+                                            </View>
+                                        </ScrollView>
+                                    </KeyboardAvoidingView>
                                     <View style={{
                                         position: 'absolute',
                                         bottom: 0,

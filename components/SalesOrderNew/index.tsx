@@ -39,6 +39,44 @@ const moneyShort = v => {
 };
 const fmt = (v, dec = 2) => Number(v || 0).toFixed(dec);
 
+const currentFyNo = () => {
+    const d = new Date();
+    const endYear = d.getMonth() >= 3 ? d.getFullYear() + 1 : d.getFullYear();
+    return String(endYear % 100).padStart(2, '0');
+};
+
+const parseErpDate = (value) => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+    const raw = String(value || '').trim();
+    const digits = raw.replace(/\D/g, '');
+
+    if (digits.length === 8) {
+        const startsWithYear = Number(digits.slice(0, 4)) >= 1900;
+        const year = startsWithYear ? Number(digits.slice(0, 4)) : Number(digits.slice(4, 8));
+        const month = startsWithYear ? Number(digits.slice(4, 6)) : Number(digits.slice(2, 4));
+        const day = startsWithYear ? Number(digits.slice(6, 8)) : Number(digits.slice(0, 2));
+        const parsed = new Date(year, month - 1, day);
+
+        if (
+            parsed.getFullYear() === year &&
+            parsed.getMonth() === month - 1 &&
+            parsed.getDate() === day
+        ) {
+            return parsed;
+        }
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
+const decimalInput = (value) => {
+    const cleaned = String(value || '').replace(/[^0-9.]/g, '');
+    const [whole, ...fraction] = cleaned.split('.');
+    return fraction.length ? `${whole}.${fraction.join('')}` : whole;
+};
+
 const authHdr = token => ({
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
@@ -1036,9 +1074,894 @@ function NewOrderTab({ token, userid }) {
     );
 }
 
-// ── ─────────────────────────────────────────────────────────────
-//    AUTH TAB
-// ── ─────────────────────────────────────────────────────────────
+function AuthOrderModal({
+    visible,
+    mode,
+    record,
+    saving,
+    token,
+    prpcode,
+    yearno,
+    onClose,
+    onSave,
+}) {
+    const isEdit = mode === 'edit';
+    const [dueDate, setDueDate] = useState(new Date());
+    const [showDueDate, setShowDueDate] = useState(false);
+    const [remark, setRemark] = useState('');
+    const [rows, setRows] = useState([]);
+    const [removedRows, setRemovedRows] = useState([]);
+    const [showAddCombination, setShowAddCombination] = useState(false);
+
+    const [addDesignList, setAddDesignList] = useState([]);
+    const [addDesignLoading, setAddDesignLoading] = useState(false);
+    const [addDesignSearch, setAddDesignSearch] = useState('');
+    const [showAddDesignPicker, setShowAddDesignPicker] = useState(false);
+    const [addDesign, setAddDesign] = useState(null);
+
+    const [addItemList, setAddItemList] = useState([]);
+    const [addItemLoading, setAddItemLoading] = useState(false);
+    const [addItemSearch, setAddItemSearch] = useState('');
+    const [showAddItemPicker, setShowAddItemPicker] = useState(false);
+    const [addItem, setAddItem] = useState(null);
+
+    const [addShadeList, setAddShadeList] = useState([]);
+    const [addShadeLoading, setAddShadeLoading] = useState(false);
+    const [addShadeSearch, setAddShadeSearch] = useState('');
+    const [showAddShadePicker, setShowAddShadePicker] = useState(false);
+    const [addShade, setAddShade] = useState(null);
+    const [addQty, setAddQty] = useState('');
+    const [addRate, setAddRate] = useState('');
+
+    const editPrpCode = record?.PrpCode || prpcode || '';
+    const editYearNo = record?.yearno || record?.YearNo || yearno || currentFyNo();
+    const editStrCode = record?.StrCode || '012';
+
+    const resetCombinationBuilder = () => {
+        setShowAddCombination(false);
+        setAddDesignList([]);
+        setAddDesignLoading(false);
+        setAddDesignSearch('');
+        setShowAddDesignPicker(false);
+        setAddDesign(null);
+        setAddItemList([]);
+        setAddItemLoading(false);
+        setAddItemSearch('');
+        setShowAddItemPicker(false);
+        setAddItem(null);
+        setAddShadeList([]);
+        setAddShadeLoading(false);
+        setAddShadeSearch('');
+        setShowAddShadePicker(false);
+        setAddShade(null);
+        setAddQty('');
+        setAddRate('');
+    };
+
+    useEffect(() => {
+        if (!visible || !record) return;
+
+        setDueDate(parseErpDate(record.DueDate || record.dduedate));
+        setRemark(String(record.Remark || ''));
+        setRows((Array.isArray(record.d1) ? record.d1 : []).map((row, index) => ({
+            ...row,
+            _qty: String(parseNum(row.Qty) || ''),
+            _rate: String(parseNum(row.UnitRate) || ''),
+            _clientKey: `existing_${row.SrNo || 0}_${row.ItmCode || 0}_${row.DsnCode || 0}_${row.ShdCode || 0}`,
+            _originalIndex: index,
+            _isNew: false,
+        })));
+        setRemovedRows([]);
+        setShowDueDate(false);
+        resetCombinationBuilder();
+    }, [visible, record, mode]);
+
+    const loadAddDesigns = async () => {
+        if (!editPrpCode || !token) {
+            Alert.alert('Unable to add item', 'Property or login information is missing.');
+            return;
+        }
+
+        try {
+            setAddDesignLoading(true);
+            const res = await axios.get(`${API}/api/getitem`, {
+                headers: authHdr(token),
+                params: {
+                    prpcode: editPrpCode,
+                    strcode: editStrCode,
+                    yearno: editYearNo,
+                },
+            });
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+            setAddDesignList(Array.isArray(data) ? data : []);
+        } catch (e) {
+            setAddDesignList([]);
+            Alert.alert(
+                'Unable to load items',
+                e?.response?.data?.message || e?.message || 'Please try again.'
+            );
+        } finally {
+            setAddDesignLoading(false);
+        }
+    };
+
+    const openCombinationBuilder = () => {
+        if (!isEdit || saving) return;
+        setShowAddCombination(true);
+        if (addDesignList.length === 0 && !addDesignLoading) loadAddDesigns();
+    };
+
+    const selectAddDesign = async (design) => {
+        setAddDesign(design);
+        setAddItem(null);
+        setAddShade(null);
+        setAddItemList([]);
+        setAddShadeList([]);
+
+        if (!design?.ItmCode) return;
+
+        try {
+            setAddItemLoading(true);
+            const res = await axios.get(`${API}/api/getdesign`, {
+                headers: authHdr(token),
+                params: {
+                    prpcode: editPrpCode,
+                    strcode: editStrCode,
+                    yearno: editYearNo,
+                    itmcode: design.ItmCode,
+                    mitmcode: design.MItmCode || design.ItmCode,
+                    txntype: 'mob_app_sales_order',
+                },
+            });
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+            setAddItemList(Array.isArray(data) ? data : []);
+        } catch (e) {
+            setAddItemList([]);
+            Alert.alert(
+                'Unable to load designs',
+                e?.response?.data?.message || e?.message || 'Please try again.'
+            );
+        } finally {
+            setAddItemLoading(false);
+        }
+    };
+
+    const selectAddItem = async (item) => {
+        setAddItem(item);
+        setAddShade(null);
+        setAddShadeList([]);
+
+        if (!addDesign?.ItmCode || !item?.DsnCode) return;
+
+        try {
+            setAddShadeLoading(true);
+            const res = await axios.get(`${API}/api/getshade`, {
+                headers: authHdr(token),
+                params: {
+                    prpcode: editPrpCode,
+                    strcode: editStrCode,
+                    yearno: editYearNo,
+                    itmcode: addDesign.ItmCode,
+                    mitmcode: addDesign.MItmCode || addDesign.ItmCode,
+                    dsncode: item.DsnCode,
+                },
+            });
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+            setAddShadeList(Array.isArray(data) ? data : []);
+        } catch (e) {
+            setAddShadeList([]);
+            Alert.alert(
+                'Unable to load shades',
+                e?.response?.data?.message || e?.message || 'Please try again.'
+            );
+        } finally {
+            setAddShadeLoading(false);
+        }
+    };
+
+    const addItemCombination = () => {
+        const qty = parseNum(addQty);
+        const rate = parseNum(addRate);
+
+        if (!addDesign) {
+            Alert.alert('Item required', 'Select an item.');
+            return;
+        }
+        if (!addItem) {
+            Alert.alert('Design required', 'Select a design.');
+            return;
+        }
+        if (!addShade) {
+            Alert.alert('Shade required', 'Select a shade.');
+            return;
+        }
+        if (qty <= 0 || rate <= 0) {
+            Alert.alert('Quantity and rate required', 'Enter quantity and rate greater than zero.');
+            return;
+        }
+
+        const duplicate = rows.some(row => (
+            String(row.ItmCode || '') === String(addDesign.ItmCode || '') &&
+            String(row.DsnCode || '') === String(addItem.DsnCode || '') &&
+            String(row.ShdCode || '') === String(addShade.ShdCode || '')
+        ));
+
+        if (duplicate) {
+            Alert.alert(
+                'Combination already exists',
+                'This item, design and shade combination is already present in the order.'
+            );
+            return;
+        }
+
+        const nextSrNo = rows.reduce(
+            (highest, row) => Math.max(highest, Number(row.SrNo || 0)),
+            0
+        ) + 1;
+        const amount = qty * rate;
+        const clientKey = `new_${Date.now()}_${nextSrNo}`;
+
+        setRows(previous => [...previous, {
+            _clientKey: clientKey,
+            _isNew: true,
+            SrNo: nextSrNo,
+            StrCode: editStrCode,
+            ItmCode: addDesign.ItmCode,
+            MItmCode: addDesign.MItmCode || addDesign.ItmCode,
+            ItmName: addDesign.ItmName,
+            DsnCode: addItem.DsnCode,
+            DsnName: addItem.DsnName,
+            ShdCode: addShade.ShdCode,
+            ShdName: addShade.ShdName || addShade.ShadeName,
+            ShdColor: addShade.ShdColor || '',
+            Qty: fmt(qty, 3),
+            _qty: String(qty),
+            QtyPcs: '0',
+            SQty: fmt(qty, 3),
+            SQtyPcs: '0',
+            BQty: fmt(qty, 3),
+            BQtyPcs: '0',
+            UnitRate: fmt(rate, 5),
+            _rate: String(rate),
+            Amount: fmt(amount),
+            D1NetAmt: fmt(amount),
+            Remark1: '',
+            Remark2: '',
+            Remark3: '',
+            Remark4: '',
+            Remark5: '',
+            PkgQty: '1.000',
+            PkgRate: '.00000',
+            AmtCalc: 'U',
+            MerCode: '0',
+            GrdCode: '0',
+            DisPer: '.00',
+            DisAmt: '.00',
+            CGSTPer: '.00',
+            CGSTAmt: '.00',
+            SGSTPer: '.00',
+            SGSTAmt: '.00',
+            IGSTPer: '.00',
+            IGSTAmt: '.00',
+            Denier: addDesign.Denier || '',
+            UOM: addDesign.UOM || '',
+            HsnCode: addDesign.HsnCode || addDesign.HSNCode || '',
+            HSNName: addDesign.HSNName || '',
+        }]);
+
+        setShowAddCombination(false);
+        setAddDesign(null);
+        setAddItem(null);
+        setAddShade(null);
+        setAddItemList([]);
+        setAddShadeList([]);
+        setAddDesignSearch('');
+        setAddItemSearch('');
+        setAddShadeSearch('');
+        setAddQty('');
+        setAddRate('');
+    };
+
+    const removeRow = (row) => {
+        if (!isEdit || saving) return;
+
+        if (row._isNew) {
+            setRows(previous => previous.filter(item => item._clientKey !== row._clientKey));
+            return;
+        }
+
+        Alert.alert(
+            'Remove item row?',
+            `${row.ItmName || 'This item'} · ${row.DsnName || 'Design'} · ${row.ShdName || 'Shade'}\n\nThe row will be deleted only after Update Order succeeds.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove row',
+                    style: 'destructive',
+                    onPress: () => {
+                        setRows(previous => previous.filter(
+                            item => item._clientKey !== row._clientKey
+                        ));
+                        setRemovedRows(previous => (
+                            previous.some(item => item._clientKey === row._clientKey)
+                                ? previous
+                                : [...previous, row]
+                        ));
+                    },
+                },
+            ]
+        );
+    };
+
+    const restoreRemovedRows = () => {
+        if (!isEdit || saving || removedRows.length === 0) return;
+
+        setRows(previous => [...previous, ...removedRows].sort((left, right) => {
+            const leftIndex = Number.isFinite(left._originalIndex)
+                ? left._originalIndex
+                : Number.MAX_SAFE_INTEGER;
+            const rightIndex = Number.isFinite(right._originalIndex)
+                ? right._originalIndex
+                : Number.MAX_SAFE_INTEGER;
+            return leftIndex - rightIndex;
+        }));
+        setRemovedRows([]);
+    };
+
+    const updateRow = (index, field, value) => {
+        if (!isEdit) return;
+        setRows(previous => previous.map((row, rowIndex) => (
+            rowIndex === index ? { ...row, [field]: decimalInput(value) } : row
+        )));
+    };
+
+    const totalQty = rows.reduce((sum, row) => sum + parseNum(row._qty), 0);
+    const totalAmount = rows.reduce(
+        (sum, row) => sum + (parseNum(row._qty) * parseNum(row._rate)),
+        0
+    );
+
+    const submit = () => {
+        if (!isEdit || saving) return;
+
+        const invalidIndex = rows.findIndex(
+            row => parseNum(row._qty) <= 0 || parseNum(row._rate) <= 0
+        );
+
+        if (rows.length === 0) {
+            Alert.alert('Cannot update', 'This sales order does not contain any item rows.');
+            return;
+        }
+
+        if (invalidIndex >= 0) {
+            Alert.alert(
+                'Invalid quantity or rate',
+                `Enter a quantity and rate greater than zero in item ${invalidIndex + 1}.`
+            );
+            return;
+        }
+
+        const save = () => onSave({
+            dueDate,
+            remark: remark.trim(),
+            rows,
+            removedRows,
+        });
+
+        if (removedRows.length > 0) {
+            const addedCount = rows.filter(row => row._isNew).length;
+            const changeParts = [
+                `${removedRows.length} existing D1 row${removedRows.length === 1 ? '' : 's'} will be deleted`,
+            ];
+            if (addedCount > 0) {
+                changeParts.push(`${addedCount} new row${addedCount === 1 ? '' : 's'} will be added`);
+            }
+            Alert.alert(
+                'Update sales order?',
+                `${changeParts.join(' and ')}.`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Update Order', onPress: save },
+                ]
+            );
+            return;
+        }
+
+        save();
+    };
+
+    if (!record) return null;
+
+    return (
+        <Modal
+            visible={visible}
+            animationType="slide"
+            presentationStyle="fullScreen"
+            onRequestClose={() => !saving && onClose()}
+        >
+            <SafeAreaView style={A.modalSafe} edges={['top', 'bottom']}>
+                <View style={A.modalHeader}>
+                    <TouchableOpacity
+                        style={A.modalCloseBtn}
+                        onPress={onClose}
+                        disabled={saving}
+                        activeOpacity={0.75}
+                    >
+                        <Icon name="arrow-back" size={22} color="#fff" />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                        <Text style={A.modalTitle}>{isEdit ? 'Edit Sales Order' : 'View Sales Order'}</Text>
+                        <Text style={A.modalSubTitle}>{record.SONo || '—'}</Text>
+                    </View>
+                    <View style={[A.modeBadge, isEdit ? A.modeBadgeEdit : A.modeBadgeView]}>
+                        <Text style={[A.modeBadgeText, isEdit ? A.modeBadgeTextEdit : A.modeBadgeTextView]}>
+                            {isEdit ? 'EDIT' : 'VIEW ONLY'}
+                        </Text>
+                    </View>
+                </View>
+
+                <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={A.modalContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {!isEdit && (
+                        <View style={A.readOnlyBanner}>
+                            <Icon name="visibility" size={18} color="#1D4ED8" />
+                            <Text style={A.readOnlyText}>
+                                View mode is read-only. No value can be changed or saved.
+                            </Text>
+                        </View>
+                    )}
+
+                    <View style={A.infoCard}>
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Customer</Text>
+                            <Text style={A.infoValue}>{record.ParName || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Sales executive</Text>
+                            <Text style={A.infoValue}>{record.SexecName || record.SExeName || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Order date</Text>
+                            <Text style={A.infoValue}>{record.SODate || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Status</Text>
+                            <Text style={A.infoValue}>{record.AuthStatus || 'Pending'}</Text>
+                        </View>
+                    </View>
+
+                    <Text style={A.formLabel}>Expected delivery date</Text>
+                    <TouchableOpacity
+                        style={[A.formInputWrap, !isEdit && A.formInputReadOnly]}
+                        onPress={() => isEdit && setShowDueDate(true)}
+                        disabled={!isEdit}
+                        activeOpacity={0.75}
+                    >
+                        <Icon name="event" size={19} color={isEdit ? '#13879A' : '#64748B'} />
+                        <Text style={[A.formInputText, !isEdit && A.formInputTextReadOnly]}>
+                            {fmtDisplay(dueDate)}
+                        </Text>
+                        {isEdit && <Icon name="chevron-right" size={20} color="#94A3B8" />}
+                    </TouchableOpacity>
+
+                    <View style={A.itemsHeader}>
+                        <Text style={A.itemsTitle}>Items</Text>
+                        <Text style={A.itemsCount}>{rows.length} row{rows.length === 1 ? '' : 's'}</Text>
+                    </View>
+
+                    {isEdit && !showAddCombination && (
+                        <TouchableOpacity
+                            style={A.addCombinationOpenBtn}
+                            onPress={openCombinationBuilder}
+                            disabled={saving}
+                            activeOpacity={0.8}
+                        >
+                            <Icon name="add-circle-outline" size={20} color="#0F766E" />
+                            <Text style={A.addCombinationOpenText}>Add item combination</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {isEdit && removedRows.length > 0 && (
+                        <View style={A.removedRowsBanner}>
+                            <View style={A.removedRowsIcon}>
+                                <Icon name="delete-sweep" size={19} color="#B91C1C" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={A.removedRowsTitle}>
+                                    {removedRows.length} row{removedRows.length === 1 ? '' : 's'} will be deleted
+                                </Text>
+                                <Text style={A.removedRowsText}>
+                                    Deletion happens only after Update Order succeeds.
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={A.restoreRowsBtn}
+                                onPress={restoreRemovedRows}
+                                disabled={saving}
+                                accessibilityRole="button"
+                                accessibilityLabel="Undo all removed rows"
+                            >
+                                <Icon name="undo" size={17} color="#1D4ED8" />
+                                <Text style={A.restoreRowsText}>Undo all</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {isEdit && showAddCombination && (
+                        <View style={A.addCombinationCard}>
+                            <View style={A.addCombinationHeader}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={A.addCombinationTitle}>New item combination</Text>
+                                    <Text style={A.addCombinationSubTitle}>
+                                        Select Item, Design and Shade
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={A.addCombinationCloseBtn}
+                                    onPress={() => setShowAddCombination(false)}
+                                    disabled={saving}
+                                >
+                                    <Icon name="close" size={20} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={A.addCombinationLabel}>ITEM</Text>
+                            <TouchableOpacity
+                                style={A.addCombinationPicker}
+                                onPress={() => setShowAddDesignPicker(true)}
+                                disabled={saving || addDesignLoading}
+                                activeOpacity={0.8}
+                            >
+                                <Text
+                                    style={[
+                                        A.addCombinationPickerText,
+                                        !addDesign && A.addCombinationPlaceholder,
+                                    ]}
+                                    numberOfLines={2}
+                                >
+                                    {addDesign?.ItmName || 'Select item'}
+                                </Text>
+                                {addDesignLoading ? (
+                                    <ActivityIndicator size="small" color="#13879A" />
+                                ) : (
+                                    <Icon name="keyboard-arrow-down" size={21} color="#64748B" />
+                                )}
+                            </TouchableOpacity>
+
+                            <Text style={A.addCombinationLabel}>DESIGN</Text>
+                            <TouchableOpacity
+                                style={[
+                                    A.addCombinationPicker,
+                                    !addDesign && A.addCombinationPickerDisabled,
+                                ]}
+                                onPress={() => setShowAddItemPicker(true)}
+                                disabled={saving || !addDesign || addItemLoading}
+                                activeOpacity={0.8}
+                            >
+                                <Text
+                                    style={[
+                                        A.addCombinationPickerText,
+                                        !addItem && A.addCombinationPlaceholder,
+                                    ]}
+                                    numberOfLines={2}
+                                >
+                                    {addItem
+                                        ? `${addItem.DsnCode} · ${addItem.DsnName}`
+                                        : 'Select design'}
+                                </Text>
+                                {addItemLoading ? (
+                                    <ActivityIndicator size="small" color="#13879A" />
+                                ) : (
+                                    <Icon name="keyboard-arrow-down" size={21} color="#64748B" />
+                                )}
+                            </TouchableOpacity>
+
+                            <Text style={A.addCombinationLabel}>SHADE</Text>
+                            <TouchableOpacity
+                                style={[
+                                    A.addCombinationPicker,
+                                    !addItem && A.addCombinationPickerDisabled,
+                                ]}
+                                onPress={() => setShowAddShadePicker(true)}
+                                disabled={saving || !addItem || addShadeLoading}
+                                activeOpacity={0.8}
+                            >
+                                <View style={A.addCombinationShadeValue}>
+                                    {addShade && (
+                                        <View style={[
+                                            A.addCombinationShadeSwatch,
+                                            { backgroundColor: addShade.ShdColor || '#CBD5E1' },
+                                        ]} />
+                                    )}
+                                    <Text
+                                        style={[
+                                            A.addCombinationPickerText,
+                                            !addShade && A.addCombinationPlaceholder,
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {addShade?.ShdName || addShade?.ShadeName || 'Select shade'}
+                                    </Text>
+                                </View>
+                                {addShadeLoading ? (
+                                    <ActivityIndicator size="small" color="#13879A" />
+                                ) : (
+                                    <Icon name="keyboard-arrow-down" size={21} color="#64748B" />
+                                )}
+                            </TouchableOpacity>
+
+                            <View style={A.addCombinationFieldsRow}>
+                                <View style={A.addCombinationFieldCol}>
+                                    <Text style={A.addCombinationLabel}>QUANTITY</Text>
+                                    <TextInput
+                                        value={addQty}
+                                        onChangeText={value => setAddQty(decimalInput(value))}
+                                        editable={!saving}
+                                        keyboardType="decimal-pad"
+                                        style={A.addCombinationInput}
+                                        placeholder="0.000"
+                                        placeholderTextColor="#94A3B8"
+                                    />
+                                </View>
+                                <View style={A.addCombinationFieldCol}>
+                                    <Text style={A.addCombinationLabel}>RATE / M</Text>
+                                    <TextInput
+                                        value={addRate}
+                                        onChangeText={value => setAddRate(decimalInput(value))}
+                                        editable={!saving}
+                                        keyboardType="decimal-pad"
+                                        style={A.addCombinationInput}
+                                        placeholder="0.00"
+                                        placeholderTextColor="#94A3B8"
+                                    />
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[
+                                    A.addCombinationConfirmBtn,
+                                    (!addDesign || !addItem || !addShade ||
+                                        parseNum(addQty) <= 0 || parseNum(addRate) <= 0 || saving) &&
+                                        A.actionDisabled,
+                                ]}
+                                onPress={addItemCombination}
+                                disabled={
+                                    saving || !addDesign || !addItem || !addShade ||
+                                    parseNum(addQty) <= 0 || parseNum(addRate) <= 0
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="add" size={19} color="#fff" />
+                                <Text style={A.addCombinationConfirmText}>Add to order</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {rows.map((row, index) => {
+                        const rowAmount = parseNum(row._qty) * parseNum(row._rate);
+                        return (
+                            <View
+                                key={row._clientKey || `${row.SrNo || index}_${row.ShdCode || index}`}
+                                style={[A.editItemCard, row._isNew && A.editItemCardNew]}
+                            >
+                                <View style={A.editItemTop}>
+                                    <View style={A.editItemIndex}>
+                                        <Text style={A.editItemIndexText}>{index + 1}</Text>
+                                    </View>
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text style={A.editItemDesign}>{row.DsnName || 'Design'}</Text>
+                                        <Text style={A.editItemMeta} numberOfLines={2}>
+                                            {row.ItmName || '—'} · {row.ShdName || '—'}
+                                        </Text>
+                                    </View>
+                                    {row._isNew && (
+                                        <View style={A.newItemBadge}>
+                                            <Text style={A.newItemBadgeText}>NEW</Text>
+                                        </View>
+                                    )}
+                                    {isEdit && (
+                                        <TouchableOpacity
+                                            style={A.removeItemBtn}
+                                            onPress={() => removeRow(row)}
+                                            disabled={saving}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={`Remove ${row.ItmName || 'item'} from order`}
+                                        >
+                                            <Icon name="delete-outline" size={19} color="#B91C1C" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <View style={A.editFieldsRow}>
+                                    <View style={A.editFieldCol}>
+                                        <Text style={A.editFieldLabel}>Quantity</Text>
+                                        <TextInput
+                                            value={row._qty}
+                                            onChangeText={value => updateRow(index, '_qty', value)}
+                                            editable={isEdit && !saving}
+                                            keyboardType="decimal-pad"
+                                            selectTextOnFocus={isEdit}
+                                            style={[A.editFieldInput, !isEdit && A.editFieldInputReadOnly]}
+                                            placeholder="0.000"
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                    </View>
+                                    <View style={A.editFieldCol}>
+                                        <Text style={A.editFieldLabel}>Rate / m</Text>
+                                        <TextInput
+                                            value={row._rate}
+                                            onChangeText={value => updateRow(index, '_rate', value)}
+                                            editable={isEdit && !saving}
+                                            keyboardType="decimal-pad"
+                                            selectTextOnFocus={isEdit}
+                                            style={[A.editFieldInput, !isEdit && A.editFieldInputReadOnly]}
+                                            placeholder="0.00"
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={A.editAmountRow}>
+                                    <Text style={A.editAmountLabel}>Amount</Text>
+                                    <Text style={A.editAmountValue}>₹{money(rowAmount)}</Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+
+                    <Text style={A.formLabel}>Remark</Text>
+                    <TextInput
+                        value={remark}
+                        onChangeText={setRemark}
+                        editable={isEdit && !saving}
+                        multiline
+                        maxLength={500}
+                        textAlignVertical="top"
+                        style={[A.remarkInput, !isEdit && A.formInputReadOnly]}
+                        placeholder={isEdit ? 'Add a remark (optional)' : 'No remark'}
+                        placeholderTextColor="#94A3B8"
+                    />
+
+                    <View style={A.editTotalsCard}>
+                        <View>
+                            <Text style={A.editTotalLabel}>TOTAL QUANTITY</Text>
+                            <Text style={A.editTotalValue}>{totalQty.toLocaleString('en-IN')}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={A.editTotalLabel}>TOTAL AMOUNT</Text>
+                            <Text style={A.editTotalValue}>₹{money(totalAmount)}</Text>
+                        </View>
+                    </View>
+                </ScrollView>
+
+                <View style={A.modalFooter}>
+                    {isEdit ? (
+                        <>
+                            <TouchableOpacity
+                                style={A.cancelEditBtn}
+                                onPress={onClose}
+                                disabled={saving}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={A.cancelEditText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[A.saveEditBtn, saving && A.actionDisabled]}
+                                onPress={submit}
+                                disabled={saving}
+                                activeOpacity={0.8}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <>
+                                        <Icon name="save" size={19} color="#fff" />
+                                        <Text style={A.saveEditText}>Update Order</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <TouchableOpacity style={A.closeViewBtn} onPress={onClose} activeOpacity={0.8}>
+                            <Text style={A.closeViewText}>Close</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {showDueDate && isEdit && (
+                    <DateTimePicker
+                        value={dueDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(event, value) => {
+                            setShowDueDate(false);
+                            if (event.type === 'set' && value) setDueDate(value);
+                        }}
+                    />
+                )}
+
+                <PickerSheet
+                    visible={showAddDesignPicker}
+                    title="Item"
+                    items={addDesignList}
+                    keyField="ItmCode"
+                    labelField="ItmName"
+                    subField="ItmCode"
+                    search={addDesignSearch}
+                    setSearch={setAddDesignSearch}
+                    loading={addDesignLoading}
+                    onSelect={selectAddDesign}
+                    onClose={() => {
+                        setShowAddDesignPicker(false);
+                        setAddDesignSearch('');
+                    }}
+                />
+
+                <PickerSheet
+                    visible={showAddItemPicker}
+                    title="Design"
+                    items={addItemList}
+                    keyField="DsnCode"
+                    labelField="DsnName"
+                    subField="DsnCode"
+                    search={addItemSearch}
+                    setSearch={setAddItemSearch}
+                    loading={addItemLoading}
+                    onSelect={selectAddItem}
+                    onClose={() => {
+                        setShowAddItemPicker(false);
+                        setAddItemSearch('');
+                    }}
+                />
+
+                <PickerSheet
+                    visible={showAddShadePicker}
+                    title="Shade"
+                    items={addShadeList}
+                    keyField="ShdCode"
+                    labelField="ShdName"
+                    subField="ShdCode"
+                    search={addShadeSearch}
+                    setSearch={setAddShadeSearch}
+                    loading={addShadeLoading}
+                    onSelect={setAddShade}
+                    onClose={() => {
+                        setShowAddShadePicker(false);
+                        setAddShadeSearch('');
+                    }}
+                    renderItem={shade => (
+                        <TouchableOpacity
+                            style={P.row}
+                            onPress={() => {
+                                setAddShade(shade);
+                                setShowAddShadePicker(false);
+                                setAddShadeSearch('');
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <View style={[
+                                    A.addCombinationShadePickerSwatch,
+                                    { backgroundColor: shade.ShdColor || '#CBD5E1' },
+                                ]} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={P.rowText}>{shade.ShdName || shade.ShadeName}</Text>
+                                    {!!shade.ShdCode && <Text style={P.rowSub}>{shade.ShdCode}</Text>}
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                />
+            </SafeAreaView>
+        </Modal>
+    );
+}
+
 // ── ─────────────────────────────────────────────────────────────
 //    AUTH TAB
 // ── ─────────────────────────────────────────────────────────────
@@ -1052,9 +1975,12 @@ function AuthTab({ token }) {
     const [showFrom, setShowFrom] = useState(false);
     const [showTo, setShowTo] = useState(false);
     const [approving, setApproving] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [savingEdit, setSavingEdit] = useState(false);
     const [prpcode, setPrpCode] = useState('');
     const [yearno, setYearNo] = useState('');
     const [expandedId, setExpandedId] = useState(null); // ← track which card is open
+    const [orderModal, setOrderModal] = useState({ visible: false, mode: 'view', record: null });
 
     useEffect(() => {
         if (!token) return;
@@ -1075,7 +2001,7 @@ function AuthTab({ token }) {
     }, []);
 
     const load = useCallback(async (isRefresh = false) => {
-        if (!fromDate || !toDate) return;
+        if (!fromDate || !toDate || !prpcode) return;
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
             const userPtype = await AsyncStorage.getItem('user_prptype');
@@ -1087,12 +2013,11 @@ function AuthTab({ token }) {
                 strtype: 'g',
                 txntype: 'sales_order',
                 referrer: 'mob_dashboard',
-                yearno: '27',
+                yearno: yearno || currentFyNo(),
                 prpcode: prpcode,
                 prpcodes: [],
                 search: '',
             };
-            console.log("base", base);
             const cfg = (extra) => ({ headers: authHdr(token), params: { ...base, ...extra } });
 
             const [pRes, aRes] = await Promise.all([
@@ -1100,12 +2025,13 @@ function AuthTab({ token }) {
                 axios.get(`${API}/api/sosortbrowse`, cfg({ isauth: 1, atype: 'm' })),
             ]);
 
-            console.log("pRes", pRes);
-            console.log("aRes", aRes);
             setPending(pRes.data?.response?.data || []);
             setAuthorised(aRes.data?.response?.data || []);
         } catch (e) {
-            console.log('auth load', e?.message);
+            Alert.alert(
+                'Unable to load orders',
+                e?.response?.data?.message || e?.message || 'Please pull down to try again.'
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -1115,10 +2041,9 @@ function AuthTab({ token }) {
     useEffect(() => {
         if (!token) return;
         load();
-    }, [prpcode, yearno, fromDate, toDate, token]);
+    }, [load, token]);
 
     const approveOrder = async (item, action) => {
-        console.log("here...")
         try {
             setApproving(item.UId);
             const payload = {
@@ -1127,7 +2052,7 @@ function AuthTab({ token }) {
                 StrCode: item.StrCode || '012',
                 ARemark: '',
                 aremark: '',
-                IsAuth: 1,
+                IsAuth: action === 'approve' ? 1 : 2,
                 referrer: 'dashboard',
                 txntype: 'sales_order',
                 action: 'edit',
@@ -1175,12 +2100,12 @@ function AuthTab({ token }) {
                 }
             );
 
-            console.log("payload", payload);
-            console.log("res", res);
-
             if (res.data?.success) {
-                load();
-                Alert.alert('Done', `Order ${action}d successfully`);
+                await load();
+                setExpandedId(null);
+                Alert.alert('Done', action === 'approve'
+                    ? 'Order approved successfully.'
+                    : 'Order rejected successfully.');
             } else {
                 Alert.alert('Failed', res.data?.message || 'Action failed');
             }
@@ -1215,6 +2140,176 @@ function AuthTab({ token }) {
     const getSoId = (item) => {
         if (!item.NSODate || !item.SONo) return item.SONo || '—';
         return `SO-${item.NSODate}-${item.SONo}`;
+    };
+
+    const openOrder = (item, mode) => {
+        if (mode === 'edit' && Number(item.IsAuth || 0) !== 0) {
+            Alert.alert('Cannot edit', 'An authorized sales order cannot be modified.');
+            return;
+        }
+        setOrderModal({ visible: true, mode, record: item });
+    };
+
+    const closeOrder = () => {
+        if (savingEdit) return;
+        setOrderModal({ visible: false, mode: 'view', record: null });
+    };
+
+    const updateOrder = async ({ dueDate, remark, rows, removedRows = [] }) => {
+        const item = orderModal.record;
+        if (!item || orderModal.mode !== 'edit') return;
+
+        const totalAmount = rows.reduce(
+            (sum, row) => sum + (parseNum(row._qty) * parseNum(row._rate)),
+            0
+        );
+        const soDate = parseErpDate(item.NSODate || item.SODate);
+        const deliveryDays = Math.max(
+            0,
+            Math.ceil((dueDate.getTime() - soDate.getTime()) / (1000 * 60 * 60 * 24))
+        );
+
+        const details = rows.map((row, index) => {
+            const qty = parseNum(row._qty);
+            const rate = parseNum(row._rate);
+            const amount = qty * rate;
+            const persistedRow = Object.fromEntries(
+                Object.entries(row).filter(([key]) => !key.startsWith('_'))
+            );
+
+            return {
+                ...persistedRow,
+                SrNo: row.SrNo || index + 1,
+                StrCode: row.StrCode || item.StrCode || '012',
+                Qty: fmt(qty, 3),
+                UnitRate: fmt(rate, 5),
+                Amount: fmt(amount),
+                D1NetAmt: fmt(amount),
+                SQty: row.SQty ?? fmt(qty, 3),
+                BQty: row.BQty ?? fmt(qty, 3),
+                QtyPcs: row.QtyPcs ?? '0',
+                SQtyPcs: row.SQtyPcs ?? row.QtyPcs ?? '0',
+                BQtyPcs: row.BQtyPcs ?? row.QtyPcs ?? '0',
+            };
+        });
+
+        const payload = {
+            Mode: 'EDIT',
+            UId: item.UId,
+            main: {
+                ...item,
+                Mode: 'EDIT',
+                UId: item.UId,
+                PrpCode: item.PrpCode || prpcode,
+                StrCode: item.StrCode || '012',
+                YearNo: item.yearno || yearno || currentFyNo(),
+                SExe: item.sexec || item.SExe || '',
+                SODate: item.NSODate || ymd(soDate),
+                DueDate: ymd(dueDate),
+                DDays: String(deliveryDays),
+                Remark: remark,
+                GrsAmt: fmt(totalAmount),
+                NetAmt: fmt(totalAmount),
+                D1NetAmt: fmt(totalAmount),
+            },
+            d1: details,
+            tax: [],
+            exp: {},
+        };
+
+        try {
+            setSavingEdit(true);
+            const res = await axios.post(`${API}/api/mobappsave`, payload, {
+                headers: authHdr(token),
+            });
+
+            console.log("payload",payload);
+            console.log("res",res);
+            if (res.data?.success !== true) {
+                throw new Error(res.data?.message || 'Unable to update the sales order.');
+            }
+
+            setOrderModal({ visible: false, mode: 'view', record: null });
+            setExpandedId(null);
+            await load();
+            const addedCount = rows.filter(row => row._isNew).length;
+            const changeParts = [];
+            if (removedRows.length > 0) {
+                changeParts.push(`${removedRows.length} row${removedRows.length === 1 ? '' : 's'} deleted`);
+            }
+            if (addedCount > 0) {
+                changeParts.push(`${addedCount} row${addedCount === 1 ? '' : 's'} added`);
+            }
+
+            Alert.alert(
+                'Updated',
+                changeParts.length > 0
+                    ? `Sales order updated successfully: ${changeParts.join(' and ')}.`
+                    : 'Sales order updated successfully.'
+            );
+        } catch (e) {
+            Alert.alert(
+                'Update failed',
+                e?.response?.data?.message || e?.message || 'Unable to update the sales order.'
+            );
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const deleteOrder = async (item) => {
+        try {
+            setDeletingId(item.UId);
+            const res = await axios.post(
+                `${API}/api/sodelete`,
+                {
+                    uid: item.UId,
+                    UId: item.UId,
+                    prpcode: item.PrpCode || prpcode,
+                    PrpCode: item.PrpCode || prpcode,
+                    strcode: item.StrCode || '012',
+                    yearno: item.yearno || yearno || currentFyNo(),
+                    txntype: 'sales_order',
+                },
+                { headers: authHdr(token) }
+            );
+
+            const response = res.data?.response || {};
+            const serverMessage = response.message || res.data?.message || '';
+            const failed = res.data?.success === false || /in use|closed|no data/i.test(serverMessage);
+
+            if (failed) {
+                throw new Error(serverMessage || 'The sales order could not be deleted.');
+            }
+
+            setPending(previous => previous.filter(row => String(row.UId) !== String(item.UId)));
+            setAuthorised(previous => previous.filter(row => String(row.UId) !== String(item.UId)));
+            setExpandedId(previous => String(previous) === String(item.UId) ? null : previous);
+            Alert.alert('Deleted', 'Sales order removed successfully.');
+        } catch (e) {
+            Alert.alert(
+                'Cannot delete order',
+                e?.response?.data?.response?.message ||
+                e?.response?.data?.message ||
+                e?.message ||
+                'This sales order may already be in use.'
+            );
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const confirmDelete = (item) => {
+        if (deletingId || savingEdit || approving) return;
+
+        Alert.alert(
+            'Delete sales order?',
+            `${getSoId(item)} will be permanently removed. This is allowed only when the order is not in use.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => deleteOrder(item) },
+            ]
+        );
     };
 
     // ── Pending card ──────────────────────────────────────────────
@@ -1338,12 +2433,48 @@ function AuthTab({ token }) {
                             </View>
                         ) : null}
 
+                        <View style={A.manageRow}>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.editBtn]}
+                                onPress={() => openOrder(item, 'edit')}
+                                disabled={deletingId === item.UId || approving === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="edit" size={17} color="#0F766E" />
+                                <Text style={[A.manageBtnText, A.editBtnText]}>Edit</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.viewBtn]}
+                                onPress={() => openOrder(item, 'view')}
+                                disabled={deletingId === item.UId || approving === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="visibility" size={17} color="#1D4ED8" />
+                                <Text style={[A.manageBtnText, A.viewBtnText]}>View</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.deleteBtn]}
+                                onPress={() => confirmDelete(item)}
+                                disabled={deletingId === item.UId || approving === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                {deletingId === item.UId ? (
+                                    <ActivityIndicator size="small" color="#B91C1C" />
+                                ) : (
+                                    <Icon name="delete-outline" size={18} color="#B91C1C" />
+                                )}
+                                <Text style={[A.manageBtnText, A.deleteBtnText]}>
+                                    {deletingId === item.UId ? 'Deleting' : 'Delete'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
                         {/* Approve / Reject */}
                         <View style={A.actRow}>
                             <TouchableOpacity
                                 style={A.approveBtn}
                                 onPress={() => approveOrder(item, 'approve')}
-                                disabled={approving === item.UId}
+                                disabled={approving === item.UId || deletingId === item.UId}
                                 activeOpacity={0.8}
                             >
                                 <Text style={A.approveTxt}>
@@ -1353,7 +2484,7 @@ function AuthTab({ token }) {
                             <TouchableOpacity
                                 style={A.rejectBtn}
                                 onPress={() => approveOrder(item, 'reject')}
-                                disabled={approving === item.UId}
+                                disabled={approving === item.UId || deletingId === item.UId}
                                 activeOpacity={0.8}
                             >
                                 <Text style={A.rejectTxt}>Reject</Text>
@@ -1425,6 +2556,42 @@ function AuthTab({ token }) {
                                 </Text>
                             </View>
                         ))}
+
+                        <View style={A.manageRow}>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.lockedEditBtn]}
+                                onPress={() => openOrder(item, 'edit')}
+                                disabled={deletingId === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="lock-outline" size={16} color="#64748B" />
+                                <Text style={[A.manageBtnText, A.lockedEditBtnText]}>Edit</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.viewBtn]}
+                                onPress={() => openOrder(item, 'view')}
+                                disabled={deletingId === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="visibility" size={17} color="#1D4ED8" />
+                                <Text style={[A.manageBtnText, A.viewBtnText]}>View</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.deleteBtn]}
+                                onPress={() => confirmDelete(item)}
+                                disabled={deletingId === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                {deletingId === item.UId ? (
+                                    <ActivityIndicator size="small" color="#B91C1C" />
+                                ) : (
+                                    <Icon name="delete-outline" size={18} color="#B91C1C" />
+                                )}
+                                <Text style={[A.manageBtnText, A.deleteBtnText]}>
+                                    {deletingId === item.UId ? 'Deleting' : 'Delete'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
             </View>
@@ -1451,17 +2618,18 @@ function AuthTab({ token }) {
     }
 
     return (
-        <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 14, paddingBottom: 30 }}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={() => load(true)}
-                    colors={['#13879A']}
-                />
-            }
-        >
+        <>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 14, paddingBottom: 30 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => load(true)}
+                        colors={['#13879A']}
+                    />
+                }
+            >
             {/* Date filter strip */}
             <View style={A.dateStrip}>
                 <TouchableOpacity style={A.datePill} onPress={() => setShowFrom(true)}>
@@ -1517,7 +2685,20 @@ function AuthTab({ token }) {
                     }}
                 />
             )}
-        </ScrollView>
+            </ScrollView>
+
+            <AuthOrderModal
+                visible={orderModal.visible}
+                mode={orderModal.mode}
+                record={orderModal.record}
+                saving={savingEdit}
+                token={token}
+                prpcode={prpcode}
+                yearno={yearno}
+                onClose={closeOrder}
+                onSave={updateOrder}
+            />
+        </>
     );
 }
 
@@ -4028,6 +5209,104 @@ const A = StyleSheet.create({
     approveTxt: { color: '#166534', fontWeight: '700', fontSize: 14 },
     rejectBtn: { flex: 1, height: 44, backgroundColor: '#FEF2F2', borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: .5, borderColor: '#FECACA' },
     rejectTxt: { color: '#dc2626', fontWeight: '700', fontSize: 14 },
+
+    // Record management actions
+    manageRow: { flexDirection: 'row', gap: 8, marginTop: 10, marginBottom: 8 },
+    manageBtn: { flex: 1, minHeight: 40, borderRadius: 10, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
+    manageBtnText: { fontSize: 12, fontWeight: '700' },
+    editBtn: { backgroundColor: '#F0FDFA', borderColor: '#99F6E4' },
+    editBtnText: { color: '#0F766E' },
+    lockedEditBtn: { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
+    lockedEditBtnText: { color: '#64748B' },
+    viewBtn: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+    viewBtnText: { color: '#1D4ED8' },
+    deleteBtn: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+    deleteBtnText: { color: '#B91C1C' },
+    actionDisabled: { opacity: 0.55 },
+
+    // Edit / view modal
+    modalSafe: { flex: 1, backgroundColor: '#F5F7F9' },
+    modalHeader: { minHeight: 64, backgroundColor: '#13879A', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+    modalCloseBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.12)' },
+    modalTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
+    modalSubTitle: { color: '#CFFAFE', fontSize: 11, marginTop: 2 },
+    modeBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
+    modeBadgeEdit: { backgroundColor: '#CCFBF1' },
+    modeBadgeView: { backgroundColor: '#DBEAFE' },
+    modeBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: .5 },
+    modeBadgeTextEdit: { color: '#0F766E' },
+    modeBadgeTextView: { color: '#1D4ED8' },
+    modalContent: { padding: 14, paddingBottom: 26 },
+    readOnlyBanner: { flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, borderRadius: 12, padding: 11, marginBottom: 12 },
+    readOnlyText: { flex: 1, color: '#1E40AF', fontSize: 12, lineHeight: 17 },
+    infoCard: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 13, marginBottom: 15 },
+    infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, paddingVertical: 4 },
+    infoLabel: { width: 105, fontSize: 12, color: '#64748B' },
+    infoValue: { flex: 1, fontSize: 12, color: '#0F172A', fontWeight: '600', textAlign: 'right' },
+    infoDivider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 6 },
+    formLabel: { color: '#334155', fontSize: 12, fontWeight: '700', marginBottom: 7, marginTop: 2 },
+    formInputWrap: { height: 48, backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 16 },
+    formInputReadOnly: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' },
+    formInputText: { flex: 1, color: '#0F172A', fontSize: 14 },
+    formInputTextReadOnly: { color: '#475569' },
+    itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
+    itemsTitle: { color: '#0F172A', fontSize: 15, fontWeight: '700' },
+    itemsCount: { color: '#64748B', fontSize: 11 },
+    addCombinationOpenBtn: { minHeight: 46, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: '#5EEAD4', backgroundColor: '#F0FDFA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12, paddingHorizontal: 12 },
+    addCombinationOpenText: { color: '#0F766E', fontSize: 13, fontWeight: '800' },
+    addCombinationCard: { backgroundColor: '#F8FAFC', borderRadius: 14, borderWidth: 1, borderColor: '#CBD5E1', padding: 12, marginBottom: 12 },
+    addCombinationHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 13 },
+    addCombinationTitle: { color: '#0F172A', fontSize: 14, fontWeight: '800' },
+    addCombinationSubTitle: { color: '#64748B', fontSize: 10, marginTop: 2 },
+    addCombinationCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+    addCombinationLabel: { color: '#475569', fontSize: 10, fontWeight: '800', letterSpacing: .35, marginBottom: 5 },
+    addCombinationPicker: { minHeight: 45, backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 11 },
+    addCombinationPickerDisabled: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' },
+    addCombinationPickerText: { flex: 1, color: '#0F172A', fontSize: 12, fontWeight: '600' },
+    addCombinationPlaceholder: { color: '#94A3B8', fontWeight: '400' },
+    addCombinationShadeValue: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    addCombinationShadeSwatch: { width: 22, height: 22, borderRadius: 6, borderWidth: .5, borderColor: '#CBD5E1' },
+    addCombinationShadePickerSwatch: { width: 28, height: 28, borderRadius: 7, borderWidth: .5, borderColor: '#CBD5E1' },
+    addCombinationFieldsRow: { flexDirection: 'row', gap: 10 },
+    addCombinationFieldCol: { flex: 1 },
+    addCombinationInput: { height: 43, backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 10, color: '#0F172A', fontSize: 14, fontWeight: '600', marginBottom: 12 },
+    addCombinationConfirmBtn: { height: 45, borderRadius: 11, backgroundColor: '#0F766E', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+    addCombinationConfirmText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+    removedRowsBanner: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 10, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
+    removedRowsIcon: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+    removedRowsTitle: { color: '#991B1B', fontSize: 12, fontWeight: '800' },
+    removedRowsText: { color: '#B91C1C', fontSize: 10, lineHeight: 14, marginTop: 2 },
+    restoreRowsBtn: { minHeight: 34, borderRadius: 9, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+    restoreRowsText: { color: '#1D4ED8', fontSize: 10, fontWeight: '800' },
+    editItemCard: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', padding: 12, marginBottom: 10 },
+    editItemCardNew: { borderColor: '#5EEAD4', backgroundColor: '#F0FDFA' },
+    editItemTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+    editItemIndex: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#E7F6F8', alignItems: 'center', justifyContent: 'center' },
+    editItemIndexText: { color: '#0F6D7A', fontSize: 12, fontWeight: '800' },
+    editItemDesign: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
+    editItemMeta: { color: '#64748B', fontSize: 11, marginTop: 2 },
+    newItemBadge: { backgroundColor: '#CCFBF1', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 },
+    newItemBadgeText: { color: '#0F766E', fontSize: 9, fontWeight: '900', letterSpacing: .4 },
+    removeItemBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', alignItems: 'center', justifyContent: 'center' },
+    editFieldsRow: { flexDirection: 'row', gap: 10 },
+    editFieldCol: { flex: 1 },
+    editFieldLabel: { color: '#64748B', fontSize: 10, fontWeight: '600', marginBottom: 5 },
+    editFieldInput: { height: 43, backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 10, color: '#0F172A', fontSize: 14, fontWeight: '600' },
+    editFieldInputReadOnly: { backgroundColor: '#F1F5F9', color: '#475569', borderColor: '#E2E8F0' },
+    editAmountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: 11, paddingTop: 9 },
+    editAmountLabel: { color: '#64748B', fontSize: 11 },
+    editAmountValue: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
+    remarkInput: { minHeight: 88, backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: '#0F172A', fontSize: 13, marginBottom: 14 },
+    editTotalsCard: { backgroundColor: '#0F172A', borderRadius: 14, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    editTotalLabel: { color: '#94A3B8', fontSize: 9, fontWeight: '700' },
+    editTotalValue: { color: '#fff', fontSize: 17, fontWeight: '800', marginTop: 3 },
+    modalFooter: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 12, paddingBottom: 16, flexDirection: 'row', gap: 10 },
+    cancelEditBtn: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+    cancelEditText: { color: '#334155', fontSize: 14, fontWeight: '700' },
+    saveEditBtn: { flex: 2, height: 48, borderRadius: 12, backgroundColor: '#13879A', flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center' },
+    saveEditText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    closeViewBtn: { flex: 1, height: 48, borderRadius: 12, backgroundColor: '#13879A', alignItems: 'center', justifyContent: 'center' },
+    closeViewText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
     // Job chart button (authorized cards)
     jobBtn: { paddingHorizontal: 10, paddingVertical: 6, borderWidth: .5, borderColor: '#d1d5db', borderRadius: 10, backgroundColor: '#fff', flexShrink: 0 },

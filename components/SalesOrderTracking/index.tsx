@@ -367,6 +367,7 @@ const SalesOrderTracking: React.FC<{
         setJobChartSaving(true);
         try {
             const payload = {
+                ReplaceAll: 1,
                 PrpCode: jobChartRef.prpcode,
                 YearNo: jobChartRef.yearno,
                 StrCode: jobChartRef.strcode,
@@ -1070,7 +1071,11 @@ const SalesOrderTracking: React.FC<{
 
             })
 
-
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1091,7 +1096,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
 
@@ -1193,7 +1198,11 @@ const SalesOrderTracking: React.FC<{
                 seArrCntr++;
 
             })
-
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1215,7 +1224,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: dsnCodes,
@@ -1288,6 +1297,12 @@ const SalesOrderTracking: React.FC<{
 
             })
 
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
+
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1308,7 +1323,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: [],
@@ -1407,7 +1422,7 @@ const SalesOrderTracking: React.FC<{
             wise:
                 selectedItemStatus1 === 'Party Wise'
                     ? 'party'
-                    : selectedItemStatus1 === 'Item Wise'
+                    : selectedItemStatus1 === 'Design Wise'
                         ? 'design'
                         : '',
             dsncodes: customPayload.dsncodes,
@@ -1498,7 +1513,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: item?.dsncode ? [item?.dsncode] : [],
@@ -1526,7 +1541,7 @@ const SalesOrderTracking: React.FC<{
                 );
                 await AsyncStorage.setItem(
                     'parties_tracking_details_party_name',
-                    selectedItemStatus1 === 'Item Wise'
+                    selectedItemStatus1 === 'Design Wise'
                         ? dsnname.dsnname
                         : parname.parname,
                 );
@@ -1538,7 +1553,7 @@ const SalesOrderTracking: React.FC<{
                 router.push({
                     pathname: '/SOPartyDetails',
                     params: {
-                        party: selectedItemStatus1 === 'Item Wise'
+                        party: selectedItemStatus1 === 'Design Wise'
                             ? dsnname.dsnname
                             : parname.parname,
                         selectedSalesExes: seArr
@@ -1871,7 +1886,7 @@ const SalesOrderTracking: React.FC<{
                                 <TouchableOpacity
                                     key={index}
                                     style={
-                                        selectedItemStatus1 === 'Item Wise'
+                                        selectedItemStatus1 === 'Design Wise'
                                             ? styles.summaryCard123
                                             : styles.summaryCard
                                     }
@@ -1885,12 +1900,12 @@ const SalesOrderTracking: React.FC<{
                                         setisALL(true);
                                     }}
                                 >
-                                    {selectedItemStatus1 === 'Item Wise' ? null : (
+                                    {selectedItemStatus1 === 'Design Wise' ? null : (
                                         <Text style={styles.partyNameInSummary}>
                                             Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
                                         </Text>
                                     )}
-                                    {selectedItemStatus1 === 'Item Wise' ? (
+                                    {selectedItemStatus1 === 'Design Wise' ? (
                                         <>
                                             <View style={styles.summaryContainer}>
                                                 <View
@@ -2142,7 +2157,7 @@ const SalesOrderTracking: React.FC<{
                                                 );
                                             }}
                                         >
-                                            {selectedItemStatus1 === 'Item Wise' ? null : (
+                                            {selectedItemStatus1 === 'Design Wise' ? null : (
                                                 <Text style={styles.partyNameInSummary}>
                                                     Party:{' '}
                                                     {selectedPartyDetails?.designdetails[0]?.partyname || ''}

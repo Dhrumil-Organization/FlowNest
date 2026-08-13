@@ -1765,6 +1765,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         loadData();
     }, [activeTab, token]);
 
+
+
+
     const getTotalPercentage = (list) => {
         return list.reduce((sum, item) => sum + Number(item.per || 0), 0);
     };
@@ -1776,6 +1779,22 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         ["#4A6FA5", "#5C85D1"], ["#2E5BBA", "#4A7CC5"],
         ["#3A7BD5", "#5A9BD5"],
     ];
+
+    const filteredData = useMemo(() => {
+        const search = cardSearch.trim().toLowerCase();
+
+        if (!search) {
+            return data;
+        }
+
+        return data.filter(item =>
+            Object.values(item || {}).some(value =>
+                String(value ?? '')
+                    .toLowerCase()
+                    .includes(search)
+            )
+        );
+    }, [data, cardSearch]);
 
     if (showSubItemCard) {
         return (
@@ -2777,17 +2796,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     //     soshow();
     // }, []);
 
-    const filteredData = useMemo(() => {
-        const search = cardSearch.trim().toLowerCase();
 
-        if (!search) return data;
-
-        return data.filter(item =>
-            Object.values(item || {}).some(value =>
-                String(value ?? '').toLowerCase().includes(search)
-            )
-        );
-    }, [data, cardSearch]);
 
     return (
         <>

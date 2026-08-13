@@ -8,6 +8,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+// import {
+//     ActivityIndicator,
+//     Alert,
+//     Dimensions,
+//     FlatList,
+//     KeyboardAvoidingView,
+//     Platform,
+//     StyleSheet,
+//     Text,
+//     TextInput,
+//     TouchableOpacity,
+//     View
+// } from 'react-native';
 import {
     ActivityIndicator,
     Alert,
@@ -15,6 +28,7 @@ import {
     FlatList,
     KeyboardAvoidingView,
     Platform,
+    StatusBar,
     StyleSheet,
     Text,
     TextInput,
@@ -180,6 +194,9 @@ const SalesOrderTracking: React.FC<{
         grdname: string;
         sono?: string;
         status?: string;
+        pendingMeter: number; // 👈 NEW
+        shdcode?: string;
+        apccode?: string;
     } | null>(null);
     const [allocations, setAllocations] = useState<any[]>([]);
     // 👇 NEW: shade picker is now a separate full modal, not inline dropdown
@@ -217,30 +234,29 @@ const SalesOrderTracking: React.FC<{
     // Open job chart for a design-level item (from Main Design Details or Sub Design Details card)
     const openJobChart = async (item: any) => {
         console.log('🔵 payload JOB CHART', item);
-        const orderUId =
-            item?.suid || '';
+        const orderUId = item?.suid || '';
 
         if (!orderUId) {
             Alert.alert('Error', 'Order reference (UId) not found on this item.');
             return;
         }
 
-        console.log('🔵 orderUId', orderUId, selectedYear.split('-')[1].substring(2));
-
         const ref = {
             orderUId: String(orderUId),
             itmCode: String(item?.itmcode || ''),
             dsnCode: String(item?.dsncode || ''),
             dsnName: item?.Dsnname || '',
-            // 👇 dynamic with fallback — update fallback once field names confirmed
             prpcode: item?.prpcode || '',
             strcode: item?.strcode || '',
             yearno: selectedYear ? selectedYear.split('-')[1].substring(2) : '',
-            srno: item?.OrderSrNo || item?.SrNo || item?.srno || '1 ',
+            srno: item?.OrderSrNo || item?.SrNo || item?.srno || '1',
             grdcode: item?.grdcode || '1',
             grdname: item?.GrdName || item?.grdname || '',
             sono: item?.sono || '',
-            status: item?.status || '',
+            status: String(item?.status || '').toUpperCase().trim(),
+            pendingMeter: parseFloat(item?.pending) || 0, // 👈 NEW
+            shdcode: item?.shdcode || '',
+            apccode: item?.apccode || '',
         };
 
         setJobChartRef(ref);
@@ -252,6 +268,39 @@ const SalesOrderTracking: React.FC<{
         setJobChartVisible(true);
         await fetchAllocations(ref);
     };
+
+    const areCodesMatching = (shdcode: string, apccode: string): boolean => {
+        return shdcode === apccode;
+    };
+
+    // 👇 Can user add/edit allocations for this item?
+    const canEditAllocation = () => {
+        if (!jobChartRef) return false;
+        if (jobChartRef.status === 'CLOSED') return false;
+        // if (jobChartRef.status === 'CLOSED') return false;
+        if ((jobChartRef.pendingMeter || 0) <= 0) return false;
+
+        // 🆕 APC condition: allow only if shdcode matches apccode
+        if (!areCodesMatching(jobChartRef?.shdcode, jobChartRef?.apccode)) return false;
+        return true;
+    };
+
+    // 👇 Today's date in YYYYMMDD format, matching LastDate format
+    const getTodayDateStr = () => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}${m}${day}`;
+    };
+
+    const formatAllocDate = (dateStr?: string) => {
+        if (!dateStr || dateStr.length !== 8) return '';
+        return `${dateStr.substring(6, 8)}-${dateStr.substring(4, 6)}-${dateStr.substring(0, 4)}`;
+    };
+
+    const getTotalAllocatedQty = () =>
+        allocations.reduce((sum, a) => sum + (parseFloat(a.AllocationQty) || 0), 0);
 
     const fetchAllocations = async (ref: typeof jobChartRef) => {
         if (!ref) return;
@@ -328,12 +377,59 @@ const SalesOrderTracking: React.FC<{
     };
 
     const handleAddAllocationRow = () => {
+        // if (!canEditAllocation()) {
+        //     Alert.alert(
+        //         'Not Allowed',
+        //         jobChartRef?.status === 'CLOSED'
+        //             ? 'This design is closed. Allocation cannot be modified.'
+        //             : 'No pending meter available to allocate.',
+        //     );
+        //     return;
+        // }
+        {
+            !canEditAllocation() && (
+                <View style={styles.jobChartLockBanner}>
+                    <Icon name="lock" size={16} color="#E65100" />
+                    <Text style={styles.jobChartLockBannerText}>
+                        {jobChartRef?.status === 'CLOSED'
+                            ? 'This design is closed — view only.'
+                            : jobChartRef?.pendingMeter <= 0
+                                ? 'No pending meter left — view only.'
+                                : 'APC not matched — view only.'}
+                    </Text>
+                </View>
+            )
+        }
         if (!selectedShade) {
             Alert.alert('Error', 'Please select a shade first.');
             return;
         }
         if (!addQty || parseFloat(addQty) <= 0) {
             Alert.alert('Error', 'Please enter a valid quantity.');
+            return;
+        }
+
+        // 🚫 Duplicate shade check
+        const alreadyExists = allocations.some(
+            a => String(a.ShdCode) === String(selectedShade.Code),
+        );
+        if (alreadyExists) {
+            Alert.alert(
+                'Duplicate Shade',
+                'This shade is already allocated. Please edit the existing quantity instead of adding it again.',
+            );
+            return;
+        }
+
+        // 🚫 Pending meter check
+        const currentTotal = getTotalAllocatedQty();
+        const newQty = parseFloat(addQty);
+        const pendingMeter = jobChartRef?.pendingMeter || 0;
+        if (currentTotal + newQty > pendingMeter) {
+            Alert.alert(
+                'Exceeds Pending Meter',
+                `Total allocation (${formatNumber(String(currentTotal + newQty))} m) can't exceed pending meter (${formatNumber(String(pendingMeter))} m). You can add up to ${formatNumber(String(Math.max(pendingMeter - currentTotal, 0)))} m more.`,
+            );
             return;
         }
 
@@ -359,14 +455,23 @@ const SalesOrderTracking: React.FC<{
     };
 
     const handleRemoveAllocationRow = (index: number) => {
+        if (!canEditAllocation()) return;
         setAllocations(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleSaveAllocations = async () => {
         if (!jobChartRef) return;
+
+        const totalQty = getTotalAllocatedQty();
+        if (totalQty > (jobChartRef.pendingMeter || 0)) {
+            Alert.alert('Error', 'Total allocation exceeds pending meter. Please adjust quantities before saving.');
+            return;
+        }
+
         setJobChartSaving(true);
         try {
             const payload = {
+                ReplaceAll: 1,
                 PrpCode: jobChartRef.prpcode,
                 YearNo: jobChartRef.yearno,
                 StrCode: jobChartRef.strcode,
@@ -399,8 +504,9 @@ const SalesOrderTracking: React.FC<{
             console.log('🔵 so-allocation/sync response:', response.data);
 
             if (response.data.success) {
-                setAllocations(response.data.response.data || []);
-                Alert.alert('Success', response.data.response.message || 'Allocation saved.');
+                Alert.alert('Success', response.data.response?.message || 'Allocation saved.');
+                // 🔁 Re-fetch fresh data from server after successful save
+                await fetchAllocations(jobChartRef);
             } else {
                 Alert.alert('Error', response.data.message || 'Failed to save allocation.');
             }
@@ -1070,7 +1176,11 @@ const SalesOrderTracking: React.FC<{
 
             })
 
-
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1091,7 +1201,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
 
@@ -1193,7 +1303,11 @@ const SalesOrderTracking: React.FC<{
                 seArrCntr++;
 
             })
-
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1215,7 +1329,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: dsnCodes,
@@ -1288,6 +1402,12 @@ const SalesOrderTracking: React.FC<{
 
             })
 
+            console.log('wise: ', selectedItemStatus1 === 'Party Wise'
+                ? 'party'
+                : selectedItemStatus1 === 'Design Wise'
+                    ? 'design'
+                    : '', selectedItemStatus1);
+
 
             const payload = {
                 // fromdate: formatDate(fromDate),
@@ -1308,7 +1428,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: [],
@@ -1407,7 +1527,7 @@ const SalesOrderTracking: React.FC<{
             wise:
                 selectedItemStatus1 === 'Party Wise'
                     ? 'party'
-                    : selectedItemStatus1 === 'Item Wise'
+                    : selectedItemStatus1 === 'Design Wise'
                         ? 'design'
                         : '',
             dsncodes: customPayload.dsncodes,
@@ -1498,7 +1618,7 @@ const SalesOrderTracking: React.FC<{
                 wise:
                     selectedItemStatus1 === 'Party Wise'
                         ? 'party'
-                        : selectedItemStatus1 === 'Item Wise'
+                        : selectedItemStatus1 === 'Design Wise'
                             ? 'design'
                             : '',
                 dsncodes: item?.dsncode ? [item?.dsncode] : [],
@@ -1526,7 +1646,7 @@ const SalesOrderTracking: React.FC<{
                 );
                 await AsyncStorage.setItem(
                     'parties_tracking_details_party_name',
-                    selectedItemStatus1 === 'Item Wise'
+                    selectedItemStatus1 === 'Design Wise'
                         ? dsnname.dsnname
                         : parname.parname,
                 );
@@ -1538,7 +1658,7 @@ const SalesOrderTracking: React.FC<{
                 router.push({
                     pathname: '/SOPartyDetails',
                     params: {
-                        party: selectedItemStatus1 === 'Item Wise'
+                        party: selectedItemStatus1 === 'Design Wise'
                             ? dsnname.dsnname
                             : parname.parname,
                         selectedSalesExes: seArr
@@ -1871,7 +1991,7 @@ const SalesOrderTracking: React.FC<{
                                 <TouchableOpacity
                                     key={index}
                                     style={
-                                        selectedItemStatus1 === 'Item Wise'
+                                        selectedItemStatus1 === 'Design Wise'
                                             ? styles.summaryCard123
                                             : styles.summaryCard
                                     }
@@ -1885,12 +2005,12 @@ const SalesOrderTracking: React.FC<{
                                         setisALL(true);
                                     }}
                                 >
-                                    {selectedItemStatus1 === 'Item Wise' ? null : (
+                                    {selectedItemStatus1 === 'Design Wise' ? null : (
                                         <Text style={styles.partyNameInSummary}>
                                             Party: {selectedDesignData?.designdetails[0]?.partyname || ''}
                                         </Text>
                                     )}
-                                    {selectedItemStatus1 === 'Item Wise' ? (
+                                    {selectedItemStatus1 === 'Design Wise' ? (
                                         <>
                                             <View style={styles.summaryContainer}>
                                                 <View
@@ -2100,7 +2220,7 @@ const SalesOrderTracking: React.FC<{
                             {!isAll ? (
                                 <>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Sub Design Summary1</Text>
+                                        <Text style={styles.modalTitle}>Sub Design Summary</Text>
                                         <TouchableOpacity
                                             onPress={() => setIsPartyDetailsModalVisible(false)}
                                         >
@@ -2142,7 +2262,7 @@ const SalesOrderTracking: React.FC<{
                                                 );
                                             }}
                                         >
-                                            {selectedItemStatus1 === 'Item Wise' ? null : (
+                                            {selectedItemStatus1 === 'Design Wise' ? null : (
                                                 <Text style={styles.partyNameInSummary}>
                                                     Party:{' '}
                                                     {selectedPartyDetails?.designdetails[0]?.partyname || ''}
@@ -2183,7 +2303,7 @@ const SalesOrderTracking: React.FC<{
                             ) : (
                                 <View>
                                     <View style={styles.modalHeader}>
-                                        <Text style={styles.modalTitle}>Sub Design Summary12</Text>
+                                        <Text style={styles.modalTitle}>Sub Design Summary</Text>
                                         <TouchableOpacity
                                             onPress={() => setIsPartyDetailsModalVisible(false)}
                                         >
@@ -2292,15 +2412,10 @@ const SalesOrderTracking: React.FC<{
                                             <Text style={styles.designName}>{item.Dsnname}</Text>
                                             <Text style={styles.designCode}>{item.dsncode}</Text>
                                         </View>
-                                        <TouchableOpacity
-                                            style={styles.jobChartBtn}
-                                            onPress={(e) => {
-                                                openJobChart(item);
-                                            }}
-                                        >
-                                            <Icon name="receipt-long" size={14} color={theme.BRAND_GRADIENT_END} />
-                                            <Text style={styles.jobChartBtnText}>Job Chart</Text>
-                                        </TouchableOpacity>
+                                        <View style={styles.designSubheader}>
+                                            <Text style={styles.designNameSub}>Shade: {item.shdname} ({item.shdcode})</Text>
+                                        </View>
+
                                         <View style={styles.designValues}>
                                             <View style={styles.valueRow}>
                                                 <View style={styles.valueItem}>
@@ -2345,6 +2460,50 @@ const SalesOrderTracking: React.FC<{
                                                 </View>
                                             </View>
                                         </View>
+                                        <View style={styles.designSubheader}>
+                                            <View
+                                                style={[
+                                                    styles.jobChartBtn,
+                                                    {
+                                                        backgroundColor:
+                                                            item.status === 'CLOSED'
+                                                                ? '#FFEBEE'
+                                                                : item.status === 'PENDING'
+                                                                    ? '#FFF3E0'
+                                                                    : item.status === 'PARTIAL'
+                                                                        ? '#E8F5E8'
+                                                                        : 'transparent',
+                                                    }
+                                                ]}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.jobChartBtnText,
+                                                        {
+                                                            color:
+                                                                item.status === 'CLOSED'
+                                                                    ? '#E65100'
+                                                                    : item.status === 'PENDING'
+                                                                        ? '#E65100'
+                                                                        : item.status === 'PARTIAL'
+                                                                            ? '#4CAF50'
+                                                                            : theme.BRAND_GRADIENT_END,
+                                                        }
+                                                    ]}
+                                                >
+                                                    {item.status}
+                                                </Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={styles.jobChartBtn}
+                                                onPress={(e) => {
+                                                    openJobChart(item);
+                                                }}
+                                            >
+                                                <Icon name="receipt-long" size={14} color={theme.BRAND_GRADIENT_END} />
+                                                <Text style={styles.jobChartBtnText}>Job Chart</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     </TouchableOpacity>
                                 )}
                                 keyExtractor={(item, index) => `${item.dsncode}-${index}`}
@@ -2366,125 +2525,295 @@ const SalesOrderTracking: React.FC<{
             )}
 
             {/* JOB CHART MODAL */}
+            {/* JOB CHART — FULL SCREEN */}
             {jobChartVisible && (
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={styles.jobChartOverlay}
+                    style={styles.jobChartFullOverlay}
                 >
-                    <View style={styles.jobChartSheet}>
-                        <View style={styles.jobChartHandle} />
-                        <View style={styles.jobChartHeaderRow}>
-                            <Text style={styles.jobChartTitle}>Job chart</Text>
-                            <TouchableOpacity onPress={() => setJobChartVisible(false)}>
-                                <Icon name="close" size={22} color="#333" />
-                            </TouchableOpacity>
+                    {/* HEADER */}
+                    <View style={styles.jobChartFullHeader}>
+                        <TouchableOpacity
+                            onPress={() => setJobChartVisible(false)}
+                            style={styles.jobChartBackBtn}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Icon name="arrow-back" size={24} color="#333" />
+                        </TouchableOpacity>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.jobChartFullTitle}>Job Chart</Text>
+                            <Text style={styles.jobChartFullSubtitle} numberOfLines={1}>
+                                {jobChartRef?.dsnName} ({jobChartRef?.dsnCode})
+                            </Text>
                         </View>
+                        <View style={styles.jobChartDateBadge}>
+                            <Icon name="event" size={12} color="#fff" />
+                            <Text style={styles.jobChartDateBadgeText}>
+                                {formatAllocDate(getTodayDateStr())}
+                            </Text>
+                        </View>
+                    </View>
 
-                        {jobChartLoading ? (
-                            <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} style={{ marginTop: 30 }} />
-                        ) : (
-                            <>
-                                <FlatList
-                                    data={allocations}
-                                    keyExtractor={(_, i) => `alloc-${i}`}
-                                    style={{ maxHeight: 260 }}
-                                    ListHeaderComponent={
-                                        <>
+                    {jobChartLoading ? (
+                        <ActivityIndicator size="large" color={theme.BRAND_GRADIENT_END} style={{ marginTop: 40 }} />
+                    ) : (
+                        <>
+                            <FlatList
+                                data={[]}
+                                keyExtractor={() => 'x'}
+                                renderItem={null}
+                                style={{ flex: 1 }}
+                                contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                                ListHeaderComponent={
+                                    <>
+                                        {/* REF CARD */}
+                                        <View style={styles.jobChartRefCard}>
                                             <View style={styles.jobChartRefRow}>
-                                                <View>
-                                                    <Text style={styles.jobChartRefLabel}>REF</Text>
-                                                    <Text style={styles.jobChartRefValue}>{jobChartRef?.dsnCode}</Text>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.jobChartRefLabel}>SO NO</Text>
+                                                    <Text style={styles.jobChartRefValue}>{jobChartRef?.sono || '-'}</Text>
                                                 </View>
-                                                <View style={{ alignItems: 'flex-end' }}>
-                                                    <Text style={styles.jobChartRefLabel}>DESIGN</Text>
-                                                    <Text style={styles.jobChartRefValue}>{jobChartRef?.dsnName}</Text>
+                                                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                                    <Text style={styles.jobChartRefLabel}>STATUS</Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.jobChartRefValue,
+                                                            { color: jobChartRef?.status === 'CLOSED' ? '#E65100' : '#4CAF50' },
+                                                        ]}
+                                                    >
+                                                        {jobChartRef?.status || 'OPEN'}
+                                                    </Text>
                                                 </View>
                                             </View>
-                                            <Text style={styles.jobChartSectionLabel}>SHADE / COLOUR</Text>
-                                        </>
-                                    }
-                                    renderItem={({ item, index }) => (
-                                        <View style={styles.jobChartRow}>
-                                            <Text style={styles.jobChartRowLabel}>{item.ShdName?.trim()}</Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={styles.jobChartRowValue}>
-                                                    {formatNumber(String(item.AllocationQty))} m
-                                                </Text>
-                                                {!item.IsLocked ? (
-                                                    <TouchableOpacity
-                                                        onPress={() => handleRemoveAllocationRow(index)}
-                                                        style={{ marginLeft: 10 }}
+
+                                            <View style={styles.jobChartProgressWrap}>
+                                                <View style={styles.jobChartProgressRow}>
+                                                    <Text style={styles.jobChartRefLabel}>PENDING METER</Text>
+                                                    <Text style={styles.jobChartPendingValue}>
+                                                        {formatNumber(String(jobChartRef?.pendingMeter || 0))} m
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.progressBarBg}>
+                                                    <View
+                                                        style={[
+                                                            styles.progressBarFill,
+                                                            {
+                                                                width: `${Math.min(
+                                                                    100,
+                                                                    ((getTotalAllocatedQty()) /
+                                                                        Math.max(jobChartRef?.pendingMeter || 1, 1)) *
+                                                                    100,
+                                                                )}%`,
+                                                                backgroundColor:
+                                                                    getTotalAllocatedQty() > (jobChartRef?.pendingMeter || 0)
+                                                                        ? '#E53935'
+                                                                        : theme.BRAND_GRADIENT_END,
+                                                            },
+                                                        ]}
+                                                    />
+                                                </View>
+                                                <View style={styles.jobChartProgressRow}>
+                                                    <Text style={styles.jobChartAllocatedText}>
+                                                        Allocated: {formatNumber(String(getTotalAllocatedQty()))} m
+                                                    </Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.jobChartAllocatedText,
+                                                            {
+                                                                color:
+                                                                    (jobChartRef?.pendingMeter || 0) - getTotalAllocatedQty() < 0
+                                                                        ? '#E53935'
+                                                                        : '#4CAF50',
+                                                                fontWeight: 'bold',
+                                                            },
+                                                        ]}
                                                     >
-                                                        <Icon name="close" size={16} color="#E65100" />
-                                                    </TouchableOpacity>
-                                                ) : null}
+                                                        Remaining: {formatNumber(String(Math.max((jobChartRef?.pendingMeter || 0) - getTotalAllocatedQty(), 0)))} m
+                                                    </Text>
+                                                </View>
                                             </View>
                                         </View>
-                                    )}
-                                    ListEmptyComponent={
-                                        <Text style={{ color: '#999', paddingVertical: 10 }}>
-                                            No allocation added yet.
-                                        </Text>
-                                    }
-                                    ListFooterComponent={
+
+                                        {!canEditAllocation() && (
+                                            <View style={styles.jobChartLockBanner}>
+                                                <Icon name="lock" size={16} color="#E65100" />
+                                                <Text style={styles.jobChartLockBannerText}>
+                                                    {jobChartRef?.status === 'CLOSED'
+                                                        ? 'This design is closed — view only.'
+                                                        : 'No pending meter left — view only.'}
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                        {/* ===== GROUP: NEW / UNSAVED ===== */}
+                                        {allocations.filter(a => !a.LastDate).length > 0 && (
+                                            <View style={styles.allocGroupSection}>
+                                                <View style={styles.allocGroupHeaderRow}>
+                                                    <View style={[styles.allocGroupDot, { backgroundColor: '#2196F3' }]} />
+                                                    <Text style={styles.allocGroupTitle}>New (Not Saved)</Text>
+                                                    <Text style={styles.allocGroupCount}>
+                                                        {allocations.filter(a => !a.LastDate).length}
+                                                    </Text>
+                                                </View>
+                                                {allocations
+                                                    .map((a, idx) => ({ ...a, __idx: idx }))
+                                                    .filter(a => !a.LastDate)
+                                                    .map(item => (
+                                                        <View key={`new-${item.__idx}`} style={[styles.allocRowCard, { borderLeftColor: '#2196F3' }]}>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
+                                                                <Text style={styles.allocRowCode}>Code: {item.ShdCode}</Text>
+                                                            </View>
+                                                            <Text style={styles.allocRowQty}>
+                                                                {formatNumber(String(item.AllocationQty))} m
+                                                            </Text>
+                                                            {canEditAllocation() && (
+                                                                <TouchableOpacity
+                                                                    onPress={() => handleRemoveAllocationRow(item.__idx)}
+                                                                    style={styles.allocRowRemoveBtn}
+                                                                >
+                                                                    <Icon name="close" size={16} color="#E65100" />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
+                                                    ))}
+                                            </View>
+                                        )}
+
+                                        {/* ===== GROUP: UPDATED TODAY ===== */}
+                                        {allocations.filter(a => a.LastDate === getTodayDateStr()).length > 0 && (
+                                            <View style={styles.allocGroupSection}>
+                                                <View style={styles.allocGroupHeaderRow}>
+                                                    <View style={[styles.allocGroupDot, { backgroundColor: '#4CAF50' }]} />
+                                                    <Text style={styles.allocGroupTitle}>Updated Today ({formatAllocDate(getTodayDateStr())})</Text>
+                                                    <Text style={styles.allocGroupCount}>
+                                                        {allocations.filter(a => a.LastDate === getTodayDateStr()).length}
+                                                    </Text>
+                                                </View>
+                                                {allocations
+                                                    .map((a, idx) => ({ ...a, __idx: idx }))
+                                                    .filter(a => a.LastDate === getTodayDateStr())
+                                                    .map(item => (
+                                                        <View key={`today-${item.__idx}`} style={[styles.allocRowCard, { borderLeftColor: '#4CAF50' }]}>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
+                                                                <Text style={styles.allocRowCode}>Code: {item.ShdCode}</Text>
+                                                            </View>
+                                                            <Text style={styles.allocRowQty}>
+                                                                {formatNumber(String(item.AllocationQty))} m
+                                                            </Text>
+                                                            {!item.IsLocked && canEditAllocation() && (
+                                                                <TouchableOpacity
+                                                                    onPress={() => handleRemoveAllocationRow(item.__idx)}
+                                                                    style={styles.allocRowRemoveBtn}
+                                                                >
+                                                                    <Icon name="close" size={16} color="#E65100" />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
+                                                    ))}
+                                            </View>
+                                        )}
+
+                                        {/* ===== GROUP: PREVIOUS ===== */}
+                                        {allocations.filter(a => a.LastDate && a.LastDate !== getTodayDateStr()).length > 0 && (
+                                            <View style={styles.allocGroupSection}>
+                                                <View style={styles.allocGroupHeaderRow}>
+                                                    <View style={[styles.allocGroupDot, { backgroundColor: '#9E9E9E' }]} />
+                                                    <Text style={styles.allocGroupTitle}>Previous Allocations</Text>
+                                                    <Text style={styles.allocGroupCount}>
+                                                        {allocations.filter(a => a.LastDate && a.LastDate !== getTodayDateStr()).length}
+                                                    </Text>
+                                                </View>
+                                                {allocations
+                                                    .map((a, idx) => ({ ...a, __idx: idx }))
+                                                    .filter(a => a.LastDate && a.LastDate !== getTodayDateStr())
+                                                    .map(item => (
+                                                        <View key={`prev-${item.__idx}`} style={[styles.allocRowCard, { borderLeftColor: '#9E9E9E' }]}>
+                                                            <View style={{ flex: 1 }}>
+                                                                <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
+                                                                <Text style={styles.allocRowCode}>
+                                                                    Code: {item.ShdCode} • {formatAllocDate(item.LastDate)}
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={styles.allocRowQty}>
+                                                                {formatNumber(String(item.AllocationQty))} m
+                                                            </Text>
+                                                            {!item.IsLocked && canEditAllocation() && (
+                                                                <TouchableOpacity
+                                                                    onPress={() => handleRemoveAllocationRow(item.__idx)}
+                                                                    style={styles.allocRowRemoveBtn}
+                                                                >
+                                                                    <Icon name="close" size={16} color="#E65100" />
+                                                                </TouchableOpacity>
+                                                            )}
+                                                        </View>
+                                                    ))}
+                                            </View>
+                                        )}
+
+                                        {allocations.length === 0 && (
+                                            <Text style={styles.jobChartEmptyText}>No allocation added yet.</Text>
+                                        )}
+
                                         <View style={styles.jobChartTotalRow}>
-                                            <Text style={styles.jobChartTotalLabel}>TOTAL</Text>
+                                            <Text style={styles.jobChartTotalLabel}>TOTAL ALLOCATED</Text>
                                             <Text style={styles.jobChartTotalValue}>
                                                 {formatNumber(getJobChartTotal())} m
                                             </Text>
                                         </View>
-                                    }
-                                />
+                                    </>
+                                }
+                            />
 
-                                {/* ADD NEW SHADE ROW — shade field is a BUTTON, opens picker overlay */}
-                                <View style={styles.jobChartAddRow}>
-                                    <TouchableOpacity
-                                        style={[styles.searchInput, styles.shadeSelectBtn]}
-                                        onPress={openShadePicker}
-                                    >
-                                        <Text
-                                            style={selectedShade ? styles.shadeSelectText : styles.shadeSelectPlaceholder}
-                                            numberOfLines={1}
+                            {/* BOTTOM ACTION AREA */}
+                            {canEditAllocation() && (
+                                <View style={styles.jobChartBottomBar}>
+                                    <View style={styles.jobChartAddRow}>
+                                        <TouchableOpacity
+                                            style={[styles.searchInput, styles.shadeSelectBtn]}
+                                            onPress={openShadePicker}
                                         >
-                                            {selectedShade ? selectedShade.Name : 'Tap to select shade'}
-                                        </Text>
-                                        <Icon name="search" size={18} color="#999" />
-                                    </TouchableOpacity>
-                                    <TextInput
-                                        ref={qtyInputRef}
-                                        style={[styles.searchInput, { width: 80, marginLeft: 8, marginBottom: 0 }]}
-                                        placeholder="Qty"
-                                        keyboardType="numeric"
-                                        value={addQty}
-                                        onChangeText={setAddQty}
-                                        returnKeyType="done"
-                                        onSubmitEditing={handleAddAllocationRow}
-                                    />
-                                    <TouchableOpacity style={styles.jobChartAddBtn} onPress={handleAddAllocationRow}>
-                                        <Icon name="add" size={20} color="#fff" />
+                                            <Text
+                                                style={selectedShade ? styles.shadeSelectText : styles.shadeSelectPlaceholder}
+                                                numberOfLines={1}
+                                            >
+                                                {selectedShade ? selectedShade.Name : 'Tap to select shade'}
+                                            </Text>
+                                            <Icon name="search" size={18} color="#999" />
+                                        </TouchableOpacity>
+                                        <TextInput
+                                            ref={qtyInputRef}
+                                            style={[styles.searchInput, { width: 80, marginLeft: 8, marginBottom: 0 }]}
+                                            placeholder="Qty"
+                                            keyboardType="numeric"
+                                            value={addQty}
+                                            onChangeText={setAddQty}
+                                            returnKeyType="done"
+                                            onSubmitEditing={handleAddAllocationRow}
+                                        />
+                                        <TouchableOpacity style={styles.jobChartAddBtn} onPress={handleAddAllocationRow}>
+                                            <Icon name="add" size={20} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={styles.jobChartSaveBtn}
+                                        onPress={handleSaveAllocations}
+                                        disabled={jobChartSaving}
+                                    >
+                                        {jobChartSaving ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <Text style={styles.jobChartSaveBtnText}>Save Allocation</Text>
+                                        )}
                                     </TouchableOpacity>
                                 </View>
+                            )}
+                        </>
+                    )}
 
-                                <Text style={styles.jobChartHint}>
-                                    Job chart carries no customer or pricing information.
-                                </Text>
-
-                                <TouchableOpacity
-                                    style={styles.jobChartSaveBtn}
-                                    onPress={handleSaveAllocations}
-                                    disabled={jobChartSaving}
-                                >
-                                    {jobChartSaving ? (
-                                        <ActivityIndicator size="small" color="#fff" />
-                                    ) : (
-                                        <Text style={styles.jobChartSaveBtnText}>Save Allocation</Text>
-                                    )}
-                                </TouchableOpacity>
-                            </>
-                        )}
-                    </View>
-
-                    {/* SHADE PICKER — separate overlay ABOVE job chart sheet, own keyboard space, no nested Modal */}
+                    {/* SHADE PICKER — separate overlay above job chart, own keyboard space */}
                     {shadePickerVisible && (
                         <View style={styles.shadePickerOverlay}>
                             <View style={styles.shadePickerSheet}>
@@ -2512,14 +2841,26 @@ const SalesOrderTracking: React.FC<{
                                         keyExtractor={(s) => s.Code}
                                         keyboardShouldPersistTaps="handled"
                                         style={{ maxHeight: 320 }}
-                                        renderItem={({ item: s }) => (
-                                            <TouchableOpacity
-                                                style={styles.shadePickerRow}
-                                                onPress={() => handleSelectShade(s)}
-                                            >
-                                                <Text style={styles.shadePickerRowText}>{s.Name}</Text>
-                                            </TouchableOpacity>
-                                        )}
+                                        renderItem={({ item: s }) => {
+                                            const isUsed = allocations.some(a => String(a.ShdCode) === String(s.Code));
+                                            return (
+                                                <TouchableOpacity
+                                                    style={[styles.shadePickerRow, isUsed && styles.shadePickerRowDisabled]}
+                                                    onPress={() => {
+                                                        if (isUsed) {
+                                                            Alert.alert('Already Allocated', 'This shade is already in the list.');
+                                                            return;
+                                                        }
+                                                        handleSelectShade(s);
+                                                    }}
+                                                >
+                                                    <Text style={[styles.shadePickerRowText, isUsed && { color: '#bbb' }]}>
+                                                        {s.Name}
+                                                    </Text>
+                                                    {isUsed && <Text style={styles.shadePickerUsedTag}>Added</Text>}
+                                                </TouchableOpacity>
+                                            );
+                                        }}
                                         ListEmptyComponent={
                                             <Text style={{ color: '#999', textAlign: 'center', marginTop: 20 }}>
                                                 No shades found.
@@ -2724,12 +3065,26 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 8,
     },
+    designSubheader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
     designName: {
         fontSize: 16,
         fontWeight: 'bold',
         color: '#333',
     },
     designCode: {
+        fontSize: 12,
+        color: '#666',
+    },
+    designNameSub: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    designCodeSub: {
         fontSize: 12,
         color: '#666',
     },
@@ -2866,7 +3221,7 @@ const styles = StyleSheet.create({
     jobChartBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        alignSelf: 'flex-start',
+        alignSelf: 'flex-end',
         borderWidth: 1,
         borderColor: theme.BRAND_GRADIENT_END,
         borderRadius: 6,
@@ -2875,7 +3230,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     jobChartBtnText: {
-        color: theme.BRAND_GRADIENT_END,
         fontSize: 12,
         fontWeight: '600',
         marginLeft: 4,
@@ -3053,6 +3407,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.6)',
         zIndex: 999, // higher than jobChartOverlay's 500, sits on top of job chart sheet
         justifyContent: 'flex-end',
+        height: '100%',
     },
     shadePickerSheet: {
         backgroundColor: '#fff',
@@ -3086,10 +3441,187 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     shadePickerRowText: {
         fontSize: 15,
         color: '#333',
+    },
+    // 
+    // ===== FULL SCREEN JOB CHART =====
+    jobChartFullOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#f5f5f5',
+        zIndex: 500,
+    },
+    jobChartFullHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 54,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    jobChartBackBtn: {
+        marginRight: 10,
+        padding: 4,
+    },
+    jobChartFullTitle: {
+        fontSize: 17,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    jobChartFullSubtitle: {
+        fontSize: 12,
+        color: '#777',
+        marginTop: 2,
+    },
+    jobChartDateBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.BRAND_GRADIENT_END,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 6,
+    },
+    jobChartDateBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    jobChartProgressWrap: {
+        marginTop: 10,
+    },
+    jobChartProgressRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    jobChartPendingValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#E65100',
+    },
+    progressBarBg: {
+        height: 8,
+        backgroundColor: '#eee',
+        borderRadius: 4,
+        marginTop: 6,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: 8,
+        borderRadius: 4,
+    },
+    jobChartAllocatedText: {
+        fontSize: 11,
+        color: '#666',
+    },
+    jobChartLockBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF3E0',
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 12,
+    },
+    jobChartLockBannerText: {
+        fontSize: 12,
+        color: '#E65100',
+        marginLeft: 6,
+        flex: 1,
+    },
+    allocGroupSection: {
+        marginBottom: 16,
+    },
+    allocGroupHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    allocGroupDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 6,
+    },
+    allocGroupTitle: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#333',
+        flex: 1,
+    },
+    allocGroupCount: {
+        fontSize: 11,
+        color: '#999',
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    allocRowCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        borderLeftWidth: 4,
+        padding: 12,
+        marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    allocRowName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    allocRowCode: {
+        fontSize: 11,
+        color: '#888',
+        marginTop: 2,
+    },
+    allocRowQty: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#333',
+        marginRight: 8,
+    },
+    allocRowRemoveBtn: {
+        padding: 4,
+    },
+    jobChartEmptyText: {
+        color: '#999',
+        textAlign: 'center',
+        paddingVertical: 20,
+    },
+    jobChartBottomBar: {
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+        padding: 12,
+        paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    },
+    shadePickerRowDisabled: {
+        opacity: 0.5,
+    },
+    shadePickerUsedTag: {
+        fontSize: 10,
+        color: '#4CAF50',
+        fontWeight: 'bold',
     },
 });
 

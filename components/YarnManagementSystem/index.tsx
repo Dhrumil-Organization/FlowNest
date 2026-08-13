@@ -1767,6 +1767,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         loadData();
     }, [activeTab, token]);
 
+
+
+
     const getTotalPercentage = (list) => {
         return list.reduce((sum, item) => sum + Number(item.per || 0), 0);
     };

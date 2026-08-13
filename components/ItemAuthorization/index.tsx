@@ -1015,6 +1015,11 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                     <Text style={newStyles.value}>{item.IgName || '-'}</Text>
                 </View>
 
+                 <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Denier</Text>
+                    <Text style={newStyles.value}>{item.Denier || '-'}</Text>
+                </View>
+
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Status</Text>
                     <Text style={newStyles.statusValue}>{item.AuthStatus || '-'}</Text>
@@ -1141,6 +1146,11 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                     <Text style={newStyles.value}>{item.IgName || '-'}</Text>
                 </View>
 
+                  <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Denier</Text>
+                    <Text style={newStyles.value}>{item.Denier || '-'}</Text>
+                </View>
+
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Status</Text>
                     <Text style={newStyles.statusValue}>{item.AuthStatus || '-'}</Text>
@@ -1189,6 +1199,10 @@ const ItemAuthorization: React.FC<Props> = ({ token, isConnected = true, usernam
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Item Group</Text>
                     <Text style={newStyles.value}>{item.IgName || '-'}</Text>
+                </View>
+                 <View style={newStyles.row}>
+                    <Text style={newStyles.label}>Denier</Text>
+                    <Text style={newStyles.value}>{item.Denier || '-'}</Text>
                 </View>
                 <View style={newStyles.row}>
                     <Text style={newStyles.label}>Status</Text>

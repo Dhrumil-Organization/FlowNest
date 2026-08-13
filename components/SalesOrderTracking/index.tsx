@@ -2640,18 +2640,20 @@ const SalesOrderTracking: React.FC<{
                                                 <Text style={styles.jobChartLockBannerText}>
                                                     {jobChartRef?.status === 'CLOSED'
                                                         ? 'This design is closed — view only.'
-                                                        : 'No pending meter left — view only.'}
+                                                        : jobChartRef?.pendingMeter <= 0
+                                                            ? 'No pending meter left — view only.'
+                                                            : 'APC not matched — view only.'}
                                                 </Text>
                                             </View>
                                         )}
 
                                         {/* ===== GROUP: NEW / UNSAVED ===== */}
                                         {allocations.filter(a => !a.LastDate).length > 0 && (
-                                            <View style={styles.allocGroupSection}>
-                                                <View style={styles.allocGroupHeaderRow}>
-                                                    <View style={[styles.allocGroupDot, { backgroundColor: '#2196F3' }]} />
-                                                    <Text style={styles.allocGroupTitle}>New (Not Saved)</Text>
-                                                    <Text style={styles.allocGroupCount}>
+                                            <View style={styles.groupBlockNew}>
+                                                <View style={styles.groupHeader}>
+                                                    <View style={[styles.groupDot, { backgroundColor: '#2196F3' }]} />
+                                                    <Text style={styles.groupTitle}>New (Not Saved)</Text>
+                                                    <Text style={styles.groupCount}>
                                                         {allocations.filter(a => !a.LastDate).length}
                                                     </Text>
                                                 </View>
@@ -2659,7 +2661,7 @@ const SalesOrderTracking: React.FC<{
                                                     .map((a, idx) => ({ ...a, __idx: idx }))
                                                     .filter(a => !a.LastDate)
                                                     .map(item => (
-                                                        <View key={`new-${item.__idx}`} style={[styles.allocRowCard, { borderLeftColor: '#2196F3' }]}>
+                                                        <View key={`new-${item.__idx}`} style={styles.allocRowCard}>
                                                             <View style={{ flex: 1 }}>
                                                                 <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
                                                                 <Text style={styles.allocRowCode}>Code: {item.ShdCode}</Text>
@@ -2677,16 +2679,28 @@ const SalesOrderTracking: React.FC<{
                                                             )}
                                                         </View>
                                                     ))}
+                                                <View style={styles.groupTotal}>
+                                                    <Text style={styles.groupTotalLabel}>Total:</Text>
+                                                    <Text style={styles.groupTotalValue}>
+                                                        {formatNumber(
+                                                            String(
+                                                                allocations
+                                                                    .filter(a => !a.LastDate)
+                                                                    .reduce((sum, a) => sum + (parseFloat(a.AllocationQty) || 0), 0)
+                                                            )
+                                                        )} m
+                                                    </Text>
+                                                </View>
                                             </View>
                                         )}
 
                                         {/* ===== GROUP: UPDATED TODAY ===== */}
                                         {allocations.filter(a => a.LastDate === getTodayDateStr()).length > 0 && (
-                                            <View style={styles.allocGroupSection}>
-                                                <View style={styles.allocGroupHeaderRow}>
-                                                    <View style={[styles.allocGroupDot, { backgroundColor: '#4CAF50' }]} />
-                                                    <Text style={styles.allocGroupTitle}>Updated Today ({formatAllocDate(getTodayDateStr())})</Text>
-                                                    <Text style={styles.allocGroupCount}>
+                                            <View style={styles.groupBlockToday}>
+                                                <View style={styles.groupHeader}>
+                                                    <View style={[styles.groupDot, { backgroundColor: '#4CAF50' }]} />
+                                                    <Text style={styles.groupTitle}>Updated Today ({formatAllocDate(getTodayDateStr())})</Text>
+                                                    <Text style={styles.groupCount}>
                                                         {allocations.filter(a => a.LastDate === getTodayDateStr()).length}
                                                     </Text>
                                                 </View>
@@ -2694,7 +2708,7 @@ const SalesOrderTracking: React.FC<{
                                                     .map((a, idx) => ({ ...a, __idx: idx }))
                                                     .filter(a => a.LastDate === getTodayDateStr())
                                                     .map(item => (
-                                                        <View key={`today-${item.__idx}`} style={[styles.allocRowCard, { borderLeftColor: '#4CAF50' }]}>
+                                                        <View key={`today-${item.__idx}`} style={styles.allocRowCard}>
                                                             <View style={{ flex: 1 }}>
                                                                 <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
                                                                 <Text style={styles.allocRowCode}>Code: {item.ShdCode}</Text>
@@ -2712,45 +2726,76 @@ const SalesOrderTracking: React.FC<{
                                                             )}
                                                         </View>
                                                     ))}
+                                                <View style={styles.groupTotal}>
+                                                    <Text style={styles.groupTotalLabel}>Total:</Text>
+                                                    <Text style={styles.groupTotalValue}>
+                                                        {formatNumber(
+                                                            String(
+                                                                allocations
+                                                                    .filter(a => a.LastDate === getTodayDateStr())
+                                                                    .reduce((sum, a) => sum + (parseFloat(a.AllocationQty) || 0), 0)
+                                                            )
+                                                        )} m
+                                                    </Text>
+                                                </View>
                                             </View>
                                         )}
 
-                                        {/* ===== GROUP: PREVIOUS ===== */}
-                                        {allocations.filter(a => a.LastDate && a.LastDate !== getTodayDateStr()).length > 0 && (
-                                            <View style={styles.allocGroupSection}>
-                                                <View style={styles.allocGroupHeaderRow}>
-                                                    <View style={[styles.allocGroupDot, { backgroundColor: '#9E9E9E' }]} />
-                                                    <Text style={styles.allocGroupTitle}>Previous Allocations</Text>
-                                                    <Text style={styles.allocGroupCount}>
-                                                        {allocations.filter(a => a.LastDate && a.LastDate !== getTodayDateStr()).length}
-                                                    </Text>
-                                                </View>
-                                                {allocations
-                                                    .map((a, idx) => ({ ...a, __idx: idx }))
-                                                    .filter(a => a.LastDate && a.LastDate !== getTodayDateStr())
-                                                    .map(item => (
-                                                        <View key={`prev-${item.__idx}`} style={[styles.allocRowCard, { borderLeftColor: '#9E9E9E' }]}>
-                                                            <View style={{ flex: 1 }}>
-                                                                <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
-                                                                <Text style={styles.allocRowCode}>
-                                                                    Code: {item.ShdCode} • {formatAllocDate(item.LastDate)}
-                                                                </Text>
-                                                            </View>
-                                                            <Text style={styles.allocRowQty}>
-                                                                {formatNumber(String(item.AllocationQty))} m
-                                                            </Text>
-                                                            {!item.IsLocked && canEditAllocation() && (
-                                                                <TouchableOpacity
-                                                                    onPress={() => handleRemoveAllocationRow(item.__idx)}
-                                                                    style={styles.allocRowRemoveBtn}
-                                                                >
-                                                                    <Icon name="close" size={16} color="#E65100" />
-                                                                </TouchableOpacity>
-                                                            )}
+                                        {/* ===== GROUP: PREVIOUS ALLOCATIONS (DATE-WISE) ===== */}
+                                        {(() => {
+                                            const today = getTodayDateStr();
+                                            const withIdx = allocations.map((a, idx) => ({ ...a, __idx: idx }));
+                                            const previous = withIdx.filter(a => a.LastDate && a.LastDate !== today);
+
+                                            if (previous.length === 0) return null;
+
+                                            const grouped = previous.reduce((acc, a) => {
+                                                const date = a.LastDate;
+                                                if (!acc[date]) acc[date] = [];
+                                                acc[date].push(a);
+                                                return acc;
+                                            }, {} as Record<string, any[]>);
+
+                                            // Sort dates (most recent first)
+                                            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+                                            return sortedDates.map(date => {
+                                                const items = grouped[date];
+                                                const totalQty = items.reduce((sum, a) => sum + parseFloat(a.AllocationQty || 0), 0);
+                                                return (
+                                                    <View key={date} style={styles.groupBlockPrevious}>
+                                                        <View style={styles.groupHeader}>
+                                                            <View style={[styles.groupDot, { backgroundColor: '#9E9E9E' }]} />
+                                                            <Text style={styles.groupTitle}>Allocations – {formatAllocDate(date)}</Text>
+                                                            <Text style={styles.groupCount}>{items.length}</Text>
                                                         </View>
-                                                    ))}
-                                            </View>
-                                        )}
+                                                        {items.map(item => (
+                                                            <View key={`prev-${date}-${item.__idx}`} style={styles.allocRowCard}>
+                                                                <View style={{ flex: 1 }}>
+                                                                    <Text style={styles.allocRowName}>{item.ShdName?.trim()}</Text>
+                                                                    <Text style={styles.allocRowCode}>Code: {item.ShdCode}</Text>
+                                                                </View>
+                                                                <Text style={styles.allocRowQty}>
+                                                                    {formatNumber(String(item.AllocationQty))} m
+                                                                </Text>
+                                                                {!item.IsLocked && canEditAllocation() && (
+                                                                    <TouchableOpacity
+                                                                        onPress={() => handleRemoveAllocationRow(item.__idx)}
+                                                                        style={styles.allocRowRemoveBtn}
+                                                                    >
+                                                                        <Icon name="close" size={16} color="#E65100" />
+                                                                    </TouchableOpacity>
+                                                                )}
+                                                            </View>
+                                                        ))}
+                                                        <View style={styles.groupTotal}>
+                                                            <Text style={styles.groupTotalLabel}>Total:</Text>
+                                                            <Text style={styles.groupTotalValue}>{formatNumber(String(totalQty))} m</Text>
+                                                        </View>
+                                                    </View>
+                                                );
+                                            });
+                                        })()}
 
                                         {allocations.length === 0 && (
                                             <Text style={styles.jobChartEmptyText}>No allocation added yet.</Text>
@@ -3622,6 +3667,82 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#4CAF50',
         fontWeight: 'bold',
+    },
+    // Group block containers
+    groupBlockNew: {
+        backgroundColor: '#E3F2FD',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+    },
+    groupBlockToday: {
+        backgroundColor: '#E8F5E9',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+    },
+    groupBlockPrevious: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 16,
+    },
+    groupHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    groupDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 8,
+    },
+    groupTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#333',
+        flex: 1,
+    },
+    groupCount: {
+        fontSize: 12,
+        color: '#666',
+        backgroundColor: 'rgba(0,0,0,0.08)',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    groupTotal: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginTop: 8,
+        paddingTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.1)',
+    },
+    groupTotalLabel: {
+        fontSize: 12,
+        color: '#666',
+        marginRight: 6,
+    },
+    groupTotalValue: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    // Update allocRowCard to remove left border (now handled by group blocks)
+    allocRowCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
     },
 });
 

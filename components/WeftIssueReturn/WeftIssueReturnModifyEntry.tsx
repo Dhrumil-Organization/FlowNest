@@ -992,7 +992,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
                     data: [temppayloadObj],
                     IskgQty: 0,
                     printype: "Print",
-                    PrintFormat: 3,
+                    PrintFormat: 5,
                     printerName: printer ? printer : '',
                     txntype: "beam_weft_issue_return"
                 };

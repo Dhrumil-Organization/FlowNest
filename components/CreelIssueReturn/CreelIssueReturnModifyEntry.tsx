@@ -767,9 +767,9 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     data: [temppayloadObj],
                     IskgQty: 0,
                     printype: "Print",
-                    PrintFormat: 3,
+                    PrintFormat: 5,
                     printerName: printer ? printer : '',
-                    txntype: "beam_weft_issue_return"
+                    txntype: "creel_issue_return"
                 };
 
                 console.log("Print Params :", params);

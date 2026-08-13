@@ -463,7 +463,9 @@ export default function Header({
     };
 
     const goBack = () => {
-        router.replace('/(tabs)');
+        // router.replace('/(tabs)');
+        if (router.canGoBack()) router.back();
+        else router.replace('/(tabs)');
     };
 
     useEffect(() => {

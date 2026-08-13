@@ -1014,9 +1014,9 @@ const LookupSelectionScreen = () => {
             await AsyncStorage.setItem(STORAGE_KEY, selected);
 
             if (selected === 'NEW') {
-                router.push('/new');
+                router.replace('/new');
             } else {
-                router.push('/(auth)/login');
+                router.replace('/(auth)/login');
             }
         } catch (e) {
             Alert.alert('Error', 'Unable to save selection.');

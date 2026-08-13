@@ -553,7 +553,7 @@ export default function LandingPage() {
                 <TouchableOpacity
                     style={styles.primaryBtn}
                     // onPress={() => router.replace('/(auth)/login')}
-                    onPress={() => router.push('/lookup-select')}
+                    onPress={() => router.replace('/lookup-select')}
                 >
                     <Text style={styles.primaryText}>
                         Login

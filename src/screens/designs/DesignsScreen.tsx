@@ -1428,23 +1428,49 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const requestSequence = useRef(0);
 
     const load = useCallback(async (page = 1) => {
+        const requestId = ++requestSequence.current;
+        const normalizedSearch = search.trim();
+
         try {
             const res = await DesignAPI.list({
-                yearno: yearno,
+                yearno,
                 page,
                 per_page: 50,
                 limit: 50,
-                category: filter !== 'All' ? filter : undefined,
-                search: search || undefined,
+
+                /*
+                 * A typed search is intentionally GLOBAL.
+                 *
+                 * The production app previously sent both a stale category
+                 * chip and the search text, which could hide a valid design.
+                 * Category filtering resumes automatically when search clears.
+                 */
+                category:
+                    normalizedSearch === '' && filter !== 'All'
+                        ? filter
+                        : undefined,
+
+                search: normalizedSearch || undefined,
             } as any);
+
+            /*
+             * Only the newest Catalog request may update UI state.
+             * This prevents slower old searches (8 -> 82 -> 822 -> 8229)
+             * from overwriting the latest result after it has already loaded.
+             */
+            if (requestId !== requestSequence.current) {
+                return;
+            }
 
             console.log('DESIGN LIST OK', {
                 url: res.config?.url,
                 baseURL: res.config?.baseURL,
                 params: res.config?.params,
                 status: res.status,
+                requestId,
             });
 
             const body: any = res.data;
@@ -1457,11 +1483,37 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
             const meta = body?.meta ?? body?.data?.meta ?? {};
             const hasMore = Boolean(meta.has_more);
 
-            setDesigns(prev => page === 1 ? rows : [...prev, ...rows]);
+            setDesigns(prev => {
+                if (page === 1) {
+                    return rows;
+                }
+
+                /*
+                 * Defensive de-duplication protects pagination if the server
+                 * result set shifts while the user is browsing.
+                 */
+                const seen = new Set(prev.map(row => String(row.id)));
+                const appendRows = rows.filter(
+                    row => !seen.has(String(row.id))
+                );
+
+                return [...prev, ...appendRows];
+            });
+
             setTotalPages(hasMore ? page + 1 : page);
-            setTotal((page === 1 ? 0 : designs.length) + rows.length + (hasMore ? 1 : 0));
+            setTotal(previousTotal =>
+                page === 1
+                    ? rows.length + (hasMore ? 1 : 0)
+                    : Math.max(0, previousTotal - 1)
+                        + rows.length
+                        + (hasMore ? 1 : 0)
+            );
             setCurrentPage(page);
         } catch (e: any) {
+            if (requestId !== requestSequence.current) {
+                return;
+            }
+
             const msg = e?.response?.data?.message
                 || e?.response?.data?.error
                 || e?.message
@@ -1475,15 +1527,36 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                 url: e?.config?.url,
                 baseURL: e?.config?.baseURL,
                 params: e?.config?.params,
+                requestId,
             });
 
             Alert.alert('Design list error', String(msg));
+        } finally {
+            if (requestId === requestSequence.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
-        finally { setLoading(false); setRefreshing(false); }
-    }, [filter, search, designs.length]);
+    }, [filter, search, yearno]);
 
-    useEffect(() => { load(1); }, [filter]);
-    useEffect(() => { const t = setTimeout(() => load(1), 400); return () => clearTimeout(t); }, [search]);
+    /*
+     * One effect owns first-page loading for both category and search.
+     * Invalidating the request sequence immediately (before debounce)
+     * prevents an already-running old request from updating the screen
+     * while the user is still typing.
+     */
+    useEffect(() => {
+        requestSequence.current += 1;
+        setExpandedId(null);
+        setExpandedDetail(null);
+
+        const timer = setTimeout(
+            () => void load(1),
+            search.trim() ? 400 : 0
+        );
+
+        return () => clearTimeout(timer);
+    }, [load, search]);
 
     const handleExpand = async (d: Design) => {
         if (expandedId === d.id) { setExpandedId(null); setExpandedDetail(null); return; }
@@ -1895,11 +1968,14 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             /*
              * Normalize all supported production response envelopes.
              *
-             * Supported examples:
-             * 1. { success, id, design_id, data: { id } }
-             * 2. { success, data: { design_id, data: { id } } }
-             * 3. { response: { success, id, data: { id } } }
-             * 4. Axios interceptor already returned the JSON body.
+             * IMPORTANT:
+             * HTTP 200/201 alone is NOT treated as a completed Design save.
+             * A completed save must resolve a real engineering design ID and
+             * that ID is read back from /designs/{id} below.
+             *
+             * This fixes the old false-positive popup:
+             * "Server confirmed the save but did not return the engineering
+             * design ID."
              */
             const rawBody: any = response?.data ?? response;
 
@@ -1913,7 +1989,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 body?.data ??
                 {};
 
-            const savedId = String(
+            let savedId = String(
                 nestedData?.id ??
                 nestedData?.design_id ??
                 nestedData?.engineering_design_id ??
@@ -1926,11 +2002,94 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 ''
             ).trim();
 
+            const explicitFailure =
+                body?.success === false ||
+                rawBody?.success === false;
+
+            if (explicitFailure) {
+                throw new Error(
+                    String(
+                        body?.message ||
+                        rawBody?.message ||
+                        'Server rejected the design save.'
+                    )
+                );
+            }
+
+            /*
+             * UPDATE is deterministic: the engineering ID is already known.
+             * Some older production response envelopes returned no ID after
+             * a successful PUT, so safely retain the current design ID.
+             */
+            if (!savedId && design?.id) {
+                savedId = String(design.id).trim();
+            }
+
+            /*
+             * CREATE recovery:
+             *
+             * If the save call returned successfully but an old proxy/client
+             * envelope stripped the ID, search the Catalog by the submitted
+             * code and accept ONLY one exact code match. This cannot confuse
+             * code 8229 with 1129128229/1 because comparison is exact here.
+             *
+             * We still verify /designs/{id} immediately afterwards, so this
+             * recovery never converts an uncommitted save into success.
+             */
+            if (!savedId && !design?.id) {
+                const submittedCode = String(form.code || '').trim();
+
+                try {
+                    const recoveryResponse = await DesignAPI.list({
+                        yearno,
+                        page: 1,
+                        per_page: 50,
+                        limit: 50,
+                        search: submittedCode,
+                    } as any);
+
+                    const recoveryBody: any = recoveryResponse?.data ?? {};
+                    const recoveryRows: Design[] = Array.isArray(recoveryBody?.data)
+                        ? recoveryBody.data
+                        : Array.isArray(recoveryBody?.data?.data)
+                            ? recoveryBody.data.data
+                            : [];
+
+                    const exactMatches = recoveryRows.filter(row =>
+                        String(row?.code || '').trim().toUpperCase()
+                        === submittedCode.toUpperCase()
+                    );
+
+                    if (exactMatches.length === 1) {
+                        savedId = String(exactMatches[0]?.id || '').trim();
+                    } else if (exactMatches.length > 1) {
+                        throw new Error(
+                            `Design code ${submittedCode} returned multiple exact Catalog matches. Save verification was stopped for safety.`
+                        );
+                    }
+                } catch (recoveryError: any) {
+                    /*
+                     * Preserve a deliberate ambiguity/safety error, otherwise
+                     * continue to the standard missing-ID failure below.
+                     */
+                    if (
+                        String(recoveryError?.message || '')
+                            .includes('multiple exact Catalog matches')
+                    ) {
+                        throw recoveryError;
+                    }
+
+                    console.log('DESIGN SAVE ID RECOVERY ERROR', {
+                        message: recoveryError?.message,
+                        status: recoveryError?.response?.status,
+                        responseData: recoveryError?.response?.data,
+                    });
+                }
+            }
+
             const saveConfirmed =
-                body?.success === true ||
-                rawBody?.success === true ||
-                response?.status === 200 ||
-                response?.status === 201;
+                Boolean(savedId) &&
+                !explicitFailure;
 
             console.log('DESIGN SAVE NORMALIZED RESPONSE', {
                 status: response?.status,
@@ -1943,19 +2102,9 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 saveConfirmed,
             });
 
-            if (!saveConfirmed) {
-                throw new Error(
-                    String(
-                        body?.message ||
-                        rawBody?.message ||
-                        'Server did not confirm the design save.'
-                    )
-                );
-            }
-
             if (!savedId) {
                 throw new Error(
-                    'Server confirmed the save but did not return the engineering design ID.'
+                    'The design save response did not contain an engineering design ID, and the committed design could not be recovered safely.'
                 );
             }
 
@@ -2006,6 +2155,15 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
             ) {
                 throw new Error(
                     `Design ${savedId} was returned by save but could not be read back.`
+                );
+            }
+
+            if (
+                String(verified?.code || '').trim().toUpperCase() !==
+                String(form.code || '').trim().toUpperCase()
+            ) {
+                throw new Error(
+                    `Design ${savedId} was read back with a different design code. Save verification was stopped for safety.`
                 );
             }
 

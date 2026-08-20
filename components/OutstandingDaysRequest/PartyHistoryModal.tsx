@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import React, { useEffect, useState } from 'react';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    Modal,
     ActivityIndicator,
-    TextInput,
     FlatList,
+    Modal,
     StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { crlimtreq_styles } from '../../../common/Styles/Style';
+import { crlimtreq_styles } from '../../common/Style';
 
 interface PartyData {
     ParCode: string;
@@ -168,25 +168,29 @@ const PartyHistoryModal: React.FC<PartyHistoryModalProps> = ({
             <View style={crlimtreq_styles.cardContent}>
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Old Limit:</Text>
-                        <Text style={crlimtreq_styles.valuegreen}>{item.limit1}</Text>
+                        <Text style={crlimtreq_styles.key}>OS. Days:</Text>
+                        <Text style={crlimtreq_styles.valuegreen}>{parseInt(item.limit1, 10)}</Text>
                     </View>
                     <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Req. Limit:</Text>
-                        <Text style={crlimtreq_styles.editableValue1}>{item.limit2}</Text>
+                        <Text style={crlimtreq_styles.key}>Requested OS. Days:</Text>
+                        <Text style={crlimtreq_styles.editableValue1}>{parseInt(item.limit2, 10)}</Text>
                     </View>
                 </View>
                 <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={crlimtreq_styles.key}>Auth. Limit:</Text>
-                        <Text style={crlimtreq_styles.Authvalue}>{item.limit3}</Text>
+                        <Text style={crlimtreq_styles.key}>Auth. OS. Day:</Text>
+                        <Text style={crlimtreq_styles.Authvalue}>{parseInt(item.limit3, 10)}</Text>
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
+                    {/* <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Auth. Days:</Text>
                         <Text style={crlimtreq_styles.Authvalue}>{item.crday3}</Text>
+                    </View> */}
+                    <View style={crlimtreq_styles.keyValuePair}>
+                        <Text style={crlimtreq_styles.key}>Revert Date:</Text>
+                        <Text style={crlimtreq_styles.value}>{item.revertdate || 'N/A'}</Text>
                     </View>
                 </View>
-                <View style={crlimtreq_styles.twoColumnRow}>
+                {/* <View style={crlimtreq_styles.twoColumnRow}>
                     <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Old Cr. Days:</Text>
                         <Text style={crlimtreq_styles.valuegreen}>{item.crday1}</Text>
@@ -195,7 +199,7 @@ const PartyHistoryModal: React.FC<PartyHistoryModalProps> = ({
                         <Text style={crlimtreq_styles.key}>Req. Cr. Days:</Text>
                         <Text style={crlimtreq_styles.editableValue1}>{item.crday2}</Text>
                     </View>
-                </View>
+                </View> */}
                 <View style={crlimtreq_styles.twoColumnRow}>
 
                     <View style={crlimtreq_styles.keyValuePair}>
@@ -216,10 +220,10 @@ const PartyHistoryModal: React.FC<PartyHistoryModalProps> = ({
                                     : <Text style={crlimtreq_styles.value}>{item.status}</Text>}
                         {/* <Text style={crlimtreq_styles.value}>{item.status}</Text> */}
                     </View>
-                    <View style={crlimtreq_styles.keyValuePair}>
+                    {/* <View style={crlimtreq_styles.keyValuePair}>
                         <Text style={crlimtreq_styles.key}>Revert Date:</Text>
                         <Text style={crlimtreq_styles.value}>{item.revertdate || 'N/A'}</Text>
-                    </View>
+                    </View> */}
                 </View>
 
 
@@ -387,6 +391,7 @@ const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
         backgroundColor: '#f5f5f5',
+        marginTop: 40
         // paddingTop: 50,
     },
     closeButton: {

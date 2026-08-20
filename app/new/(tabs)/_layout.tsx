@@ -320,7 +320,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   designs: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Designs' },
   costing: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Costing' },
   monthlysalestarget: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Sales Target' },
-  // orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
+  orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
@@ -383,7 +383,7 @@ export default function TabsLayout() {
     const filtered = APP_NAVIGATION.filter((item) => {
       if (!ready) return false;
       // Skip "Orders" tab
-      if (item.routeName === 'orders') return false;
+      // if (item.routeName === 'orders') return false;
       return item.action && item.action !== 'view'
         ? canDo(item.resource, item.action)
         : canAccess(item.resource);

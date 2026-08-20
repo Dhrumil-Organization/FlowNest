@@ -758,7 +758,8 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
                     mercode: d1.MerCode ?? "0",
                     mername: d1.MerName ?? "",
                     denier: d1.Denier ?? "0",
-                    prpcode: PrpCode ?? ""
+                    prpcode: PrpCode ?? "",
+                    chees: d2.Chees?? "0"
                 };
 
                 console.log("Print Payload Object :", temppayloadObj);

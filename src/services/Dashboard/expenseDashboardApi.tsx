@@ -35,13 +35,13 @@ export async function fetchExpenseDashboardCard(args: {
                 prptype: String(args.prptype || 'S').toUpperCase(),
                 yearno: String(args.yearno),
                 monthno: String(args.monthno).padStart(2, '0'),
-                date:  '29/07/2026',
+                date: '29/07/2026',
                 refresh: args.refresh ? 1 : 0,
                 prpcodes: args.prpcodes || [],
             },
             timeout: 30000,
         });
-
+        console.log("args.token", args.token);
         const params = {
             prptype: String(args.prptype || 'S').toUpperCase(),
             yearno: String(args.yearno),

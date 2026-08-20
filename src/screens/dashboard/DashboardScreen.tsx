@@ -173,7 +173,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
         monthno,
         refresh: forceRefresh ? 1 : 0,
       });
-
+      console.log("result",result);
       setExpenseData(result.response?.data || null);
     } catch (e: any) {
       setExpenseError(e?.message || 'Unable to load production cost.');
@@ -194,6 +194,8 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
     setError('');
     try {
       const result = await DashboardAPI.targetCard({ prptype, yearno, monthno, view });
+      console.log("prptype",prptype);
+      console.log("result",result);
       const payload = result.response;
       setCards(payload.cards || []);
       setPeriodLabel(payload.period?.label || payload.period?.month_name || 'Monthly Target');

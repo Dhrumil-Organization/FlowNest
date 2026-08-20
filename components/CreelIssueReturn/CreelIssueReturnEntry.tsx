@@ -592,7 +592,8 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                     mercode: getSavedData.MerCode ?? "0",
                     mername: getSavedData.MerName ?? "",
                     denier: getSavedData.Denier ?? "0",
-                    prpcode: getSavedData.PrpCode ?? ""
+                    prpcode: getSavedData.PrpCode ?? "",
+                    chees: getSavedData.Chees ?? "",
                 }
                 console.log("getSavedData", getSavedData, temppayloadObj);
                 const params = {

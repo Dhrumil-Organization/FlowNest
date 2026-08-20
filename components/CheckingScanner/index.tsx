@@ -2806,6 +2806,10 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                                 </Text>
 
                                                 <Text style={checkingScannerStyles.subText}>
+                                                    Meter : {item.Qty} m
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
                                                     Taka : {item.TakaNo}
                                                 </Text>
 

@@ -15,7 +15,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, FlatList,
     TouchableOpacity, TextInput, Modal, Alert,
@@ -23,6 +23,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_BASE_URL as API } from '@/src/api/client';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { fetchAllPropertyData } from '@/src/api/legacyFunctions';
 
 // ── Helpers (duplicated from the original file's top-level helpers —
 //    kept local here rather than shared, since this whole file is
@@ -48,6 +50,38 @@ const authHdr = (token: string) => ({
     Accept: 'application/json',
     'x-platform': 'mob',
 });
+
+const fmt = (v: any, dec = 2) => Number(v || 0).toFixed(dec);
+
+const currentFyNo = () => {
+    const d = new Date();
+    const endYear = d.getMonth() >= 3 ? d.getFullYear() + 1 : d.getFullYear();
+    return String(endYear % 100).padStart(2, '0');
+};
+
+const parseErpDate = (value: any) => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+    const raw = String(value || '').trim();
+    const digits = raw.replace(/\D/g, '');
+
+    if (digits.length === 8) {
+        const yyyy = Number(digits.slice(0, 4));
+        const mm = Number(digits.slice(4, 6));
+        const dd = Number(digits.slice(6, 8));
+        const d = new Date(yyyy, mm - 1, dd);
+        if (!Number.isNaN(d.getTime())) return d;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
+const decimalInput = (value: any) => {
+    const cleaned = String(value || '').replace(/[^0-9.]/g, '');
+    const [whole, ...fraction] = cleaned.split('.');
+    return fraction.length ? `${whole}.${fraction.join('')}` : whole;
+};
 
 // ── Bottom Sheet Picker (local to this file, same as the original —
 //    NOT the app's real PickerSheet.tsx; a naming collision that gets
@@ -83,7 +117,7 @@ function PickerSheet({ visible, title, items, keyField, labelField, subField,
                     )}
                 </View>
                 {loading ? (
-                    <View style={P.loader}><ActivityIndicator color="#13879A" /></View>
+                    <View style={P.loader}><ActivityIndicator color="#C87533" /></View>
                 ) : (
                     <FlatList
                         data={filtered}
@@ -109,7 +143,7 @@ function PickerSheet({ visible, title, items, keyField, labelField, subField,
 
 const P = StyleSheet.create({
     safe: { flex: 1, backgroundColor: '#fff' },
-    header: { height: 56, backgroundColor: '#13879A', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
+    header: { height: 56, backgroundColor: '#C87533', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
     backBtn: { width: 36 },
     backText: { color: '#fff', fontSize: 32, lineHeight: 38 },
     title: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center' },
@@ -123,6 +157,885 @@ const P = StyleSheet.create({
     empty: { padding: 40, alignItems: 'center' },
     emptyText: { color: '#9ca3af' },
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Full Sales Order View / Modify modal.
+// Functionality follows the existing View/Modify flow; visual styling uses
+// the CURRENT Auth tab theme (A/P styles), not the reference screen theme.
+// ─────────────────────────────────────────────────────────────────────────────
+function AuthOrderModal({
+    visible,
+    mode,
+    record,
+    saving,
+    token,
+    prpcode,
+    yearno,
+    onClose,
+    onSave,
+}: any) {
+    const isEdit = mode === 'edit';
+
+    const [dueDate, setDueDate] = useState(new Date());
+    const [showDueDate, setShowDueDate] = useState(false);
+    const [remark, setRemark] = useState('');
+    const [rows, setRows] = useState<any[]>([]);
+
+    // ── Add new item combination while modifying an existing SO ──
+    const [showAddCombination, setShowAddCombination] = useState(false);
+
+    const [addDesignList, setAddDesignList] = useState<any[]>([]);
+    const [addDesignLoading, setAddDesignLoading] = useState(false);
+    const [addDesignSearch, setAddDesignSearch] = useState('');
+    const [showAddDesignPicker, setShowAddDesignPicker] = useState(false);
+    const [addDesign, setAddDesign] = useState<any>(null);
+
+    const [addItemList, setAddItemList] = useState<any[]>([]);
+    const [addItemLoading, setAddItemLoading] = useState(false);
+    const [addItemSearch, setAddItemSearch] = useState('');
+    const [showAddItemPicker, setShowAddItemPicker] = useState(false);
+    const [addItem, setAddItem] = useState<any>(null);
+
+    const [addShadeList, setAddShadeList] = useState<any[]>([]);
+    const [addShadeLoading, setAddShadeLoading] = useState(false);
+    const [addShadeSearch, setAddShadeSearch] = useState('');
+    const [showAddShadePicker, setShowAddShadePicker] = useState(false);
+    const [addShade, setAddShade] = useState<any>(null);
+    const [addQty, setAddQty] = useState('');
+    const [addRate, setAddRate] = useState('');
+
+    const editPrpCode = record?.PrpCode || prpcode || '';
+    const editYearNo = record?.yearno || record?.YearNo || yearno || currentFyNo();
+    const editStrCode = record?.StrCode || '012';
+
+    const resetCombinationBuilder = () => {
+        setShowAddCombination(false);
+        setAddDesignList([]);
+        setAddDesignLoading(false);
+        setAddDesignSearch('');
+        setShowAddDesignPicker(false);
+        setAddDesign(null);
+        setAddItemList([]);
+        setAddItemLoading(false);
+        setAddItemSearch('');
+        setShowAddItemPicker(false);
+        setAddItem(null);
+        setAddShadeList([]);
+        setAddShadeLoading(false);
+        setAddShadeSearch('');
+        setShowAddShadePicker(false);
+        setAddShade(null);
+        setAddQty('');
+        setAddRate('');
+    };
+
+    useEffect(() => {
+        if (!visible || !record) return;
+
+        setDueDate(parseErpDate(record.DueDate || record.dduedate));
+        setRemark(String(record.Remark || ''));
+
+        setRows(
+            (Array.isArray(record.d1) ? record.d1 : []).map((row: any, index: number) => ({
+                ...row,
+                _qty: String(parseNum(row.Qty) || ''),
+                _rate: String(parseNum(row.UnitRate) || ''),
+                _clientKey: `existing_${row.SrNo || 0}_${row.ItmCode || 0}_${row.DsnCode || 0}_${row.ShdCode || 0}_${index}`,
+                _originalIndex: index,
+                _isNew: false,
+            }))
+        );
+
+        setShowDueDate(false);
+        resetCombinationBuilder();
+    }, [visible, record, mode]);
+
+    const loadAddDesigns = async () => {
+        if (!editPrpCode || !token) {
+            Alert.alert('Unable to add item', 'Property or login information is missing.');
+            return;
+        }
+
+        try {
+            setAddDesignLoading(true);
+            const res = await axios.get(`${API}/api/getitem`, {
+                headers: authHdr(token),
+                params: {
+                    prpcode: editPrpCode,
+                    strcode: editStrCode,
+                    yearno: editYearNo,
+                },
+            });
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+            setAddDesignList(Array.isArray(data) ? data : []);
+        } catch (e: any) {
+            setAddDesignList([]);
+            Alert.alert(
+                'Unable to load items',
+                e?.response?.data?.message || e?.message || 'Please try again.'
+            );
+        } finally {
+            setAddDesignLoading(false);
+        }
+    };
+
+    const openCombinationBuilder = () => {
+        if (!isEdit || saving) return;
+        setShowAddCombination(true);
+        if (addDesignList.length === 0 && !addDesignLoading) loadAddDesigns();
+    };
+
+    const selectAddDesign = async (design: any) => {
+        setAddDesign(design);
+        setAddItem(null);
+        setAddShade(null);
+        setAddItemList([]);
+        setAddShadeList([]);
+        setAddRate('');
+
+        if (!design?.ItmCode) return;
+
+        try {
+            setAddItemLoading(true);
+            const res = await axios.get(`${API}/api/getdesign`, {
+                headers: authHdr(token),
+                params: {
+                    prpcode: editPrpCode,
+                    strcode: editStrCode,
+                    yearno: editYearNo,
+                    itmcode: design.ItmCode,
+                    mitmcode: design.MItmCode || design.ItmCode,
+                    txntype: 'mob_app_sales_order',
+                },
+            });
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+            setAddItemList(Array.isArray(data) ? data : []);
+        } catch (e: any) {
+            setAddItemList([]);
+            Alert.alert(
+                'Unable to load designs',
+                e?.response?.data?.message || e?.message || 'Please try again.'
+            );
+        } finally {
+            setAddItemLoading(false);
+        }
+    };
+
+    const selectAddItem = async (item: any) => {
+        setAddItem(item);
+        setAddShade(null);
+        setAddShadeList([]);
+
+        if (!addDesign?.ItmCode || !item?.DsnCode) return;
+
+        try {
+            setAddShadeLoading(true);
+            const res = await axios.get(`${API}/api/getshade`, {
+                headers: authHdr(token),
+                params: {
+                    prpcode: editPrpCode,
+                    strcode: editStrCode,
+                    yearno: editYearNo,
+                    itmcode: addDesign.ItmCode,
+                    mitmcode: addDesign.MItmCode || addDesign.ItmCode,
+                    dsncode: item.DsnCode,
+                },
+            });
+            const data = res.data?.response?.data || res.data?.response || res.data?.data || [];
+            setAddShadeList(Array.isArray(data) ? data : []);
+        } catch (e: any) {
+            setAddShadeList([]);
+            Alert.alert(
+                'Unable to load shades',
+                e?.response?.data?.message || e?.message || 'Please try again.'
+            );
+        } finally {
+            setAddShadeLoading(false);
+        }
+    };
+
+    const addItemCombination = () => {
+        const qty = parseNum(addQty);
+        const rate = parseNum(addRate);
+
+        if (!addDesign) {
+            Alert.alert('Item required', 'Select an item.');
+            return;
+        }
+        if (!addItem) {
+            Alert.alert('Design required', 'Select a design.');
+            return;
+        }
+        if (!addShade) {
+            Alert.alert('Shade required', 'Select a shade.');
+            return;
+        }
+        if (qty <= 0 || rate <= 0) {
+            Alert.alert('Quantity and rate required', 'Enter quantity and rate greater than zero.');
+            return;
+        }
+
+        const duplicate = rows.some(row =>
+            String(row.ItmCode || '') === String(addDesign.ItmCode || '') &&
+            String(row.DsnCode || '') === String(addItem.DsnCode || '') &&
+            String(row.ShdCode || '') === String(addShade.ShdCode || '')
+        );
+
+        if (duplicate) {
+            Alert.alert(
+                'Combination already exists',
+                'This item, design and shade combination is already present in the order.'
+            );
+            return;
+        }
+
+        const nextSrNo = rows.reduce(
+            (highest, row) => Math.max(highest, Number(row.SrNo || 0)),
+            0
+        ) + 1;
+
+        const amount = qty * rate;
+        const clientKey = `new_${Date.now()}_${nextSrNo}`;
+
+        setRows(previous => [...previous, {
+            _clientKey: clientKey,
+            _isNew: true,
+            SrNo: nextSrNo,
+            StrCode: editStrCode,
+            ItmCode: addDesign.ItmCode,
+            MItmCode: addDesign.MItmCode || addDesign.ItmCode,
+            ItmName: addDesign.ItmName,
+            DsnCode: addItem.DsnCode,
+            DsnName: addItem.DsnName,
+            ShdCode: addShade.ShdCode,
+            ShdName: addShade.ShdName || addShade.ShadeName,
+            ShdColor: addShade.ShdColor || '',
+            Qty: fmt(qty, 3),
+            _qty: String(qty),
+            QtyPcs: '0',
+            SQty: fmt(qty, 3),
+            SQtyPcs: '0',
+            BQty: fmt(qty, 3),
+            BQtyPcs: '0',
+            UnitRate: fmt(rate, 5),
+            _rate: String(rate),
+            Amount: fmt(amount),
+            D1NetAmt: fmt(amount),
+            Remark1: '',
+            Remark2: '',
+            Remark3: '',
+            Remark4: '',
+            Remark5: '',
+            PkgQty: '1.000',
+            PkgRate: '.00000',
+            AmtCalc: 'U',
+            MerCode: '0',
+            GrdCode: '0',
+            DisPer: '.00',
+            DisAmt: '.00',
+            CGSTPer: '.00',
+            CGSTAmt: '.00',
+            SGSTPer: '.00',
+            SGSTAmt: '.00',
+            IGSTPer: '.00',
+            IGSTAmt: '.00',
+            Denier: addDesign.Denier || '',
+            UOM: addDesign.UOM || '',
+            HsnCode: addDesign.HsnCode || addDesign.HSNCode || '',
+            HSNName: addDesign.HSNName || '',
+        }]);
+
+        setShowAddCombination(false);
+        setAddDesign(null);
+        setAddItem(null);
+        setAddShade(null);
+        setAddItemList([]);
+        setAddShadeList([]);
+        setAddDesignSearch('');
+        setAddItemSearch('');
+        setAddShadeSearch('');
+        setAddQty('');
+        setAddRate('');
+    };
+
+    const updateRow = (index: number, field: string, value: string) => {
+        if (!isEdit) return;
+        setRows(previous =>
+            previous.map((row, rowIndex) =>
+                rowIndex === index ? { ...row, [field]: decimalInput(value) } : row
+            )
+        );
+    };
+
+    const totalQty = rows.reduce((sum, row) => sum + parseNum(row._qty), 0);
+    const totalAmount = rows.reduce(
+        (sum, row) => sum + parseNum(row._qty) * parseNum(row._rate),
+        0
+    );
+
+    const submit = () => {
+        if (!isEdit || saving) return;
+
+        if (!rows.length) {
+            Alert.alert('Cannot update', 'This sales order does not contain any item rows.');
+            return;
+        }
+
+        const invalidIndex = rows.findIndex(
+            row => parseNum(row._qty) <= 0 || parseNum(row._rate) <= 0
+        );
+
+        if (invalidIndex >= 0) {
+            Alert.alert(
+                'Invalid quantity or rate',
+                `Enter a quantity and rate greater than zero in item ${invalidIndex + 1}.`
+            );
+            return;
+        }
+
+        onSave({
+            dueDate,
+            remark: remark.trim(),
+            rows,
+            removedRows: [],
+        });
+    };
+
+    if (!record) return null;
+
+    return (
+        <Modal
+            visible={visible}
+            animationType="slide"
+            presentationStyle="fullScreen"
+            onRequestClose={() => !saving && onClose()}
+        >
+            <SafeAreaView style={A.modalSafe} edges={['top', 'bottom']}>
+                <View style={A.modalHeader}>
+                    <TouchableOpacity
+                        style={A.modalCloseBtn}
+                        onPress={onClose}
+                        disabled={saving}
+                        activeOpacity={0.75}
+                    >
+                        <Icon name="arrow-back" size={22} color="#fff" />
+                    </TouchableOpacity>
+
+                    <View style={{ flex: 1 }}>
+                        <Text style={A.modalTitle}>
+                            {isEdit ? 'Modify Sales Order' : 'View Sales Order'}
+                        </Text>
+                        <Text style={A.modalSubTitle}>{record.SONo || '—'}</Text>
+                    </View>
+
+                    <View style={[A.modeBadge, isEdit ? A.modeBadgeEdit : A.modeBadgeView]}>
+                        <Text style={[A.modeBadgeText, isEdit ? A.modeBadgeTextEdit : A.modeBadgeTextView]}>
+                            {isEdit ? 'MODIFY' : 'VIEW ONLY'}
+                        </Text>
+                    </View>
+                </View>
+
+                <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={A.modalContent}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {!isEdit && (
+                        <View style={A.readOnlyBanner}>
+                            <Icon name="visibility" size={18} color="#1D4ED8" />
+                            <Text style={A.readOnlyText}>
+                                View mode is read-only. No value can be changed or saved.
+                            </Text>
+                        </View>
+                    )}
+
+                    <View style={A.infoCard}>
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Customer</Text>
+                            <Text style={A.infoValue}>{record.ParName || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Sales executive</Text>
+                            <Text style={A.infoValue}>
+                                {record.SexecName || record.SExeName || '—'}
+                            </Text>
+                        </View>
+                        <View style={A.infoDivider} />
+
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Order date</Text>
+                            <Text style={A.infoValue}>{record.SODate || record.NSODate || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>SO Number</Text>
+                            <Text style={A.infoValue}>{record.SONo || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>PO Number</Text>
+                            <Text style={A.infoValue}>{record.PONo || '—'}</Text>
+                        </View>
+                        <View style={A.infoDivider} />
+
+                        <View style={A.infoRow}>
+                            <Text style={A.infoLabel}>Status</Text>
+                            <Text style={A.infoValue}>{record.AuthStatus || record.Status || 'Pending'}</Text>
+                        </View>
+                    </View>
+
+                    <Text style={A.formLabel}>Expected delivery date</Text>
+                    <TouchableOpacity
+                        style={[A.formInputWrap, !isEdit && A.formInputReadOnly]}
+                        onPress={() => isEdit && setShowDueDate(true)}
+                        disabled={!isEdit}
+                        activeOpacity={0.75}
+                    >
+                        <Icon name="event" size={19} color={isEdit ? '#C87533' : '#64748B'} />
+                        <Text style={[A.formInputText, !isEdit && A.formInputTextReadOnly]}>
+                            {fmtDisplay(dueDate)}
+                        </Text>
+                        {isEdit && <Icon name="chevron-right" size={20} color="#94A3B8" />}
+                    </TouchableOpacity>
+
+                    <View style={A.itemsHeader}>
+                        <Text style={A.itemsTitle}>Items</Text>
+                        <Text style={A.itemsCount}>
+                            {rows.length} row{rows.length === 1 ? '' : 's'}
+                        </Text>
+                    </View>
+
+                    {isEdit && !showAddCombination && (
+                        <TouchableOpacity
+                            style={A.addCombinationOpenBtn}
+                            onPress={openCombinationBuilder}
+                            disabled={saving}
+                            activeOpacity={0.8}
+                        >
+                            <Icon name="add-circle-outline" size={20} color="#0F766E" />
+                            <Text style={A.addCombinationOpenText}>Add item combination</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    {isEdit && showAddCombination && (
+                        <View style={A.addCombinationCard}>
+                            <View style={A.addCombinationHeader}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={A.addCombinationTitle}>New item combination</Text>
+                                    <Text style={A.addCombinationSubTitle}>
+                                        Select Item, Design and Shade
+                                    </Text>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={A.addCombinationCloseBtn}
+                                    onPress={() => setShowAddCombination(false)}
+                                    disabled={saving}
+                                    activeOpacity={0.8}
+                                >
+                                    <Icon name="close" size={20} color="#64748B" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={A.addCombinationLabel}>ITEM</Text>
+                            <TouchableOpacity
+                                style={A.addCombinationPicker}
+                                onPress={() => setShowAddDesignPicker(true)}
+                                disabled={saving || addDesignLoading}
+                                activeOpacity={0.8}
+                            >
+                                <Text
+                                    style={[
+                                        A.addCombinationPickerText,
+                                        !addDesign && A.addCombinationPlaceholder,
+                                    ]}
+                                    numberOfLines={2}
+                                >
+                                    {addDesign?.ItmName || 'Select item'}
+                                </Text>
+                                {addDesignLoading ? (
+                                    <ActivityIndicator size="small" color="#C87533" />
+                                ) : (
+                                    <Icon name="keyboard-arrow-down" size={21} color="#64748B" />
+                                )}
+                            </TouchableOpacity>
+
+                            <Text style={A.addCombinationLabel}>DESIGN</Text>
+                            <TouchableOpacity
+                                style={[
+                                    A.addCombinationPicker,
+                                    !addDesign && A.addCombinationPickerDisabled,
+                                ]}
+                                onPress={() => setShowAddItemPicker(true)}
+                                disabled={saving || !addDesign || addItemLoading}
+                                activeOpacity={0.8}
+                            >
+                                <Text
+                                    style={[
+                                        A.addCombinationPickerText,
+                                        !addItem && A.addCombinationPlaceholder,
+                                    ]}
+                                    numberOfLines={2}
+                                >
+                                    {addItem
+                                        ? `${addItem.DsnCode} · ${addItem.DsnName}`
+                                        : 'Select design'}
+                                </Text>
+                                {addItemLoading ? (
+                                    <ActivityIndicator size="small" color="#13879A" />
+                                ) : (
+                                    <Icon name="keyboard-arrow-down" size={21} color="#64748B" />
+                                )}
+                            </TouchableOpacity>
+
+                            <Text style={A.addCombinationLabel}>SHADE</Text>
+                            <TouchableOpacity
+                                style={[
+                                    A.addCombinationPicker,
+                                    !addItem && A.addCombinationPickerDisabled,
+                                ]}
+                                onPress={() => setShowAddShadePicker(true)}
+                                disabled={saving || !addItem || addShadeLoading}
+                                activeOpacity={0.8}
+                            >
+                                <View style={A.addCombinationShadeValue}>
+                                    {addShade && (
+                                        <View
+                                            style={[
+                                                A.addCombinationShadeSwatch,
+                                                { backgroundColor: addShade.ShdColor || '#CBD5E1' },
+                                            ]}
+                                        />
+                                    )}
+                                    <Text
+                                        style={[
+                                            A.addCombinationPickerText,
+                                            !addShade && A.addCombinationPlaceholder,
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {addShade?.ShdName || addShade?.ShadeName || 'Select shade'}
+                                    </Text>
+                                </View>
+
+                                {addShadeLoading ? (
+                                    <ActivityIndicator size="small" color="#13879A" />
+                                ) : (
+                                    <Icon name="keyboard-arrow-down" size={21} color="#64748B" />
+                                )}
+                            </TouchableOpacity>
+
+                            <View style={A.addCombinationFieldsRow}>
+                                <View style={A.addCombinationFieldCol}>
+                                    <Text style={A.addCombinationLabel}>QUANTITY</Text>
+                                    <TextInput
+                                        value={addQty}
+                                        onChangeText={value => setAddQty(decimalInput(value))}
+                                        editable={!saving}
+                                        keyboardType="decimal-pad"
+                                        style={A.addCombinationInput}
+                                        placeholder="0.000"
+                                        placeholderTextColor="#94A3B8"
+                                    />
+                                </View>
+
+                                <View style={A.addCombinationFieldCol}>
+                                    <Text style={A.addCombinationLabel}>RATE / M</Text>
+                                    <TextInput
+                                        value={addRate}
+                                        onChangeText={value => setAddRate(decimalInput(value))}
+                                        editable={!saving}
+                                        keyboardType="decimal-pad"
+                                        style={A.addCombinationInput}
+                                        placeholder="0.00"
+                                        placeholderTextColor="#94A3B8"
+                                    />
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[
+                                    A.addCombinationConfirmBtn,
+                                    (
+                                        !addDesign ||
+                                        !addItem ||
+                                        !addShade ||
+                                        parseNum(addQty) <= 0 ||
+                                        parseNum(addRate) <= 0 ||
+                                        saving
+                                    ) && A.actionDisabled,
+                                ]}
+                                onPress={addItemCombination}
+                                disabled={
+                                    saving ||
+                                    !addDesign ||
+                                    !addItem ||
+                                    !addShade ||
+                                    parseNum(addQty) <= 0 ||
+                                    parseNum(addRate) <= 0
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="add" size={19} color="#fff" />
+                                <Text style={A.addCombinationConfirmText}>Add to order</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {rows.map((row, index) => {
+                        const rowAmount = parseNum(row._qty) * parseNum(row._rate);
+
+                        return (
+                            <View
+                                key={row._clientKey || `${row.SrNo}_${index}`}
+                                style={[A.editItemCard, row._isNew && A.editItemCardNew]}
+                            >
+                                <View style={A.editItemTop}>
+                                    <View style={A.editItemIndex}>
+                                        <Text style={A.editItemIndexText}>{index + 1}</Text>
+                                    </View>
+
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text style={A.editItemDesign}>
+                                            {row.DsnName || row.DsnCode || 'Design'}
+                                        </Text>
+                                        <Text style={A.editItemMeta} numberOfLines={2}>
+                                            {row.ItmName || '—'} · {row.ShdName || row.ShadeName || '—'}
+                                        </Text>
+                                    </View>
+                                    {row._isNew && (
+                                        <View style={A.newItemBadge}>
+                                            <Text style={A.newItemBadgeText}>NEW</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={A.detailGrid}>
+                                    <View style={A.detailGridItem}>
+                                        <Text style={A.detailGridLabel}>Item Code</Text>
+                                        <Text style={A.detailGridValue}>{row.ItmCode || '—'}</Text>
+                                    </View>
+                                    <View style={A.detailGridItem}>
+                                        <Text style={A.detailGridLabel}>Design Code</Text>
+                                        <Text style={A.detailGridValue}>{row.DsnCode || '—'}</Text>
+                                    </View>
+                                    <View style={A.detailGridItem}>
+                                        <Text style={A.detailGridLabel}>Shade Code</Text>
+                                        <Text style={A.detailGridValue}>{row.ShdCode || '—'}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={A.editFieldsRow}>
+                                    <View style={A.editFieldCol}>
+                                        <Text style={A.editFieldLabel}>Quantity</Text>
+                                        <TextInput
+                                            value={row._qty}
+                                            onChangeText={value => updateRow(index, '_qty', value)}
+                                            editable={isEdit && !saving}
+                                            keyboardType="decimal-pad"
+                                            selectTextOnFocus={isEdit}
+                                            style={[A.editFieldInput, !isEdit && A.editFieldInputReadOnly]}
+                                            placeholder="0.000"
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                    </View>
+
+                                    <View style={A.editFieldCol}>
+                                        <Text style={A.editFieldLabel}>Rate / m</Text>
+                                        <TextInput
+                                            value={row._rate}
+                                            onChangeText={value => updateRow(index, '_rate', value)}
+                                            editable={isEdit && !saving}
+                                            keyboardType="decimal-pad"
+                                            selectTextOnFocus={isEdit}
+                                            style={[A.editFieldInput, !isEdit && A.editFieldInputReadOnly]}
+                                            placeholder="0.00"
+                                            placeholderTextColor="#94A3B8"
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={A.editAmountRow}>
+                                    <Text style={A.editAmountLabel}>Amount</Text>
+                                    <Text style={A.editAmountValue}>
+                                        ₹{moneyShort(rowAmount).replace(/^₹/, '')}
+                                    </Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+
+                    <Text style={A.formLabel}>Remark</Text>
+                    <TextInput
+                        value={remark}
+                        onChangeText={setRemark}
+                        editable={isEdit && !saving}
+                        multiline
+                        maxLength={500}
+                        textAlignVertical="top"
+                        style={[A.remarkInput, !isEdit && A.formInputReadOnly]}
+                        placeholder={isEdit ? 'Add a remark (optional)' : 'No remark'}
+                        placeholderTextColor="#94A3B8"
+                    />
+
+                    <View style={A.editTotalsCard}>
+                        <View>
+                            <Text style={A.editTotalLabel}>TOTAL QUANTITY</Text>
+                            <Text style={A.editTotalValue}>
+                                {totalQty.toLocaleString('en-IN')}
+                            </Text>
+                        </View>
+
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={A.editTotalLabel}>TOTAL AMOUNT</Text>
+                            <Text style={A.editTotalValue}>
+                                ₹{moneyShort(totalAmount).replace(/^₹/, '')}
+                            </Text>
+                        </View>
+                    </View>
+                </ScrollView>
+
+                <View style={A.modalFooter}>
+                    {isEdit ? (
+                        <>
+                            <TouchableOpacity
+                                style={A.cancelEditBtn}
+                                onPress={onClose}
+                                disabled={saving}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={A.cancelEditText}>Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[A.saveEditBtn, saving && A.actionDisabled]}
+                                onPress={submit}
+                                disabled={saving}
+                                activeOpacity={0.8}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                    <>
+                                        <Icon name="save" size={19} color="#fff" />
+                                        <Text style={A.saveEditText}>Update Order</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <TouchableOpacity
+                            style={A.closeViewBtn}
+                            onPress={onClose}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={A.closeViewText}>Close</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {showDueDate && isEdit && (
+                    <DateTimePicker
+                        value={dueDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(event, value) => {
+                            setShowDueDate(false);
+                            if (event.type === 'set' && value) setDueDate(value);
+                        }}
+                    />
+                )}
+
+                <PickerSheet
+                    visible={showAddDesignPicker}
+                    title="Item"
+                    items={addDesignList}
+                    keyField="ItmCode"
+                    labelField="ItmName"
+                    subField="ItmCode"
+                    search={addDesignSearch}
+                    setSearch={setAddDesignSearch}
+                    loading={addDesignLoading}
+                    onSelect={selectAddDesign}
+                    onClose={() => {
+                        setShowAddDesignPicker(false);
+                        setAddDesignSearch('');
+                    }}
+                />
+
+                <PickerSheet
+                    visible={showAddItemPicker}
+                    title="Design"
+                    items={addItemList}
+                    keyField="DsnCode"
+                    labelField="DsnName"
+                    subField="DsnCode"
+                    search={addItemSearch}
+                    setSearch={setAddItemSearch}
+                    loading={addItemLoading}
+                    onSelect={selectAddItem}
+                    onClose={() => {
+                        setShowAddItemPicker(false);
+                        setAddItemSearch('');
+                    }}
+                />
+
+                <PickerSheet
+                    visible={showAddShadePicker}
+                    title="Shade"
+                    items={addShadeList}
+                    keyField="ShdCode"
+                    labelField="ShdName"
+                    subField="ShdCode"
+                    search={addShadeSearch}
+                    setSearch={setAddShadeSearch}
+                    loading={addShadeLoading}
+                    onSelect={(shade: any) => {
+                        setAddShade(shade);
+                        setShowAddShadePicker(false);
+                        setAddShadeSearch('');
+                    }}
+                    onClose={() => {
+                        setShowAddShadePicker(false);
+                        setAddShadeSearch('');
+                    }}
+                    renderItem={(shade: any) => (
+                        <TouchableOpacity
+                            style={P.row}
+                            onPress={() => {
+                                setAddShade(shade);
+                                setShowAddShadePicker(false);
+                                setAddShadeSearch('');
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <View
+                                    style={[
+                                        A.addCombinationShadePickerSwatch,
+                                        { backgroundColor: shade.ShdColor || '#CBD5E1' },
+                                    ]}
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={P.rowText}>
+                                        {shade.ShdName || shade.ShadeName}
+                                    </Text>
+                                    {!!shade.ShdCode && (
+                                        <Text style={P.rowSub}>{shade.ShdCode}</Text>
+                                    )}
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    )}
+                />
+            </SafeAreaView>
+        </Modal>
+    );
+}
 
 // ── ─────────────────────────────────────────────────────────────
 //    AUTH TAB
@@ -140,9 +1053,20 @@ function AuthTab({ token }) {
     const [showFrom, setShowFrom] = useState(false);
     const [showTo, setShowTo] = useState(false);
     const [approving, setApproving] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    // Property selection — same source/flow as New Order.
+    const [propertyData, setPropertyData] = useState<any[]>([]);
+    const [propertyLoading, setPropertyLoading] = useState(false);
+    const [propertyPickerOpen, setPropertyPickerOpen] = useState(false);
+    const [propertySearch, setPropertySearch] = useState('');
+    const [selectedProperty, setSelectedProperty] = useState<any>(null);
+
     const [prpcode, setPrpCode] = useState('');
     const [yearno, setYearNo] = useState('');
     const [expandedId, setExpandedId] = useState(null); // ← track which card is open
+    const [orderModal, setOrderModal] = useState({ visible: false, mode: 'view', record: null });
 
     useEffect(() => {
         if (!token) return;
@@ -153,17 +1077,118 @@ function AuthTab({ token }) {
     }, [token]);
 
     useEffect(() => {
+        if (!token) return;
+
         const loadFilterData = async () => {
-            const code = await AsyncStorage.getItem('selected_prpcode');
-            const year = await AsyncStorage.getItem('selected_yearno');
-            setPrpCode(code || '');
-            setYearNo(year ? `${year.slice(-2)}` : '');
+            try {
+                setPropertyLoading(true);
+
+                const [properties, savedProperty, savedYear, savedYearNo] = await Promise.all([
+                    fetchAllPropertyData(token),
+                    AsyncStorage.getItem('selected_prpcode'),
+                    AsyncStorage.getItem('selectedyear'),
+                    AsyncStorage.getItem('selected_yearno'),
+                ]);
+
+                const list = Array.isArray(properties) ? properties : [];
+                setPropertyData(list);
+
+                const code = savedProperty || '';
+                const selected = list.find(
+                    (item: any) => String(item?.PrpCode ?? '') === String(code)
+                );
+
+                setSelectedProperty(selected || null);
+                setPrpCode(code);
+
+                const rawYear = savedYearNo || savedYear || '';
+                setYearNo(rawYear ? String(rawYear).split('-').pop()?.slice(-2) || '' : '');
+            } catch (e) {
+                console.log('AUTH PROPERTY LOAD ERROR:', e);
+                setPropertyData([]);
+            } finally {
+                setPropertyLoading(false);
+            }
         };
+
         loadFilterData();
-    }, []);
+    }, [token]);
+
+    const propertyPickerItems = useMemo(() => {
+        const q = propertySearch.trim().toLowerCase();
+
+        const items = propertyData.map((item: any) => ({
+            ...item,
+            _label: item?.LngName || item?.ShtName || item?.PrpName || item?.PrpCode || '',
+            _sub: item?.ShtName || item?.PrpCode || '',
+        }));
+
+        if (!q) return items;
+
+        return items.filter((item: any) =>
+            `${item._label} ${item._sub} ${item.PrpCode || ''}`
+                .toLowerCase()
+                .includes(q)
+        );
+    }, [propertyData, propertySearch]);
+
+    const selectProperty = async (item: any) => {
+        const code = String(item?.PrpCode ?? '').trim();
+        if (!code) return;
+
+        setSelectedProperty(item);
+        setPrpCode(code);
+        setExpandedId(null);
+
+        try {
+            await AsyncStorage.setItem('selected_prpcode', code);
+        } catch (e) {
+            console.log('AUTH PROPERTY SAVE ERROR:', e);
+        }
+
+        setPropertyPickerOpen(false);
+        setPropertySearch('');
+    };
+
+    // ── Cross-platform From / To date picker handlers ──
+    // Android: native calendar dialog.
+    // iOS: native spinner date picker.
+    const handleFromDateChange = (event: any, selectedDate?: Date) => {
+        setShowFrom(false);
+
+        if (event?.type === 'dismissed' || !selectedDate) return;
+
+        const nextFrom = new Date(selectedDate);
+        nextFrom.setHours(0, 0, 0, 0);
+
+        // From date cannot be after To date.
+        if (toDate && nextFrom.getTime() > new Date(toDate).setHours(0, 0, 0, 0)) {
+            Alert.alert('Invalid date', 'From date cannot be greater than To date.');
+            return;
+        }
+
+        setFromDate(nextFrom);
+    };
+
+    const handleToDateChange = (event: any, selectedDate?: Date) => {
+        setShowTo(false);
+
+        if (event?.type === 'dismissed' || !selectedDate) return;
+
+        const nextTo = new Date(selectedDate);
+        nextTo.setHours(0, 0, 0, 0);
+
+        // To date cannot be before From date.
+        if (fromDate && nextTo.getTime() < new Date(fromDate).setHours(0, 0, 0, 0)) {
+            Alert.alert('Invalid date', 'To date cannot be less than From date.');
+            return;
+        }
+
+        setToDate(nextTo);
+    };
 
     const load = useCallback(async (isRefresh = false) => {
-        if (!fromDate || !toDate) return;
+        if (!fromDate || !toDate || !prpcode) return;
         try {
             isRefresh ? setRefreshing(true) : setLoading(true);
             const userPtype = await AsyncStorage.getItem('user_prptype');
@@ -175,8 +1200,8 @@ function AuthTab({ token }) {
                 strtype: 'g',
                 txntype: 'sales_order',
                 referrer: 'mob_dashboard',
-                yearno: '27',
-                prpcode: prpcode,
+                yearno: yearno || '27',
+                prpcode: prpcode || '',
                 prpcodes: [],
                 search: '',
             };
@@ -305,6 +1330,178 @@ function AuthTab({ token }) {
         return `SO-${item.NSODate}-${item.SONo}`;
     };
 
+    const openOrder = (item, mode) => {
+        if (mode === 'edit' && Number(item.IsAuth || 0) !== 0) {
+            Alert.alert('Cannot modify', 'An authorized sales order cannot be modified.');
+            return;
+        }
+        setOrderModal({ visible: true, mode, record: item });
+    };
+
+    const closeOrder = () => {
+        if (savingEdit) return;
+        setOrderModal({ visible: false, mode: 'view', record: null });
+    };
+
+    const updateOrder = async ({ dueDate, remark, rows, removedRows = [] }) => {
+        const item = orderModal.record;
+        if (!item || orderModal.mode !== 'edit') return;
+
+        const totalAmount = rows.reduce(
+            (sum, row) => sum + (parseNum(row._qty) * parseNum(row._rate)),
+            0
+        );
+
+        const soDate = parseErpDate(item.NSODate || item.SODate);
+        const deliveryDays = Math.max(
+            0,
+            Math.ceil((dueDate.getTime() - soDate.getTime()) / (1000 * 60 * 60 * 24))
+        );
+
+        const details = rows.map((row, index) => {
+            const qty = parseNum(row._qty);
+            const rate = parseNum(row._rate);
+            const amount = qty * rate;
+
+            const persistedRow = Object.fromEntries(
+                Object.entries(row).filter(([key]) => !key.startsWith('_'))
+            );
+
+            return {
+                ...persistedRow,
+                SrNo: row.SrNo || index + 1,
+                StrCode: row.StrCode || item.StrCode || '012',
+                Qty: fmt(qty, 3),
+                UnitRate: fmt(rate, 5),
+                Amount: fmt(amount),
+                D1NetAmt: fmt(amount),
+                SQty: row.SQty ?? fmt(qty, 3),
+                BQty: row.BQty ?? fmt(qty, 3),
+                QtyPcs: row.QtyPcs ?? '0',
+                SQtyPcs: row.SQtyPcs ?? row.QtyPcs ?? '0',
+                BQtyPcs: row.BQtyPcs ?? row.QtyPcs ?? '0',
+            };
+        });
+
+        const payload = {
+            Mode: 'EDIT',
+            UId: item.UId,
+            main: {
+                ...item,
+                Mode: 'EDIT',
+                UId: item.UId,
+                PrpCode: item.PrpCode || prpcode,
+                StrCode: item.StrCode || '012',
+                YearNo: item.yearno || yearno || currentFyNo(),
+                SExe: item.sexec || item.SExe || '',
+                SODate: item.NSODate || ymd(soDate),
+                DueDate: ymd(dueDate),
+                DDays: String(deliveryDays),
+                Remark: remark,
+                GrsAmt: fmt(totalAmount),
+                NetAmt: fmt(totalAmount),
+                D1NetAmt: fmt(totalAmount),
+            },
+            d1: details,
+            tax: [],
+            exp: {},
+        };
+
+        try {
+            setSavingEdit(true);
+
+            const res = await axios.post(`${API}/api/mobappsave`, payload, {
+                headers: authHdr(token),
+            });
+
+            if (res.data?.success !== true) {
+                throw new Error(res.data?.message || 'Unable to update the sales order.');
+            }
+
+            setOrderModal({ visible: false, mode: 'view', record: null });
+            setExpandedId(null);
+            await load();
+
+            const addedCount = rows.filter(row => row._isNew).length;
+            Alert.alert(
+                'Updated',
+                addedCount > 0
+                    ? `Sales order updated successfully. ${addedCount} new item${addedCount === 1 ? '' : 's'} added.`
+                    : 'Sales order updated successfully.'
+            );
+        } catch (e: any) {
+            Alert.alert(
+                'Update failed',
+                e?.response?.data?.message || e?.message || 'Unable to update the sales order.'
+            );
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const deleteOrder = async (item) => {
+        try {
+            setDeletingId(item.UId);
+
+            const res = await axios.post(
+                `${API}/api/sodelete`,
+                {
+                    uid: item.UId,
+                    UId: item.UId,
+                    prpcode: item.PrpCode || prpcode,
+                    PrpCode: item.PrpCode || prpcode,
+                    strcode: item.StrCode || '012',
+                    yearno: item.yearno || yearno || currentFyNo(),
+                    txntype: 'sales_order',
+                },
+                { headers: authHdr(token) }
+            );
+
+            const response = res.data?.response || {};
+            const serverMessage = response.message || res.data?.message || '';
+            const failed =
+                res.data?.success === false || /in use|closed|no data/i.test(serverMessage);
+
+            if (failed) {
+                throw new Error(serverMessage || 'The sales order could not be deleted.');
+            }
+
+            setPending(previous =>
+                previous.filter(row => String(row.UId) !== String(item.UId))
+            );
+            setAuthorised(previous =>
+                previous.filter(row => String(row.UId) !== String(item.UId))
+            );
+            setExpandedId(previous =>
+                String(previous) === String(item.UId) ? null : previous
+            );
+
+            Alert.alert('Deleted', 'Sales order removed successfully.');
+        } catch (e: any) {
+            Alert.alert(
+                'Cannot delete order',
+                e?.response?.data?.message ||
+                e?.message ||
+                'This sales order may already be in use.'
+            );
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const confirmDelete = (item) => {
+        if (deletingId || savingEdit || approving) return;
+
+        Alert.alert(
+            'Delete sales order?',
+            `${getSoId(item)} will be permanently removed. This is allowed only when the order is not in use.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => deleteOrder(item) },
+            ]
+        );
+    };
+
     // ── Pending card ──────────────────────────────────────────────
     const renderPendingCard = (item) => {
         const isOpen = expandedId === item.UId;
@@ -426,6 +1623,45 @@ function AuthTab({ token }) {
                             </View>
                         ) : null}
 
+                        {/* View / Modify / Delete — existing Auth theme */}
+                        <View style={A.manageRow}>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.editBtn]}
+                                onPress={() => openOrder(item, 'edit')}
+                                disabled={deletingId === item.UId || approving === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="edit" size={17} color="#0F766E" />
+                                <Text style={[A.manageBtnText, A.editBtnText]}>Modify</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.viewBtn]}
+                                onPress={() => openOrder(item, 'view')}
+                                disabled={deletingId === item.UId || approving === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="visibility" size={17} color="#1D4ED8" />
+                                <Text style={[A.manageBtnText, A.viewBtnText]}>View</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.deleteBtn]}
+                                onPress={() => confirmDelete(item)}
+                                disabled={deletingId === item.UId || approving === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                {deletingId === item.UId ? (
+                                    <ActivityIndicator size="small" color="#B91C1C" />
+                                ) : (
+                                    <Icon name="delete-outline" size={18} color="#B91C1C" />
+                                )}
+                                <Text style={[A.manageBtnText, A.deleteBtnText]}>
+                                    {deletingId === item.UId ? 'Deleting' : 'Delete'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
                         {/* Approve / Reject */}
                         <View style={A.actRow}>
                             <TouchableOpacity
@@ -513,6 +1749,44 @@ function AuthTab({ token }) {
                                 </Text>
                             </View>
                         ))}
+
+                        <View style={A.manageRow}>
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.lockedEditBtn]}
+                                onPress={() => openOrder(item, 'edit')}
+                                disabled={deletingId === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="lock-outline" size={16} color="#64748B" />
+                                <Text style={[A.manageBtnText, A.lockedEditBtnText]}>Modify</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.viewBtn]}
+                                onPress={() => openOrder(item, 'view')}
+                                disabled={deletingId === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                <Icon name="visibility" size={17} color="#1D4ED8" />
+                                <Text style={[A.manageBtnText, A.viewBtnText]}>View</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[A.manageBtn, A.deleteBtn]}
+                                onPress={() => confirmDelete(item)}
+                                disabled={deletingId === item.UId}
+                                activeOpacity={0.8}
+                            >
+                                {deletingId === item.UId ? (
+                                    <ActivityIndicator size="small" color="#B91C1C" />
+                                ) : (
+                                    <Icon name="delete-outline" size={18} color="#B91C1C" />
+                                )}
+                                <Text style={[A.manageBtnText, A.deleteBtnText]}>
+                                    {deletingId === item.UId ? 'Deleting' : 'Delete'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
             </View>
@@ -550,6 +1824,38 @@ function AuthTab({ token }) {
                 />
             }
         >
+            {/* Property selection — same compact style as New Order */}
+            <View style={A.propertyStrip}>
+                <TouchableOpacity
+                    style={A.propertyPill}
+                    onPress={() => {
+                        setPropertySearch('');
+                        setPropertyPickerOpen(true);
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Text style={A.propertyPillLabel}>PROPERTY</Text>
+                    <View style={A.propertyPillValueRow}>
+                        <Text
+                            style={[
+                                A.propertyPillValue,
+                                !selectedProperty && A.propertyPillPlaceholder,
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {selectedProperty?.LngName ||
+                                selectedProperty?.ShtName ||
+                                'Select property'}
+                        </Text>
+                        {propertyLoading ? (
+                            <ActivityIndicator size="small" color="#C87533" />
+                        ) : (
+                            <Icon name="keyboard-arrow-down" size={19} color="#64748B" />
+                        )}
+                    </View>
+                </TouchableOpacity>
+            </View>
+
             {/* Date filter strip */}
             <View style={A.dateStrip}>
                 <TouchableOpacity style={A.datePill} onPress={() => setShowFrom(true)}>
@@ -583,28 +1889,63 @@ function AuthTab({ token }) {
                 </View>
             )}
 
+            <PickerSheet
+                visible={propertyPickerOpen}
+                title="Property"
+                items={propertyPickerItems}
+                keyField="PrpCode"
+                labelField="_label"
+                subField="_sub"
+                search={propertySearch}
+                setSearch={setPropertySearch}
+                loading={propertyLoading}
+                onSelect={selectProperty}
+                onClose={() => {
+                    setPropertyPickerOpen(false);
+                    setPropertySearch('');
+                }}
+            />
+
+            {/* From Date Picker
+                iOS  -> spinner
+                Android -> native calendar dialog
+            */}
             {showFrom && (
                 <DateTimePicker
                     value={fromDate || new Date()}
                     mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={(e, d) => {
-                        setShowFrom(false);
-                        if (e.type === 'set' && d) setFromDate(d);
-                    }}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                    maximumDate={toDate || new Date()}
+                    onChange={handleFromDateChange}
                 />
             )}
+
+            {/* To Date Picker
+                iOS  -> spinner
+                Android -> native calendar dialog
+            */}
             {showTo && (
                 <DateTimePicker
                     value={toDate || new Date()}
                     mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={(e, d) => {
-                        setShowTo(false);
-                        if (e.type === 'set' && d) setToDate(d);
-                    }}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                    minimumDate={fromDate || undefined}
+                    maximumDate={new Date()}
+                    onChange={handleToDateChange}
                 />
             )}
+
+            <AuthOrderModal
+                visible={orderModal.visible}
+                mode={orderModal.mode}
+                record={orderModal.record}
+                saving={savingEdit}
+                token={token}
+                prpcode={prpcode}
+                yearno={yearno}
+                onClose={closeOrder}
+                onSave={updateOrder}
+            />
         </ScrollView>
     );
 }
@@ -741,7 +2082,7 @@ function TrackingTab({ token }) {
                 yearno: yearno || '27',
                 sexes: '',
                 type: 'all',
-                wise: 'order',          // TODO confirm with ERP: order-wise list
+                wise: '',          // TODO confirm with ERP: order-wise list
                 dsncodes: [],
                 itemcodes: [],
                 parties: [],
@@ -1053,7 +2394,13 @@ function TrackingTab({ token }) {
                         </TouchableOpacity>
                     )}
                     {actions.includes('job') && (
-                        <TouchableOpacity style={Tr.jobBtn} onPress={() => setJobItem(item)}>
+                        <TouchableOpacity style={Tr.jobBtn}
+                            // onPress={() => setJobItem(item)}
+                            onPress={() => {
+                                console.log("CLICKED CARD ITEM =", item);
+                                setJobItem(item);
+                            }}
+                        >
                             <Text style={Tr.jobBtnText}>Job chart</Text>
                         </TouchableOpacity>
                     )}
@@ -2525,16 +3872,72 @@ const SU = StyleSheet.create({
 const A = StyleSheet.create({
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
+    // Property selection
+    propertyStrip: { marginBottom: 10 },
+    propertyPill: {
+        minHeight: 52,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: .5,
+        borderColor: '#e4e7ef',
+        paddingHorizontal: 13,
+        paddingVertical: 8,
+        justifyContent: 'center',
+    },
+    propertyPillLabel: {
+        fontSize: 9,
+        color: '#94A3B8',
+        fontWeight: '800',
+        letterSpacing: .7,
+        marginBottom: 3,
+    },
+    propertyPillValueRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    propertyPillValue: {
+        flex: 1,
+        fontSize: 13,
+        color: '#111827',
+        fontWeight: '700',
+    },
+    propertyPillPlaceholder: {
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
+
     // Date strip
     dateStrip: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-    datePill: { flex: 1, height: 36, backgroundColor: '#fff', borderRadius: 10, borderWidth: .5, borderColor: '#e4e7ef', justifyContent: 'center', alignItems: 'center' },
-    datePillText: { fontSize: 12, color: '#000' },
-    applyBtn: { width: 56, height: 36, backgroundColor: '#13879A', borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    datePill: {
+        flex: 1,
+        minHeight: 42,
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        borderWidth: 0.7,
+        borderColor: '#e4e7ef',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+    },
+    datePillText: {
+        fontSize: 12,
+        color: '#111827',
+        fontWeight: '600',
+    },
+    applyBtn: {
+        width: 68,
+        minHeight: 42,
+        backgroundColor: '#C87533',
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     applyBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
     // Section headings
     sectionHead: { fontSize: 14, fontWeight: '600', color: '#000', marginBottom: 10 },
-    sectionCnt: { color: '#13879A' },
+    sectionCnt: { color: '#C87533' },
 
     // Card shell
     card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, borderWidth: .5, borderColor: '#e4e7ef', overflow: 'hidden' },
@@ -2602,6 +4005,101 @@ const A = StyleSheet.create({
     // Empty state
     emptyBox: { paddingVertical: 20, alignItems: 'center' },
     emptyText: { color: '#000', fontSize: 13 },
+
+    // View / Modify actions — same current Auth theme
+    manageRow: { flexDirection: 'row', gap: 8, marginTop: 10, marginBottom: 10 },
+    manageBtn: { flex: 1, minHeight: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 5, borderWidth: .5 },
+    manageBtnText: { fontSize: 12, fontWeight: '700' },
+    editBtn: { backgroundColor: '#ECFDF5', borderColor: '#99F6E4' },
+    editBtnText: { color: '#0F766E' },
+    viewBtn: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+    viewBtnText: { color: '#1D4ED8' },
+    deleteBtn: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+    deleteBtnText: { color: '#B91C1C' },
+    lockedEditBtn: { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
+    lockedEditBtnText: { color: '#64748B' },
+
+    // Full-screen View / Modify modal
+    modalSafe: { flex: 1, backgroundColor: '#fff' },
+    modalHeader: { minHeight: 62, backgroundColor: '#0D1B2A', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 10 },
+    modalCloseBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,.16)', justifyContent: 'center', alignItems: 'center' },
+    modalTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    modalSubTitle: { color: 'rgba(255,255,255,.82)', fontSize: 11, marginTop: 2 },
+    modeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+    modeBadgeEdit: { backgroundColor: '#FFF7ED' },
+    modeBadgeView: { backgroundColor: '#EFF6FF' },
+    modeBadgeText: { fontSize: 9, fontWeight: '800' },
+    modeBadgeTextEdit: { color: '#9A3412' },
+    modeBadgeTextView: { color: '#1D4ED8' },
+    modalContent: { padding: 14, paddingBottom: 28 },
+    readOnlyBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EFF6FF', borderWidth: .5, borderColor: '#BFDBFE', borderRadius: 10, padding: 10, marginBottom: 12 },
+    readOnlyText: { flex: 1, color: '#1D4ED8', fontSize: 11, fontWeight: '600' },
+    infoCard: { backgroundColor: '#fff', borderRadius: 14, borderWidth: .5, borderColor: '#e4e7ef', padding: 12, marginBottom: 14 },
+    infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, minHeight: 30 },
+    infoLabel: { color: '#667085', fontSize: 11 },
+    infoValue: { flex: 1, textAlign: 'right', color: '#000', fontSize: 12, fontWeight: '600' },
+    infoDivider: { height: .5, backgroundColor: '#edf0f3' },
+    formLabel: { color: '#000', fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 4 },
+    formInputWrap: { minHeight: 44, borderWidth: .5, borderColor: '#e4e7ef', borderRadius: 10, backgroundColor: '#fff', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 14 },
+    formInputText: { flex: 1, color: '#000', fontSize: 13, fontWeight: '600' },
+    formInputReadOnly: { backgroundColor: '#f8fafc' },
+    formInputTextReadOnly: { color: '#64748B' },
+    itemsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    itemsTitle: { color: '#000', fontSize: 14, fontWeight: '700' },
+    itemsCount: { color: '#C87533', fontSize: 11, fontWeight: '700' },
+    addCombinationOpenBtn: { minHeight: 44, borderRadius: 11, borderWidth: 1, borderStyle: 'dashed', borderColor: '#5EEAD4', backgroundColor: '#F0FDFA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10, paddingHorizontal: 12 },
+    addCombinationOpenText: { color: '#0F766E', fontSize: 12, fontWeight: '800' },
+    addCombinationCard: { backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: .5, borderColor: '#CBD5E1', padding: 11, marginBottom: 10 },
+    addCombinationHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 11 },
+    addCombinationTitle: { color: '#000', fontSize: 13, fontWeight: '800' },
+    addCombinationSubTitle: { color: '#64748B', fontSize: 10, marginTop: 2 },
+    addCombinationCloseBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#fff', borderWidth: .5, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+    addCombinationLabel: { color: '#64748B', fontSize: 9, fontWeight: '800', marginBottom: 5, marginTop: 2 },
+    addCombinationPicker: { minHeight: 42, borderWidth: .5, borderColor: '#CBD5E1', borderRadius: 9, backgroundColor: '#fff', paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 9 },
+    addCombinationPickerDisabled: { backgroundColor: '#F1F5F9', opacity: .65 },
+    addCombinationPickerText: { flex: 1, color: '#0F172A', fontSize: 12, fontWeight: '600' },
+    addCombinationPlaceholder: { color: '#94A3B8', fontWeight: '500' },
+    addCombinationShadeValue: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    addCombinationShadeSwatch: { width: 15, height: 15, borderRadius: 5, borderWidth: .5, borderColor: '#CBD5E1' },
+    addCombinationShadePickerSwatch: { width: 28, height: 28, borderRadius: 8, borderWidth: .5, borderColor: '#CBD5E1' },
+    addCombinationFieldsRow: { flexDirection: 'row', gap: 9 },
+    addCombinationFieldCol: { flex: 1 },
+    addCombinationInput: { height: 42, backgroundColor: '#fff', borderWidth: .5, borderColor: '#CBD5E1', borderRadius: 9, paddingHorizontal: 10, color: '#000', fontSize: 13, fontWeight: '600', marginBottom: 10 },
+    addCombinationConfirmBtn: { height: 43, borderRadius: 10, backgroundColor: '#0F766E', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+    addCombinationConfirmText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    editItemCardNew: { borderColor: '#5EEAD4', backgroundColor: '#F0FDFA' },
+    newItemBadge: { backgroundColor: '#CCFBF1', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 },
+    newItemBadgeText: { color: '#0F766E', fontSize: 9, fontWeight: '900', letterSpacing: .4 },
+    editItemCard: { backgroundColor: '#fff', borderRadius: 12, borderWidth: .5, borderColor: '#e4e7ef', padding: 11, marginBottom: 8 },
+    editItemTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    editItemIndex: { width: 27, height: 27, borderRadius: 8, backgroundColor: '#FFF7ED', justifyContent: 'center', alignItems: 'center' },
+    editItemIndexText: { color: '#C87533', fontSize: 11, fontWeight: '800' },
+    editItemDesign: { color: '#000', fontSize: 13, fontWeight: '700' },
+    editItemMeta: { color: '#667085', fontSize: 11, marginTop: 2 },
+    detailGrid: { flexDirection: 'row', gap: 7, marginTop: 9 },
+    detailGridItem: { flex: 1, backgroundColor: '#fafafa', borderRadius: 8, padding: 7 },
+    detailGridLabel: { color: '#98A2B3', fontSize: 9, fontWeight: '600' },
+    detailGridValue: { color: '#000', fontSize: 10, fontWeight: '600', marginTop: 2 },
+    editFieldsRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
+    editFieldCol: { flex: 1 },
+    editFieldLabel: { color: '#667085', fontSize: 10, fontWeight: '700', marginBottom: 4 },
+    editFieldInput: { height: 40, borderWidth: .5, borderColor: '#d6dae1', borderRadius: 9, backgroundColor: '#fff', paddingHorizontal: 10, color: '#000', fontSize: 13 },
+    editFieldInputReadOnly: { backgroundColor: '#f8fafc', color: '#64748B' },
+    editAmountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: .5, borderTopColor: '#edf0f3' },
+    editAmountLabel: { color: '#667085', fontSize: 10, fontWeight: '600' },
+    editAmountValue: { color: '#000', fontSize: 12, fontWeight: '700' },
+    remarkInput: { minHeight: 82, borderWidth: .5, borderColor: '#e4e7ef', borderRadius: 10, backgroundColor: '#fff', padding: 10, color: '#000', fontSize: 12, marginBottom: 12 },
+    editTotalsCard: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FFF7ED', borderRadius: 12, borderWidth: .5, borderColor: '#FED7AA', padding: 12, marginBottom: 12 },
+    editTotalLabel: { color: '#9A3412', fontSize: 9, fontWeight: '800' },
+    editTotalValue: { color: '#000', fontSize: 15, fontWeight: '800', marginTop: 3 },
+    modalFooter: { flexDirection: 'row', gap: 9, padding: 12, borderTopWidth: .5, borderTopColor: '#e4e7ef', backgroundColor: '#fff' },
+    cancelEditBtn: { flex: 1, height: 46, borderRadius: 11, borderWidth: .5, borderColor: '#d1d5db', backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+    cancelEditText: { color: '#475467', fontSize: 13, fontWeight: '700' },
+    saveEditBtn: { flex: 1.5, height: 46, borderRadius: 11, backgroundColor: '#C87533', justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 7 },
+    saveEditText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    closeViewBtn: { flex: 1, height: 46, borderRadius: 11, backgroundColor: '#C87533', justifyContent: 'center', alignItems: 'center' },
+    closeViewText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    actionDisabled: { opacity: 0.55 },
 });
 
 export { AuthTab, TrackingTab, SummaryTab };

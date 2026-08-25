@@ -198,10 +198,119 @@ export function parseXlsxBase64(b64) {
     const storeWjet = n('L40');
 
     // ── Production ──
-    const prodRapier = n('O36') + n('P36');
+    const prodMW = n('O36');
+    const prodSud = n('P36');
+    const prodRapier = prodMW + prodSud;
     const prodWjet = n('Q37');
     const prodTotal = n('R37') || (prodRapier + prodWjet);
     const prodTotalL = prodTotal > 0 ? prodTotal / 1e5 : 0;
+
+    /*
+     * CLIENT REQUIREMENT — utility contribution per metre / pick.
+     *
+     * The Excel report exposes one Rapier average-pick basis (B46), one
+     * Waterjet basis (F48), and the combined weighted basis (G48). Direct MW
+     * and Sud Rapier utility heads therefore use their own production metres
+     * with the existing Rapier pick basis. Shared Warping/Misc remain shared
+     * and use combined metres / combined weighted picks. This is display-only
+     * and does not alter any existing costing/allocation formula.
+     */
+    const rapierPicks = n('B46');
+    const waterjetPicks = n('F48');
+    const combinedPicks = n('G48');
+
+    const utilityRateRow = ({
+      key, label, kwh, amount, productionMtr, picks, basis, shared = false,
+    }) => {
+      const safeAmount = Number(amount || 0);
+      const safeProduction = Number(productionMtr || 0);
+      const safePicks = Number(picks || 0);
+      return {
+        key,
+        label,
+        shared,
+        kwh: Number(kwh || 0),
+        amount: safeAmount,
+        production_mtr_basis: safeProduction,
+        picks_basis: safePicks,
+        rate_available: safeProduction > 0,
+        pick_rate_available: safeProduction > 0 && safePicks > 0,
+        cost_per_mtr: safeProduction > 0 ? safeAmount / safeProduction : 0,
+        cost_per_pick:
+          safeProduction > 0 && safePicks > 0
+            ? safeAmount / safeProduction / safePicks
+            : 0,
+        basis,
+      };
+    };
+
+    const utilityRates = [
+      utilityRateRow({
+        key: 'mw_rapier_looms',
+        label: 'MW Rapier — Looms',
+        kwh: n('B36'),
+        amount: n('B41'),
+        productionMtr: prodMW,
+        picks: rapierPicks,
+        basis: 'MW Rapier production / Rapier avg picks',
+      }),
+      utilityRateRow({
+        key: 'mw_rapier_luwa',
+        label: 'MW Rapier — Luwa (humid.)',
+        kwh: n('C36'),
+        amount: n('C41'),
+        productionMtr: prodMW,
+        picks: rapierPicks,
+        basis: 'MW Rapier production / Rapier avg picks',
+      }),
+      utilityRateRow({
+        key: 'sud_rapier_looms',
+        label: 'Sud Rapier — Looms',
+        kwh: n('D36'),
+        amount: n('D41'),
+        productionMtr: prodSud,
+        picks: rapierPicks,
+        basis: 'Sud Rapier production / Rapier avg picks',
+      }),
+      utilityRateRow({
+        key: 'sud_rapier_luwa',
+        label: 'Sud Rapier — Luwa (humid.)',
+        kwh: n('E36'),
+        amount: n('E41'),
+        productionMtr: prodSud,
+        picks: rapierPicks,
+        basis: 'Sud Rapier production / Rapier avg picks',
+      }),
+      utilityRateRow({
+        key: 'sud_waterjet_looms',
+        label: 'Sud W-Jet — Looms',
+        kwh: n('F36'),
+        amount: n('F41'),
+        productionMtr: prodWjet,
+        picks: waterjetPicks,
+        basis: 'Waterjet production / Waterjet avg picks',
+      }),
+      utilityRateRow({
+        key: 'warping_shared',
+        label: 'Warping (shared)',
+        kwh: n('G36'),
+        amount: elecWarping,
+        productionMtr: prodTotal,
+        picks: combinedPicks,
+        basis: 'Combined production / weighted avg picks',
+        shared: true,
+      }),
+      utilityRateRow({
+        key: 'misc_shared',
+        label: 'Miscellaneous (shared)',
+        kwh: n('H36'),
+        amount: elecMisc,
+        productionMtr: prodTotal,
+        picks: combinedPicks,
+        basis: 'Combined production / weighted avg picks',
+        shared: true,
+      }),
+    ];
 
     return {
       // Header
@@ -258,10 +367,15 @@ export function parseXlsxBase64(b64) {
       store_wjet: storeWjet,
 
       // Production
+      prod_mw: prodMW,
+      prod_sud: prodSud,
       prod_rapier: prodRapier,
       prod_wjet: prodWjet,
       prod_total: prodTotal,
       prod_total_L: prodTotalL,
+
+      // Per-utility display KPIs. Existing totals/allocation stay untouched.
+      utility_rates: utilityRates,
 
       // Derived per-metre
       units_per_mtr: prodTotal > 0 ? n('I36') / prodTotal : 0,

@@ -233,6 +233,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
 
     const ALL_APPS = [
         { name: 'Credit Limit Request', route: 'credit-limit', icon: 'credit-score', color: '#4285F4', category: 'Finance' },
+        { name: 'Outstanding Days Request', route: 'outstanding-days-request', icon: 'credit-score', color: '#4285F4', category: 'Finance' },
         {
             name: 'Receivables',
             icon: 'receipt-long',
@@ -321,6 +322,10 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
                     //                     },
                     //                     {
                     //                         "title": "Credit Limit Request",
+                    //                         "href": "/"
+                    //                     },
+                    //                     {
+                    //                         "title": "Outstanding Days Request",
                     //                         "href": "/"
                     //                     },
                     //                     {

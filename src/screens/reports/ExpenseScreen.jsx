@@ -1553,7 +1553,7 @@
 //               iconBg="#EFF6FF"
 //               title="Utilities / units consumed"
 //               sub={`${fN(d.kwh_total)} kWh @ ₹${d.unit_rate}`}
-//               amt={`${fLn(d.elec_total)} L`}
+//               amt={fLn(d.elec_total)}
 //               // editLabel="Edit ›"
 //               onEdit={() => setView("daily-units")}
 //             >
@@ -1588,7 +1588,7 @@
 //               iconBg="#FDF3E8"
 //               title="Salaries / wages"
 //               sub="Rapier + Waterjet"
-//               amt={`${fLn(d.sal_total)} L`}
+//               amt={fLn(d.sal_total)}
 //               // editLabel="Edit ›"
 //               // onEdit={() => setView('daily-salary')}
 //               onEdit={() => {
@@ -1628,7 +1628,7 @@
 //               iconBg="#E1F5EE"
 //               title="Production-linked expenses"
 //               sub="Stores & spares"
-//               amt={`${fLn(d.store_total)} L`}
+//               amt={fLn(d.store_total)}
 //             >
 //               <ShedRow
 //                 label="Rapier stores"
@@ -2414,6 +2414,7 @@ import { T } from "../../theme";
 // mirrors Salary.js + AvgPicksCalendar.jsx from the web app 1:1).
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import AvgPicksSection, { AvgPicksTab } from "./AvgPicksSection";
+import InteractiveDailyTrendChart from "../dashboard/employ/components/InteractiveDailyTrendChart";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -2426,7 +2427,59 @@ const fL = (v) => `₹${(v / 1e5).toFixed(2)} L`;
 const fLn = (v) => `${(v / 1e5).toFixed(2)} L`;
 const f2 = (v) => Number(v || 0).toFixed(2);
 const f3 = (v) => Number(v || 0).toFixed(3);
+const f4 = (v) => Number(v || 0).toFixed(4);
 const fN = (v) => Math.round(v || 0).toLocaleString("en-IN");
+
+const buildUtilityRateRows = (d) => {
+  if (!d) return [];
+  if (Array.isArray(d.utility_rates) && d.utility_rates.length > 0) {
+    return d.utility_rates;
+  }
+
+  // Backward-compatible fallback in case an older cached month was parsed
+  // before useExpenseData added utility_rates. No costing value is changed.
+  const daily = Array.isArray(d.daily) ? d.daily : [];
+  const sumDaily = (key) => daily.reduce(
+    (total, row) => total + Number(row?.[key] || 0),
+    0,
+  );
+  const prodMW = Number(d.prod_mw || 0) || sumDaily('prod_mw');
+  const prodSud = Number(d.prod_sud || 0) || sumDaily('prod_sud');
+  const prodWjet = Number(d.prod_wjet || 0);
+  const prodTotal = Number(d.prod_total || 0);
+  const rapierPicks = Number(d.avg_pick_mw || 0);
+  const waterjetPicks = Number(d.avg_pick_wjet || 0);
+  const combinedPicks = Number(d.avg_pick_tot || 0);
+
+  const row = (key, label, kwh, amount, production, picks, shared = false) => ({
+    key,
+    label,
+    kwh: Number(kwh || 0),
+    amount: Number(amount || 0),
+    shared,
+    rate_available: Number(production || 0) > 0,
+    pick_rate_available: Number(production || 0) > 0 && Number(picks || 0) > 0,
+    cost_per_mtr:
+      Number(production || 0) > 0
+        ? Number(amount || 0) / Number(production || 0)
+        : 0,
+    cost_per_pick:
+      Number(production || 0) > 0 && Number(picks || 0) > 0
+        ? Number(amount || 0) / Number(production || 0) / Number(picks || 0)
+        : 0,
+  });
+
+  return [
+    row('mw_rapier_looms', 'MW Rapier — Looms', d.kwh_mw_looms, d.elec_mw_looms, prodMW, rapierPicks),
+    row('mw_rapier_luwa', 'MW Rapier — Luwa (humid.)', d.kwh_mw_luwa, d.elec_mw_luwa, prodMW, rapierPicks),
+    row('sud_rapier_looms', 'Sud Rapier — Looms', d.kwh_sd_looms, d.elec_sd_looms, prodSud, rapierPicks),
+    row('sud_rapier_luwa', 'Sud Rapier — Luwa (humid.)', d.kwh_sd_luwa, d.elec_sd_luwa, prodSud, rapierPicks),
+    row('sud_waterjet_looms', 'Sud W-Jet — Looms', d.kwh_wj_looms, d.elec_wj_looms, prodWjet, waterjetPicks),
+    row('warping_shared', 'Warping (shared)', d.kwh_warping, d.elec_warping, prodTotal, combinedPicks, true),
+    row('misc_shared', 'Miscellaneous (shared)', d.kwh_misc, d.elec_misc, prodTotal, combinedPicks, true),
+  ];
+};
+
 const arrow = (c, p) => {
   if (!p) return "—";
   const d = ((c - p) / p) * 100;
@@ -2985,17 +3038,29 @@ function ExpBlock({
 }
 
 // ── Bar row (electricity sub-meter) ──────────────────────────────
-function BarRow({ label, kwh, cost, pct, costPct }) {
+function BarRow({
+  label,
+  kwh,
+  cost,
+  pct,
+  costPct,
+  perMtr,
+  perPick,
+  rateAvailable = true,
+  pickRateAvailable = true,
+}) {
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 14 }}>
       <View
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
-          marginBottom: 3,
+          alignItems: "flex-start",
+          gap: 10,
+          marginBottom: 5,
         }}
       >
-        <Text style={{ fontSize: 12, color: "#374151" }}>{label}</Text>
+        <Text style={{ fontSize: 12, color: "#374151", flex: 1 }}>{label}</Text>
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ fontSize: 12, color: "#374151" }}>
             {fN(kwh)} kWh · {fL(cost)}
@@ -3005,6 +3070,41 @@ function BarRow({ label, kwh, cost, pct, costPct }) {
           </Text>
         </View>
       </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 6,
+          marginBottom: 7,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "#EFF6FF",
+            borderRadius: 8,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+          }}
+        >
+          <Text style={{ fontSize: 10.5, color: "#185FA5", fontWeight: "700" }}>
+            {rateAvailable ? `₹${f3(perMtr)}/mtr` : "₹—/mtr"}
+          </Text>
+        </View>
+        <View
+          style={{
+            backgroundColor: "#F0FDF4",
+            borderRadius: 8,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+          }}
+        >
+          <Text style={{ fontSize: 10.5, color: "#18794E", fontWeight: "700" }}>
+            {pickRateAvailable ? `₹${f4(perPick)}/pick` : "₹—/pick"}
+          </Text>
+        </View>
+      </View>
+
       <View style={{ height: 5, backgroundColor: "#f3f4f6", borderRadius: 3 }}>
         <View
           style={{
@@ -3680,64 +3780,209 @@ function MonthSettings({ d, monthKey }) {
   );
 }
 
+// ── Expense input coverage ─────────────────────────────────────────
+function ExpenseCoverageNotice({ d, month }) {
+  const daily = Array.isArray(d?.daily) ? d.daily : [];
+  if (!month || daily.length === 0) return null;
+
+  const lastDayFor = (predicate) => {
+    let last = 0;
+    daily.forEach((row) => {
+      if (!predicate(row)) return;
+      const day = Number(String(row?.date || '').slice(0, 2));
+      if (Number.isFinite(day) && day > last) last = day;
+    });
+    return last;
+  };
+
+  const electricityLast = lastDayFor(
+    (row) => Number(row?.total_kwh || 0) !== 0,
+  );
+  const salaryLast = lastDayFor(
+    (row) => Number(row?.sal_t || 0) !== 0,
+  );
+
+  const now = new Date();
+  const isCurrentMonth =
+    Number(month.calYear) === now.getFullYear()
+    && Number(month.calMonth) === now.getMonth();
+  const requestedDay = isCurrentMonth
+    ? now.getDate()
+    : new Date(Number(month.calYear), Number(month.calMonth) + 1, 0).getDate();
+
+  const requiredPresent = electricityLast > 0 && salaryLast > 0;
+  const completeDay = requiredPresent
+    ? Math.min(electricityLast, salaryLast, requestedDay)
+    : 0;
+
+  const monthName = new Date(
+    Number(month.calYear),
+    Number(month.calMonth),
+    1,
+  ).toLocaleDateString('en-GB', { month: 'short' });
+
+  const coverageHeads = [
+    { key: 'electricity', label: 'Electricity', lastDay: electricityLast },
+    { key: 'salary', label: 'Salary', lastDay: salaryLast },
+  ].map((head) => {
+    const isCurrent = head.lastDay >= requestedDay;
+    const pendingFromDay = !isCurrent
+      ? (head.lastDay > 0 ? head.lastDay + 1 : 1)
+      : null;
+
+    return {
+      ...head,
+      isCurrent,
+      pendingFromDay,
+      pendingDays: pendingFromDay
+        ? Math.max(0, requestedDay - pendingFromDay + 1)
+        : 0,
+    };
+  });
+
+  const pending = coverageHeads.filter((head) => !head.isCurrent);
+  const dayMonth = (day) => `${String(day).padStart(2, '0')} ${monthName}`;
+
+  const completeText = completeDay > 0
+    ? `01–${String(completeDay).padStart(2, '0')} ${monthName} ${month.calYear}`
+    : `No fully complete expense day yet for ${month.fullLabel}`;
+
+  return (
+    <View style={S.coverageCard}>
+      <View style={{ flex: 1 }}>
+        <Text style={S.coverageKicker}>EXPENSE DATA COVERAGE</Text>
+        <Text style={S.coverageTitle}>
+          {pending.length === 0 ? 'Entered through' : 'Complete through'} {completeText}
+        </Text>
+        {pending.length > 0 ? (
+          <View style={S.coverageHeadList}>
+            {coverageHeads.map((head) => (
+              <View key={head.key} style={S.coverageHeadRow}>
+                <Text style={S.coverageHeadLabel}>{head.label}</Text>
+                <Text style={head.isCurrent ? S.coverageHeadCurrent : S.coverageHeadPending}>
+                  {head.lastDay > 0
+                    ? `Entered through ${dayMonth(head.lastDay)}`
+                    : `No entry in ${monthName}`}
+                  {head.isCurrent
+                    ? ' · current'
+                    : ` · pending ${dayMonth(head.pendingFromDay)}–${dayMonth(requestedDay)} (${head.pendingDays}d)`}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={S.coverageOk}>All required daily expense heads are current through {dayMonth(requestedDay)}.</Text>
+        )}
+      </View>
+      <View style={[S.coverageBadge, pending.length > 0 ? S.coverageBadgeWarn : S.coverageBadgeOk]}>
+        <Text style={S.coverageBadgeText}>{pending.length > 0 ? 'PARTIAL' : 'CURRENT'}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ── Production block ──────────────────────────────────────────────
 function ProductionBlock({ d }) {
+  const [series, setSeries] = useState('combined');
+  const daily = Array.isArray(d?.daily) ? d.daily : [];
+
+  const trend = daily.map((row, index) => {
+    const rapier = Number(row?.prod_mw || 0) + Number(row?.prod_sud || 0);
+    const waterjet = Number(row?.prod_wj || 0);
+    const combined = Number(row?.prod_tot || 0) || (rapier + waterjet);
+    const value = series === 'rapier'
+      ? rapier
+      : series === 'waterjet'
+        ? waterjet
+        : combined;
+
+    return {
+      day: String(Number(String(row?.date || index + 1).slice(0, 2)) || index + 1),
+      meters: value,
+    };
+  });
+
+  const total = series === 'rapier'
+    ? Number(d?.prod_rapier || 0)
+    : series === 'waterjet'
+      ? Number(d?.prod_wjet || 0)
+      : Number(d?.prod_total || 0);
+
+  const picks = series === 'rapier'
+    ? Number(d?.avg_pick_mw || 0)
+    : series === 'waterjet'
+      ? Number(d?.avg_pick_wjet || 0)
+      : Number(d?.avg_pick_tot || 0);
+
+  const label = series === 'rapier'
+    ? 'Rapier'
+    : series === 'waterjet'
+      ? 'Waterjet'
+      : 'Combined';
+
   return (
     <View style={S.prodBlock}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 8,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 10,
-            color: "#000",
-            textTransform: "uppercase",
-            letterSpacing: 0.7,
-          }}
-        >
-          Production · from production system
-        </Text>
-        <View
-          style={{
-            backgroundColor: "#E1F5EE",
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            borderRadius: 10,
-          }}
-        >
-          <Text style={{ fontSize: 10, color: "#0F6E56", fontWeight: "600" }}>
-            AUTO
-          </Text>
+      <View style={S.prodHeaderRow}>
+        <View>
+          <Text style={S.prodKicker}>Production · from production system</Text>
+          <Text style={S.prodTitle}>{label} day-wise production</Text>
+        </View>
+        <View style={S.autoBadge}>
+          <Text style={S.autoBadgeText}>AUTO</Text>
         </View>
       </View>
-      {[
-        ["Rapier", d.prod_rapier, d.avg_pick_mw],
-        ["Waterjet", d.prod_wjet, d.avg_pick_wjet],
-      ].map(([l, p, pk]) => (
-        <View
-          key={l}
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 5,
-          }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: "500" }}>{l}</Text>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text style={{ fontSize: 13, fontWeight: "600" }}>
-              {f2(p / 1e5)} L m
-            </Text>
-            <Text style={{ fontSize: 11, color: "#000" }}>{pk} pk</Text>
-          </View>
+
+      <View style={S.prodSelector}>
+        {[
+          ['combined', 'Combined'],
+          ['rapier', 'Rapier'],
+          ['waterjet', 'Waterjet'],
+        ].map(([key, text]) => {
+          const active = series === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              onPress={() => setSeries(key)}
+              activeOpacity={0.75}
+              style={[S.prodChip, active && S.prodChipActive]}
+            >
+              <Text style={[S.prodChipText, active && S.prodChipTextActive]}>{text}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={S.prodSummaryRow}>
+        <View>
+          <Text style={S.prodSummaryLabel}>MONTH PRODUCTION</Text>
+          <Text style={S.prodSummaryValue}>{f2(total / 1e5)} L m</Text>
         </View>
-      ))}
-      <Text style={{ fontSize: 11, color: "#000", marginTop: 4 }}>
-        Meters & picks flow in from the loom production feed — read-only here.
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={S.prodSummaryLabel}>AVG PICKS</Text>
+          <Text style={S.prodSummaryValue}>{f2(picks)}</Text>
+        </View>
+      </View>
+
+      <InteractiveDailyTrendChart
+        data={trend}
+        valueKey="meters"
+        labelKey="day"
+        color={series === 'waterjet' ? '#185FA5' : series === 'rapier' ? '#B77932' : '#0D1B2A'}
+        fillColor={series === 'waterjet' ? '#185FA5' : series === 'rapier' ? '#B77932' : '#0D1B2A'}
+        height={116}
+        pointGap={48}
+        minWidth={Math.max(320, trend.length * 48)}
+        showBaseline
+        valueFormatter={(value) => {
+          const n = Number(value || 0);
+          if (Math.abs(n) >= 100000) return `${(n / 100000).toFixed(2)} L m`;
+          if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)} K m`;
+          return `${Math.round(n).toLocaleString('en-IN')} m`;
+        }}
+      />
+
+      <Text style={S.prodFootnote}>
+        Select Combined, Rapier or Waterjet. The chart always uses the selected month’s day-wise production feed.
       </Text>
     </View>
   );
@@ -3783,6 +4028,7 @@ export default function ExpenseScreen({ token, apiBase }) {
   const m = months[activeTab];
   const st = states[m?.key];
   const d = st?.data;
+  const utilityRows = buildUtilityRateRows(d);
 
   const prevM = months[activeTab + 1];
   const prevD = prevM ? states[prevM?.key]?.data : null;
@@ -3870,10 +4116,10 @@ export default function ExpenseScreen({ token, apiBase }) {
         {/* Avg Picks — thin full-width accordion tab, directly under the
             month tabs. Always bound to the currently selected month `m`
             (same yearno/monthno the rest of this screen already uses). */}
-        <AvgPicksTab
+        {/* <AvgPicksTab
           expanded={avgPicksOpen}
           onPress={() => setAvgPicksOpen((o) => !o)}
-        />
+        /> */}
         <AvgPicksSection
           token={token}
           apiBase={apiBase}
@@ -3909,6 +4155,7 @@ export default function ExpenseScreen({ token, apiBase }) {
         {/* Data */}
         {st?.status === "done" && d && (
           <>
+            <ExpenseCoverageNotice d={d} month={m} />
             <KPIGrid d={d} label={m.fullLabel} />
 
             {/* Cost composition donut */}
@@ -3974,27 +4221,25 @@ export default function ExpenseScreen({ token, apiBase }) {
               // editLabel="Edit ›"
               onEdit={() => setView("daily-units")}
             >
-              {[
-                ["MW Rapier — Looms", d.kwh_mw_looms, d.elec_mw_looms],
-                ["MW Rapier — Luwa (humid.)", d.kwh_mw_luwa, d.elec_mw_luwa],
-                ["Sud Rapier — Looms", d.kwh_sd_looms, d.elec_sd_looms],
-                ["Sud Rapier — Luwa (humid.)", d.kwh_sd_luwa, d.elec_sd_luwa],
-                ["Sud W-Jet — Looms", d.kwh_wj_looms, d.elec_wj_looms],
-                ["Warping (shared)", d.kwh_warping, d.elec_warping],
-                ["Miscellaneous (shared)", d.kwh_misc, d.elec_misc],
-              ].map(([label, kwh, cost]) => (
+              {utilityRows.map((row) => (
                 <BarRow
-                  key={label}
-                  label={label}
-                  kwh={kwh}
-                  cost={cost}
-                  pct={d.kwh_total > 0 ? (kwh / d.kwh_total) * 100 : 0}
-                  costPct={d.elec_total > 0 ? (cost / d.elec_total) * 100 : 0}
+                  key={row.key || row.label}
+                  label={row.label}
+                  kwh={row.kwh}
+                  cost={row.amount}
+                  pct={d.kwh_total > 0 ? (row.kwh / d.kwh_total) * 100 : 0}
+                  costPct={d.elec_total > 0 ? (row.amount / d.elec_total) * 100 : 0}
+                  perMtr={row.cost_per_mtr}
+                  perPick={row.cost_per_pick}
+                  rateAvailable={row.rate_available !== false}
+                  pickRateAvailable={row.pick_rate_available !== false}
                 />
               ))}
               <Text style={{ fontSize: 11, color: "#000", marginTop: 4 }}>
-                Warping + Misc are shared — allocated ⅔ Rapier, ⅓ Waterjet in
-                costing.
+                ₹/mtr and ₹/pick are utility contribution KPIs only. Warping +
+                Misc remain shared exactly as before — existing ⅔ Rapier, ⅓
+                Waterjet costing allocation is unchanged. Shared display rates
+                use combined production and weighted picks.
               </Text>
             </ExpBlock>
 
@@ -4316,6 +4561,147 @@ const S = StyleSheet.create({
   refreshText: { color: "#fff", fontSize: 18 },
   body: { flex: 1, paddingHorizontal: 12, paddingTop: 14 },
 
+  coverageCard: {
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#FFFDF9',
+    borderWidth: 1,
+    borderColor: '#E5DED4',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  coverageKicker: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.05,
+    color: '#8A8177',
+  },
+  coverageTitle: {
+    marginTop: 5,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  coverageHeadList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  coverageHeadRow: {
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#EFE7DB',
+  },
+  coverageHeadLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#5C5147',
+  },
+  coverageHeadPending: {
+    marginTop: 2,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: '800',
+    color: '#A75D13',
+  },
+  coverageHeadCurrent: {
+    marginTop: 2,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: '800',
+    color: '#2F855A',
+  },
+  coveragePending: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#A75D13',
+  },
+  coverageOk: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2F855A',
+  },
+  coverageBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  coverageBadgeWarn: { backgroundColor: '#FFF0D8' },
+  coverageBadgeOk: { backgroundColor: '#E6F4EA' },
+  coverageBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#5C5147',
+  },
+  prodHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  prodKicker: {
+    fontSize: 9,
+    color: '#8A8177',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontWeight: '800',
+  },
+  prodTitle: {
+    marginTop: 3,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  autoBadge: {
+    backgroundColor: '#E1F5EE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  autoBadgeText: { fontSize: 9, color: '#0F6E56', fontWeight: '800' },
+  prodSelector: {
+    flexDirection: 'row',
+    gap: 7,
+    marginBottom: 12,
+  },
+  prodChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: '#F4F0EA',
+    borderWidth: 1,
+    borderColor: '#E5DED4',
+  },
+  prodChipActive: { backgroundColor: '#0D1B2A', borderColor: '#0D1B2A' },
+  prodChipText: { fontSize: 11, fontWeight: '800', color: '#6F665D' },
+  prodChipTextActive: { color: '#FFFFFF' },
+  prodSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  prodSummaryLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: '#8A8177',
+  },
+  prodSummaryValue: {
+    marginTop: 3,
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#111827',
+  },
+  prodFootnote: {
+    marginTop: 5,
+    fontSize: 10,
+    lineHeight: 15,
+    color: '#756C61',
+  },
   monthTab: {
     paddingVertical: 5,
     paddingHorizontal: 12,

@@ -67,7 +67,8 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
     const [selectedPrinterStatus, setSelectedPrinterStatus] = useState("");
     const [printerSearch, setPrinterSearch] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [getSavedData, setGetSavedData] = useState({});
+    // const [getSavedData, setGetSavedData] = useState({});
+    const [getSavedData, setGetSavedData] = useState<any>({});
     const [getDataSaved, setDataSaved] = useState(false)
 
     const showWarning = (msg) => {
@@ -447,23 +448,41 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
             const resData = res?.data;
 
-            if (resData?.message === false) {
-                showWarning(resData?.response?.message);
-                setGetSavedData(payload);
-                setDataSaved(false);
-                getAllPrinters();
-            } else if (resData?.response?.error === true) {
-                showWarning(resData?.response?.message);
-                getAllPrinters();
-                setGetSavedData(payload);
-                setDataSaved(false);
-            } else if (resData?.success === true) {
+            // if (resData?.message === false) {
+            //     showWarning(resData?.response?.message);
+            //     setGetSavedData(payload);
+            //     setDataSaved(false);
+            //     getAllPrinters();
+            // } else if (resData?.response?.error === true) {
+            //     showWarning(resData?.response?.message);
+            //     getAllPrinters();
+            //     setGetSavedData(payload);
+            //     setDataSaved(false);
+            // } else if (resData?.success === true) {
+            //     showSuccess(resData?.response?.message);
+            //     getAllPrinters();
+            //     setGetSavedData(payload);
+            //     setDataSaved(true);
+            // } else {
+            //     showError(resData?.message);
+            // }
+            if (resData?.success === true) {
                 showSuccess(resData?.response?.message);
-                getAllPrinters();
+
                 setGetSavedData(payload);
                 setDataSaved(true);
+
+                getAllPrinters();
+
             } else {
-                showError(resData?.message);
+                showWarning(
+                    resData?.response?.message ||
+                    resData?.message ||
+                    "Data save failed."
+                );
+
+                setGetSavedData(payload);
+                setDataSaved(false);
             }
         } catch (error) {
             console.log("❌ SAVE ERROR:", error?.response?.data || error.message);
@@ -563,37 +582,74 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
             if (Object.keys(getSavedData).length > 0) {
                 temppayloadObj = {
-                    uid: getSavedData.IssUId ?? "0",
-                    inwno: "",
-                    inwdate: "",
-                    srno: getSavedData.IssSrNo ?? "0",
-                    itmcode: getSavedData.ItmCode ?? "0",
-                    itmname: getSavedData.ItmName ?? "",
-                    dsncode: "0",
-                    dsnname: "",
-                    rcno: "",
-                    amount: "",
-                    subsr: getSavedData.IssSubSr ?? "0",
-                    takano: getSavedData.CartNo ?? "",
-                    qty: getSavedData.TotQty ?? "0",
-                    trantype: getSavedData.trantype ?? "",
-                    ttype: "",
-                    dptname: "",
-                    shdcode: getSavedData.ShdCode ?? "0",
-                    shdname: getSavedData.ShdName ?? "",
-                    whr: "",
-                    yarncostr: "",
-                    yard: "",
-                    sexecname: "",
-                    strcode: "",
-                    unqsrno: "",
-                    grdcode: getSavedData.GrdCode ?? "0",
-                    grdname: getSavedData.GrdName ?? "",
-                    mercode: getSavedData.MerCode ?? "0",
-                    mername: getSavedData.MerName ?? "",
-                    denier: getSavedData.Denier ?? "0",
-                    prpcode: getSavedData.PrpCode ?? "",
-                    chees: getSavedData.Chees ?? "",
+                    // uid: getSavedData.IssUId ?? "0",
+                    // inwno: "",
+                    // inwdate: "",
+                    // srno: getSavedData.IssSrNo ?? "0",
+                    // itmcode: getSavedData.ItmCode ?? "0",
+                    // itmname: getSavedData.ItmName ?? "",
+                    // dsncode: "0",
+                    // dsnname: "",
+                    // rcno: "",
+                    // amount: "",
+                    // subsr: getSavedData.IssSubSr ?? "0",
+                    // takano: getSavedData.CartNo ?? "",
+                    // qty: getSavedData.TotQty ?? "0",
+                    // trantype: getSavedData.trantype ?? "",
+                    // ttype: "",
+                    // dptname: "",
+                    // shdcode: getSavedData.ShdCode ?? "0",
+                    // shdname: getSavedData.ShdName ?? "",
+                    // whr: "",
+                    // yarncostr: "",
+                    // yard: "",
+                    // sexecname: "",
+                    // strcode: "",
+                    // unqsrno: "",
+                    // grdcode: getSavedData.GrdCode ?? "0",
+                    // grdname: getSavedData.GrdName ?? "",
+                    // mercode: getSavedData.MerCode ?? "0",
+                    // mername: getSavedData.MerName ?? "",
+                    // denier: getSavedData.Denier ?? "0",
+                    // prpcode: getSavedData.PrpCode ?? "",
+                    // chees: getSavedData.Chees ?? "",
+                    UId: getSavedData.IssUId ?? "0",
+                    TranDate: "0",
+                    PrpCode: getSavedData.PrpCode ?? "",
+                    StrCode: getSavedData.StrCode ?? "0",
+                    ItmCode: getSavedData.ItmCode ?? "0",
+                    MerCode: getSavedData.MerCode ?? "0",
+                    ShdCode: getSavedData.ShdCode ?? "0",
+                    GrdCode: getSavedData.GrdCode ?? "0",
+                    Denier: getSavedData.Denier ?? "0",
+                    DsnCode: "0",
+                    CartNo: getSavedData.CartNo ?? "",
+                    Wt: getSavedData.TotQty ?? "0",
+                    Chees: getSavedData.Chees ?? "",
+                    IsAuto: "0",
+                    GrossWt: "0",
+                    PUId: getSavedData.IssUId ?? "0",
+                    PSrNo: getSavedData.IssSrNo ?? "0",
+                    PSubSr: getSavedData.IssSubSr ?? "0",
+                    TranType: getSavedData.trantype ?? "",
+                    TranName: " ",
+                    StkType: getSavedData.StkType ?? "",
+                    StkDate: "0",
+                    SrNo: getSavedData.IssSrNo ?? "0",
+                    UsrCode: "0",
+                    StrName: "",
+                    ItmName: getSavedData.ItmName ?? "",
+                    MerName: getSavedData.MerName ?? "",
+                    ShdName: getSavedData.ShdName ?? "",
+                    GrdName: getSavedData.GrdName ?? "",
+                    DnsName: "",
+                    Stktype: getSavedData.StkType ?? "",
+                    nStkDate: "",
+                    yearno: getSavedData.YearNo ?? "0",
+                    IskgQty: "0",
+                    Rate: "0",
+                    MItmCode: "0",
+                    MItmName: ""
                 }
                 console.log("getSavedData", getSavedData, temppayloadObj);
                 const params = {
@@ -606,7 +662,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                 };
 
                 // return;
-                // axios.post(`${PRINTSTICKER}`, params)
+                axios.post(`${PRINTSTICKER}`, params)
                 axios.post(
                     PRINTSTICKER,
                     params,

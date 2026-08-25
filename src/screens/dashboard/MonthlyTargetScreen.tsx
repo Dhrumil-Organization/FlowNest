@@ -181,15 +181,8 @@ export function MonthlyTargetScreen() {
         view,
       });
 
-      if (
-        view === 'my' &&
-        cardResult.response?.configured === false &&
-        Boolean(cardResult.response?.scope?.owner_view_allowed)
-      ) {
-        setOwnerAllowedFromApi(true);
-        setView('owner');
-        return;
-      }
+      // Do not auto-switch My View to Owner. Server scope decides what
+      // My View contains and any genuine configuration error stays visible.
 
       const executiveResult = await DashboardAPI.analyticsExecutives({
         prptype,

@@ -515,18 +515,8 @@ export function MonthlyReportScreen() {
         const enforcedScope: DashboardScope | null =
           cardResult.response.scope || null;
 
-        // Director / Super Admin without a configured My View should never be
-        // trapped on a configuration error. Their authoritative fallback is
-        // Owner View, which remains all-executive.
-        if (
-          view === 'my' &&
-          cardResult.response?.configured === false &&
-          Boolean(enforcedScope?.owner_view_allowed)
-        ) {
-          setScope(enforcedScope);
-          setView('owner');
-          return;
-        }
+        // Keep My View selected. The server is the scope authority and
+        // React must not silently redirect a user to Owner View.
 
         setScope(enforcedScope);
         setCards(cardResult.response.cards || []);

@@ -817,7 +817,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
                 "BROWSE PRINT PARAMS ::",
                 params
             );
-            return;
+            // return;
             axios.post(PRINTSTICKER, params, { headers: getPrinterHeaders() })
                 .then(response => {
                     setIsLoading(false);

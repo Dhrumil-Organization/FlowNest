@@ -914,8 +914,23 @@ export default function SalesExecDashboardScreen({
         data?.exec_info?.exec_id ??
         data?.exec_info?.id ??
         data?.exec_info?.sexe ??
-        myInspectExecId ??
         selectedExecId;
+
+      /*
+       * Preserve My View scope into Party drill-down.
+       *
+       * IMPORTANT: do not take executive_codes[0] for an aggregate My View.
+       * Super Admin My View can contain ALL executives and Director My View can
+       * contain a configured executive group. Picking the first code silently
+       * changes the party report to one executive. Blank execId lets Laravel
+       * resolve the authenticated My View scope. If a future My View selector
+       * is enabled, myInspectExecId may intentionally narrow the drill-down.
+       */
+      const partyExecId = isUnassigned
+        ? "-1"
+        : (isMyView
+          ? asString(myInspectExecId).trim()
+          : asString(responseExecId).trim());
 
       router.push({
         pathname: "/new/PartyDashboardNew",
@@ -923,7 +938,7 @@ export default function SalesExecDashboardScreen({
           partyId,
           partyName: asString(party?.party_name, "Party"),
           /* Executive codes are VARCHAR in this ERP. Never coerce SL/PB/etc. to 0. */
-          execId: isUnassigned ? "-1" : asString(responseExecId).trim(),
+          execId: partyExecId,
           execScope: isUnassigned
             ? "unassigned"
             : (isMyView ? "myview" : "executive"),

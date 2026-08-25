@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import Footer from '@/components/Footer';
 // import GreyPurchaseOrder from '@/components/GreyPurchaseOrder';
 // import YarnPurchaseOrder from '@/components/YarnPurchaseOrder_old';
-import FebricStockVerificationModule from '@/components/FebricStockVerification/FebricStockVerificationModule';
+import CriteriaView from '@/components/FebricStockVerification/FebricStockVerificationModule';
 export default function CRLimit_Request_Container() {
     // const { token, username } = useAuth();
     const [token, setToken] = useState('');
@@ -23,11 +23,9 @@ export default function CRLimit_Request_Container() {
     }, []);
 
     return (
-        <>
-            {/* <AuthProvider> */}
-            <FebricStockVerificationModule token={token || ''} username={username} />
-            {/* <Footer/> */}
-            {/* </AuthProvider> */}
-        </>
+        <CriteriaView
+            token={token}
+            username={username}
+        />
     );
 }

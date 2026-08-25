@@ -3,8 +3,7 @@
 // import React, { useCallback, useEffect, useState } from 'react';
 // import {
 //   RefreshControl,
-//   SafeAreaView,
-//   ScrollView,
+// //   ScrollView,
 //   StyleSheet,
 //   Text,
 //   TouchableOpacity,
@@ -395,16 +394,17 @@
 // screens/PartyDashboardScreen.js
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { AmountDisplayModeControl, useDashboardAmountMode } from "@/src/components/dashboard/AmountDisplayModeControl";
 import { SubScreenHeader } from "../../../../components/layout/SubScreenHeader";
 import {
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { api, formatAmount } from "../api/api";
 import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 import PartyDashboardSkeleton from "../components/PartyDashboardSkeleton";
@@ -594,6 +594,7 @@ export default function PartyDashboardScreen({ username }) {
     partyName,
     execId,
     execName,
+    execScope,
     date: routeDate,
     getUserPrptype,
   } = params || {};
@@ -604,6 +605,8 @@ export default function PartyDashboardScreen({ username }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const displayAmount = value => formatAmount(value, amountMode);
   const [showTour, setShowTour] = useState(false);
   const [ageingExpanded, setAgeingExpanded] = useState(false);
 
@@ -623,7 +626,8 @@ export default function PartyDashboardScreen({ username }) {
           safePartyId,
           safeExecId,
           date,
-          prpType
+          prpType,
+          String(execScope ?? "").trim()
         );
 
         console.log("Party dashboard response:", res);
@@ -641,7 +645,7 @@ export default function PartyDashboardScreen({ username }) {
         setRefreshing(false);
       }
     },
-    [partyId, execId, date]
+    [partyId, execId, execScope, date]
   );
 
   useEffect(() => {
@@ -725,7 +729,11 @@ export default function PartyDashboardScreen({ username }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
+        <View style={styles.amountModeBar}>
+        <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
+      </View>
+
+      <ScrollView
           style={styles.scroll}
           nestedScrollEnabled
           contentContainerStyle={styles.content}
@@ -756,18 +764,18 @@ export default function PartyDashboardScreen({ username }) {
             <View style={styles.summaryRow}>
               <SummaryCard
                 label="TODAY SALE"
-                value={formatAmount(asNumber(summary.today_sale))}
+                value={displayAmount(asNumber(summary.today_sale))}
               />
               <SummaryCard
                 label="TOTAL BILLED"
-                value={formatAmount(asNumber(summary.total_billed))}
+                value={displayAmount(asNumber(summary.total_billed))}
               />
               <SummaryCard
                 label="OUTSTANDING"
                 value={
                   asNumber(summary.outstanding) === 0
                     ? "Nil"
-                    : formatAmount(asNumber(summary.outstanding))
+                    : displayAmount(asNumber(summary.outstanding))
                 }
               />
             </View>
@@ -782,10 +790,10 @@ export default function PartyDashboardScreen({ username }) {
 
             <TotalRow
               leftLabel="TODAY"
-              leftValue={formatAmount(asNumber(salesTrend?.total?.today))}
+              leftValue={displayAmount(asNumber(salesTrend?.total?.today))}
               tealLeft
               rightLabel="BILLED (MONTH)"
-              rightValue={formatAmount(asNumber(salesTrend?.total?.mtd))}
+              rightValue={displayAmount(asNumber(salesTrend?.total?.mtd))}
             />
 
             <View style={styles.chartWrap}>
@@ -798,7 +806,7 @@ export default function PartyDashboardScreen({ username }) {
                 fillColor={COLORS.teal}
                 height={70}
                 pointGap={54}
-                valueFormatter={value => formatAmount(Number(value || 0))}
+                valueFormatter={value => displayAmount(Number(value || 0))}
                 showBaseline
                 showHint
               />
@@ -814,18 +822,18 @@ export default function PartyDashboardScreen({ username }) {
 
             <TotalRow
               leftLabel="COLLECTED"
-              leftValue={formatAmount(collected)}
+              leftValue={displayAmount(collected)}
               tealLeft
               rightLabel="DUE"
-              rightValue={due === 0 ? "—" : formatAmount(due)}
+              rightValue={due === 0 ? "—" : displayAmount(due)}
             />
 
             <View style={styles.rateRow}>
               <View style={styles.rateLeft}>
                 <Text style={styles.rateLabel}>COLLECTION RATE</Text>
                 <Text style={styles.rateValue}>
-                  {formatAmount(asNumber(paymentStatus.collection_rate_today))}{" "}
-                  / {formatAmount(asNumber(paymentStatus.collection_rate_mtd))}
+                  {displayAmount(asNumber(paymentStatus.collection_rate_today))}{" "}
+                  / {displayAmount(asNumber(paymentStatus.collection_rate_mtd))}
                 </Text>
               </View>
               <Text
@@ -856,7 +864,7 @@ export default function PartyDashboardScreen({ username }) {
                 fillColor={COLORS.green}
                 height={70}
                 pointGap={54}
-                valueFormatter={value => formatAmount(Number(value || 0))}
+                valueFormatter={value => displayAmount(Number(value || 0))}
                 showBaseline
                 showHint
               />
@@ -893,7 +901,7 @@ export default function PartyDashboardScreen({ username }) {
                       />
                     </View>
                     <Text style={styles.ageingAmount}>
-                      {formatAmount(bucket.amount)}
+                      {displayAmount(bucket.amount)}
                     </Text>
                   </View>
                 );
@@ -981,7 +989,7 @@ export default function PartyDashboardScreen({ username }) {
                         </Text>
                       </View>
                       <Text style={styles.invoiceAmount}>
-                        {formatAmount(amount)}
+                        {displayAmount(amount)}
                       </Text>
                     </View>
                   );
@@ -1004,6 +1012,7 @@ export default function PartyDashboardScreen({ username }) {
 }
 
 const styles = StyleSheet.create({
+  amountModeBar: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, alignItems: "flex-end" },
   safe: { flex: 1, backgroundColor: COLORS.bg },
   header: {
     flexDirection: "row",

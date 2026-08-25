@@ -20,7 +20,27 @@ export type DashboardScope = {
   configured: boolean;
   scope_type: string;
   executive_codes: string[];
+  executive_names?: string[];
+  selected_executive_code?: string;
+  selected_executive_name?: string;
   message: string;
+
+  // Server-authoritative Monthly Report view contract.
+  owner_view_allowed?: boolean;
+  my_view_available?: boolean;
+  my_view_configured?: boolean;
+  my_view_locked?: boolean;
+  my_view_mode?: 'ASSIGNED_EXECUTIVE' | 'MANAGEMENT_SELECTOR' | 'UNAVAILABLE' | string;
+  my_selector_allowed?: boolean;
+  my_executive_codes?: string[];
+  my_executive_names?: string[];
+  self_executive_code?: string;
+  assigned_executive_codes?: string[];
+  selectable_executives?: Array<{
+    code: string;
+    name: string;
+  }>;
+  available_views?: DashboardView[];
 };
 
 export type DashboardPeriod = {
@@ -268,6 +288,11 @@ export type TargetCardParams = {
   monthno: string | number;
   view: DashboardView;
   upto_date?: string;
+
+  // Used only for management My View when the logged-in user does not have
+  // users.saleexeid. Sales Executive users are server-locked to their own
+  // mapping and this value cannot widen their scope.
+  sexe?: string;
 };
 
 export type AnalyticsExecutivesParams = TargetCardParams & {

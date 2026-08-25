@@ -97,6 +97,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
 
     const [savedResponse, setSavedResponse] = useState(null);
     const [d3Rows, setD3Rows] = useState([]);
+    const [mainRows, setmainRows] = useState([]);
     const [deleteModal, setDeleteModal] = useState(false);
     const [deleteIndex, setDeleteIndex] = useState(null);
 
@@ -393,6 +394,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
             setD1Data(Array.isArray(responseData?.d1) ? responseData.d1 : []);
             setD2Data(Array.isArray(responseData?.d2) ? responseData.d2 : []);
             setD3Rows(Array.isArray(responseData?.d3) ? responseData.d3 : []);
+            setmainRows(responseData.main[0]);
 
             const cartonTypeFromAPI = responseData?.main?.[0]?.IsCartonType;
 
@@ -594,6 +596,53 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
 
             console.log("resData ::", resData)
 
+            const responseData = resData?.response || {};
+            const updatedMain = responseData?.main?.[0] || {};
+
+            if (Object.keys(updatedMain).length > 0) {
+                setPrpCode(updatedMain?.PrpCode || "");
+
+                setCartonType(
+                    String(updatedMain?.IsCartonType) === "0"
+                        ? "Single"
+                        : "Mix"
+                );
+
+                setStatus(
+                    String(updatedMain?.IsCartonStatus) === "0"
+                        ? "Open"
+                        : "Close"
+                );
+            }
+
+            const updatedD1 = Array.isArray(responseData?.d1)
+                ? responseData.d1
+                : [];
+
+            const updatedD2 = Array.isArray(responseData?.d2)
+                ? responseData.d2
+                : [];
+
+            const updatedD3 = Array.isArray(responseData?.d3)
+                ? responseData.d3
+                : [];
+
+            const updatedMainRows = Array.isArray(responseData?.main)
+                ? responseData.main
+                : [];
+
+            setD1Data(updatedD1);
+            setD2Data(updatedD2);
+            setD3Rows(updatedD3);
+            setmainRows(updatedMainRows);
+            setSavedResponse(responseData);
+
+            console.log("UPDATED MAIN ::", updatedMain);
+            console.log("UPDATED D1 ::", updatedD1);
+            console.log("UPDATED D2 ::", updatedD2);
+            console.log("UPDATED D3 ::", updatedD3);
+            console.log("UPDATED MAIN ROWS ::", updatedMainRows);
+
             // if (resData?.message === false) {
             //     showWarning(resData?.response?.message);
             // } else if (resData?.response?.error === true) {
@@ -604,48 +653,77 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
             //     showError(resData?.message);
             // }
 
-            if (resData?.message === false) {
-                showWarning(resData?.response?.message);
+            // if (resData?.message === false) {
+            //     showWarning(resData?.response?.message);
 
-            } else if (resData?.response?.error === true) {
-                showWarning(resData?.response?.message);
+            // } else if (resData?.response?.error === true) {
+            //     showWarning(resData?.response?.message);
 
-            }
-            else if (resData?.success === true) {
-                Alert.alert(
-                    "Success",
-                    resData?.response?.message,
-                    [
-                        {
-                            text: "OK",
-                            onPress: () => {
-                                // navigation.replace("Weft Issue Return", {
-                                //     token,
-                                //     refresh: true,
-                                //     selectedProperty,
-                                //     selectedYear,
-                                //     fromDate,
-                                //     toDate,
-                                // });
-                                router.replace({
-                                    pathname: "/weft-issue-return",
-                                    params: {
-                                        token,
-                                        refresh: "true",
-                                        selectedProperty: JSON.stringify(selectedProperty),
-                                        selectedYear,
-                                        fromDate,
-                                        toDate,
-                                    },
-                                });
-                            },
-                        },
-                    ],
-                    { cancelable: false }
+            // }
+            // else if (resData?.success === true) {
+            //     Alert.alert(
+            //         "Success",
+            //         resData?.response?.message,
+            //         [
+            //             {
+            //                 text: "OK",
+            //                 onPress: () => {
+            //                     // navigation.replace("Weft Issue Return", {
+            //                     //     token,
+            //                     //     refresh: true,
+            //                     //     selectedProperty,
+            //                     //     selectedYear,
+            //                     //     fromDate,
+            //                     //     toDate,
+            //                     // });
+            //                     router.replace({
+            //                         pathname: "/weft-issue-return",
+            //                         params: {
+            //                             token,
+            //                             refresh: "true",
+            //                             selectedProperty: JSON.stringify(selectedProperty),
+            //                             selectedYear,
+            //                             fromDate,
+            //                             toDate,
+            //                         },
+            //                     });
+            //                 },
+            //             },
+            //         ],
+            //         { cancelable: false }
+            //     );
+            // }
+            // else {
+            //     showError(resData?.message);
+            // }
+
+            if (resData?.success === true) {
+                getAllPrinters();
+                if (typeof resData?.message === "string") {
+                    showSuccess(resData.message);
+                } else if (typeof responseData?.message === "string") {
+                    showSuccess(responseData.message);
+                } else {
+                    showSuccess("Weft issue return updated successfully.");
+                }
+            } else if (resData?.message === false) {
+                if (typeof responseData?.message === "string") {
+                    showWarning(responseData.message);
+                } else {
+                    showWarning("Unable to update Weft issue return.");
+                }
+            } else if (responseData?.error === true) {
+                if (typeof responseData?.message === "string") {
+                    showError(responseData.message);
+                } else {
+                    showError("Unable to update Weft issue return.");
+                }
+            } else {
+                showError(
+                    typeof resData?.message === "string"
+                        ? resData.message
+                        : "Something went wrong while updating."
                 );
-            }
-            else {
-                showError(resData?.message);
             }
 
         } catch (error) {
@@ -945,6 +1023,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
             const d1 = d1Data?.[0] || {};
             const d2 = d2Data?.[0] || {};
             const d3 = d3Rows?.[0] || {};
+            const main = mainRows?.[0] || {};
             // const main = savedResponse?.main?.[0]?.[0] || {};
 
             console.log('printsticker function :', { d1, d2, d3 });
@@ -954,36 +1033,75 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
             if (Object.keys(d1).length > 0) {
 
                 temppayloadObj = {
-                    uid: d1.IssUId ?? "0",
-                    inwno: "",
-                    inwdate: "",
-                    srno: d1.IssSrNo ?? "0",
-                    itmcode: d1.ItmCode ?? "0",
-                    itmname: d1.ItmName ?? "",
-                    dsncode: "0",
-                    dsnname: "",
-                    rcno: "",
-                    amount: "",
-                    subsr: d3.IssSubSr ?? "0",
-                    takano: d2.CartNo ?? "",
-                    qty: d2.Qty ?? "0",
-                    trantype: d1.trantype ?? "",
-                    ttype: "",
-                    dptname: "",
-                    shdcode: d1.ShdCode ?? "0",
-                    shdname: d1.ShdName ?? "",
-                    whr: "",
-                    yarncostr: "",
-                    yard: "",
-                    sexecname: "",
-                    strcode: "",
-                    unqsrno: "",
-                    grdcode: d1.GrdCode ?? "0",
-                    grdname: d1.GrdName ?? "",
-                    mercode: d1.MerCode ?? "0",
-                    mername: d1.MerName ?? "",
-                    denier: d1.Denier ?? "0",
-                    prpcode: PrpCode ?? ""
+                    // uid: d1.IssUId ?? "0",
+                    // inwno: "",
+                    // inwdate: "",
+                    // srno: d1.IssSrNo ?? "0",
+                    // itmcode: d1.ItmCode ?? "0",
+                    // itmname: d1.ItmName ?? "",
+                    // dsncode: "0",
+                    // dsnname: "",
+                    // rcno: "",
+                    // amount: "",
+                    // subsr: d3.IssSubSr ?? "0",
+                    // takano: d2.CartNo ?? "",
+                    // qty: d2.Qty ?? "0",
+                    // trantype: d1.trantype ?? "",
+                    // ttype: "",
+                    // dptname: "",
+                    // shdcode: d1.ShdCode ?? "0",
+                    // shdname: d1.ShdName ?? "",
+                    // whr: "",
+                    // yarncostr: "",
+                    // yard: "",
+                    // sexecname: "",
+                    // strcode: "",
+                    // unqsrno: "",
+                    // grdcode: d1.GrdCode ?? "0",
+                    // grdname: d1.GrdName ?? "",
+                    // mercode: d1.MerCode ?? "0",
+                    // mername: d1.MerName ?? "",
+                    // denier: d1.Denier ?? "0",
+                    // prpcode: PrpCode ?? "",
+                    // chees: d2.Chees ?? "0"
+
+                    UId: main.UId ?? "0",
+                    TranDate: "0",
+                    PrpCode: PrpCode ?? "",
+                    StrCode: d1.StrCode ?? "0",
+                    ItmCode: d1.ItmCode ?? "0",
+                    MerCode: d1.MerCode ?? "0",
+                    ShdCode: d1.ShdCode ?? "0",
+                    GrdCode: d1.GrdCode ?? "0",
+                    Denier: d1.Denier ?? "0",
+                    DsnCode: "0",
+                    CartNo: d2.CartNo ?? "",
+                    Wt: d1.TotQty ?? "0",
+                    Chees: d2.Chees ?? "0",
+                    IsAuto: "0",
+                    GrossWt: "0",
+                    PUId: d1.IssUId ?? "0",
+                    PSrNo: d1.IssSrNo ?? "0",
+                    PSubSr: d3.IssSubSr ?? "0",
+                    TranType: "0",
+                    TranName: "",
+                    StkType: main.StkType ?? "",
+                    StkDate: "",
+                    SrNo: d1.IssSrNo ?? "0",
+                    UsrCode: "0",
+                    StrName: "",
+                    ItmName: d1.ItmName ?? "",
+                    MerName: d1.MerName ?? "",
+                    ShdName: d1.ShdName ?? "",
+                    GrdName: d1.GrdName ?? "",
+                    DnsName: "",
+                    Stktype: main.StkType ?? "",
+                    nStkDate: "0",
+                    yearno: "",
+                    IskgQty: "0",
+                    Rate: "0",
+                    MItmCode: "",
+                    MItmName: ""
                 };
 
                 console.log("Print Payload Object :", temppayloadObj);

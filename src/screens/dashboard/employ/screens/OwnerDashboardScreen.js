@@ -188,7 +188,7 @@
 // // //               bgColor={COLORS.salesBg}
 // // //               rightText={dateString}
 // // //               action="Full report"
-// // //               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+// // //               onAction={() => openCollectionReport()}
 // // //             />
 
 // // //             <TotalRow
@@ -324,7 +324,7 @@
 // // //               bgColor={COLORS.collBg}
 // // //               rightText={dateString}
 // // //               action="Full report"
-// // //               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+// // //               onAction={() => openCollectionReport()}
 // // //             />
 
 // // //             <TotalRow
@@ -369,7 +369,7 @@
 // // //                   rightVal={formatAmount(exec.mtd)}
 // // //                   rawLeftVal={exec.today}
 // // //                   rawRightVal={exec.mtd}
-// // //                   onPress={() => goToExec(exec)}
+// // //                   onPress={() => openCollectionReport(exec)}
 // // //                 />
 // // //               ))}
 // // //             </TableWrapper>
@@ -405,7 +405,7 @@
 // // //                   rightVal={formatAmount(exec.outstanding)}
 // // //                   rawRightVal={exec.outstanding}
 // // //                   trendUp={false}
-// // //                   onPress={() => goToExec(exec)}
+// // //                   onPress={() => openOutstandingReport(exec)}
 // // //                 />
 // // //               ))}
 // // //             </TableWrapper>
@@ -808,7 +808,7 @@
 // //               bgColor={COLORS.collBg}
 // //               rightText={dateString}
 // //               action="Full report"
-// //               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+// //               onAction={() => openCollectionReport()}
 // //             />
 
 // //             <TotalRow
@@ -1232,7 +1232,7 @@
 // //               bgColor={COLORS.salesBg}
 // //               rightText={dateString}
 // //               action="Full report"
-// //               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+// //               onAction={() => openCollectionReport()}
 // //             />
 
 // //             <TotalRow
@@ -1368,7 +1368,7 @@
 // //               bgColor={COLORS.collBg}
 // //               rightText={dateString}
 // //               action="Full report"
-// //               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+// //               onAction={() => openCollectionReport()}
 // //             />
 
 // //             <TotalRow
@@ -1886,7 +1886,7 @@
 //               bgColor={COLORS.collBg}
 //               rightText={dateString}
 //               action="Full report"
-//               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+//               onAction={() => openCollectionReport()}
 //             />
 
 //             <TotalRow
@@ -2309,7 +2309,7 @@
 //               bgColor={COLORS.salesBg}
 //               rightText={dateString}
 //               action="Full report"
-//               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+//               onAction={() => openCollectionReport()}
 //             />
 
 //             <TotalRow
@@ -2445,7 +2445,7 @@
 //               bgColor={COLORS.collBg}
 //               rightText={dateString}
 //               action="Full report"
-//               onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+//               onAction={() => openCollectionReport()}
 //             />
 
 //             <TotalRow
@@ -2681,7 +2681,9 @@
 // screens/OwnerDashboardScreen.js
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AmountDisplayModeControl, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import {
   Platform,
   RefreshControl,
@@ -2714,6 +2716,28 @@ const ROW_HEIGHT = 70;
 const SCROLL_THRESHOLD = 4;
 const FIXED_TABLE_HEIGHT = ROW_HEIGHT * SCROLL_THRESHOLD;
 
+const coverageSubtitle = period => {
+  if (!period) return '';
+  if (period.type === 'live_balance') {
+    return period.freshness_label || 'Live current balance';
+  }
+
+  const ymd = String(period.actual_to_ymd || '');
+  if (/^\d{8}$/.test(ymd)) {
+    const dt = new Date(
+      Number(ymd.slice(0, 4)),
+      Number(ymd.slice(4, 6)) - 1,
+      Number(ymd.slice(6, 8)),
+    );
+    const label = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    return Number(period.pending_days || 0) > 0
+      ? `Data through ${label}`
+      : `Current through ${label}`;
+  }
+
+  return period.freshness_label || period.display_label || '';
+};
+
 const TableWrapper = ({ rowCount, children }) => {
   if (rowCount < SCROLL_THRESHOLD) {
     return <View>{children}</View>;
@@ -2744,6 +2768,7 @@ export default function OwnerDashboardScreen({
   route,
   getUserPrptype,
   visibleSections = { sales: true, production: true, collection: true, outstanding: true },
+  showAmountControl = true,
 }) {
   const router = useRouter();
   const { user } = route.params || {};
@@ -2751,6 +2776,9 @@ export default function OwnerDashboardScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const displayAmount = value => formatAmount(value, amountMode);
+  const hasFocusedOnce = useRef(false);
 
   // ── Date state as Date object ──
   const [date, setDate] = useState(new Date());
@@ -2768,10 +2796,10 @@ export default function OwnerDashboardScreen({
   const [outstandingSort, setOutstandingSort] = useState('desc');
 
   const load = useCallback(
-    async getUserPrptype => {
+    async (getUserPrptype, silent = false) => {
       try {
         setError(null);
-        setLoading(true);
+        if (!silent) setLoading(true);
         const res = await api.getOwnerDashboard(dateString, getUserPrptype);
         console.log('getOwnerDashboard', res);
         if (res.success) setData(res.data);
@@ -2790,6 +2818,25 @@ export default function OwnerDashboardScreen({
     if (!getUserPrptype) return;
     load(getUserPrptype);
   }, [load, getUserPrptype]);
+
+  /*
+   * Card drill-downs are live. When the user comes back after viewing a
+   * report, refresh the dashboard silently so the parent row reflects the
+   * same current database state instead of keeping an old carried amount.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (!getUserPrptype) return undefined;
+
+      if (!hasFocusedOnce.current) {
+        hasFocusedOnce.current = true;
+        return undefined;
+      }
+
+      void load(getUserPrptype, true);
+      return undefined;
+    }, [getUserPrptype, load]),
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -2810,6 +2857,43 @@ export default function OwnerDashboardScreen({
       date: dateString,
       user,
       getUserPrptype,
+    });
+  };
+
+
+  const openCollectionReport = exec => {
+    router.push({
+      pathname: '/new/(tabs)/reports/collection-flow',
+      params: {
+        mode: 'collection',
+        view: 'owner',
+        date: dateString,
+        prptype: getUserPrptype,
+        report_month: String(dateString || '').slice(0, 7).replace('-', ''),
+        expected_month: String(dateString || '').slice(0, 7).replace('-', ''),
+        level: exec ? 'parties' : 'executives',
+        executive_code: exec?.exec_id != null ? String(exec.exec_id) : undefined,
+        executive_name: exec?.name || undefined,
+        expected_amount: String(Number(exec?.mtd ?? collection?.total?.mtd ?? 0)),
+      },
+    });
+  };
+
+  const openOutstandingReport = exec => {
+    router.push({
+      pathname: '/new/(tabs)/reports/collection-flow',
+      params: {
+        mode: 'outstanding',
+        view: 'owner',
+        date: dateString,
+        prptype: getUserPrptype,
+        report_month: String(dateString || '').slice(0, 7).replace('-', ''),
+        expected_month: String(dateString || '').slice(0, 7).replace('-', ''),
+        level: exec ? 'parties' : 'executives',
+        executive_code: exec?.exec_id != null ? String(exec.exec_id) : undefined,
+        executive_name: exec?.name || undefined,
+        expected_amount: String(Number(exec?.outstanding ?? outstanding?.total_due ?? 0)),
+      },
     });
   };
 
@@ -2942,12 +3026,20 @@ export default function OwnerDashboardScreen({
             />
           )}
 
+          {showAmountControl && (
+            <View style={styles.amountModeBar}>
+              <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
+            </View>
+          )}
+
           {/* ── SALES SECTION ── */}
           {visibleSections.sales && (
             <SalesDashboardCard
               sales={sales}
               dateString={dateString}
               view="owner"
+              prptype={getUserPrptype}
+              amountMode={amountMode}
             />
           )}
 
@@ -2958,7 +3050,7 @@ export default function OwnerDashboardScreen({
                 icon="⚙️"
                 title="PRODUCTION"
                 bgColor={COLORS.prodBg}
-                rightText={dateString}
+                subtitle={coverageSubtitle(production?.period)}
                 action="Full report"
                 onAction={openProductionReport}
               />
@@ -3020,17 +3112,17 @@ export default function OwnerDashboardScreen({
                 icon="💰"
                 title="PAYMENT COLLECTION"
                 bgColor={COLORS.collBg}
-                rightText={dateString}
+                subtitle={coverageSubtitle(collection?.period)}
                 action="Full report"
-                onAction={() => router.push('/new/(tabs)/reports/monthly-report')}
+                onAction={() => openCollectionReport()}
               />
 
               <TotalRow
                 leftLabel="TODAY"
-                leftValue={formatAmount(collection.total.today)}
+                leftValue={displayAmount(collection.total.today)}
                 tealLeft
                 rightLabel="TOTAL MTD"
-                rightValue={formatAmount(collection.total.mtd)}
+                rightValue={displayAmount(collection.total.mtd)}
                 rawLeftValue={collection.total.today}
                 rawRightValue={collection.total.mtd}
               />
@@ -3045,7 +3137,7 @@ export default function OwnerDashboardScreen({
                   fillColor={COLORS.green}
                   height={68}
                   pointGap={54}
-                  valueFormatter={value => formatAmount(Number(value || 0))}
+                  valueFormatter={value => displayAmount(Number(value || 0))}
                   showBaseline
                   showHint
                 />
@@ -3092,11 +3184,11 @@ export default function OwnerDashboardScreen({
                     key={exec.exec_id}
                     name={exec.name}
                     avatarColor={exec.avatar_color}
-                    leftVal={formatAmount(exec.today)}
-                    rightVal={formatAmount(exec.mtd)}
+                    leftVal={displayAmount(exec.today)}
+                    rightVal={displayAmount(exec.mtd)}
                     rawLeftVal={exec.today}
                     rawRightVal={exec.mtd}
-                    onPress={() => goToExec(exec)}
+                    onPress={() => openCollectionReport(exec)}
                   />
                 ))}
               </TableWrapper>
@@ -3110,13 +3202,16 @@ export default function OwnerDashboardScreen({
                 icon="⚠️"
                 title="OUTSTANDING"
                 bgColor={COLORS.outsBg}
+                subtitle={coverageSubtitle(outstanding?.period)}
+                action="Full report"
+                onAction={() => openOutstandingReport()}
               />
 
               <View style={styles.outsTotalRow}>
                 <Text style={styles.outsTotalLabel}>Total Due</Text>
                 <LongPressValue
                   rawValue={outstanding.total_due}
-                  formattedValue={formatAmount(outstanding.total_due)}
+                  formattedValue={displayAmount(outstanding.total_due)}
                   style={styles.outsTotalValue}
                 />
               </View>
@@ -3159,10 +3254,10 @@ export default function OwnerDashboardScreen({
                     key={exec.exec_id}
                     name={exec.name}
                     avatarColor={exec.avatar_color}
-                    rightVal={formatAmount(exec.outstanding)}
+                    rightVal={displayAmount(exec.outstanding)}
                     rawRightVal={exec.outstanding}
                     trendUp={false}
-                    onPress={() => goToExec(exec)}
+                    onPress={() => openOutstandingReport(exec)}
                   />
                 ))}
               </TableWrapper>
@@ -3186,6 +3281,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { flex: 1 },
   content: { paddingTop: 8, paddingBottom: 24 },
+  amountModeBar: { paddingHorizontal: 12, paddingBottom: 8, alignItems: 'flex-end' },
 
   // ── Date bar ──
   dateBar: {

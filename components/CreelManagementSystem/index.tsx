@@ -3250,7 +3250,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     'X-Requested-with': 'XMLHttpRequest',
                 },
             });
-
+            console.log("response",response);
             if (!response?.data?.success) {
                 throw new Error(response?.data?.message || 'Unable to start creel session.');
             }

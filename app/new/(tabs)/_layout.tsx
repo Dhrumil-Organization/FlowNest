@@ -300,7 +300,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 // drift out of sync.
 const TAB_BAR_HEIGHT = 75;
 const TAB_BAR_SIDE_MARGIN = 14;
-const TAB_BAR_BOTTOM = 40; // matches the exact base file's hardcoded `bottom: 40`
+const TAB_BAR_GROUND_GAP = 10; // visual gap above iOS home indicator / Android system navigation
 
 // FIX: this is now the ONE place a header is rendered for every tab screen.
 // Previously DashboardScreen, DesignsScreen, PermissionManagerScreen and
@@ -320,7 +320,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   designs: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Designs' },
   costing: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Costing' },
   monthlysalestarget: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Sales Target' },
-  // orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
+  orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
@@ -347,8 +347,18 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const ready = hydrated && Boolean(appSession);
 
-  const barBottomOffset = TAB_BAR_BOTTOM;
-  const sceneBottomPadding = TAB_BAR_HEIGHT + barBottomOffset + 12;
+  // SYSTEM-SAFE FLOATING TAB BAR:
+  // safe-area-context reports the physical bottom obstruction for both
+  // platforms (iOS home indicator, Android gesture/3-button navigation).
+  // Add only a small visual ground gap above that obstruction.
+  const barBottomOffset = Math.max(0, insets.bottom) + TAB_BAR_GROUND_GAP;
+  const barLeftOffset = Math.max(TAB_BAR_SIDE_MARGIN, insets.left + 8);
+  const barRightOffset = Math.max(TAB_BAR_SIDE_MARGIN, insets.right + 8);
+
+  // The tab bar is absolute, so reserve its full footprint in every scene.
+  // This prevents the last report/list row from sitting behind the pill on
+  // either iOS or Android.
+  const sceneBottomPadding = TAB_BAR_HEIGHT + barBottomOffset + 16;
   const onDashboard = pathname === '/new' || pathname === '/new/' || pathname.endsWith('/new/(tabs)') || pathname.endsWith('/new/(tabs)/');
 
   const activeRouteName = onDashboard
@@ -357,6 +367,14 @@ export default function TabsLayout() {
       (routeName) => routeName !== 'index' && pathname.includes(routeName.replace(/\/index$/, '')),
     );
   const header = (activeRouteName && HEADER_CONTENT[activeRouteName]) || HEADER_CONTENT.index;
+
+  // Drill-down report screens render their own compact SubScreenHeader.
+  // Do not stack the large tab-level AppHeader above them, otherwise the
+  // screen gets the large empty navy block marked in the screenshots.
+  // The parent SafeAreaView still owns the top system inset/background.
+  const ownsSubScreenHeader =
+    pathname.includes('/reports/sales-flow') ||
+    pathname.includes('/reports/collection-flow');
 
   const subtitle = useHeaderExtrasStore((state) => state.subtitle);
   const right = useHeaderExtrasStore((state) => state.right);
@@ -383,7 +401,7 @@ export default function TabsLayout() {
     const filtered = APP_NAVIGATION.filter((item) => {
       if (!ready) return false;
       // Skip "Orders" tab
-      if (item.routeName === 'orders') return false;
+      // if (item.routeName === 'orders') return false;
       return item.action && item.action !== 'view'
         ? canDo(item.resource, item.action)
         : canAccess(item.resource);
@@ -414,7 +432,14 @@ export default function TabsLayout() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: T.nav }}>
-      <AppHeader eyebrow={header.eyebrow} title={header.title} subtitle={subtitle || undefined} right={right || undefined} />
+      {!ownsSubScreenHeader ? (
+        <AppHeader
+          eyebrow={header.eyebrow}
+          title={header.title}
+          subtitle={subtitle || undefined}
+          right={right || undefined}
+        />
+      ) : null}
       <View style={{ flex: 1, backgroundColor: T.bg }}>
         <Tabs
           screenOptions={{
@@ -430,7 +455,9 @@ export default function TabsLayout() {
               primaryItems={primaryItems}
               overflowItems={overflowItems}
               hasOverflow={hasOverflow}
-              barBottom={TAB_BAR_BOTTOM}
+              barBottom={barBottomOffset}
+              barLeft={barLeftOffset}
+              barRight={barRightOffset}
               onMorePress={() => setMoreOpen(true)}
             />
           )}
@@ -462,7 +489,12 @@ export default function TabsLayout() {
         <View style={moreStyles.shade}>
           <BlurView tint="dark" intensity={25} style={StyleSheet.absoluteFill} />
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setMoreOpen(false)} />
-          <View style={moreStyles.sheet}>
+          <View
+            style={[
+              moreStyles.sheet,
+              { paddingBottom: 12 + Math.max(0, insets.bottom) },
+            ]}
+          >
             <BlurView tint="light" intensity={80} style={StyleSheet.absoluteFill} />
             <View style={moreStyles.handle} />
             <View style={moreStyles.sheetHeader}>
@@ -503,6 +535,8 @@ type GlassTabBarProps = {
   overflowItems: NavItem[];
   hasOverflow: boolean;
   barBottom: number;
+  barLeft: number;
+  barRight: number;
   onMorePress: () => void;
 };
 
@@ -513,6 +547,8 @@ function GlassTabBar({
   overflowItems,
   hasOverflow,
   barBottom,
+  barLeft,
+  barRight,
   onMorePress,
 }: GlassTabBarProps) {
   const items: NavItem[] = useMemo(
@@ -574,7 +610,13 @@ function GlassTabBar({
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.barWrap, { bottom: barBottom }]}>
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.barWrap,
+        { bottom: barBottom, left: barLeft, right: barRight },
+      ]}
+    >
       <View style={styles.barShadow}>
         <View style={styles.barClip}>
           <BlurView tint="dark" intensity={55} style={StyleSheet.absoluteFillObject} />
@@ -649,8 +691,6 @@ function TabButton({
 const styles = StyleSheet.create({
   barWrap: {
     position: 'absolute',
-    left: TAB_BAR_SIDE_MARGIN,
-    right: TAB_BAR_SIDE_MARGIN,
     height: TAB_BAR_HEIGHT,
   },
   barShadow: {

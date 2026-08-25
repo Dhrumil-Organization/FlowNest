@@ -5,6 +5,15 @@ registerUiNodes([
   { id: 'screen.dashboard', kind: 'screen', title: 'Dashboard', permission: 'dashboard', action: 'view', order: 10 },
   { id: 'dashboard.monthly_target', kind: 'dashboard-card', parentId: 'screen.dashboard', title: 'Monthly Target', permission: 'dashboard.monthly_target', action: 'view', order: 10 },
   {
+    id: 'dashboard.monthly_report',
+    kind: 'dashboard-card',
+    parentId: 'screen.dashboard',
+    title: 'Monthly Report',
+    permission: 'dashboard.monthly_report',
+    action: 'view',
+    order: 20,
+  },
+  {
     id: 'dashboard.operational_details',
     kind: 'dashboard-card',
     parentId: 'screen.dashboard',

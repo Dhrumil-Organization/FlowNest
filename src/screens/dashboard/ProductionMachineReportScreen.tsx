@@ -40,6 +40,15 @@ type TrendPoint = {
   value: number;
 };
 
+type CategoryRow = {
+  itmcode?: string | number | null;
+  name?: string;
+  today_meters?: number;
+  mtd_meters?: number;
+  share_pct?: number;
+  unresolved?: boolean;
+};
+
 function points(source: any): TrendPoint[] {
   if (!Array.isArray(source)) {
     return [];
@@ -174,6 +183,13 @@ export default function ProductionMachineReportScreen() {
           </View>
         </View>
 
+        <CategorySummaryCard
+          title="▦  CATEGORY MIX"
+          rows={machine?.by_category || []}
+          totalMtd={mtd}
+          reconciliation={machine?.category_reconciliation}
+        />
+
         <ChartCard
           title="⚙  PRODUCTION TREND"
           leftLabel="YESTERDAY"
@@ -193,6 +209,100 @@ export default function ProductionMachineReportScreen() {
         />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function CategorySummaryCard({
+  title,
+  rows,
+  totalMtd,
+  reconciliation,
+}: {
+  title: string;
+  rows: CategoryRow[];
+  totalMtd: number;
+  reconciliation?: any;
+}) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const unresolved = Number(reconciliation?.unresolved_meters || 0);
+  const unresolvedPct = Number(reconciliation?.unresolved_pct || 0);
+  const reconciled = reconciliation?.is_reconciled !== false;
+
+  return (
+    <View style={s.card}>
+      <View style={s.purpleHeader}>
+        <Text style={s.headerText}>{title}</Text>
+      </View>
+
+      {safeRows.length === 0 ? (
+        <View style={s.emptyState}>
+          <Text style={s.emptyTitle}>No category data</Text>
+          <Text style={s.emptyText}>
+            No Item/category summary is available for this production unit.
+          </Text>
+        </View>
+      ) : (
+        <>
+          {safeRows.map((row, index) => (
+            <View
+              key={`${String(row?.itmcode ?? 'unresolved')}-${index}`}
+              style={s.categoryRow}
+            >
+              <View style={s.categoryLeft}>
+                <Text
+                  style={[
+                    s.categoryName,
+                    row?.unresolved && s.categoryUnresolved,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {row?.name || 'UNRESOLVED ITEM'}
+                </Text>
+
+                <Text style={s.categoryMeta} numberOfLines={1}>
+                  {row?.unresolved
+                    ? 'Item not resolved · included in total'
+                    : `Item ${String(row?.itmcode ?? '')}`}
+                </Text>
+              </View>
+
+              <View style={s.categoryRight}>
+                <Text style={s.categoryMtd}>
+                  {meters(Number(row?.mtd_meters || 0))}
+                </Text>
+                <Text style={s.categoryDetail}>
+                  Yday {meters(Number(row?.today_meters || 0))} ·{' '}
+                  {Number(row?.share_pct || 0).toFixed(1)}%
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          <View style={s.categoryTotalRow}>
+            <Text style={s.categoryTotalLabel}>MACHINE TOTAL</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={s.categoryTotalValue}>{meters(totalMtd)}</Text>
+              <Text style={s.categoryTotalShare}>100.0%</Text>
+            </View>
+          </View>
+
+          <View style={s.reconcileBox}>
+            <Text style={s.reconcileText}>
+              {reconciled
+                ? '✓ Category mix reconciled with machine production'
+                : '⚠ Category mix does not reconcile with machine production'}
+            </Text>
+
+            {unresolved > 0 ? (
+              <Text style={s.unresolvedText}>
+                {meters(unresolved)} unresolved ({unresolvedPct.toFixed(2)}%)
+                is included in this machine total.
+              </Text>
+            ) : null}
+          </View>
+        </>
+      )}
+    </View>
   );
 }
 
@@ -610,6 +720,87 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.4,
+  },
+  categoryRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+  },
+  categoryLeft: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 10,
+  },
+  categoryRight: {
+    minWidth: 118,
+    alignItems: 'flex-end',
+  },
+  categoryName: {
+    color: T.nav,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  categoryUnresolved: {
+    color: '#A85B00',
+  },
+  categoryMeta: {
+    color: T.muted,
+    fontSize: 8,
+    marginTop: 4,
+  },
+  categoryMtd: {
+    color: '#6D287F',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  categoryDetail: {
+    color: T.muted,
+    fontSize: 8,
+    marginTop: 4,
+  },
+  categoryTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: '#F8F5F1',
+  },
+  categoryTotalLabel: {
+    color: T.nav,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  categoryTotalValue: {
+    color: T.nav,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  categoryTotalShare: {
+    color: T.muted,
+    fontSize: 8,
+    marginTop: 2,
+  },
+  reconcileBox: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+  },
+  reconcileText: {
+    color: '#236A4A',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  unresolvedText: {
+    color: '#A85B00',
+    fontSize: 8,
+    lineHeight: 12,
+    marginTop: 4,
   },
   chartKpis: {
     flexDirection: 'row',

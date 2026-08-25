@@ -31,7 +31,20 @@ const CHILD_LABELS = {
   party: 'BY PARTY',
 };
 
+const LEVEL_BY_DIMENSION = {
+  category: 'categories',
+  executive: 'executives',
+  design: 'designs',
+  party: 'parties',
+};
 
+const NEXT_LEVEL_BY_DIMENSION = {
+  category: 'executives',
+  executive: 'parties',
+  design: 'executives',
+  // Explicit business rule: direct Party drill-down first shows that party's categories.
+  party: 'categories',
+};
 
 const formatQty = value => {
   const amount = Number(value || 0);
@@ -40,18 +53,31 @@ const formatQty = value => {
   return `${amount.toLocaleString('en-IN', { maximumFractionDigits: 1 })} m`;
 };
 
-const cleanAmount = value => formatAmount(Number(value || 0)).replace('Cr', ' Cr').replace('L', ' L');
+const cleanAmount = (value, amountMode = 'compact') =>
+  formatAmount(Number(value || 0), amountMode);
 
-function MetricValue({ quantity, amount, compact = false }) {
+const coverageSubtitle = period => {
+  if (!period) return '';
+  if (period.type === 'live_balance') return period.freshness_label || 'Live current balance';
+  const ymd = String(period.actual_to_ymd || '');
+  if (/^\d{8}$/.test(ymd)) {
+    const d = new Date(Number(ymd.slice(0, 4)), Number(ymd.slice(4, 6)) - 1, Number(ymd.slice(6, 8)));
+    const label = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    return Number(period.pending_days || 0) > 0 ? `Data through ${label}` : `Current through ${label}`;
+  }
+  return period.freshness_label || period.display_label || '';
+};
+
+function MetricValue({ quantity, amount, compact = false, amountMode = 'compact' }) {
   return (
     <View style={[styles.metricValue, compact && styles.metricValueCompact]}>
       <Text numberOfLines={1} style={[styles.qty, compact && styles.childQty]}>{formatQty(quantity)}</Text>
-      <Text numberOfLines={1} style={[styles.amount, compact && styles.childAmount]}>{cleanAmount(amount)}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={[styles.amount, compact && styles.childAmount]}>{cleanAmount(amount, amountMode)}</Text>
     </View>
   );
 }
 
-function ChildSection({ type, rows }) {
+function ChildSection({ type, rows, amountMode = 'compact' }) {
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
   return (
@@ -69,14 +95,14 @@ function ChildSection({ type, rows }) {
             )}
             <Text numberOfLines={1} style={styles.childName}>{row.name}</Text>
           </View>
-          <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} compact />
+          <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} amountMode={amountMode} compact />
         </View>
       ))}
     </View>
   );
 }
 
-function InteractiveSalesChart({ dailyTrend }) {
+function InteractiveSalesChart({ dailyTrend, amountMode = 'compact' }) {
   return (
     <View style={styles.chartWrap}>
       <InteractiveDailyTrendChart
@@ -87,7 +113,7 @@ function InteractiveSalesChart({ dailyTrend }) {
         fillColor="#0D2234"
         height={62}
         pointGap={54}
-        valueFormatter={value => cleanAmount(value)}
+        valueFormatter={value => cleanAmount(value, amountMode)}
         showBaseline
         showHint
       />
@@ -95,7 +121,7 @@ function InteractiveSalesChart({ dailyTrend }) {
   );
 }
 
-export default function SalesDashboardCard({ sales, dateString, view = 'owner' }) {
+export default function SalesDashboardCard({ sales, dateString, view = 'owner', prptype = 'S', amountMode = 'compact' }) {
   const router = useRouter();
   const [dimension, setDimension] = useState(sales?.default_dimension || 'category');
   const [expandedKey, setExpandedKey] = useState(null);
@@ -153,12 +179,20 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
 
   const openFullReport = extra => {
     router.push({
-      pathname: '/new/(tabs)/reports/monthly-report',
+      pathname: '/new/(tabs)/reports/sales-flow',
       params: {
         view: view === 'myview' ? 'my' : view,
         date: dateString,
-        monthno: String(new Date(dateString).getMonth() + 1),
-        sales_dimension: dimension,
+        report_month: String(dateString || '').slice(0, 7).replace('-', ''),
+        expected_month: String(dateString || '').slice(0, 7).replace('-', ''),
+        prptype,
+        level: LEVEL_BY_DIMENSION[dimension] || 'categories',
+        source_dimension: dimension,
+        /*
+         * Header Full Report is authoritative and therefore does not inherit
+         * a preview-table total. Expanded-row View Full Report passes its own
+         * parent amount/qty through `extra` for reconciliation.
+         */
         ...(extra || {}),
       },
     });
@@ -170,7 +204,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
         icon="🧵"
         title="SALES"
         bgColor={COLORS.salesBg}
-        rightText="updated now"
+        subtitle={coverageSubtitle(sales?.period)}
         action="Full report"
         onAction={() => openFullReport()}
       />
@@ -178,15 +212,15 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
       <View style={styles.summaryRow}>
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryLabel}>TODAY</Text>
-          <Text style={styles.todayValue}>{cleanAmount(sales?.total?.today)}</Text>
+          <Text style={styles.todayValue}>{cleanAmount(sales?.total?.today, amountMode)}</Text>
         </View>
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryLabel}>THIS MONTH</Text>
-          <Text style={styles.monthValue}>{cleanAmount(sales?.total?.mtd)}</Text>
+          <Text style={styles.monthValue}>{cleanAmount(sales?.total?.mtd, amountMode)}</Text>
         </View>
       </View>
 
-      <InteractiveSalesChart dailyTrend={dailyTrend} />
+      <InteractiveSalesChart dailyTrend={dailyTrend} amountMode={amountMode} />
 
       <View style={styles.tabs}>
         {DIMENSIONS.map(tab => {
@@ -231,19 +265,23 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
               )}
               {dimension !== 'executive' && <View style={[styles.rankDot, { backgroundColor: ['#255C85', '#7440B7', '#168274', '#2563EB', '#B55E10', '#0A9B6C', '#D98200'][index % 7] }]} />}
               <Text numberOfLines={1} style={styles.parentName}>{row.name}</Text>
-              <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} />
+              <MetricValue quantity={row.mtd_qty} amount={row.mtd_amount} amountMode={amountMode} />
             </TouchableOpacity>
 
             {expanded && (
               <View style={styles.expandedBody}>
                 {childEntries.map(([childType, childRows]) => (
-                  <ChildSection key={childType} type={childType} rows={childRows} />
+                  <ChildSection key={childType} type={childType} rows={childRows} amountMode={amountMode} />
                 ))}
                 <TouchableOpacity
                   accessibilityRole="link"
                   onPress={() => openFullReport({
+                    level: NEXT_LEVEL_BY_DIMENSION[dimension] || 'categories',
                     [`${dimension}_code`]: row.code,
                     [`${dimension}_name`]: row.name,
+                    expected_amount: String(Number(row?.mtd_amount || 0)),
+                    expected_qty: String(Number(row?.mtd_qty || 0)),
+                    expected_generated_at: String(sales?.generated_at || ''),
                   })}
                 >
                   <Text style={styles.fullLink}>View full report ›</Text>
@@ -267,6 +305,7 @@ export default function SalesDashboardCard({ sales, dateString, view = 'owner' }
             (sum, row) => sum + Number(row.mtd_amount || 0),
             0
           )}
+          amountMode={amountMode}
         />
       </View>
       <Text style={styles.footerNote}>Toggle the view · tap any row to expand its breakdown. Qty in metres, amount in ₹.</Text>

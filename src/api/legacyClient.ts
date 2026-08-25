@@ -44,7 +44,22 @@ export const DesignAPI = {
   get: (id: string | number) => client.get(LEGACY_ROUTES.designDetail(id)),
   create: (body: any) => client.post(LEGACY_ROUTES.designCreate, body),
   update: (id: string | number, body: any) => client.put(LEGACY_ROUTES.designUpdate(id), body),
-  addColourway: (id: string | number, body: any) => client.post(LEGACY_ROUTES.designColourway(id), body),
+
+  // Required by YD Costing:
+  // GET /api/designs/{mdId}/colourways
+  //
+  // The route already exists in Laravel. The previous legacyClient exposed
+  // addColourway() but accidentally omitted the corresponding GET method,
+  // which caused:
+  //   DesignAPI.colourways is not a function (it is undefined)
+  colourways: (id: string | number) =>
+    client.get<{ success: boolean; data: SubDesign[] }>(
+      LEGACY_ROUTES.designColourway(id)
+    ),
+
+  addColourway: (id: string | number, body: any) =>
+    client.post(LEGACY_ROUTES.designColourway(id), body),
+
   yarns: (params?: any) => client.get(LEGACY_ROUTES.designYarns, { params }),
   yarnDyeing: (body: any) => client.post(LEGACY_ROUTES.designDyeing, body),
 };

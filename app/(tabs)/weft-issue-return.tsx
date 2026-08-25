@@ -2,8 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import WeftIssueReturn from '@/components/WeftIssueReturn/WeftIssueReturn';
 
-export default function CRLimit_Request_Container() {
-    // const { token, username } = useAuth();
+export default function WeftIssueReturnContainer() {
     const [token, setToken] = useState('');
     const [username, setUsername] = useState('');
 
@@ -15,15 +14,14 @@ export default function CRLimit_Request_Container() {
             setToken(t || '');
             setUsername(u || 'User');
         };
+
         load();
     }, []);
 
     return (
-        <>
-            {/* <AuthProvider> */}
-            <WeftIssueReturn token={token || ''} username={username} />
-            {/* <Footer/> */}
-            {/* </AuthProvider> */}
-        </>
+        <WeftIssueReturn
+            token={token}
+            username={username}
+        />
     );
 }

@@ -3764,7 +3764,7 @@ const SU = StyleSheet.create({
         paddingVertical: 7, paddingHorizontal: 16, borderRadius: 999,
         backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB',
     },
-    pillOn: { backgroundColor: '#13879A', borderColor: '#13879A' },
+    pillOn: { backgroundColor: '#E0A864', borderColor: '#E0A864' },
     pillText: { fontSize: 12, color: '#000', fontWeight: '600' },
     pillTextOn: { color: '#fff', fontWeight: '700' },
 

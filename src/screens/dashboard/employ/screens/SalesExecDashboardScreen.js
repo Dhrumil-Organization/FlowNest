@@ -4,13 +4,13 @@
 // import React, { useCallback, useEffect, useState } from "react";
 // import {
 //   RefreshControl,
-//   SafeAreaView,
-//   ScrollView,
+// //   ScrollView,
 //   StyleSheet,
 //   Text,
 //   TouchableOpacity,
 //   View,
 // } from "react-native";
+// import { SafeAreaView } from "react-native-safe-area-context";
 // import { api, formatAmount } from "../api/api";
 // import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
 // import SalesExecDashboardSkeleton from "../components/SalesExecDashboardSkeleton";
@@ -106,8 +106,8 @@
 //       : "owner";
 //   const isMyView = activeTab === "myview";
 
-//   const selectedExecId = asNumber(mergedParams.execId, 0);
-//   const execId = isMyView ? 0 : selectedExecId;
+//   const selectedExecId = asString(mergedParams.execId).trim();
+//   const execId = isMyView ? "" : selectedExecId;
 //   const execName = asString(mergedParams.execName);
 //   const execColor = asString(mergedParams.execColor);
 //   const routeDate = asString(mergedParams.date);
@@ -656,15 +656,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
+import { AmountDisplayModeControl, useDashboardAmountMode } from "@/src/components/dashboard/AmountDisplayModeControl";
 import {
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { SubScreenHeader } from "../../../../components/layout/SubScreenHeader";
 import { api, formatAmount } from "../api/api";
 import InteractiveDailyTrendChart from "../components/InteractiveDailyTrendChart";
@@ -744,6 +745,7 @@ export default function SalesExecDashboardScreen({
   route,
   username,
   visibleSections = { sales: true, production: false, collection: true, outstanding: true },
+  showAmountControl = true,
 }) {
   const router = useRouter();
   const routerParams = useLocalSearchParams();
@@ -762,7 +764,7 @@ export default function SalesExecDashboardScreen({
       : "owner";
   const isMyView = activeTab === "myview";
 
-  const selectedExecId = asNumber(mergedParams.execId, 0);
+  const selectedExecId = asString(mergedParams.execId).trim();
   const execName = asString(mergedParams.execName);
   const routeExecScope = asString(mergedParams.execScope).toLowerCase();
 
@@ -770,11 +772,12 @@ export default function SalesExecDashboardScreen({
     !isMyView &&
     (
       routeExecScope === "unassigned" ||
-      selectedExecId === 0 ||
+      selectedExecId === "" ||
+      selectedExecId === "0" ||
       execName.trim().toLowerCase() === "unassigned"
     );
 
-  const execId = isMyView ? 0 : selectedExecId;
+  const execId = isMyView ? "" : selectedExecId;
   const execColor = asString(mergedParams.execColor);
   const routeDate = asString(mergedParams.date);
   const date = routeDate || new Date().toISOString().split("T")[0];
@@ -784,9 +787,12 @@ export default function SalesExecDashboardScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const displayAmount = value => formatAmount(value, amountMode);
   const [showTour, setShowTour] = useState(false);
 
   const [outstandingSort, setOutstandingSort] = useState("desc");
+  const [myInspectExecId, setMyInspectExecId] = useState("");
 
   console.log('Sales activeTab: ', activeTab);
 
@@ -826,7 +832,7 @@ export default function SalesExecDashboardScreen({
         return;
       }
 
-      if (!isMyView && !isUnassigned && execId <= 0) {
+      if (!isMyView && !isUnassigned && !String(execId || "").trim()) {
         setError("Selected sales executive code is missing.");
         setLoading(false);
         setRefreshing(false);
@@ -838,13 +844,20 @@ export default function SalesExecDashboardScreen({
         if (initial) setLoading(true);
 
         const effectiveExecId = isMyView
-          ? 0
-          : (isUnassigned ? -1 : execId);
+          ? ""
+          : (isUnassigned ? "-1" : execId);
 
         const res = await api.getExecDashboard(
           effectiveExecId,
           date,
-          prpType
+          prpType,
+          {
+            view: isMyView ? "my" : "owner",
+            myExecId: isMyView ? myInspectExecId : "",
+            execScope: isUnassigned
+              ? "unassigned"
+              : (isMyView ? "myview" : "executive"),
+          },
         );
 
         if (!res?.success || !res?.data) {
@@ -855,7 +868,7 @@ export default function SalesExecDashboardScreen({
       } catch (loadError) {
         console.error("Sales executive dashboard API error:", {
           activeTab,
-          execId: isMyView ? 0 : (isUnassigned ? -1 : execId),
+          execId: isMyView ? (myInspectExecId || "") : (isUnassigned ? "-1" : execId),
           execScope: isUnassigned ? "unassigned" : (isMyView ? "myview" : "executive"),
           selectedExecId,
           execName,
@@ -868,7 +881,16 @@ export default function SalesExecDashboardScreen({
         setRefreshing(false);
       }
     },
-    [activeTab, date, execId, execName, isMyView, isUnassigned, selectedExecId]
+    [
+      activeTab,
+      date,
+      execId,
+      execName,
+      isMyView,
+      isUnassigned,
+      myInspectExecId,
+      selectedExecId,
+    ]
   );
 
   useEffect(() => {
@@ -888,9 +910,11 @@ export default function SalesExecDashboardScreen({
       if (!partyId) return;
 
       const responseExecId =
+        safeArray(data?.executive_scope?.executive_codes)[0] ??
         data?.exec_info?.exec_id ??
         data?.exec_info?.id ??
         data?.exec_info?.sexe ??
+        myInspectExecId ??
         selectedExecId;
 
       router.push({
@@ -898,9 +922,8 @@ export default function SalesExecDashboardScreen({
         params: {
           partyId,
           partyName: asString(party?.party_name, "Party"),
-          execId: String(
-            isUnassigned ? 0 : asNumber(responseExecId, 0)
-          ),
+          /* Executive codes are VARCHAR in this ERP. Never coerce SL/PB/etc. to 0. */
+          execId: isUnassigned ? "-1" : asString(responseExecId).trim(),
           execScope: isUnassigned
             ? "unassigned"
             : (isMyView ? "myview" : "executive"),
@@ -921,6 +944,7 @@ export default function SalesExecDashboardScreen({
       getUserPrptype,
       isMyView,
       isUnassigned,
+      myInspectExecId,
       router,
       selectedExecId,
     ]
@@ -945,6 +969,43 @@ export default function SalesExecDashboardScreen({
         message="Executive dashboard data is unavailable."
         onRetry={() => load(getUserPrptype, { initial: true })}
       />
+    );
+  }
+
+  const executiveScope = data?.executive_scope || {};
+  const selectableExecutives = safeArray(executiveScope?.selectable_executives);
+
+  if (isMyView && data?.scope_selection_required) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+        <ScrollView contentContainerStyle={styles.selectorPage}>
+          <SectionCard style={styles.selectorCard}>
+            <Text style={styles.selectorTitle}>My View · Select Executive</Text>
+            <Text style={styles.selectorHint}>
+              This management account is not matched to a personal Sales Executive.
+              Select one executive to inspect.
+            </Text>
+            <View style={styles.selectorList}>
+              {selectableExecutives.map((item) => {
+                const code = asString(item?.code).trim();
+                if (!code) return null;
+                return (
+                  <TouchableOpacity
+                    key={code}
+                    style={styles.selectorRow}
+                    onPress={() => setMyInspectExecId(code)}
+                  >
+                    <Text style={styles.selectorName}>
+                      {asString(item?.name, `Executive ${code}`)}
+                    </Text>
+                    <Text style={styles.selectorCode}>{code}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </SectionCard>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -1038,6 +1099,12 @@ export default function SalesExecDashboardScreen({
           </View>
         )}
 
+        {showAmountControl && (
+          <View style={styles.amountModeBar}>
+            <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
+          </View>
+        )}
+
         <ScrollView
           style={styles.scroll}
           nestedScrollEnabled={true}
@@ -1050,6 +1117,40 @@ export default function SalesExecDashboardScreen({
             />
           }
         >
+          {isMyView && executiveScope?.my_selector_allowed ? (
+            <SectionCard style={styles.scopeSelectorCard}>
+              <Text style={styles.scopeSelectorLabel}>MY VIEW · EXECUTIVE</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scopeSelectorRow}
+              >
+                {selectableExecutives.map((item) => {
+                  const code = asString(item?.code).trim();
+                  if (!code) return null;
+                  const active =
+                    code === asString(safeArray(executiveScope?.executive_codes)[0]).trim();
+                  return (
+                    <TouchableOpacity
+                      key={code}
+                      style={[styles.scopeChip, active && styles.scopeChipActive]}
+                      onPress={() => setMyInspectExecId(code)}
+                    >
+                      <Text
+                        style={[
+                          styles.scopeChipText,
+                          active && styles.scopeChipTextActive,
+                        ]}
+                      >
+                        {asString(item?.name, code)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </SectionCard>
+          ) : null}
+
           {/* ─── Exec Profile Card ─── */}
           {!isMyView && (
             <SectionCard style={styles.profileCard}>
@@ -1078,17 +1179,17 @@ export default function SalesExecDashboardScreen({
               <View style={styles.summaryRow}>
                 <SummaryCard
                   label="TODAY SALE"
-                  value={formatAmount(safeNumber(summary.today_sale))}
+                  value={displayAmount(safeNumber(summary.today_sale))}
                   rawValue={safeNumber(summary.today_sale)}
                 />
                 <SummaryCard
                   label="TOTAL BILLED"
-                  value={formatAmount(safeNumber(summary.total_billed_mtd))}
+                  value={displayAmount(safeNumber(summary.total_billed_mtd))}
                   rawValue={safeNumber(summary.total_billed_mtd)}
                 />
                 <SummaryCard
                   label="OUTSTANDING"
-                  value={formatAmount(safeNumber(summary.outstanding))}
+                  value={displayAmount(safeNumber(summary.outstanding))}
                   rawValue={safeNumber(summary.outstanding)}
                 />
               </View>
@@ -1108,10 +1209,10 @@ export default function SalesExecDashboardScreen({
 
               <TotalRow
                 leftLabel="TODAY"
-                leftValue={formatAmount(safeNumber(salesTotal.today))}
+                leftValue={displayAmount(safeNumber(salesTotal.today))}
                 tealLeft
                 rightLabel="US MTD"
-                rightValue={formatAmount(safeNumber(salesTotal.mtd))}
+                rightValue={displayAmount(safeNumber(salesTotal.mtd))}
                 rawLeftValue={safeNumber(salesTotal.today)}
                 rawRightValue={safeNumber(salesTotal.mtd)}
               />
@@ -1126,7 +1227,7 @@ export default function SalesExecDashboardScreen({
                   fillColor={COLORS.teal}
                   height={64}
                   pointGap={54}
-                  valueFormatter={value => formatAmount(Number(value || 0))}
+                  valueFormatter={value => displayAmount(Number(value || 0))}
                   showBaseline
                   showHint
                 />
@@ -1140,8 +1241,8 @@ export default function SalesExecDashboardScreen({
                     key={p.party_id}
                     rank={p.rank}
                     name={p.party_name}
-                    leftVal={formatAmount(p.today)}
-                    rightVal={formatAmount(p.mtd)}
+                    leftVal={displayAmount(p.today)}
+                    rightVal={displayAmount(p.mtd)}
                     rawLeftVal={p.today}
                     rawRightVal={p.mtd}
                     onPress={() => goToParty(p)}
@@ -1164,10 +1265,10 @@ export default function SalesExecDashboardScreen({
 
               <TotalRow
                 leftLabel="TODAY"
-                leftValue={formatAmount(collectedToday)}
+                leftValue={displayAmount(collectedToday)}
                 tealLeft
                 rightLabel="DUE"
-                rightValue={formatAmount(amountDue)}
+                rightValue={displayAmount(amountDue)}
                 rawLeftValue={collectedToday}
                 rawRightValue={amountDue}
               />
@@ -1202,7 +1303,7 @@ export default function SalesExecDashboardScreen({
                   fillColor={COLORS.green}
                   height={64}
                   pointGap={54}
-                  valueFormatter={value => formatAmount(Number(value || 0))}
+                  valueFormatter={value => displayAmount(Number(value || 0))}
                   showBaseline
                   showHint
                 />
@@ -1217,8 +1318,8 @@ export default function SalesExecDashboardScreen({
                     key={p.party_id}
                     rank={p.rank}
                     name={p.party_name}
-                    leftVal={formatAmount(p.today)}
-                    rightVal={formatAmount(p.total_collected)}
+                    leftVal={displayAmount(p.today)}
+                    rightVal={displayAmount(p.total_collected)}
                     rawLeftVal={p.today}
                     rawRightVal={p.total_collected}
                     onPress={() =>
@@ -1275,7 +1376,7 @@ export default function SalesExecDashboardScreen({
                     key={p.party_id}
                     rank={p.rank}
                     name={p.party_name}
-                    rightVal={formatAmount(p.amount)}
+                    rightVal={displayAmount(p.amount)}
                     rawRightVal={p.amount}
                     trendUp={false}
                     onPress={() =>
@@ -1304,6 +1405,7 @@ export default function SalesExecDashboardScreen({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
+  amountModeBar: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, alignItems: "flex-end" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1328,6 +1430,42 @@ const styles = StyleSheet.create({
   content: { paddingTop: 10, paddingBottom: 24 },
   profileCard: { marginHorizontal: 12, marginBottom: 12 },
   profileTop: { flexDirection: "row", alignItems: "center", padding: 14 },
+  selectorPage: { padding: 12, paddingBottom: 28 },
+  selectorCard: { padding: 14 },
+  selectorTitle: { fontSize: 16, fontWeight: "800", color: COLORS.textDark },
+  selectorHint: { fontSize: 11, lineHeight: 17, color: COLORS.textLight, marginTop: 6 },
+  selectorList: { marginTop: 10 },
+  selectorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#DCE3EA",
+  },
+  selectorName: { flex: 1, fontSize: 13, fontWeight: "700", color: COLORS.textDark },
+  selectorCode: { marginLeft: 10, fontSize: 11, color: COLORS.textLight },
+  scopeSelectorCard: { marginHorizontal: 12, marginBottom: 10, paddingVertical: 10 },
+  scopeSelectorLabel: {
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    fontSize: 9,
+    fontWeight: "800",
+    color: COLORS.textLight,
+    letterSpacing: 0.6,
+  },
+  scopeSelectorRow: { paddingHorizontal: 10, gap: 8 },
+  scopeChip: {
+    borderWidth: 1,
+    borderColor: "#D5DDE5",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: "#FFFFFF",
+  },
+  scopeChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  scopeChipText: { fontSize: 11, fontWeight: "700", color: COLORS.textDark },
+  scopeChipTextActive: { color: "#FFFFFF" },
   profileInfo: { flex: 1, marginLeft: 12 },
   profileName: { fontSize: 15, fontWeight: "700", color: COLORS.textDark },
   profileSub: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },

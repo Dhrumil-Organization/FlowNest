@@ -80,6 +80,7 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
           route={{ params: { user } }}
           getUserPrptype={getUserPrptype}
           visibleSections={visibleSections}
+          showAmountControl={false}
         />
       )}
 
@@ -98,6 +99,7 @@ export default function EmployDashboardSection({ activeTab, username, user, visi
             },
           }}
           visibleSections={visibleSections}
+          showAmountControl={false}
         />
       )}
     </View>

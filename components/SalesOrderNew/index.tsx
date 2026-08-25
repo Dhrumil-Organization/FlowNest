@@ -209,6 +209,9 @@ function NewOrderTab({ token, userid }) {
     const [showDesignPicker, setShowDesignPicker] = useState(false);
     const [selectedDesign, setSelectedDesign] = useState(null);
 
+    const [soType, setSoType] = useState(0);
+    const [fabricType, setFabricType] = useState(0);
+
     // Step 4 - Price & Delivery
     const [designRateList, setDesignRateList] = useState([]);
     const [pricePerM, setPricePerM] = useState('');
@@ -612,17 +615,20 @@ function NewOrderTab({ token, userid }) {
                     SONo: '', SODate: '',
                     DueDate: ymd(deliveryDate),
                     DueDay: selectedParty.crday || '',
+                    SOType: soType,
+                    FabricType: fabricType,
                 },
                 d1: rows,
                 tax: [],
                 exp: {},
             };
 
-            console.log("Save Payload", payload);
+            console.log("So Save Payload", payload);
+
             const res = await axios.post(`${API}/api/mobappsave`, payload, {
                 headers: authHdr(token),
             });
-            console.log("save res", res);
+            console.log("SO save res", res);
 
             if (res.data?.success === true) {
                 setSuccessSO(res.data?.response?.sono || res.data?.response?.SONo || 'SO-' + Date.now());
@@ -761,6 +767,54 @@ function NewOrderTab({ token, userid }) {
                                 </TouchableOpacity>
                             </>
                         )}
+                    </View>
+                )}
+
+                {showStep3 && selectedDesign && selectedItem && (
+                    <View style={N.stepCard}>
+                        <View style={N.stepHead}>
+                            <View style={[N.stepBadge, (selectedDesign && selectedItem) && N.stepBadgeDone]}>
+                                <Text style={N.stepBadgeText}>{(selectedDesign && selectedItem) ? '✓' : '3'}</Text>
+                            </View>
+                            <Text style={N.stepTitle}>SO Type &amp; Fabric Type</Text>
+                        </View>
+                        <Text style={N.fieldLabel}>SO TYPE</Text>
+                        <View style={N.segmentWrap}>
+                            <TouchableOpacity
+                                style={[N.segmentBtn, soType === 1 && N.segmentBtnActive]}
+                                onPress={() => setSoType(1)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[N.segmentText, soType === 1 && N.segmentTextActive]}>MTO</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[N.segmentBtn, soType === 0 && N.segmentBtnActive]}
+                                onPress={() => setSoType(0)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[N.segmentText, soType === 0 && N.segmentTextActive]}>Stock Order</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <>
+                            <Text style={[N.fieldLabel, { marginTop: 14 }]}>FABRIC TYPE</Text>
+                            <View style={N.segmentWrap}>
+                                <TouchableOpacity
+                                    style={[N.segmentBtn, fabricType === 0 && N.segmentBtnActive]}
+                                    onPress={() => setFabricType(0)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[N.segmentText, fabricType === 0 && N.segmentTextActive]}>Greige</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[N.segmentBtn, fabricType === 1 && N.segmentBtnActive]}
+                                    onPress={() => setFabricType(1)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[N.segmentText, fabricType === 1 && N.segmentTextActive]}>Finished</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </>
+
                     </View>
                 )}
 
@@ -1728,7 +1782,7 @@ function AuthOrderModal({
                                     A.addCombinationConfirmBtn,
                                     (!addDesign || !addItem || !addShade ||
                                         parseNum(addQty) <= 0 || parseNum(addRate) <= 0 || saving) &&
-                                        A.actionDisabled,
+                                    A.actionDisabled,
                                 ]}
                                 onPress={addItemCombination}
                                 disabled={
@@ -2223,8 +2277,8 @@ function AuthTab({ token }) {
                 headers: authHdr(token),
             });
 
-            console.log("payload",payload);
-            console.log("res",res);
+            console.log("payload", payload);
+            console.log("res", res);
             if (res.data?.success !== true) {
                 throw new Error(res.data?.message || 'Unable to update the sales order.');
             }
@@ -2630,61 +2684,61 @@ function AuthTab({ token }) {
                     />
                 }
             >
-            {/* Date filter strip */}
-            <View style={A.dateStrip}>
-                <TouchableOpacity style={A.datePill} onPress={() => setShowFrom(true)}>
-                    <Text style={A.datePillText}>From: {fromDate ? fmtDisplay(fromDate) : '—'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={A.datePill} onPress={() => setShowTo(true)}>
-                    <Text style={A.datePillText}>To: {toDate ? fmtDisplay(toDate) : '—'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={A.applyBtn} onPress={() => load()}>
-                    <Text style={A.applyBtnText}>Apply</Text>
-                </TouchableOpacity>
-            </View>
-
-            <Text style={A.sectionHead}>
-                Pending <Text style={A.sectionCnt}>{pending.length}</Text>
-            </Text>
-            {pending.map(renderPendingCard)}
-            {pending.length === 0 && (
-                <View style={A.emptyBox}>
-                    <Text style={A.emptyText}>No pending orders</Text>
+                {/* Date filter strip */}
+                <View style={A.dateStrip}>
+                    <TouchableOpacity style={A.datePill} onPress={() => setShowFrom(true)}>
+                        <Text style={A.datePillText}>From: {fromDate ? fmtDisplay(fromDate) : '—'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={A.datePill} onPress={() => setShowTo(true)}>
+                        <Text style={A.datePillText}>To: {toDate ? fmtDisplay(toDate) : '—'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={A.applyBtn} onPress={() => load()}>
+                        <Text style={A.applyBtnText}>Apply</Text>
+                    </TouchableOpacity>
                 </View>
-            )}
 
-            <Text style={[A.sectionHead, { marginTop: 20 }]}>
-                Authorized <Text style={A.sectionCnt}>{authorised.length}</Text>
-            </Text>
-            {authorised.map(renderAuthCard)}
-            {authorised.length === 0 && (
-                <View style={A.emptyBox}>
-                    <Text style={A.emptyText}>No authorized orders</Text>
-                </View>
-            )}
+                <Text style={A.sectionHead}>
+                    Pending <Text style={A.sectionCnt}>{pending.length}</Text>
+                </Text>
+                {pending.map(renderPendingCard)}
+                {pending.length === 0 && (
+                    <View style={A.emptyBox}>
+                        <Text style={A.emptyText}>No pending orders</Text>
+                    </View>
+                )}
 
-            {showFrom && (
-                <DateTimePicker
-                    value={fromDate || new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={(e, d) => {
-                        setShowFrom(false);
-                        if (e.type === 'set' && d) setFromDate(d);
-                    }}
-                />
-            )}
-            {showTo && (
-                <DateTimePicker
-                    value={toDate || new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    onChange={(e, d) => {
-                        setShowTo(false);
-                        if (e.type === 'set' && d) setToDate(d);
-                    }}
-                />
-            )}
+                <Text style={[A.sectionHead, { marginTop: 20 }]}>
+                    Authorized <Text style={A.sectionCnt}>{authorised.length}</Text>
+                </Text>
+                {authorised.map(renderAuthCard)}
+                {authorised.length === 0 && (
+                    <View style={A.emptyBox}>
+                        <Text style={A.emptyText}>No authorized orders</Text>
+                    </View>
+                )}
+
+                {showFrom && (
+                    <DateTimePicker
+                        value={fromDate || new Date()}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(e, d) => {
+                            setShowFrom(false);
+                            if (e.type === 'set' && d) setFromDate(d);
+                        }}
+                    />
+                )}
+                {showTo && (
+                    <DateTimePicker
+                        value={toDate || new Date()}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={(e, d) => {
+                            setShowTo(false);
+                            if (e.type === 'set' && d) setToDate(d);
+                        }}
+                    />
+                )}
             </ScrollView>
 
             <AuthOrderModal
@@ -5134,6 +5188,11 @@ const N = StyleSheet.create({
     successSONo: { fontSize: 22, fontWeight: '700', color: '#000', marginTop: 6 },
     newOrderBtn: { height: 50, backgroundColor: '#13879A', borderRadius: 14, width: '100%', justifyContent: 'center', alignItems: 'center' },
     newOrderBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    segmentWrap: { flexDirection: 'row', borderWidth: 1, borderColor: '#e0ddd8', borderRadius: 12, overflow: 'hidden', backgroundColor: '#fff' },
+    segmentBtn: { flex: 1, height: 45, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+    segmentBtnActive: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#13879A', borderRadius: 12, margin: -1 },
+    segmentText: { fontSize: 12, fontWeight: '600', color: '#000' },
+    segmentTextActive: { color: '#13879A', fontWeight: '700' },
 });
 
 // Auth

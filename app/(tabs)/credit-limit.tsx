@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 
 // import { AuthProvider, useAuth } from '@/hooks/AuthContext';
 import CreditLimit from '@/components/CreditLimitRequest/index';
-import Footer from '@/components/Footer';
 
 export default function CRLimit_Request_Container() {
     // const { token, username } = useAuth();
@@ -25,7 +24,7 @@ export default function CRLimit_Request_Container() {
         <>
             {/* <AuthProvider> */}
             <CreditLimit token={token || ''} username={username} />
-            <Footer/>
+            {/* <Footer/> */}
             {/* </AuthProvider> */}
         </>
     );

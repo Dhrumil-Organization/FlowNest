@@ -242,19 +242,8 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
       console.log("result",result);
       const payload = result.response;
 
-      // Owner-authority users (Director / Super Admin) may legitimately have no
-      // dashboard My View mapping. Never strand them on the My View
-      // configuration error: fall back to their authoritative Owner View.
-      if (
-        view === 'my' &&
-        payload?.configured === false &&
-        Boolean(payload?.scope?.owner_view_allowed)
-      ) {
-        setOwnerAllowedFromApi(true);
-        setScopeMessage(payload?.scope?.message || payload?.message || '');
-        setView('owner');
-        return;
-      }
+      // Keep the user's selected view. The backend is the sole scope
+      // authority; React must never silently change My View back to Owner.
 
       setCards(payload.cards || []);
       setPeriodLabel(payload.period?.label || payload.period?.month_name || 'Monthly Target');

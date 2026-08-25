@@ -143,6 +143,7 @@ import {
   ExpenseDashboardData,
   fetchExpenseDashboardCard,
 } from '../../services/Dashboard/expenseDashboardApi';
+import { formatDashboardAmount, useDashboardAmountMode } from './AmountDisplayModeControl';
 
 type Props = {
   token: string;
@@ -225,6 +226,23 @@ const formatMetres = (value: unknown): string => {
   })} m`;
 };
 
+const formatYmdShort = (value: unknown): string => {
+  const raw = String(value ?? '').replace(/\D/g, '');
+  if (raw.length !== 8) return '';
+
+  const year = Number(raw.slice(0, 4));
+  const month = Number(raw.slice(4, 6));
+  const day = Number(raw.slice(6, 8));
+  const date = new Date(year, month - 1, day);
+
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+  });
+};
+
 const RING_SIZE = 126;
 const RING_STROKE = 14;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
@@ -240,10 +258,12 @@ const CostRing = memo(
     total,
     periodLabel,
     segments,
+    amountMode,
   }: {
     total: number;
     periodLabel: string;
     segments: RingSegment[];
+    amountMode: 'compact' | 'actual';
   }) => {
     const safeTotal = total > 0 ? total : 1;
     let cumulative = 0;
@@ -291,7 +311,7 @@ const CostRing = memo(
 
         <View pointerEvents="none" style={styles.ringCenter}>
           <Text numberOfLines={1} adjustsFontSizeToFit style={styles.ringValue}>
-            {formatCompactMoney(total)}
+            {formatDashboardAmount(total, amountMode)}
           </Text>
           <Text numberOfLines={1} style={styles.ringPeriod}>
             {periodLabel}
@@ -316,6 +336,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const { mode: amountMode } = useDashboardAmountMode();
 
   const load = useCallback(
     async (force = false) => {
@@ -413,6 +434,12 @@ const ExpenseDashboardCard: React.FC<Props> = ({
   }
 
   const { summary, period } = data;
+  const pendingExpenses = Array.isArray(period.pending_expenses)
+    ? period.pending_expenses
+    : [];
+  const coverageIncomplete = pendingExpenses.length > 0;
+  const coverageEnd = period.complete_through_ymd || period.upto_date_ymd;
+  const requestedEnd = period.requested_upto_ymd || period.upto_date_ymd;
 
   return (
     <TouchableOpacity
@@ -463,18 +490,66 @@ const ExpenseDashboardCard: React.FC<Props> = ({
         </TouchableOpacity>
       </View>
 
+      <View
+        style={[
+          styles.coverageBox,
+          coverageIncomplete ? styles.coverageWarn : styles.coverageOk,
+        ]}
+      >
+        <View style={styles.coverageCopy}>
+          <Text style={styles.coverageTitle}>
+            {coverageIncomplete ? 'Expense data complete through' : 'Expense data entered through'}{' '}
+            {formatYmdShort(coverageEnd) || period.label}
+          </Text>
+          <Text style={styles.coverageText}>
+            {period.display_range || `${formatYmdShort(period.month_start_ymd)} – ${formatYmdShort(coverageEnd)}`}
+          </Text>
+          {coverageIncomplete ? (
+            <View style={styles.coveragePendingList}>
+              {pendingExpenses.map((item, index) => {
+                const lastEntered = item?.last_entered_ymd
+                  ? formatYmdShort(item.last_entered_ymd)
+                  : '';
+                const pendingFrom = formatYmdShort(item?.pending_from_ymd);
+                const pendingTo = formatYmdShort(item?.pending_to_ymd || requestedEnd);
+                const days = Number(item?.pending_days || 0);
+
+                return (
+                  <Text
+                    key={`${String(item?.key || item?.label || 'expense')}-${index}`}
+                    style={styles.coveragePending}
+                  >
+                    {String(item?.label || 'Expense')}: {' '}
+                    {lastEntered ? `entered through ${lastEntered}` : 'no entry this month'}
+                    {pendingFrom && pendingTo
+                      ? ` · pending ${pendingFrom}–${pendingTo}${days > 0 ? ` (${days}d)` : ''}`
+                      : ''}
+                  </Text>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+        <Icon
+          name={coverageIncomplete ? 'schedule' : 'check-circle'}
+          size={20}
+          color={coverageIncomplete ? '#B86A16' : '#2F855A'}
+        />
+      </View>
+
       <View style={styles.contentRow}>
         <CostRing
           total={numberValue(summary.total_cost)}
           periodLabel={period.label}
           segments={ringSegments}
+          amountMode={amountMode}
         />
 
         <View style={styles.metricsArea}>
           <View style={styles.metricsColumn}>
             <CompactMetric
               label="COST / PICK"
-              value={formatMoney(summary.cost_per_pick, 3)}
+              value={formatDashboardAmount(summary.cost_per_pick, amountMode, undefined, 3)}
               accent
             />
             <CompactMetric
@@ -490,7 +565,7 @@ const ExpenseDashboardCard: React.FC<Props> = ({
             />
             <CompactMetric
               label="COST / MC-DAY"
-              value={formatMoney(summary.cost_per_machine_day, 2)}
+              value={formatDashboardAmount(summary.cost_per_machine_day, amountMode, undefined, 2)}
             />
           </View>
         </View>
@@ -612,6 +687,49 @@ const styles = StyleSheet.create({
     color: '#C96E16',
     fontSize: 11,
     fontWeight: '900',
+  },
+  coverageBox: {
+    marginTop: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  coverageOk: {
+    backgroundColor: '#F0F8F3',
+    borderColor: '#CBE5D3',
+  },
+  coverageWarn: {
+    backgroundColor: '#FFF7EB',
+    borderColor: '#EBCB9E',
+  },
+  coverageCopy: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  coverageTitle: {
+    color: '#3B332B',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  coverageText: {
+    marginTop: 2,
+    color: '#756C61',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  coveragePendingList: {
+    marginTop: 4,
+  },
+  coveragePending: {
+    marginTop: 2,
+    color: '#A75D13',
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
   },
   contentRow: {
     marginTop: 12,

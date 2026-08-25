@@ -696,7 +696,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                             <View style={crlimtreq_styles.keyValuePair}>
                                 <Text style={crlimtreq_styles.key}>OS Days:</Text>
                                 <Text style={crlimtreq_styles.valuegreen}>
-                                    {formatToIndianCurrency(item.limit1 || '0')}
+                                    {/* {formatToIndianCurrency(item.limit1 || '0')} */}
+                                    {parseInt(item.limit1 || '0', 10)}
                                 </Text>
                             </View>
                         </View>

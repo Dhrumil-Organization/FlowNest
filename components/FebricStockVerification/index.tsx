@@ -200,7 +200,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             dsncodes: dsnCodes,
             items: itemCodes,
             prptype: 'S',
-            txntype: 'prodorderlist'
+            txntype: 'fabricStockVerification'
         };
         const sendCardPayload = {
             fromdate: formatDate(fromDate),
@@ -212,7 +212,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             itmcode: itemCodes,
             itmname: itemNames,
             prptype: 'S',
-            txntype: 'prodordertrack',
+            txntype: 'fabricStockVerification',
             rowdata: {}
         };
         const sendpayload = [sendCardPayload]

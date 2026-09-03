@@ -298,6 +298,7 @@ import Snackbar, { SnackbarType } from '@/components/Snackbar';
 import { SalesOrderProvider } from '@/components/YarnSalesOrder/SalesOrderContext';
 import { getFCMToken } from '@/hooks/NotificationService';
 import { AppCoreProvider } from '@/src/core/AppCoreProvider';
+import { initNewErpAPI } from '@/src/api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import { Stack, useRouter } from 'expo-router';
@@ -325,21 +326,6 @@ export default function RootLayout() {
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const t = await AsyncStorage.getItem('access_token');
-      const u = await AsyncStorage.getItem('user_details');
-      const p = await AsyncStorage.getItem('user_prptype');
-      const l = await AsyncStorage.getItem('LOOKUP_PLATFORM');
-
-      setToken(t || '');
-      setUsername(u || 'User');
-      setUsertype(p || '');
-      setLookupPlatform(l || '');
-    };
-    load();
-  }, []);
-
-  useEffect(() => {
     registerSnackbar((message, type = 'info', action, duration) => {
       setSnackbar({
         visible: true,
@@ -355,9 +341,10 @@ export default function RootLayout() {
   // initAPIForPrinterList();
   // initAPIForSticker();
   useEffect(() => {
-    initAPI();
-    initAPIForPrinterList();
-    initAPIForSticker();
+    void initAPI();
+    void initAPIForPrinterList();
+    void initAPIForSticker();
+    void initNewErpAPI();
   }, []);
 
   const initializeDatabases = async () => {
@@ -408,29 +395,24 @@ export default function RootLayout() {
     initializeDatabasesEvent();
   }, [token, getUsertype]);
 
-  // 🔥 ROUTING DECISION — ab lookupPlatform ke hisaab se New ERP (expo-router
-  // based /new) ya purane (tabs)/landing flow mein bhejta hai.
+  // Top-level authentication boundary. Platform selection never grants access
+  // to a dashboard. Only a stored authenticated session can enter a protected
+  // Legacy/New ERP route on app bootstrap.
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || !isAllowed || isLoggedIn === null) return;
 
-    // ✅ NEW ERP selected -> sab kuch /new ke andar khud apna token/auth
-    // gate sambhal lega (app/new/index.tsx). Root layout ko yahan
-    // MainTabs/RoleLoginScreen se koi matlab nahi rakhna.
+    if (!isLoggedIn) {
+      router.replace('/(all)/landing');
+      return;
+    }
+
     if (lookupPlatform === 'NEW') {
       router.replace('/new');
       return;
     }
 
-    // ❌ NOT LOGGED IN (old/legacy system) → FORCE LOGIN
-    if (isAllowed && isLoggedIn === false) {
-      router.replace('/landing');
-    }
-
-    // ✅ LOGGED IN (old/legacy system) → FORCE HOME
-    if (isAllowed && isLoggedIn === true) {
-      router.replace('/(tabs)');
-    }
-  }, [isReady, isAllowed, isLoggedIn, lookupPlatform]);
+    router.replace('/(tabs)');
+  }, [isReady, isAllowed, isLoggedIn, lookupPlatform, router]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -442,8 +424,25 @@ export default function RootLayout() {
 
         setIsAllowed(true);
 
-        const token = await AsyncStorage.getItem('access_token');
-        setIsLoggedIn(!!token);
+        const storedToken = await AsyncStorage.getItem('access_token');
+        const storedUser = await AsyncStorage.getItem('user_details');
+        const storedUserType = await AsyncStorage.getItem('user_prptype');
+        const storedPlatform = await AsyncStorage.getItem('LOOKUP_PLATFORM');
+
+        setToken(storedToken || '');
+        setUsername(storedUser || 'User');
+        setUsertype(storedUserType || '');
+        setLookupPlatform(storedPlatform || '');
+        setIsLoggedIn(Boolean(storedToken));
+
+        // Keep both API families synchronized with the persisted property before
+        // any authenticated screen starts issuing requests.
+        await Promise.all([
+          initAPI(),
+          initAPIForPrinterList(),
+          initAPIForSticker(),
+          initNewErpAPI(),
+        ]);
       } catch (err) {
         console.log('❌ INIT ERROR:', err);
       } finally {

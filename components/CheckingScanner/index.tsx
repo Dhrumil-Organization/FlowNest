@@ -156,6 +156,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const [scannerFaultData, setScannerFaultData] = useState<any[]>([]);
     const [selectedScannerRow, setSelectedScannerRow] = useState<any>(null);
 
+    console.log("formstate", FormState.values);
+
 
     let cancelToken: any;
 
@@ -2272,8 +2274,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         type="checkingdesigndata"
                                         onSelect={(item) => {
                                             setselecteddesign(item);
-                                            handleChange('DsnCode', item.DsnCode);
-                                            handleChange('DsnName', item.DsnName);
+                                            handleChange('DsnCode', item.dsncode);
+                                            handleChange('DsnName', item.dsnname);
                                             manualDesignSelect(item);
                                         }}
                                     />

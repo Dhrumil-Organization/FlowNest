@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
-import Footer from '@/components/Footer';
-import FabricStockVerificationScreen from '@/components/FebricStockVerification';
+import FebricStockVerification from '../../components/FabricStockVerification';
 
 export default function CRLimit_Request_Container() {
     // const { token, username } = useAuth();
@@ -20,7 +19,7 @@ export default function CRLimit_Request_Container() {
     }, []);
 
     return (
-        <FabricStockVerificationScreen
+        <FebricStockVerification
             token={token}
             username={username}
         />

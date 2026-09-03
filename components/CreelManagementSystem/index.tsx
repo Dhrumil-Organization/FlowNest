@@ -1,31 +1,36 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import {
-    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, FlatList, ActivityIndicator, StyleSheet, Dimensions,
-    Platform, Modal
-} from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
-import axios from 'axios';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import FullScreenLoader from '@/components/FullScreenLoader';
-import { checkingScannerStyles, yarnmanagementsystemstyle } from '@/common/Style';
-import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
-import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
+import { yarnmanagementsystemstyle } from '@/common/Style';
 import HeaderBarwithBack from '@/components/Header';
-import Header from '../Header';
-import { Picker } from '@react-native-picker/picker';
+import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ScrollView } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import axios from 'axios';
+import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text, TextInput, TouchableOpacity,
+    View
+} from 'react-native';
+import { API } from '../../common/API/dynamicAPI';
+
 import { Snackbar } from 'react-native-snackbar';
-import { Switch } from 'react-native';
+
+import { fetchAllYeardata, fetchPropertyData } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';
-import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
-import { fetchPropertyData } from '../../common/API/Functions';
+
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import SearchableDropdown from '@/Shared/SearchableDropdown';
-import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
 interface Props {
     token: string;
     navigation: any;

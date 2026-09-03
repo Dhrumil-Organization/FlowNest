@@ -27,31 +27,76 @@ interface Props {
     duration?: number;
 }
 
+interface CardData {
+    uid: string;
+    prptypename: string;
+    date: string;
+    parname: string;
+    limit1: string;
+    limit2: string;
+    remark: string;
+    prpcode: string;
+    prptype: string;
+    yearno: string;
+    parcode: string;
+    outstanding: string;
+    overdue: string;
+    sexename: string;
+    BrkAccName: string;
+    crdays: string;
+    crday1: string;
+    crday2: string;
+    isProcessed?: boolean;
+    actionType?: 'accept' | 'reject';
+}
+
+interface AllHistoryData {
+    uid: string;
+    prptypename: string;
+    date: string;
+    parname: string;
+    limit1: string;
+    limit2: string;
+    limit3: string;
+    isauth: string;
+    adate: string;
+    ausrname: string;
+    revertdate: string;
+    status: string;
+    remark: string;
+    BrkAccName: string;
+    sexename: string;
+}
+
 // export default function CreditLimit() {
 const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
-    // const { token, username } = useAuth();
     const flatListRef = useRef<FlatList>(null);
     const flatHistoryListRef = useRef<FlatList>(null);
 
-    const [data, setData] = useState<any[]>([]);
-    const [allhistoryData, setAllHistoryData] = useState<any[]>([]);
+    const [data, setData] = useState<CardData[]>([]);
+    const [allhistoryData, setAllHistoryData] = useState<AllHistoryData[]>([]);
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [partyList, setPartyList] = useState<any[]>([]);
     const [getParname, setParname] = useState('');
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchhistoryQuery, setSearchhistoryQuery] = useState('');
+    const [billsSearchQuery, setBillsSearchQuery] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
     const [historyLoading, setIsHistoryLoading] = useState(false);
     const [partyLoading, setIsPartyLoading] = useState(false);
+    const [billsLoading, setBillsLoading] = useState(false);
 
     const [editableValues, setEditableValues] = useState<any>({});
-    const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [selectedAction, setSelectedAction] = useState<any>(null);
+    const [selectedItem, setSelectedItem] = useState<CardData | null>(null);
+    const [selectedAction, setSelectedAction] = useState<'accept' | 'reject' | 'list' | 'info' | null>(null);
 
     const [showOverlay, setShowOverlay] = useState(false);
     const [showPartyHistoryModal, setShowPartyHistoryModal] = useState(false);
+    const [showBillsAccordion, setShowBillsAccordion] = useState(false);
+    const [billsData, setBillsData] = useState<any[]>([]);
+    const [mainParData, setMainParData] = useState<any>(null);
 
     const [activeTab, setActiveTab] = useState<'party' | 'history'>('party');
     const [activeTab1, setActiveTab1] = useState<'requests' | 'history'>('requests');
@@ -59,6 +104,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
     const [responsemessage, setresponsemessage] = useState('');
     const [getSuccess, setSuccess] = useState(false);
     const [showTopButton, setShowTopButton] = useState(false);
+    const [isInfoLoading, setInfoLoading] = useState(false);
     const [limitInWords, setLimitInWords] = useState('');
     const { width } = useWindowDimensions();
     let cancelToken: any;
@@ -633,6 +679,368 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         }
         return res.trim();
     };
+
+
+    // Fetch Bills Data for Accordion
+    const fetchBillsData = async (parcode: string, prptype: string, uid: string, prpcode: string) => {
+        setInfoLoading(true);   // for icon spinner
+        setBillsLoading(true);  // for modal loader
+        try {
+            const payload = {
+                uid: uid,                     // ✅ passed directly
+                prpcode: prpcode,             // ✅ passed directly
+                acccode: parcode,
+                txntype: 'outstandingdaysrequestbills',
+                referrer: 'dashboard',
+                action: 'partybills',
+                prptype: prptype,
+            };
+
+            const response = await axios.get(
+                `${API}/api/osdaysreqbills`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params: payload,
+                }
+            );
+
+            if (response.data.success) {
+                const data = response.data.data;
+                setMainParData(data.mainpardata);
+                setBillsData(data.osbills || []);
+            } else {
+                Alert.alert('Error', response.data.message || 'Failed to fetch bills');
+                closeBillsModal();
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Server error');
+            closeBillsModal();
+        } finally {
+            setInfoLoading(false);
+            setBillsLoading(false);
+        }
+    };
+
+    const closeBillsModal = () => {
+        setShowBillsAccordion(false);
+        setBillsData([]);
+        setMainParData(null);
+        setBillsSearchQuery('');
+    };
+
+    // Handle Info Icon Click
+    // const handleInfoIconClick = (item: CardData) => {
+    //     setSelectedItem(item);
+    //     setSelectedAction('info');
+    //     fetchBillsData(item.parcode, item.prptype);
+    // };
+    const handleInfoIconClick = (item: CardData) => {
+        setSelectedItem(item);
+        setSelectedAction('info');
+        // Clear old data
+        setBillsData([]);
+        setMainParData(null);
+        setShowBillsAccordion(true);
+        // Pass required fields directly
+        fetchBillsData(item.parcode, item.prptype, item.uid, item.prpcode);
+    };
+
+    // Render Bills Accordion
+    // Update the renderBillsAccordion function
+    // const renderBillsAccordion = () => {
+    //     if (!showBillsAccordion || !billsData.length) return null;
+
+    //     const filteredBillsData = billsSearchQuery
+    //         ? billsData.filter((bill) =>
+    //             Object.values(bill).some((value) =>
+    //                 String(value).toLowerCase().includes(billsSearchQuery.toLowerCase())
+    //             )
+    //         )
+    //         : billsData;
+
+    //     const numAccordionColumns = width < 600 ? 1 : width < 1000 ? 2 : 3;
+
+    //     // Helper to format keys into readable labels
+    //     const formatLabel = (key: string) =>
+    //         key
+    //             .split(/(?=[A-Z])|_/)
+    //             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    //             .join(' ');
+
+    //     // Helper to detect if value is numeric (for right-alignment)
+    //     const isNumeric = (val: any) => !isNaN(parseFloat(val)) && isFinite(val);
+
+    //     return (
+    //         <Modal
+    //             visible={showBillsAccordion}
+    //             animationType="slide"
+    //             transparent={false}
+    //             onRequestClose={closeBillsModal}
+    //         >
+    //             <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+    //                 <Header
+    //                     userName={username}
+    //                     onSearch={setBillsSearchQuery}
+    //                     placeholder="Search bills..."
+    //                 />
+
+    //                 {billsLoading ? (
+    //                     <FullScreenLoader message="Loading bills..." />
+    //                 ) : (
+    //                     <>
+    //                         {/* Main Party Header */}
+    //                         {mainParData && (
+    //                             <View style={styles.billsHeaderContainer}>
+    //                                 <Text style={styles.billsHeaderTitle}>{mainParData.mainparname}</Text>
+    //                                 <Text style={styles.billsHeaderSub}>
+    //                                     Party Code: {mainParData.mainparcode}
+    //                                 </Text>
+    //                             </View>
+    //                         )}
+
+    //                         {/* Bills List */}
+    //                         <FlatList
+    //                             data={filteredBillsData}
+    //                             keyExtractor={(item, index) => `${item.billno || index}-${index}`}
+    //                             numColumns={numAccordionColumns}
+    //                             key={numAccordionColumns}
+    //                             contentContainerStyle={{ padding: 8 }}
+    //                             renderItem={({ item }) => (
+    //                                 <View style={styles.billCard}>
+    //                                     {Object.entries(item).map(([key, value]) => (
+    //                                         <View key={key} style={styles.billRow}>
+    //                                             <Text style={styles.billLabel}>{formatLabel(key)}</Text>
+    //                                             <Text
+    //                                                 style={[
+    //                                                     styles.billValue,
+    //                                                     isNumeric(value) && styles.billValueNumeric,
+    //                                                 ]}
+    //                                             >
+    //                                                 {isNumeric(value)
+    //                                                     ? formatToIndianCurrency(String(value))
+    //                                                     : value}
+    //                                             </Text>
+    //                                         </View>
+    //                                     ))}
+    //                                 </View>
+    //                             )}
+    //                             ListEmptyComponent={
+    //                                 <View style={styles.emptyContainer}>
+    //                                     <Text style={styles.emptyText}>No bills found</Text>
+    //                                 </View>
+    //                             }
+    //                         />
+    //                     </>
+    //                 )}
+
+    //                 {/* Close button – now RED */}
+
+    //                 <TouchableOpacity
+    //                     style={styles.closeButton}
+    //                     onPress={closeBillsModal}
+    //                 >
+    //                     <Icon name="close" size={28} color="white" />
+    //                 </TouchableOpacity>
+    //             </View>
+    //         </Modal>
+    //     );
+    // };
+
+    // Add these styles to your StyleSheet (or crlimtreq_styles)
+    // Update the renderBillsAccordion function
+    // Update the renderBillsAccordion function
+    const renderBillsAccordion = () => {
+        if (!showBillsAccordion) return null;
+
+        const filteredBillsData = billsSearchQuery
+            ? billsData.filter((bill) =>
+                Object.values(bill).some((value) =>
+                    String(value).toLowerCase().includes(billsSearchQuery.toLowerCase())
+                )
+            )
+            : billsData;
+
+        const numAccordionColumns = width < 600 ? 1 : width < 1000 ? 2 : 3;
+
+        const formatLabel = (key: string) =>
+            key
+                .split(/(?=[A-Z])|_/)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+
+        const isNumeric = (val: any) => !isNaN(parseFloat(val)) && isFinite(val);
+
+        return (
+            <Modal
+                visible={showBillsAccordion}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={closeBillsModal}
+            >
+                <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+                    <Header
+                        userName={username}
+                        onSearch={setBillsSearchQuery}
+                        placeholder="Search bills..."
+                    />
+
+                    {billsLoading ? (
+                        <FullScreenLoader message="Loading bills..." />
+                    ) : (
+                        <>
+                            {mainParData && (
+                                <View style={styles.billsHeaderContainer}>
+                                    <Text style={styles.billsHeaderTitle}>{mainParData.mainparname}</Text>
+                                    <Text style={styles.billsHeaderSub}>
+                                        Party Code: {mainParData.mainparcode} | Bills: {filteredBillsData.length}
+                                    </Text>
+                                </View>
+                            )}
+
+                            <FlatList
+                                data={filteredBillsData}
+                                keyExtractor={(item, index) => `${item.billno || index}-${index}`}
+                                numColumns={numAccordionColumns}
+                                key={numAccordionColumns}
+                                contentContainerStyle={{ padding: 8 }}
+                                renderItem={({ item }) => (
+                                    <View style={styles.billCard}>
+                                        {Object.entries(item).map(([key, value]) => {
+                                            // Skip formatting for osdays and diffdays
+                                            const shouldSkipFormatting = key.toLowerCase() === 'osdays' || key.toLowerCase() === 'diffdays';
+
+                                            let displayValue: string;
+                                            if (shouldSkipFormatting) {
+                                                // Parse as float, convert to integer, and display as string
+                                                const numericValue = parseFloat(String(value));
+                                                displayValue = !isNaN(numericValue) ? Math.floor(numericValue).toString() : String(value);
+                                            } else {
+                                                displayValue = isNumeric(value) ? formatToIndianCurrency(String(value)) : String(value);
+                                            }
+
+                                            return (
+                                                <View key={key} style={styles.billRow}>
+                                                    <Text style={styles.billLabel}>{formatLabel(key)}</Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.billValue,
+                                                            isNumeric(value) && styles.billValueNumeric,
+                                                        ]}
+                                                    >
+                                                        {displayValue}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>No bills found</Text>
+                                    </View>
+                                }
+                            />
+                        </>
+                    )}
+
+                    <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={closeBillsModal}
+                    >
+                        <Icon name="close" size={28} color="white" />
+                    </TouchableOpacity>
+                </View>
+            </Modal>
+        );
+    };
+
+    // Add these styles to your StyleSheet (or crlimtreq_styles)
+    const styles = {
+        billsHeaderContainer: {
+            backgroundColor: '#fff',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: '#e0e0e0',
+        },
+        billsHeaderTitle: {
+            fontSize: 18,
+            fontWeight: '700',
+            color: '#1a1a1a',
+        },
+        billsHeaderSub: {
+            fontSize: 14,
+            color: '#6c757d',
+            marginTop: 2,
+        },
+        billCard: {
+            flex: 1,
+            margin: 6,
+            backgroundColor: '#ffffff',
+            borderRadius: 10,
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            elevation: 2,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            borderWidth: 1,
+            borderColor: '#f0f0f0',
+        },
+        billRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingVertical: 4,
+            borderBottomWidth: 1,
+            borderBottomColor: '#f5f5f5',
+        },
+        billLabel: {
+            fontSize: 13,
+            color: '#495057',
+            fontWeight: '500',
+            flex: 0.45,
+        },
+        billValue: {
+            fontSize: 13,
+            color: '#212529',
+            flex: 0.55,
+            textAlign: 'left',
+        },
+        billValueNumeric: {
+            textAlign: 'right',
+            fontWeight: '500',
+            color: '#0d6efd',
+        },
+        closeButton: {
+            position: 'absolute',
+            bottom: 24,
+            right: 24,
+            backgroundColor: '#F44336', // RED as requested
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4,
+        },
+        emptyContainer: {
+            padding: 30,
+            alignItems: 'center',
+        },
+        emptyText: {
+            fontSize: 16,
+            color: '#6c757d',
+        },
+    };
+
+    // Add these styles to your StyleSheet (or crlimtreq_styles)
+
+
     const formatToIndianCurrency = (value: string | number) => {
         const numericValue = typeof value === 'string'
             ? value.replace(/[^0-9]/g, '') // Remove all non-numeric characters
@@ -775,8 +1183,20 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                         <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={item.isProcessed}>
                             <Icon name="cancel" size={40} color={item.isProcessed ? "#ccc" : "#F44336"} />
                         </TouchableOpacity>
+                        {/* New Info Icon */}
+                        <TouchableOpacity
+                            onPress={() => handleInfoIconClick(item)}
+                            disabled={item.isProcessed || isInfoLoading}
+                        >
+                            {isInfoLoading ? (
+                                <ActivityIndicator size={40} color="#FF9800" />
+                            ) : (
+                                <Icon name="info" size={40} color={item.isProcessed ? "#ccc" : "#FF9800"} />
+                            )}
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => handleIconPress(item, 'list')} disabled={item.isProcessed}>
                             <Icon name="list" size={40} color={item.isProcessed ? "#ccc" : "#2196F3"} />
+
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -1088,6 +1508,9 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                     </View>
                 </Modal>
             )}
+
+            {/* Bills Accordion Modal */}
+            {renderBillsAccordion()}
 
             {/* PARTY HISTORY */}
             <PartyHistoryModal

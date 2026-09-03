@@ -82,6 +82,11 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const [getSavedData, setSavedData] = useState<any>({});
     const [isMending, setIsMending] = useState(false);
 
+    const [isLastTaka, setIsLastTaka] = useState(false);
+
+    // Manual checkbox
+    const [manualIsLastTaka, setManualIsLastTaka] = useState(false);
+
     const [getPrinters, setPrinters] = useState<any[]>([]);
     const [printer, setPrinter] = useState('');
     const [printerLoading, setPrinterLoading] = useState(false);
@@ -193,6 +198,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         setTakaNo('');
         setScannedObj({});
         setShift('');
+        setIsLastTaka(false);
         setPrinter('');
         setPrinters([]);
         setDataSaved(false);
@@ -579,7 +585,8 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 txntype: 'chekingScanner',
                 ShfCode: shift,
                 SrNo: '0',
-                islasttaka: getScannedObj.islasttaka,
+                // islasttaka: getScannedObj.islasttaka,
+                islasttaka: isLastTaka ? 1 : 0,
                 isfirsttaka: getScannedObj.isfirsttaka,
                 IsLastTaka: getScannedObj.islasttaka,
                 IsFirstTaka: getScannedObj.isfirsttaka,
@@ -1101,6 +1108,49 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
         } catch (error) {
             console.log('fetchManualGradeCheckerOperatorShift error:', error);
+        }
+    };
+
+
+    const fetchManualShift = async (prpcode: string) => {
+        try {
+            const yno = await AsyncStorage.getItem('yno');
+            const userPtype = await AsyncStorage.getItem('user_prptype');
+
+            const payload = {
+                referrer: 'dashboard',
+                prpcode: prpcode || '',
+                yearno: yno,
+                prptype: userPtype,
+                txntype: 'manual_checking',
+                fetch: 'shift',
+            };
+
+            console.log('fetchManualShift payload:', payload);
+
+            const response = await axios.get(
+                `${API}/api/get_criterion`,
+                getRequestConfig({
+                    params: payload,
+                })
+            );
+
+            console.log('fetchManualShift response:', response);
+
+            if (
+                response?.data?.success &&
+                response.data.response?.data?.length > 0
+            ) {
+                setManualShiftData(response.data.response.data);
+            } else {
+                setManualShiftData([]);
+                setManualShift('');
+            }
+
+        } catch (error) {
+            console.log('fetchManualShift error:', error);
+            setManualShiftData([]);
+            setManualShift('');
         }
     };
 
@@ -1991,6 +2041,47 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
                                     <View
                                         style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            marginTop: 12,
+                                        }}
+                                    >
+                                        <TouchableOpacity
+                                            onPress={() => setIsLastTaka(!isLastTaka)}
+                                            style={{
+                                                width: 22,
+                                                height: 22,
+                                                borderWidth: 2,
+                                                borderColor: isLastTaka ? '#007EA7' : '#94A3B8',
+                                                borderRadius: 4,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: isLastTaka ? '#007EA7' : '#FFFFFF',
+                                            }}
+                                        >
+                                            {isLastTaka && (
+                                                <Icon
+                                                    name="check"
+                                                    size={16}
+                                                    color="#FFFFFF"
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+
+                                        <Text
+                                            style={{
+                                                marginLeft: 8,
+                                                fontSize: 14,
+                                                fontWeight: '700',
+                                                color: '#0F172A',
+                                            }}
+                                        >
+                                            Is Last Taka
+                                        </Text>
+                                    </View>
+
+                                    <View
+                                        style={{
                                             marginTop: 16,
                                             padding: 12,
                                             borderRadius: 16,
@@ -2149,6 +2240,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                                 },
                                             }));
                                             fetchDesignHelp(item);
+                                            fetchManualShift(item.PrpCode);
                                         }}
                                     />
 
@@ -2292,6 +2384,56 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                         handleChange('ShfCode', val);
                                         setForm((prev: any) => ({ ...prev, ShfCode: val }));
                                     })}
+
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            marginTop: 12,
+                                        }}
+                                    >
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                handleChange(
+                                                    'islasttaka',
+                                                    FormState.values.islasttaka ? 0 : 1
+                                                )
+                                            }
+                                            style={{
+                                                width: 22,
+                                                height: 22,
+                                                borderWidth: 2,
+                                                borderColor: FormState.values.islasttaka
+                                                    ? '#007EA7'
+                                                    : '#94A3B8',
+                                                borderRadius: 4,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: FormState.values.islasttaka
+                                                    ? '#007EA7'
+                                                    : '#FFFFFF',
+                                            }}
+                                        >
+                                            {FormState.values.islasttaka === 1 && (
+                                                <Icon
+                                                    name="check"
+                                                    size={16}
+                                                    color="#FFFFFF"
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+
+                                        <Text
+                                            style={{
+                                                marginLeft: 8,
+                                                fontSize: 14,
+                                                fontWeight: '700',
+                                                color: '#0F172A',
+                                            }}
+                                        >
+                                            Is Last Taka
+                                        </Text>
+                                    </View>
 
                                     <View
                                         style={{
@@ -2803,6 +2945,10 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
                                                 <Text style={checkingScannerStyles.subText}>
                                                     Beam No : {item.BeamNo}
+                                                </Text>
+
+                                                <Text style={checkingScannerStyles.subText}>
+                                                    Meter : {item.Qty} m
                                                 </Text>
 
                                                 <Text style={checkingScannerStyles.subText}>

@@ -1,6 +1,7 @@
 import { getCurrentFinancialYear } from '@/common/commonfunction';
 import { DashboardAPI, DashboardCard, DashboardView, ExpenseDashboardData } from '@/src/api/dashboard';
 import { EmptyState, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import ExpenseDashboardCard from '@/src/components/dashboard/ExpenseDashboardCard';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { usePermission } from '@/src/core/permissions';
@@ -28,19 +29,11 @@ import {
 // SafeAreaView either, since the tabs layout's one SafeAreaView + header
 // already accounts for it — reverted to a plain View.
 
-function money(value: number) {
-  const abs = Math.abs(Number(value || 0));
-  const sign = value < 0 ? '-' : '';
-  if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(2)} Cr`;
-  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(2)} L`;
-  return `${sign}₹${abs.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-}
-
 function cardByKey(cards: DashboardCard[], key: DashboardCard['key']) {
   return cards.find((card) => card.key === key);
 }
 
-function TargetSummary({ cards, label, onOpen }: { cards: DashboardCard[]; label: string; onOpen: () => void }) {
+function TargetSummary({ cards, label, onOpen, amountMode }: { cards: DashboardCard[]; label: string; onOpen: () => void; amountMode: 'compact' | 'actual' }) {
   const so = cardByKey(cards, 'SALES_ORDER');
   const billing = cardByKey(cards, 'BILLING');
   const collection = cardByKey(cards, 'COLLECTION');
@@ -70,15 +63,50 @@ function TargetSummary({ cards, label, onOpen }: { cards: DashboardCard[]; label
 
         <View style={styles.targetMetrics}>
           <Text style={styles.darkKicker}>SALES</Text>
-          <Text style={styles.darkLine}>SO booked <Text style={styles.copper}>{money(so?.actual || 0)}</Text></Text>
-          <Text style={styles.darkLine}>Billed <Text style={styles.blueText}>{money(billing?.actual || 0)}</Text></Text>
+          <Text style={styles.darkLine}>SO booked <Text style={styles.copper}>{formatDashboardAmount(so?.actual || 0, amountMode)}</Text></Text>
+          <Text style={styles.darkLine}>Billed <Text style={styles.blueText}>{formatDashboardAmount(billing?.actual || 0, amountMode)}</Text></Text>
           <Text style={[styles.darkKicker, { marginTop: 12 }]}>COLLECTION</Text>
           <ProgressBar value={collection?.achievement_pct || 0} />
           <Text style={styles.collectionLine}>
-            {money(collection?.actual || 0)} / {money(collection?.target || 0)}
+            {formatDashboardAmount(collection?.actual || 0, amountMode)} / {formatDashboardAmount(collection?.target || 0, amountMode)}
           </Text>
         </View>
       </View>
+    </TouchableOpacity>
+  );
+}
+
+
+function MonthlyReportCard({
+  label,
+  view,
+  onOpen,
+}: {
+  label: string;
+  view: DashboardView;
+  onOpen: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.88}
+      onPress={onOpen}
+      style={styles.monthlyReportCard}
+    >
+      <View style={styles.monthlyReportIcon}>
+        <Text style={styles.monthlyReportIconText}>↗</Text>
+      </View>
+
+      <View style={styles.monthlyReportMain}>
+        <Text style={styles.monthlyReportKicker}>
+          {view === 'owner' ? 'OWNER' : 'MY VIEW'} · MONTHLY REPORT
+        </Text>
+        <Text style={styles.monthlyReportTitle}>Monthly Report</Text>
+        <Text style={styles.monthlyReportSub}>
+          {label} · Sales order, billing and collection
+        </Text>
+      </View>
+
+      <Text style={styles.monthlyReportArrow}>›</Text>
     </TouchableOpacity>
   );
 }
@@ -92,10 +120,20 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const logout = useAppSessionStore((state) => state.logout);
 
   const context = appSession?.business_context;
-  const [view, setView] = useState<DashboardView>(isSuperAdmin ? 'owner' : 'my');
+  const isDirector = Number(
+    sessionUser?.is_director ??
+    rawLoginResponse?.is_director ??
+    rawLoginResponse?.user?.is_director ??
+    0,
+  ) === 1;
+  const hasOwnerAuthority = isDirector || isSuperAdmin;
+
+  const [view, setView] = useState<DashboardView>(hasOwnerAuthority ? 'owner' : 'my');
+  const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
   const [cards, setCards] = useState<DashboardCard[]>([]);
   const [periodLabel, setPeriodLabel] = useState('Monthly Target');
   const [scopeMessage, setScopeMessage] = useState('');
+  const [ownerAllowedFromApi, setOwnerAllowedFromApi] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -111,7 +149,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
   const monthno = now.getMonth() + 1;
-  const ownerAllowed = isSuperAdmin || canAccess('dashboard.owner_view');
+  const ownerAllowed = ownerAllowedFromApi ?? hasOwnerAuthority;
 
   // useEffect(() => {
   //   // if (!token) return
@@ -124,6 +162,12 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
   //   };
   //   load();
   // }, [token]);
+
+  useEffect(() => {
+    if (!ownerAllowed && view === 'owner') {
+      setView('my');
+    }
+  }, [ownerAllowed, view]);
 
   useEffect(() => {
     if (!token) return;
@@ -173,7 +217,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
         monthno,
         refresh: forceRefresh ? 1 : 0,
       });
-
+      console.log("result",result);
       setExpenseData(result.response?.data || null);
     } catch (e: any) {
       setExpenseError(e?.message || 'Unable to load production cost.');
@@ -194,10 +238,19 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
     setError('');
     try {
       const result = await DashboardAPI.targetCard({ prptype, yearno, monthno, view });
+      console.log("prptype",prptype);
+      console.log("result",result);
       const payload = result.response;
+
+      // Keep the user's selected view. The backend is the sole scope
+      // authority; React must never silently change My View back to Owner.
+
       setCards(payload.cards || []);
       setPeriodLabel(payload.period?.label || payload.period?.month_name || 'Monthly Target');
       setScopeMessage(payload.scope?.message || payload.message || '');
+      if (payload.scope?.owner_view_allowed !== undefined) {
+        setOwnerAllowedFromApi(Boolean(payload.scope.owner_view_allowed));
+      }
     } catch (e: any) {
       setError(e?.message || 'Unable to load dashboard.');
     } finally {
@@ -250,6 +303,11 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.amountModeRow}>
+          <Text style={styles.amountModeLabel}>AMOUNT</Text>
+          <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
+        </View>
+
         {loading ? (
           <View style={styles.loadingCard}><ActivityIndicator color={T.copper} /><Text style={styles.loadingText}>Loading dashboard…</Text></View>
         ) : error ? (
@@ -263,12 +321,12 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
             {/* {view !== 'my' && ( */}
             {/* <DashboardSection title="THIS MONTH · BUSINESS PULSE" tone="orange" action="Refresh" onAction={() => load(true)}>
                 <View style={styles.metricRow}>
-                  <MetricCell label="SALES ORDER" value={money(salesOrder?.actual || 0)} />
-                  <MetricCell label="BILLING" value={money(billing?.actual || 0)} />
+                  <MetricCell label="SALES ORDER" value={formatDashboardAmount(salesOrder?.actual || 0, amountMode)} />
+                  <MetricCell label="BILLING" value={formatDashboardAmount(billing?.actual || 0, amountMode)} />
                 </View>
                 <View style={[styles.metricRow, { marginTop: 15 }]}>
-                  <MetricCell label="COLLECTION" value={money(collection?.actual || 0)} accent />
-                  <MetricCell label="OUTSTANDING" value={money(collection?.remaining || 0)} />
+                  <MetricCell label="COLLECTION" value={formatDashboardAmount(collection?.actual || 0, amountMode)} accent />
+                  <MetricCell label="OUTSTANDING" value={formatDashboardAmount(collection?.remaining || 0, amountMode)} />
                 </View>
               </DashboardSection> */}
             {/* )} */}
@@ -314,10 +372,25 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
                   <TargetSummary
                     cards={cards}
                     label={periodLabel}
+                    amountMode={amountMode}
                     onOpen={() => router.push({ pathname: '/new/(tabs)/reports/monthly-target', params: { view } } as any)}
                   />
                 ),
-                //
+                'dashboard.monthly_report': () => (
+                  <MonthlyReportCard
+                    label={periodLabel}
+                    view={view}
+                    onOpen={() =>
+                      router.push({
+                        pathname: '/new/(tabs)/reports/monthly-report',
+                        params: {
+                          view,
+                          monthno: String(monthno),
+                        },
+                      } as any)
+                    }
+                  />
+                ),
                 'dashboard.operational_details': () => (
                   <EmployDashboardSection
                     activeTab={view === 'owner' ? 'owner' : 'myview'}
@@ -332,16 +405,16 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
 
             {/* <DashboardSection title="SALES" tone="navy" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
               <View style={styles.metricRow}>
-                <MetricCell label="THIS MONTH" value={money(billing?.actual || 0)} />
-                <MetricCell label="SO BOOKED" value={money(salesOrder?.actual || 0)} />
+                <MetricCell label="THIS MONTH" value={formatDashboardAmount(billing?.actual || 0, amountMode)} />
+                <MetricCell label="SO BOOKED" value={formatDashboardAmount(salesOrder?.actual || 0, amountMode)} />
               </View>
               <View style={styles.miniTrend}><View style={styles.miniTrendLine} /></View>
             </DashboardSection>
 
             <DashboardSection title="PAYMENT COLLECTION" tone="blue" action="Full report" onAction={() => router.push('/new/(tabs)/reports/monthly-report' as any)}>
               <View style={styles.metricRow}>
-                <MetricCell label="COLLECTED" value={money(collection?.actual || 0)} />
-                <MetricCell label="TARGET" value={money(collection?.target || 0)} />
+                <MetricCell label="COLLECTED" value={formatDashboardAmount(collection?.actual || 0, amountMode)} />
+                <MetricCell label="TARGET" value={formatDashboardAmount(collection?.target || 0, amountMode)} />
               </View>
               <View style={styles.achievementRow}>
                 <Text style={styles.achievementLabel}>Achievement</Text>
@@ -372,6 +445,59 @@ const styles = StyleSheet.create({
   segmentDisabled: { opacity: 0.35 },
   segmentText: { color: T.muted, fontSize: 12, fontWeight: '900' },
   segmentTextActive: { color: '#fff' },
+  amountModeRow: { marginTop: -6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
+  amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  monthlyReportCard: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 14,
+  },
+  monthlyReportIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: T.nav,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  monthlyReportIconText: {
+    color: T.copper,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  monthlyReportMain: { flex: 1, minWidth: 0 },
+  monthlyReportKicker: {
+    color: T.copper,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  monthlyReportTitle: {
+    color: T.ink,
+    fontSize: 17,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  monthlyReportSub: {
+    color: T.muted,
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 3,
+  },
+  monthlyReportArrow: {
+    color: T.nav,
+    fontSize: 28,
+    fontWeight: '700',
+    marginLeft: 10,
+  },
   loadingCard: { minHeight: 160, backgroundColor: T.surface, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.border, gap: 10 },
   loadingText: { color: T.muted, fontSize: 12, fontWeight: '700' },
   errorCard: { backgroundColor: '#FFF7F4', borderWidth: 1, borderColor: '#F0C7BB', borderRadius: 16, padding: 18 },

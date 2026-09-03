@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, } from 'react-native';
-import { TouchableOpacity } from 'react-native';
-import Icon from '@expo/vector-icons/MaterialIcons';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 import theme from '@/components/theme';
+import Icon from '@expo/vector-icons/MaterialIcons';
 
 const PCAcard = (props) => {
     const {
@@ -19,34 +19,57 @@ const PCAcard = (props) => {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [isGlobalLoading, setIsGlobalLoading] = useState(false);
 
-    useEffect(
+    // useEffect(
 
-        () => {
+    //     () => {
 
-            if (!searchQuery.trim()) {
+    //         if (!searchQuery.trim()) {
 
-                setFilteredData(getChunkData || []);
-                setAllData((getChunkData || []).slice(0, 20));
-                setPage(1);
+    //             setFilteredData(getChunkData || []);
+    //             setAllData((getChunkData || []).slice(0, 20));
+    //             setPage(1);
 
-            } else {
+    //         } else {
 
-                const filtered = (getChunkData || []).filter((item) => {
+    //             const filtered = (getChunkData || []).filter((item) => {
 
-                    const matchesSearch = Object.values(item).some(
+    //                 const matchesSearch = Object.values(item).some(
 
-                        (value) => typeof value === 'string' && value.toLowerCase().includes(searchQuery.toLowerCase())
-                    );
+    //                     (value) => typeof value === 'string' && value.toLowerCase().includes(searchQuery.toLowerCase())
+    //                 );
 
-                    return matchesSearch;
-                });
+    //                 return matchesSearch;
+    //             });
 
-                setFilteredData(filtered);
-                setAllData(filtered.slice(0, 20));
-                setPage(1);
-            }
-        }, [getChunkData, searchQuery]
-    );
+    //             setFilteredData(filtered);
+    //             setAllData(filtered.slice(0, 20));
+    //             setPage(1);
+    //         }
+    //     }, [getChunkData, searchQuery]
+    // );
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredData(getChunkData || []);
+            setAllData((getChunkData || []).slice(0, 20));
+            setPage(1);
+        } else {
+            const excludedKeys = ['GradUId', 'Gruid', 'PrUid', 'ProcessUId'];
+            const filtered = (getChunkData || []).filter((item) => {
+                // Check all values except the excluded keys
+                const matchesSearch = Object.entries(item).some(
+                    ([key, value]) =>
+                        !excludedKeys.includes(key) &&
+                        typeof value === 'string' &&
+                        value.toLowerCase().includes(searchQuery.toLowerCase())
+                );
+                return matchesSearch;
+            });
+
+            setFilteredData(filtered);
+            setAllData(filtered.slice(0, 20));
+            setPage(1);
+        }
+    }, [getChunkData, searchQuery]);
 
     const loadMoreData = () => {
 

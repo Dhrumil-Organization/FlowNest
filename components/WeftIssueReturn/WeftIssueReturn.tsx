@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
-    Modal, FlatList, StyleSheet, Alert, Platform
+    Modal, FlatList, StyleSheet, Alert, Platform, Dimensions
 } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { fetchPropertyData } from '../../common/API/Functions';
 import axios from "axios";
-import { API } from "../../common/API/dynamicAPI";
+import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Snackbar } from 'react-native-snackbar';
 
 const WeftIssueReturn = ({ token, navigation }) => {
 
@@ -64,6 +66,17 @@ const WeftIssueReturn = ({ token, navigation }) => {
 
     const [deleteModal, setDeleteModal] = useState(false);
     const [selectedDeleteItem, setSelectedDeleteItem] = useState(null);
+
+    const [getPrinters, setPrinters] = useState([]);
+    const [printer, setPrinter] = useState("");
+    const [printerLoading, setPrinterLoading] = useState(false);
+    const [printerError, setPrinterError] = useState("");
+    const [printerModalVisible, setPrinterModalVisible] = useState(false);
+    const [selectedPrinterStatus, setSelectedPrinterStatus] = useState("");
+    const [printerSearch, setPrinterSearch] = useState("");
+    const [pendingPrintItem, setPendingPrintItem] = useState(null);
+    const [isPrinting, setIsPrinting] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const showWarning = msg =>
         setAlertData({
@@ -593,6 +606,301 @@ const WeftIssueReturn = ({ token, navigation }) => {
         else router.replace('/');
     };
 
+    const getPrinterHeaders = () => ({
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        "x-api-key": "PRINT_SECRET_123",
+    });
+
+    const getPrintersUrl = () =>
+        `${String(API).replace(/\/$/, "")}/api/printers`;
+
+    const normalizePrinterList = (raw) => {
+        const list = raw?.printers || raw?.data?.printers || raw?.data || raw || [];
+
+        if (!Array.isArray(list)) return [];
+
+        return list.map(item => ({
+            ...item,
+            Name: item.Name || item.name,
+            StatusText: item.StatusText || item.status || "Idle",
+        }));
+    };
+
+    const selectPrinter = async (item) => {
+        setPrinter(item.Name);
+        setSelectedPrinterStatus(item.StatusText);
+
+        await AsyncStorage.setItem(
+            "lastSelectedPrinter",
+            item.Name
+        );
+
+        setPrinterModalVisible(false);
+    };
+
+    const getPrinterStatusColor = (status) => {
+        if (status === "Offline") return "#DC2626";
+        return "#16A34A";
+    };
+
+    const getAllPrinters = async () => {
+
+        setPrinterLoading(true);
+
+        try {
+
+            const res = await axios.get(
+                getPrintersUrl(),
+                {
+                    headers: getPrinterHeaders()
+                }
+            );
+
+            const list = normalizePrinterList(res.data);
+
+            setPrinters(list);
+
+            // Restore the saved printer only as the highlighted selection.
+            // The printer list still opens every time.
+            const savedPrinterName = await AsyncStorage.getItem("lastSelectedPrinter");
+            if (savedPrinterName) {
+                const selected = list.find(x => x.Name === savedPrinterName);
+                if (selected) {
+                    setPrinter(selected.Name);
+                    setSelectedPrinterStatus(selected.StatusText || "Idle");
+                }
+            }
+
+            const last = await AsyncStorage.getItem(
+                "lastSelectedPrinter"
+            );
+
+            if (last) {
+                const p = list.find(x => x.Name === last);
+
+                if (p) {
+                    setPrinter(p.Name);
+                    setSelectedPrinterStatus(
+                        p.StatusText
+                    );
+                }
+            }
+
+        } catch (e) {
+
+            setPrinterError("Unable to load printers");
+
+        } finally {
+
+            setPrinterLoading(false);
+
+        }
+    };
+
+
+    const printBrowseSticker = async (item, selectedPrinterName = printer) => {
+        if (!item) {
+            Alert.alert('Printing sticker data is empty');
+            return false;
+        }
+        const printerToUse = selectedPrinterName || printer;
+
+        const yearno = (() => {
+            const issRDate = item?.IssRDate;
+
+            if (!issRDate) {
+                return "0";
+            }
+
+            const date = new Date(issRDate);
+
+            if (isNaN(date.getTime())) {
+                return "0";
+            }
+
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+
+            // April to March Financial Year
+            const financialYearEnd =
+                month >= 4 ? year + 1 : year;
+
+            return String(financialYearEnd).slice(-2);
+        })();
+
+        console.log("IssRDate ::", item?.IssRDate);
+        console.log("Financial Year No ::", yearno);
+
+        if (
+            typeof printerToUse === 'undefined' ||
+            printerToUse == null ||
+            printerToUse === ''
+        ) {
+            Alert.alert('Please select printer first.');
+            return false;
+        }
+
+        setIsLoading(true);
+
+        console.log('printsticker function :', item);
+
+        let temppayloadObj = new Object();
+
+        if (Object.keys(item).length > 0) {
+
+            // =========================================================
+            // 🔥 SAME STATIC PRINT DATA STRUCTURE
+            // 🔥 ONLY SOURCE = SELECTED BROWSE CARD "item"
+            // =========================================================
+            temppayloadObj = {
+                UId: item.UId ?? "0",
+                TranDate: "0",
+                PrpCode: item.PrpCode ?? "",
+                StrCode: item.StrCode ?? "0",
+                ItmCode: item.ItmCode ?? "0",
+                MerCode: item.MerCode ?? "0",
+                ShdCode: item.ShdCode ?? "0",
+                GrdCode: item.GrdCode ?? "0",
+                Denier: item.Denier ?? "0",
+                DsnCode: "0",
+                CartNo: item.CartNo ?? "",
+                Wt: item.TotQty ?? "0",
+                Chees: item.TotPcs ?? "",
+                IsAuto: "0",
+                GrossWt: "0",
+                PUId: item.UId ?? "0",
+                PSrNo: item.IssSrNo ?? "0",
+                PSubSr: item.IssSubSr ?? "0",
+                TranType: "",
+                TranName: " ",
+                StkType: item.StkType ?? "",
+                StkDate: "0",
+                SrNo: item.IssSrNo ?? "0",
+                UsrCode: "0",
+                StrName: "",
+                ItmName: item.ItmName ?? "",
+                MerName: item.MerName ?? "",
+                ShdName: item.ShdName ?? "",
+                GrdName: item.GrdName ?? "",
+                DnsName: "",
+                Stktype: item.StkType ?? "",
+                nStkDate: "",
+                yearno: yearno ?? "0",
+                IskgQty: "0",
+                Rate: "0",
+                MItmCode: "0",
+                MItmName: ""
+            };
+
+            console.log(
+                "SELECTED BROWSE CARD ::",
+                item
+            );
+
+            console.log(
+                "PRINT PAYLOAD OBJECT ::",
+                temppayloadObj
+            );
+            const params = {
+                data: [temppayloadObj],
+                IskgQty: 0,
+                printype: "Print",
+                PrintFormat: 5,
+                printerName: printerToUse,
+                txntype: "beam_weft_issue_return"
+            };
+
+            console.log(
+                "BROWSE PRINT PARAMS ::",
+                params
+            );
+            // return;
+            axios.post(PRINTSTICKER, params, { headers: getPrinterHeaders() })
+                .then(response => {
+                    setIsLoading(false);
+                    const res = response.data;
+                    if (res.success) {
+                        Snackbar.show({
+                            text: `✅ ${res.printed ?? 1} label(s) sent to printer.`,
+                            duration: Snackbar.LENGTH_INDEFINITE,
+                            backgroundColor: 'green',
+                            action: {
+                                text: 'OK',
+                                textColor: 'white'
+                            },
+                        });
+                        Alert.alert('Print Successful', `✅ ${res.printed ?? 1} label(s) sent to printer.`);
+                    } else {
+                        Snackbar.show({
+                            text: res.message || 'Operation failed',
+                            duration: Snackbar.LENGTH_INDEFINITE,
+                            backgroundColor: 'red',
+                            action: {
+                                text: 'OK',
+                                textColor: 'white'
+                            },
+                        });
+                        Alert.alert(res.message || 'Operation failed');
+                    }
+                })
+                .catch(error => {
+                    setIsLoading(false);
+                    const errorMessage =
+                        error?.response?.data?.error ||
+                        error?.response?.data?.message ||
+                        error?.message ||
+                        'Print failed';
+
+                    console.log("BROWSE PRINT ERROR ::", error?.response?.data || error);
+
+                    Snackbar.show({
+                        text: errorMessage,
+                        duration: Snackbar.LENGTH_LONG,
+                        backgroundColor: 'red',
+                        action: {
+                            text: 'OK',
+                            textColor: 'white'
+                        },
+                    });
+
+                    Alert.alert(
+                        errorMessage
+                    );
+                });
+        } else {
+            setIsLoading(false);
+            Snackbar.show({
+                text: 'printing sticker data is empty',
+                duration: Snackbar.LENGTH_LONG,
+                backgroundColor: 'red',
+                textColor: '#fff',
+                action: {
+                    text: 'OK',
+                    textColor: '#fff'
+                },
+            });
+            Alert.alert(
+                'printing sticker data is empty'
+            );
+        }
+    };
+
+    const handleBrowsePrint = async (item) => {
+        setPendingPrintItem(item);
+
+        // Always open the printer list on every Print icon click.
+        // Saved printer is only highlighted; it is never auto-printed.
+        setPrinterSearch("");
+        setPrinterError("");
+
+        await getAllPrinters();
+
+        setPrinterModalVisible(true);
+    };
+
     return (
         <>
             <StatusBar
@@ -1050,15 +1358,30 @@ const WeftIssueReturn = ({ token, navigation }) => {
                                                 </View>
                                             </View>
 
-                                            <TouchableOpacity
-                                                onPress={() => {
-                                                    setSelectedDeleteItem(item);
-                                                    setDeleteModal(true);
-                                                }}
-                                                style={styles.deleteBtn}
-                                            >
-                                                <Icon name="delete" size={18} color="#fff" />
-                                            </TouchableOpacity>
+
+
+                                            <View style={styles.cardActionRow}>
+                                                {Number(item?.IsCartonStatus) === 1 && (
+                                                    <TouchableOpacity
+                                                        onPress={() => handleBrowsePrint(item)}
+                                                        disabled={isPrinting}
+                                                        style={styles.printBtn}
+                                                    >
+                                                        <Icon name="print" size={18} color="#fff" />
+                                                    </TouchableOpacity>
+                                                )}
+
+                                                <TouchableOpacity
+                                                    onPress={() => {
+                                                        setSelectedDeleteItem(item);
+                                                        setDeleteModal(true);
+                                                    }}
+                                                    style={styles.deleteBtn}
+                                                >
+                                                    <Icon name="delete" size={18} color="#fff" />
+                                                </TouchableOpacity>
+
+                                            </View>
                                         </TouchableOpacity>
                                     );
                                 }}
@@ -1113,6 +1436,176 @@ const WeftIssueReturn = ({ token, navigation }) => {
                             <Icon name="add" size={26} color="#fff" />
                         </TouchableOpacity>
                     </View>
+
+                    <Modal
+                        transparent
+                        visible={printerModalVisible}
+                        animationType="slide"
+                        onRequestClose={() => {
+                            setPrinterModalVisible(false);
+                            setPrinterSearch("");
+                            setPendingPrintItem(null);
+                        }}
+                    >
+                        <View style={styles.printerOverlay}>
+                            <View style={styles.printerSheet}>
+                                <View style={styles.printerHeader}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.printerTitle}>Select Printer</Text>
+                                        {pendingPrintItem?.IssRNo ? (
+                                            <Text style={styles.printerSubTitle}>
+                                                {pendingPrintItem.IssRNo} • {pendingPrintItem.CartNo || ""}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setPrinterModalVisible(false);
+                                            setPrinterSearch("");
+                                            setPendingPrintItem(null);
+                                        }}
+                                        style={styles.printerCloseBtn}
+                                    >
+                                        <Icon name="close" size={20} color="#111827" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TextInput
+                                    placeholder="Search printer..."
+                                    placeholderTextColor="#777"
+                                    value={printerSearch}
+                                    onChangeText={setPrinterSearch}
+                                    style={styles.printerSearchInput}
+                                />
+
+                                {printerLoading ? (
+                                    <View style={styles.printerEmptyBox}>
+                                        <Text style={styles.printerEmptyText}>Loading printers...</Text>
+                                    </View>
+                                ) : printerError ? (
+                                    <View style={styles.printerEmptyBox}>
+                                        <Text style={styles.printerErrorText}>{printerError}</Text>
+                                        <TouchableOpacity
+                                            onPress={getAllPrinters}
+                                            style={styles.printerRetryBtn}
+                                        >
+                                            <Text style={styles.printerRetryText}>Retry</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <FlatList
+                                        data={getPrinters.filter(p =>
+                                            String(p?.Name || "")
+                                                .toLowerCase()
+                                                .includes(printerSearch.toLowerCase())
+                                        )}
+                                        keyExtractor={(p, index) => `${p?.Name || "printer"}-${index}`}
+                                        keyboardShouldPersistTaps="handled"
+                                        renderItem={({ item: printerItem }) => (
+                                            <TouchableOpacity
+                                                onPress={async () => {
+                                                    const selectedName = printerItem?.Name || "";
+
+                                                    setPrinter(selectedName);
+                                                    setSelectedPrinterStatus(
+                                                        printerItem?.StatusText || "Idle"
+                                                    );
+
+                                                    await AsyncStorage.setItem(
+                                                        "lastSelectedPrinter",
+                                                        selectedName
+                                                    );
+
+                                                    // Only select the printer here.
+                                                    // Printing will happen from the "Print Sticker" button below.
+                                                    setPrinter(selectedName);
+                                                    setSelectedPrinterStatus(
+                                                        printerItem?.StatusText || "Idle"
+                                                    );
+                                                }}
+                                                style={[
+                                                    styles.printerItem,
+                                                    printer === printerItem?.Name &&
+                                                    styles.printerItemSelected
+                                                ]}
+                                            >
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.printerName}>
+                                                        {printerItem?.Name || "Unnamed Printer"}
+                                                    </Text>
+
+                                                    <Text
+                                                        style={[
+                                                            styles.printerStatus,
+                                                            {
+                                                                color: getPrinterStatusColor(
+                                                                    printerItem?.StatusText
+                                                                )
+                                                            }
+                                                        ]}
+                                                    >
+                                                        {printerItem?.StatusText || "Idle"}
+                                                    </Text>
+                                                </View>
+
+                                                {printer === printerItem?.Name && (
+                                                    <Icon
+                                                        name="check-circle"
+                                                        size={24}
+                                                        color="#0F6C7B"
+                                                    />
+                                                )}
+                                            </TouchableOpacity>
+                                        )}
+                                        ListEmptyComponent={
+                                            <View style={styles.printerEmptyBox}>
+                                                <Icon name="print-disabled" size={32} color="#9CA3AF" />
+                                                <Text style={styles.printerEmptyText}>
+                                                    No printer found
+                                                </Text>
+                                            </View>
+                                        }
+                                    />
+                                )}
+
+                                {/* PRINT STICKER - print only after printer is selected */}
+                                <TouchableOpacity
+                                    disabled={!printer || !pendingPrintItem || isLoading}
+                                    onPress={async () => {
+                                        if (!pendingPrintItem) {
+                                            Alert.alert("Printing sticker data is empty");
+                                            return;
+                                        }
+
+                                        if (!printer) {
+                                            Alert.alert("Please select printer first.");
+                                            return;
+                                        }
+
+                                        await printBrowseSticker(
+                                            pendingPrintItem,
+                                            printer
+                                        );
+
+                                        setPrinterModalVisible(false);
+                                        setPrinterSearch("");
+                                        setPendingPrintItem(null);
+                                    }}
+                                    style={[
+                                        styles.printStickerBtn,
+                                        (!printer || !pendingPrintItem || isLoading) &&
+                                        styles.printStickerBtnDisabled
+                                    ]}
+                                >
+                                    <Icon name="print" size={20} color="#fff" />
+                                    <Text style={styles.printStickerBtnText}>
+                                        {isLoading ? "Printing..." : "Print Sticker"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </Modal>
 
                     <Modal transparent visible={deleteModal} animationType="fade">
                         <View style={styles.alertOverlay}>
@@ -1226,6 +1719,9 @@ const WeftIssueReturn = ({ token, navigation }) => {
     );
 };
 export default WeftIssueReturn;
+
+const { width, height } = Dimensions.get("window");
+const isTablet = width >= 768;
 
 const styles = StyleSheet.create({
     header: {
@@ -1611,5 +2107,153 @@ const styles = StyleSheet.create({
         height: 30,
         borderRadius: 15,
         backgroundColor: "#E5E7EB",
+    },
+
+    printBtn: {
+        backgroundColor: "#0F6C7B",
+        width: isTablet ? 44 : 34,
+        height: isTablet ? 44 : 34,
+        borderRadius: isTablet ? 22 : 17,
+        justifyContent: "center",
+        alignItems: "center",
+        elevation: 4,
+    },
+
+    printerOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.45)",
+        justifyContent: "flex-end",
+    },
+
+    printerSheet: {
+        backgroundColor: "#fff",
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        padding: 20,
+        maxHeight: "80%",
+    },
+
+    printerHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 15,
+    },
+
+    printerTitle: {
+        fontSize: 20,
+        fontWeight: "700",
+        color: "#111827",
+    },
+
+    printerSubTitle: {
+        marginTop: 3,
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#0F6C7B",
+    },
+
+    printerCloseBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "#F1F5F9",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    printerSearchInput: {
+        height: 50,
+        borderWidth: 1,
+        borderColor: "#D1D5DB",
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        marginBottom: 12,
+        color: "#111827",
+    },
+
+    printerItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderColor: "#EEEEEE",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        borderRadius: 10,
+    },
+
+    printerItemSelected: {
+        backgroundColor: "#E8F7F9",
+    },
+
+    printerName: {
+        fontWeight: "700",
+        fontSize: 15,
+        color: "#111827",
+    },
+
+    printerStatus: {
+        marginTop: 3,
+        fontWeight: "600",
+        fontSize: 13,
+    },
+
+    printerEmptyBox: {
+        minHeight: 100,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 20,
+    },
+
+    printerEmptyText: {
+        marginTop: 8,
+        color: "#6B7280",
+        fontSize: 14,
+    },
+
+    printerErrorText: {
+        color: "#DC2626",
+        fontSize: 14,
+        textAlign: "center",
+    },
+
+    printerRetryBtn: {
+        marginTop: 10,
+        paddingHorizontal: 20,
+        paddingVertical: 9,
+        borderRadius: 10,
+        backgroundColor: "#0F6C7B",
+    },
+
+    printStickerBtn: {
+        marginTop: 12,
+        height: 50,
+        borderRadius: 14,
+        backgroundColor: "#0F6C7B",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+    },
+    printStickerBtnDisabled: {
+        backgroundColor: "#9CA3AF",
+    },
+    printStickerBtnText: {
+        color: "#fff",
+        fontSize: 15,
+        fontWeight: "700",
+    },
+
+    printerRetryText: {
+        color: "#fff",
+        fontWeight: "700",
+    },
+
+    cardActionRow: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        gap: 10,
+        marginTop: -25,
     },
 });

@@ -7,6 +7,7 @@ import {
   DashboardView,
 } from '@/src/api/dashboard';
 import { ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { AmountDisplayModeControl, formatDashboardAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
@@ -29,15 +30,6 @@ const METRICS: Array<{ key: DashboardMetricKey; title: string; short: string; to
   { key: 'COLLECTION', title: 'Collection', short: 'CL', tone: T.green },
 ];
 
-function money(value: number) {
-  const n = Number(value || 0);
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(2)} Cr`;
-  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(2)} L`;
-  return `${sign}₹${abs.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-}
-
 function initials(name: string) {
   const words = String(name || '').trim().split(/\s+/).filter(Boolean);
   return (words[0]?.[0] || '') + (words[1]?.[0] || words[0]?.[1] || '');
@@ -56,11 +48,12 @@ function changeMonth(year: number, month: number, delta: number) {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
-function MetricSummaryCard({ card, selected, onPress, tone }: {
+function MetricSummaryCard({ card, selected, onPress, tone, amountMode }: {
   card?: DashboardCard;
   selected: boolean;
   onPress: () => void;
   tone: string;
+  amountMode: 'compact' | 'actual';
 }) {
   const pct = Number(card?.achievement_pct || 0);
   const configured = Boolean(card?.target_configured);
@@ -70,22 +63,22 @@ function MetricSummaryCard({ card, selected, onPress, tone }: {
         <View style={[styles.metricDot, { backgroundColor: tone }]} />
         <Text style={styles.metricCardTitle}>{card?.label || 'Metric'}</Text>
       </View>
-      <Text style={styles.metricActual}>{money(card?.actual || 0)}</Text>
+      <Text style={styles.metricActual}>{formatDashboardAmount(card?.actual || 0, amountMode)}</Text>
       <Text style={styles.metricCaption}>actual</Text>
       <View style={styles.metricTargetRow}>
         <Text style={styles.metricTargetLabel}>Target</Text>
-        <Text style={styles.metricTargetValue}>{configured ? money(card?.target || 0) : 'Not configured'}</Text>
+        <Text style={styles.metricTargetValue}>{configured ? formatDashboardAmount(card?.target || 0, amountMode) : 'Not configured'}</Text>
       </View>
       <ProgressBar value={configured ? pct : 0} tone={tone === T.copper ? 'orange' : tone === T.blue ? 'blue' : 'green'} />
       <View style={styles.metricFooter}>
         <Text style={[styles.metricPct, { color: tone }]}>{configured ? `${pct.toFixed(2)}%` : '—'}</Text>
-        <Text style={styles.metricRemaining}>{configured ? `${money(card?.remaining || 0)} pending` : 'Manual target required'}</Text>
+        <Text style={styles.metricRemaining}>{configured ? `${formatDashboardAmount(card?.remaining || 0, amountMode)} pending` : 'Manual target required'}</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
-function ExecutiveRow({ row, rank, onPress }: { row: AnalyticsExecutiveRow; rank: number; onPress: () => void }) {
+function ExecutiveRow({ row, rank, onPress, amountMode }: { row: AnalyticsExecutiveRow; rank: number; onPress: () => void; amountMode: 'compact' | 'actual' }) {
   const achieved = row.target > 0 && row.actual >= row.target;
   const avatarTone = [T.yd, T.green, T.purple, T.copper, T.blue][rank % 5];
   return (
@@ -96,10 +89,10 @@ function ExecutiveRow({ row, rank, onPress }: { row: AnalyticsExecutiveRow; rank
       </View>
       <View style={styles.executiveMain}>
         <Text numberOfLines={1} style={styles.executiveName}>{row.executive_name}</Text>
-        <Text style={styles.executiveSub}>Target {money(row.target)}</Text>
+        <Text style={styles.executiveSub}>Target {formatDashboardAmount(row.target, amountMode)}</Text>
       </View>
       <View style={styles.executiveAmounts}>
-        <Text style={styles.executiveActual}>{money(row.actual)}</Text>
+        <Text style={styles.executiveActual}>{formatDashboardAmount(row.actual, amountMode)}</Text>
         <Text style={[styles.executivePct, achieved && { color: T.green }]}>{row.target > 0 ? `${row.achievement_pct.toFixed(2)}%` : 'No target'}</Text>
       </View>
       <Text style={styles.chevron}>›</Text>
@@ -107,7 +100,7 @@ function ExecutiveRow({ row, rank, onPress }: { row: AnalyticsExecutiveRow; rank
   );
 }
 
-function ReconciliationBanner({ value }: { value?: CollectionReconciliation }) {
+function ReconciliationBanner({ value, amountMode }: { value?: CollectionReconciliation; amountMode: 'compact' | 'actual' }) {
   if (!value) return null;
   const good = value.is_reconciled;
   return (
@@ -120,7 +113,7 @@ function ReconciliationBanner({ value }: { value?: CollectionReconciliation }) {
           {good ? 'Executive totals reconciled' : 'Reconciliation difference found'}
         </Text>
         <Text style={styles.reconciliationText}>
-          Target difference {money(value.target_difference)} · Actual difference {money(value.actual_difference)}
+          Target difference {formatDashboardAmount(value.target_difference, amountMode)} · Actual difference {formatDashboardAmount(value.actual_difference, amountMode)}
         </Text>
       </View>
     </View>
@@ -130,13 +123,17 @@ function ReconciliationBanner({ value }: { value?: CollectionReconciliation }) {
 export function MonthlyTargetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ view?: string; metric?: string }>();
-  const { canAccess, isSuperAdmin } = usePermission();
   const appSession = useAppSessionStore((state) => state.appSession);
+  const user = useAppSessionStore((state) => state.user);
   const rawLoginResponse = useAppSessionStore((state) => state.rawLoginResponse);
+  const { isSuperAdmin } = usePermission();
 
   const context = appSession?.business_context;
   const today = new Date();
-  const initialView: DashboardView = params.view === 'owner' ? 'owner' : 'my';
+  const hasInitialOwnerAuthority = Number(
+    user?.is_director ?? rawLoginResponse?.is_director ?? rawLoginResponse?.user?.is_director ?? 0,
+  ) === 1 || isSuperAdmin;
+  const initialView: DashboardView = params.view === 'owner' || (!params.view && hasInitialOwnerAuthority) ? 'owner' : 'my';
   const initialMetric = METRICS.some((item) => item.key === params.metric) ? params.metric as DashboardMetricKey : 'COLLECTION';
 
   const [view, setView] = useState<DashboardView>(initialView);
@@ -148,13 +145,21 @@ export function MonthlyTargetScreen() {
   const [reconciliation, setReconciliation] = useState<CollectionReconciliation | undefined>();
   const [periodTitle, setPeriodTitle] = useState('Monthly Target');
   const [scopeMessage, setScopeMessage] = useState('');
+  const [ownerAllowedFromApi, setOwnerAllowedFromApi] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
 
   const yearno = context?.year_no || rawLoginResponse?.yearno || rawLoginResponse?.yno || '';
   const prptype = context?.prp_group || rawLoginResponse?.userof || rawLoginResponse?.prptype || '';
-  const ownerAllowed = isSuperAdmin || canAccess('management.dashboard.owner_view') || canAccess('dashboard.owner_view');
+  const ownerAllowed = ownerAllowedFromApi ?? hasInitialOwnerAuthority;
+
+  useEffect(() => {
+    if (!ownerAllowed && view === 'owner') {
+      setView('my');
+    }
+  }, [ownerAllowed, view]);
 
   const load = useCallback(async (refresh = false) => {
     if (!yearno || !prptype) {
@@ -166,13 +171,33 @@ export function MonthlyTargetScreen() {
     refresh ? setRefreshing(true) : setLoading(true);
     setError('');
     try {
-      const [cardResult, executiveResult] = await Promise.all([
-        DashboardAPI.targetCard({ prptype, yearno, monthno: month, view }),
-        DashboardAPI.analyticsExecutives({ prptype, yearno, monthno: month, view, metric: selectedMetric }),
-      ]);
+      // Resolve authority/scope first. Analytics uses the same scope and may
+      // correctly reject an unconfigured My View, so do not run it in parallel
+      // until the authoritative card scope has been accepted.
+      const cardResult = await DashboardAPI.targetCard({
+        prptype,
+        yearno,
+        monthno: month,
+        view,
+      });
+
+      // Do not auto-switch My View to Owner. Server scope decides what
+      // My View contains and any genuine configuration error stays visible.
+
+      const executiveResult = await DashboardAPI.analyticsExecutives({
+        prptype,
+        yearno,
+        monthno: month,
+        view,
+        metric: selectedMetric,
+      });
+
       setCards(cardResult.response.cards || []);
       setPeriodTitle(cardResult.response.period?.label || `${monthLabel(year, month)} Target`);
       setScopeMessage(cardResult.response.scope?.message || cardResult.response.message || '');
+      if (cardResult.response.scope?.owner_view_allowed !== undefined) {
+        setOwnerAllowedFromApi(Boolean(cardResult.response.scope.owner_view_allowed));
+      }
       setExecutives(executiveResult.response.data || []);
       setReconciliation(executiveResult.response.reconciliation);
     } catch (e: any) {
@@ -240,6 +265,11 @@ export function MonthlyTargetScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.amountModeRow}>
+          <Text style={styles.amountModeLabel}>AMOUNT</Text>
+          <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
+        </View>
+
         <View style={styles.monthNavigator}>
           <TouchableOpacity onPress={() => moveMonth(-1)} style={styles.monthArrow}><Text style={styles.monthArrowText}>‹</Text></TouchableOpacity>
           <View style={{ alignItems: 'center' }}>
@@ -271,7 +301,7 @@ export function MonthlyTargetScreen() {
               </View>
               <View style={styles.heroDivider} />
               <View style={styles.heroMetrics}>
-                <View style={styles.heroMetric}><Text style={styles.heroMetricLabel}>TOTAL ACTIVITY</Text><Text style={styles.heroMetricValue}>{money(totals.actual)}</Text></View>
+                <View style={styles.heroMetric}><Text style={styles.heroMetricLabel}>TOTAL ACTIVITY</Text><Text style={styles.heroMetricValue}>{formatDashboardAmount(totals.actual, amountMode)}</Text></View>
                 <View style={styles.heroMetric}><Text style={styles.heroMetricLabel}>VIEW SCOPE</Text><Text style={styles.heroMetricValueSmall}>{view === 'owner' ? 'All executives' : 'My executives'}</Text></View>
               </View>
             </View>
@@ -283,6 +313,7 @@ export function MonthlyTargetScreen() {
                   card={cardByKey(cards, metric.key)}
                   selected={selectedMetric === metric.key}
                   tone={metric.tone}
+                  amountMode={amountMode}
                   onPress={() => setSelectedMetric(metric.key)}
                 />
               ))}
@@ -298,16 +329,16 @@ export function MonthlyTargetScreen() {
               </View>
               <View style={styles.breakdownBody}>
                 <View style={styles.breakdownGrid}>
-                  <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>TARGET</Text><Text style={styles.breakdownValue}>{selectedCard?.target_configured ? money(selectedCard.target) : 'Not configured'}</Text></View>
-                  <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>ACTUAL</Text><Text style={[styles.breakdownValue, { color: T.green }]}>{money(selectedCard?.actual || 0)}</Text></View>
-                  <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>REMAINING</Text><Text style={styles.breakdownValue}>{money(selectedCard?.remaining || 0)}</Text></View>
+                  <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>TARGET</Text><Text style={styles.breakdownValue}>{selectedCard?.target_configured ? formatDashboardAmount(selectedCard.target, amountMode) : 'Not configured'}</Text></View>
+                  <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>ACTUAL</Text><Text style={[styles.breakdownValue, { color: T.green }]}>{formatDashboardAmount(selectedCard?.actual || 0, amountMode)}</Text></View>
+                  <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>REMAINING</Text><Text style={styles.breakdownValue}>{formatDashboardAmount(selectedCard?.remaining || 0, amountMode)}</Text></View>
                   <View style={styles.breakdownCell}><Text style={styles.breakdownLabel}>STATUS</Text><Text style={styles.breakdownValueSmall}>{String(selectedCard?.status || '—').replaceAll('_', ' ')}</Text></View>
                 </View>
                 <ProgressBar value={selectedCard?.target_configured ? selectedCard.achievement_pct : 0} tone={selectedMetric === 'SALES_ORDER' ? 'orange' : selectedMetric === 'BILLING' ? 'blue' : 'green'} />
               </View>
             </View>
 
-            {selectedMetric === 'COLLECTION' ? <ReconciliationBanner value={reconciliation} /> : null}
+            {selectedMetric === 'COLLECTION' ? <ReconciliationBanner value={reconciliation} amountMode={amountMode} /> : null}
 
             <View style={styles.executivesCard}>
               <View style={styles.executivesHeader}>
@@ -319,7 +350,7 @@ export function MonthlyTargetScreen() {
               </View>
               {executives.length === 0 ? (
                 <View style={styles.noRows}><Text style={styles.noRowsTitle}>No executive data</Text><Text style={styles.noRowsText}>No rows were returned for this metric and month.</Text></View>
-              ) : executives.map((row, index) => <ExecutiveRow key={`${row.executive_code}-${index}`} row={row} rank={index} onPress={() => openExecutive(row)} />)}
+              ) : executives.map((row, index) => <ExecutiveRow key={`${row.executive_code}-${index}`} row={row} rank={index} onPress={() => openExecutive(row)} amountMode={amountMode} />)}
             </View>
 
             <TouchableOpacity activeOpacity={0.88} style={styles.monthlyReportButton} onPress={() => router.push({ pathname: '/new/(tabs)/reports/monthly-report', params: { view, monthno: month } } as any)}>
@@ -335,6 +366,8 @@ export function MonthlyTargetScreen() {
 }
 
 const styles = StyleSheet.create({
+  amountModeRow: { marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
+  amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   safe: { flex: 1, backgroundColor: T.bg },
   header: { backgroundColor: T.bg, paddingHorizontal: 15, paddingTop: 10, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 },
   backButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },

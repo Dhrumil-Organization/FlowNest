@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { T } from '../../theme';
 import { useAppStore, autoSave } from '../../stores/AppStore';
 import { SearchableDropdown, DropdownItem } from '../../components/ui/SearchableDropdown';
@@ -6,11 +7,12 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { CUSTOMERS } from '../../data/seeds';
 import type { SalesOrder, FabricType } from '../../types';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, FlatList, StatusBar } from 'react-native';
 import { SalesOrderAPI } from '@/src/api/legacyClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
 import { fetchAllPropertyData, fetchPropertyData } from '@/src/api/legacyFunctions';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 // ─── helpers ──────────────────────────────────────────────────
 const fmt = (n: number) => Math.round(n).toLocaleString('en-IN');
@@ -19,6 +21,20 @@ const rupee = (n: number) => {
     return `₹${Math.round(n)}`;
 };
 const TODAY = new Date().toISOString().slice(0, 10);
+
+const authHdr = (token: string) => ({
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'x-platform': 'mob',
+});
+
+const ymd = (value: any) => {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return d.toISOString().slice(0, 10);
+};
 
 function genSO(orders: SalesOrder[]) {
     const d = TODAY.replace(/-/g, '');
@@ -29,152 +45,6 @@ function genSO(orders: SalesOrder[]) {
 interface Props {
     token: string;
     userid?: any;
-}
-
-// ─── Component ────────────────────────────────────────────────
-function ShadeDropdown({
-    value,
-    items,
-    onSelect,
-    placeholder = 'Search shade / colour…',
-}: {
-    value: string;
-    items: DropdownItem[];
-    onSelect: (item: DropdownItem) => void;
-    placeholder?: string;
-}) {
-    const [visible, setVisible] = useState(false);
-    const [search, setSearch] = useState('');
-
-    const selected = useMemo(
-        () => items.find(item => String(item.id) === String(value)),
-        [items, value]
-    );
-
-    const filteredItems = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return items;
-
-        return items.filter(item =>
-            String(item.label ?? '').toLowerCase().includes(q) ||
-            String(item.id ?? '').toLowerCase().includes(q)
-        );
-    }, [items, search]);
-
-    const close = () => {
-        setVisible(false);
-        setSearch('');
-    };
-
-    return (
-        <>
-            <Text style={ns.fieldLabel}>SHADE</Text>
-
-            <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setVisible(true)}
-                style={ns.shadeSelectBox}
-            >
-                <View style={{ flex: 1 }}>
-                    <Text
-                        numberOfLines={1}
-                        style={[
-                            ns.shadeSelectText,
-                            !selected && { color: T.muted },
-                        ]}
-                    >
-                        {selected?.label || placeholder}
-                    </Text>
-
-                    {selected?.sub ? (
-                        <Text style={ns.shadeSelectSub}>
-                            {selected.sub}
-                        </Text>
-                    ) : null}
-                </View>
-
-                <Text style={ns.chevron}>▾</Text>
-            </TouchableOpacity>
-
-            <Modal
-                visible={visible}
-                transparent
-                animationType="fade"
-                onRequestClose={close}
-            >
-                <View style={ns.shadeModalOverlay}>
-                    <View style={ns.shadeModalCard}>
-                        <View style={ns.shadeModalHeader}>
-                            <Text style={ns.shadeModalTitle}>
-                                Select Shade
-                            </Text>
-
-                            <TouchableOpacity onPress={close}>
-                                <Text style={ns.shadeModalClose}>×</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <TextInput
-                            value={search}
-                            onChangeText={setSearch}
-                            autoFocus
-                            placeholder="Search shade code / name..."
-                            placeholderTextColor={T.muted}
-                            style={ns.shadeSearchInput}
-                        />
-
-                        <Text style={ns.shadeCountText}>
-                            {filteredItems.length.toLocaleString('en-IN')} shades
-                        </Text>
-
-                        <FlatList
-                            data={filteredItems}
-                            keyExtractor={(item, index) =>
-                                `${String(item.id)}-${index}`
-                            }
-                            keyboardShouldPersistTaps="handled"
-                            initialNumToRender={30}
-                            maxToRenderPerBatch={30}
-                            windowSize={7}
-                            removeClippedSubviews
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    style={ns.shadeOptionRow}
-                                    onPress={() => {
-                                        onSelect(item);
-                                        close();
-                                    }}
-                                >
-                                    <View style={{ flex: 1 }}>
-                                        <Text
-                                            numberOfLines={1}
-                                            style={ns.shadeOptionLabel}
-                                        >
-                                            {item.label}
-                                        </Text>
-
-                                        {item.sub ? (
-                                            <Text style={ns.shadeOptionSub}>
-                                                {item.sub}
-                                            </Text>
-                                        ) : null}
-                                    </View>
-                                </TouchableOpacity>
-                            )}
-                            ListEmptyComponent={
-                                <View style={ns.shadeEmptyBox}>
-                                    <Text style={ns.shadeEmptyText}>
-                                        No shade found
-                                    </Text>
-                                </View>
-                            }
-                        />
-                    </View>
-                </View>
-            </Modal>
-        </>
-    );
 }
 
 export function NewOrderTab({ token, userid }: Props) {
@@ -207,9 +77,55 @@ export function NewOrderTab({ token, userid }: Props) {
     const [shadeExpanded, setShadeExpanded] = useState(true);
     const [custId, setCustId] = useState('');
     const [mdId, setMdId] = useState('');
-    const [fabType, setFabType] = useState<FabricType>('finished');
     const [price, setPrice] = useState('');
     const [delivDate, setDelivDate] = useState('2026-07-15');
+    const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+    const displayDate = (value: string) => {
+        if (!value) return '';
+        const parts = value.split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        return value;
+    };
+
+    const parseDateValue = (value: string) => {
+        if (!value) return new Date();
+        const parts = value.split('-').map(Number);
+        if (parts.length === 3 && parts[0] > 31) {
+            const [year, month, day] = parts;
+            return new Date(year, month - 1, day);
+        }
+        return new Date();
+    };
+
+    const formatDateForApi = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const handleDeliveryDateChange = (
+        event: DateTimePickerEvent,
+        selectedDate?: Date,
+    ) => {
+        // Android closes the native picker after selecting/cancelling.
+        if (event.type === 'dismissed') {
+            setDatePickerOpen(false);
+            return;
+        }
+
+        if (selectedDate) {
+            setDelivDate(formatDateForApi(selectedDate));
+        }
+
+        if (event.type === 'set' || event.type === 'neutralButtonPressed') {
+            setDatePickerOpen(false);
+        }
+    };
+    // const [delivDate, setDelivDate] = useState('2026-07-15');
     const [designList, setDesignList] = useState<any[]>([]);
     const [designLoading, setDesignLoading] = useState(false);
     const [prpcode, setPrpCode] = useState('');
@@ -221,6 +137,11 @@ export function NewOrderTab({ token, userid }: Props) {
     const [selectedExec, setSelectedExec] = useState(null);
     const [salesexecLoading, setSalesExecLoading] = useState(false);
     const [execList, setExecList] = useState([]);
+
+    const [soType, setSoType] = useState(1);
+    const [fabricType, setFabricType] = useState(1);
+
+    const [soTypeExpanded, setSoTypeExpanded] = useState(true);
 
     // Selected API records:
     // selectedDesign = the ITEM record returned by the first item API.
@@ -236,6 +157,10 @@ export function NewOrderTab({ token, userid }: Props) {
 
     const [latestCosting, setLatestCosting] = useState<any>(null);
 
+    // Save / success state
+    const [submitting, setSubmitting] = useState(false);
+    const [successSO, setSuccessSO] = useState<string | null>(null);
+
     const salesExecutiveItems: DropdownItem[] = useMemo(() => {
         return (execList || []).map((item: any) => ({
             id: String(item.Code),
@@ -243,10 +168,15 @@ export function NewOrderTab({ token, userid }: Props) {
         }));
     }, [execList]);
 
-    // Multi-color lines: each has a shadeId + qty
-    const [colorLines, setColorLines] = useState<{ shadeId: string; shadeName: string; qty: string }[]>([
-        { shadeId: '', shadeName: '', qty: '' },
-    ]);
+    // Shade selection + multiple added colourways
+    const [selectedShade, setSelectedShade] = useState<any>(null);
+    const [qty, setQty] = useState('');
+    const [colourways, setColourways] = useState<any[]>([]);
+
+    const [propertyPickerOpen, setPropertyPickerOpen] = useState(false);
+    const [yearPickerOpen, setYearPickerOpen] = useState(false);
+    const [propertySearch, setPropertySearch] = useState('');
+    const [yearSearch, setYearSearch] = useState('');
 
     const propertyItems: DropdownItem[] = useMemo(() => {
         if (!Array.isArray(propertyData)) {
@@ -259,6 +189,28 @@ export function NewOrderTab({ token, userid }: Props) {
             sub: item.ShtName ?? '',
         }));
     }, [propertyData]);
+
+    const propertyPickerItems = useMemo(() => {
+        const q = propertySearch.trim().toLowerCase();
+        if (!q) return propertyItems;
+
+        return propertyItems.filter((item: DropdownItem) =>
+            `${item.label} ${item.sub || ''} ${item.id}`
+                .toLowerCase()
+                .includes(q)
+        );
+    }, [propertyItems, propertySearch]);
+
+    const yearPickerItems = useMemo(() => {
+        const q = yearSearch.trim().toLowerCase();
+        if (!q) return yearOptions;
+
+        return yearOptions.filter((item: DropdownItem) =>
+            `${item.label} ${item.sub || ''} ${item.id}`
+                .toLowerCase()
+                .includes(q)
+        );
+    }, [yearOptions, yearSearch]);
 
     // First dropdown is the API ITEM list.
     // Example API record:
@@ -288,18 +240,43 @@ export function NewOrderTab({ token, userid }: Props) {
             .filter(item => item.id);
     }, [itemList]);
 
-    // Shade API can return 13,503+ records. The data is kept in state,
-    // but the dropdown below uses FlatList so only visible rows are rendered.
+
+    // const shadeOptions: DropdownItem[] = useMemo(() => {
+    //     return shadeList;
+    // }, [shadeList]);
+
     const shadeOptions: DropdownItem[] = useMemo(() => {
         return (shadeList || [])
-            .map((item: any) => ({
-                id: String(item.ShdCode ?? ''),
-                label: String(item.ShdName ?? ''),
-                sub: item.ShdCode
-                    ? `Shade Code: ${item.ShdCode}`
-                    : '',
-            }))
-            .filter(item => item.id && item.label);
+            .map((item: any) => {
+                const code = String(
+                    item?.ShdCode ??
+                    item?.id ??
+                    ''
+                ).trim();
+
+                const name = String(
+                    item?.ShdName ??
+                    item?.label ??
+                    ''
+                ).trim();
+
+                if (!code || !name) {
+                    return null;
+                }
+
+                return {
+                    ...item,
+                    ShdCode: code,
+                    ShdName: name,
+                    id: code,
+                    label: name,
+                    sub: `Shade Code: ${code}`,
+                };
+            })
+            .filter(
+                (item): item is DropdownItem =>
+                    item !== null
+            );
     }, [shadeList]);
 
     // Header summary is the selected ITEM record.
@@ -313,28 +290,136 @@ export function NewOrderTab({ token, userid }: Props) {
         const recs = costings.filter(c => c.mdId === mdId).sort((a, b) => b.ts.localeCompare(a.ts));
         if (!recs.length) return null;
         const snap = recs[0].snap;
-        const cost = fabType === 'finished' && snap.hasFin ? snap.finishedPrice : snap.greigePrice;
+        const cost = fabricType === 1 && snap.hasFin ? snap.finishedPrice : snap.greigePrice;
         const p = parseFloat(price);
         if (!p) return null;
         const margin = p - cost;
         return { cost, margin, pct: (margin / p) * 100 };
-    }, [mdId, price, fabType, costings]);
+    }, [mdId, price, fabricType, costings]);
 
     // Validation
-    const validLines = colorLines.filter(l => l.shadeId && parseInt(l.qty) > 0);
-    const totalM = validLines.reduce((s, l) => s + (parseInt(l.qty) || 0), 0);
-    const canSubmit = !!custId && !!salesExecId && !!selectedDesign && !!selectedItem && !!mdId && parseFloat(price) > 0 && !!delivDate && validLines.length > 0;
+    const validColourways = colourways.filter(
+        (c: any) =>
+            c?.shade?.ShdCode &&
+            Number(c?.qty) > 0
+    );
 
-    function updateLine(i: number, field: keyof typeof colorLines[0], val: string) {
-        setColorLines(prev => prev.map((l, j) => j === i ? { ...l, [field]: val } : l));
+    const totalM = validColourways.reduce(
+        (sum: number, c: any) =>
+            sum + Number(c?.qty || 0),
+        0
+    );
+
+    const totalAmt = validColourways.reduce(
+        (sum: number, c: any) =>
+            sum + Number(c?.amount || 0),
+        0
+    );
+
+    // ── Latest costing calculation ───────────────────────────────
+    // Same calculation/display logic as the old New Order screen.
+    const costDiff =
+        latestCosting && price
+            ? Number(price) -
+            Number(
+                latestCosting.CostPerM ||
+                latestCosting.UnitRate ||
+                0
+            )
+            : null;
+
+    const costMonth =
+        latestCosting?.Month ||
+        latestCosting?.SODate ||
+        '';
+
+    const latestCost = latestCosting
+        ? Number(
+            latestCosting.CostPerM ||
+            latestCosting.UnitRate ||
+            0
+        )
+        : 0;
+
+    const marginPct =
+        costDiff !== null && latestCost > 0
+            ? (costDiff / latestCost) * 100
+            : null;
+
+    const canSubmit =
+        !!custId &&
+        !!salesExecId &&
+        !!selectedDesign &&
+        !!selectedItem &&
+        !!mdId &&
+        parseFloat(price) > 0 &&
+        !!delivDate &&
+        validColourways.length > 0;
+
+    function addColourway() {
+        if (!selectedShade || !qty) return;
+
+        const shadeCode = String(
+            selectedShade?.ShdCode ??
+            selectedShade?.id ??
+            ''
+        );
+
+        if (!shadeCode) return;
+
+        const alreadyAdded = colourways.some(
+            (c: any) =>
+                String(
+                    c?.shade?.ShdCode ??
+                    c?.shade?.id ??
+                    ''
+                ) === shadeCode
+        );
+
+        if (alreadyAdded) {
+            Alert.alert(
+                'Already added',
+                `${selectedShade?.ShdName ?? selectedShade?.label ?? 'This shade'} is already in the list.`
+            );
+            return;
+        }
+
+        const quantity = Number(qty);
+        const rate = Number(price || 0);
+        const amount = quantity * rate;
+
+        setColourways(prev => [
+            ...prev,
+            {
+                shade: {
+                    ...selectedShade,
+                    ShdCode: shadeCode,
+                    ShdName:
+                        selectedShade?.ShdName ??
+                        selectedShade?.label ??
+                        '',
+                },
+                qty: quantity,
+                rate,
+                amount,
+            },
+        ]);
+
+        setSelectedShade(null);
+        setQty('');
     }
 
-    function addLine() {
-        setColorLines(prev => [...prev, { shadeId: '', shadeName: '', qty: '' }]);
-    }
-
-    function removeLine(i: number) {
-        setColorLines(prev => prev.filter((_, j) => j !== i));
+    function removeColourway(code: string) {
+        setColourways(prev =>
+            prev.filter(
+                (c: any) =>
+                    String(
+                        c?.shade?.ShdCode ??
+                        c?.shade?.id ??
+                        ''
+                    ) !== String(code)
+            )
+        );
     }
 
     console.log("token", token);
@@ -556,10 +641,16 @@ export function NewOrderTab({ token, userid }: Props) {
     const loadShades = useCallback(async (design, item) => {
         if (!design?.ItmCode || !item || !prpcode) return;
 
-        const dsncode = item.DsnCode ?? '';
+        const dsncode =
+            item.DsnCode ??
+            item.dsncode ??
+            '';
 
         if (!dsncode) {
-            console.log('❌ Shade API skipped: DsnCode is empty', item);
+            console.log(
+                '❌ Shade API skipped: DsnCode is empty',
+                item
+            );
             return;
         }
 
@@ -571,18 +662,28 @@ export function NewOrderTab({ token, userid }: Props) {
             prpcode,
             strcode: '012',
             yearno: yrno,
-            itmcode: design.ItmCode,
-            mitmcode: design.MItmCode ?? design.ItmCode,
+            itmcode:
+                design.ItmCode ??
+                design.itmcode ??
+                '',
+            mitmcode:
+                design.MItmCode ??
+                design.MitmCode ??
+                design.mitmcode ??
+                design.ItmCode ??
+                design.itmcode ??
+                '',
             dsncode,
         };
 
         try {
             setShadeLoading(true);
-            setShadeList([]);
 
             console.log('SHADE API PARAMS:', params);
 
             const res = await SalesOrderAPI.getShade(params);
+
+            console.log("shade res", res);
 
             const data =
                 res?.data?.response?.data ??
@@ -591,31 +692,40 @@ export function NewOrderTab({ token, userid }: Props) {
                 [];
 
             if (!Array.isArray(data)) {
-                console.log('❌ Invalid SHADE API response:', data);
+                console.log(
+                    '❌ Invalid SHADE API response:',
+                    data
+                );
                 setShadeList([]);
                 return;
             }
+            const normalizedShades: DropdownItem[] = data.reduce(
+                (result: DropdownItem[], item: any) => {
+                    const code = String(
+                        item?.ShdCode ?? ''
+                    ).trim();
 
-            console.log('SHADE API RECORD COUNT:', data.length);
+                    const name = String(
+                        item?.ShdName ?? ''
+                    ).trim();
 
-            // Keep only the fields actually required by the dropdown.
-            // This prevents the extra API fields from consuming memory.
-            const normalizedShades = data
-                .map((item: any) => ({
-                    ShdCode: String(item?.ShdCode ?? ''),
-                    ShdName: String(item?.ShdName ?? ''),
-                    tag: item?.tag ?? '',
-                }))
-                .filter((item: any) => item.ShdCode && item.ShdName);
+                    if (code && name) {
+                        result.push({
+                            id: code,
+                            label: name,
+                            sub: `Shade Code: ${code}`,
+                        });
+                    }
 
-            console.log(
-                'NORMALIZED SHADE RECORD COUNT:',
-                normalizedShades.length
+                    return result;
+                },
+                []
             );
-
+            console.log('NORMALIZED SHADE RECORD COUNT:', normalizedShades.length);
+            console.log('FIRST SHADE:', normalizedShades[0]);
             setShadeList(normalizedShades);
-        } catch (e) {
-            console.log('SHADE API ERROR:', e);
+        } catch (e: any) {
+            console.log('SHADE API ERROR:', e?.message ?? e);
             setShadeList([]);
         } finally {
             setShadeLoading(false);
@@ -680,72 +790,377 @@ export function NewOrderTab({ token, userid }: Props) {
         }
     }, [prpcode, yearno, token]);
 
-    function submit() {
-        if (!canSubmit) return;
+    const submitOrder = async () => {
+        // -----------------------------
+        // Final validation
+        // -----------------------------
+        if (!prpcode) {
+            Alert.alert('Required', 'Select a property first');
+            return;
+        }
 
-        // Existing customer data lookup - kept as it was.
+        if (!yearno) {
+            Alert.alert('Required', 'Select a year');
+            return;
+        }
+
+        if (!custId) {
+            Alert.alert('Required', 'Select a customer');
+            return;
+        }
+
+        if (!salesExecId) {
+            Alert.alert('Required', 'Select a sales executive');
+            return;
+        }
+
+        if (!selectedDesign) {
+            Alert.alert('Required', 'Select an item');
+            return;
+        }
+
+        if (!selectedItem) {
+            Alert.alert('Required', 'Select a design');
+            return;
+        }
+
+        if (!mdId) {
+            Alert.alert('Required', 'Select a design');
+            return;
+        }
+
+        if (!price || Number(price) <= 0) {
+            Alert.alert('Required', 'Enter price per metre');
+            return;
+        }
+
+        if (!delivDate) {
+            Alert.alert('Required', 'Select expected delivery date');
+            return;
+        }
+
+        if (validColourways.length === 0) {
+            Alert.alert('Required', 'Add at least one shade');
+            return;
+        }
+
+        // -----------------------------
+        // Prevent duplicate shades
+        // -----------------------------
+        const shadeCodes = validColourways
+            .map((c: any) =>
+                String(
+                    c?.shade?.ShdCode ??
+                    c?.shade?.id ??
+                    ''
+                ).trim()
+            )
+            .filter(Boolean);
+
+        const duplicateShade = shadeCodes.find(
+            (code: string, index: number) =>
+                shadeCodes.indexOf(code) !== index
+        );
+
+        if (duplicateShade) {
+            const duplicateRow = validColourways.find(
+                (c: any) =>
+                    String(
+                        c?.shade?.ShdCode ??
+                        c?.shade?.id ??
+                        ''
+                    ).trim() === duplicateShade
+            );
+
+            Alert.alert(
+                'Duplicate Shade',
+                `${duplicateRow?.shade?.ShdName ?? duplicateRow?.shade?.label ?? duplicateShade} is already added. Please select another shade.`
+            );
+            return;
+        }
+
         const custData = parties.find(
             (p: any) =>
-                (p.AccCode || p.acccode) === custId
+                String(p.AccCode ?? p.acccode ?? '') === String(custId)
         );
 
-        addOrder({
-            // ==============================
-            // EXISTING FIELDS - DO NOT REMOVE
-            // ==============================
-            soNumber: genSO(orders),
-            customer: custId,
-            salesExec: user?.exec ?? custData?.exec ?? 'Unknown',
-            mdId,
-            fabricType: fabType,
-            price: parseFloat(price),
-            date: TODAY,
-            deliveryDate: delivDate,
-            status: 'pending_auth',
+        try {
+            setSubmitting(true);
 
-            colors: validLines.map(l => ({
-                color: l.shadeName,
-                qty: parseInt(l.qty),
-                pendingQty: parseInt(l.qty),
-            })),
+            // -----------------------------
+            // Detail rows
+            // -----------------------------
+            const rows = validColourways.map((c: any, i: number) => {
+                const quantity = Number(c?.qty || 0);
+                const rate = Number(c?.rate ?? price ?? 0);
+                const amount = Number(c?.amount ?? quantity * rate);
 
-            // ==============================
-            // NEW ITEM API FIELDS - ADDED ONLY
-            // ==============================
-            itmcode:
-                selectedDesign?.ItmCode ??
-                selectedDesign?.itmcode ??
-                '',
+                return {
+                    SrNo: i + 1,
+                    StrCode: '012',
 
-            hsncode:
-                selectedDesign?.HsnCode ??
-                selectedDesign?.hsncode ??
-                '',
+                    ItmCode:
+                        selectedDesign?.ItmCode ??
+                        selectedDesign?.itmcode ??
+                        '',
 
-            itmname:
-                selectedDesign?.ItmName ??
-                selectedDesign?.itmname ??
-                '',
+                    MItmCode:
+                        selectedDesign?.MItmCode ??
+                        selectedDesign?.MitmCode ??
+                        selectedDesign?.mitmcode ??
+                        selectedDesign?.ItmCode ??
+                        selectedDesign?.itmcode ??
+                        '',
 
-            denier:
-                selectedDesign?.Denier ??
-                selectedDesign?.denier ??
-                '',
-        });
+                    ItmName:
+                        selectedDesign?.ItmName ??
+                        selectedDesign?.Itmname ??
+                        selectedDesign?.itmname ??
+                        '',
 
-        autoSave();
+                    DsnCode:
+                        selectedItem?.DsnCode ??
+                        selectedItem?.dsncode ??
+                        selectedItem?.DsnCode1 ??
+                        selectedItem?.dsncode1 ??
+                        '',
 
-        Alert.alert(
-            'Submitted',
-            'Order sent for authorization.'
-        );
+                    DsnName:
+                        selectedItem?.DsnName ??
+                        selectedItem?.dsnname ??
+                        selectedItem?.DsnName1 ??
+                        selectedItem?.dsnname1 ??
+                        '',
 
-        // Reset - existing flow
-        setCustomerExpanded(true);
-        setSalesExecExpanded(true);
-        setDesignExpanded(true);
-        setPriceExpanded(true);
-        setShadeExpanded(true);
+                    ShdCode:
+                        c?.shade?.ShdCode ??
+                        c?.shade?.id ??
+                        '',
+
+                    ShdName:
+                        c?.shade?.ShdName ??
+                        c?.shade?.label ??
+                        c?.shade?.ShadeName ??
+                        '',
+
+                    Qty: fmt(quantity),
+                    QtyPcs: '0',
+                    UnitRate: fmt(rate),
+                    Amount: fmt(amount),
+                    D1NetAmt: fmt(amount),
+
+                    Remark1: '',
+                    Remark2: '',
+                    Remark3: '',
+                    Remark4: '',
+                    Remark5: '',
+
+                    PkgQty: '1.000',
+                    PkgRate: '.00000',
+                    AmtCalc: 'U',
+
+                    MerCode: '0',
+                    GrdCode: '0',
+
+                    DisPer: '.00',
+                    DisAmt: '.00',
+
+                    CGSTPer: '.00',
+                    CGSTAmt: '.00',
+
+                    SGSTPer: '.00',
+                    SGSTAmt: '.00',
+
+                    IGSTPer: '.00',
+                    IGSTAmt: '.00',
+
+                    Denier:
+                        selectedDesign?.Denier ??
+                        selectedDesign?.denier ??
+                        '',
+
+                    UOM:
+                        selectedDesign?.UOM ??
+                        selectedDesign?.uom ??
+                        '',
+
+                    HsnCode:
+                        selectedDesign?.HsnCode ??
+                        selectedDesign?.hsncode ??
+                        '',
+
+                    HSNName:
+                        selectedDesign?.HSNName ??
+                        selectedDesign?.hsnname ??
+                        '',
+                };
+            });
+
+            // -----------------------------
+            // Main SO payload
+            // -----------------------------
+            const payload = {
+                Mode: 'ADD',
+                UId: 0,
+
+                main: {
+                    UId: 0,
+                    Mode: 'ADD',
+
+                    PrpCode: prpcode,
+                    StrCode: '012',
+                    YearNo: yearno
+                        ? yearno.split('-')[1]?.slice(-2)
+                        : '',
+
+                    ParCode:
+                        custData?.AccCode ??
+                        custData?.acccode ??
+                        custId,
+
+                    ParName:
+                        custData?.AccName ??
+                        custData?.accountname ??
+                        custData?.ParName ??
+                        '',
+
+                    SExe:
+                        selectedExec?.id ??
+                        selectedExec?.Code ??
+                        selectedExec?.ExecCode ??
+                        salesExecId ??
+                        custData?.sexe ??
+                        '',
+
+                    SExeName:
+                        selectedExec?.label ??
+                        selectedExec?.SalesExecutive ??
+                        selectedExec?.ExecName ??
+                        custData?.SExeName ??
+                        '',
+
+                    GrsAmt: fmt(totalAmt),
+
+                    DisAmt: '.00',
+                    NDisAmt: '.00',
+                    TDisAmt: '.00',
+
+                    TaxAmt: '.00',
+                    NTaxAmt: '.00',
+                    TTaxAmt: '.00',
+                    GSTAmt: '.00',
+
+                    NetAmt: fmt(totalAmt),
+                    D1NetAmt: fmt(totalAmt),
+
+                    Remark: '',
+
+                    DDays: delivDate
+                        ? String(
+                            Math.max(
+                                0,
+                                Math.ceil(
+                                    (new Date(delivDate).getTime() - Date.now()) /
+                                    (1000 * 60 * 60 * 24)
+                                )
+                            )
+                        )
+                        : '',
+
+                    DAdd:
+                        custData?.Address ??
+                        custData?.address ??
+                        '',
+
+                    DCity:
+                        custData?.City ??
+                        custData?.city ??
+                        '',
+
+                    Station:
+                        custData?.City ??
+                        custData?.city ??
+                        '',
+
+                    Status: 'P',
+                    EntType: 'G2',
+                    TaxStru: '123',
+
+                    SONo: '',
+                    SODate: '',
+
+                    DueDate: ymd(delivDate),
+
+                    DueDay:
+                        custData?.crday ??
+                        custData?.CrDay ??
+                        '',
+
+                    // Keep the new SO Type / Fabric Type values.
+                    // SOType: soType,
+                    // FabricType: fabricType,
+                },
+
+                d1: rows,
+                tax: [],
+                exp: {},
+            };
+
+            console.log('SO SAVE PAYLOAD:', JSON.stringify(payload, null, 2));
+            console.log('SO SAVE PAYLOAD111:', payload);
+
+            // -----------------------------
+            // Actual save API
+            // -----------------------------
+            const res = await SalesOrderAPI.mobAppSave(payload);
+
+            console.log('SO SAVE RESPONSE:', res);
+
+            if (
+                res?.data?.success === true ||
+                res?.data?.success === 'true'
+            ) {
+                const savedSO =
+                    res?.data?.response?.sono ??
+                    res?.data?.response?.SONo ??
+                    res?.data?.response?.soNo ??
+                    res?.data?.response?.soNumber ??
+                    `SO-${Date.now()}`;
+
+                // Do NOT reset the form here.
+                // Success screen must remain visible until user taps New Order.
+                setSuccessSO(String(savedSO));
+            } else {
+                Alert.alert(
+                    'Save Failed',
+                    res?.data?.message ||
+                    res?.data?.response?.message ||
+                    'Unable to save order'
+                );
+            }
+        } catch (e: any) {
+            console.error(
+                'SO SAVE ERROR:',
+                e?.response?.data ?? e
+            );
+
+            Alert.alert(
+                'Error',
+                e?.response?.data?.message ||
+                e?.response?.data?.response?.message ||
+                e?.message ||
+                'Something went wrong while saving the sales order.'
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // -----------------------------
+    // Reset only after successful save
+    // -----------------------------
+    const resetForm = () => {
+        setSuccessSO(null);
 
         setCustId('');
         setSalesExecId('');
@@ -755,25 +1170,78 @@ export function NewOrderTab({ token, userid }: Props) {
         setSelectedDesign(null);
         setSelectedItem(null);
 
-        setPrice('');
-
+        setItemList([]);
         setShadeList([]);
         setLatestCosting(null);
 
-        setColorLines([
-            {
-                shadeId: '',
-                shadeName: '',
-                qty: '',
-            },
-        ]);
-    }
+        setPrice('');
+        setDelivDate('');
+
+        setSelectedShade(null);
+        setQty('');
+        setColourways([]);
+        setPropertySearch('');
+        setYearSearch('');
+
+        // Keep Property and Year selected.
+        // They are configuration values, not part of the new-order reset.
+
+        setCustomerExpanded(true);
+        setSalesExecExpanded(true);
+        setDesignExpanded(true);
+        setPriceExpanded(true);
+        setShadeExpanded(true);
+        setSoTypeExpanded(true);
+    };
 
     const StepDot = ({ n, done }: { n: number; done: boolean }) => (
         <View style={[ns.dot, { backgroundColor: done ? T.green : T.copper }]}>
             <Text style={ns.dotTxt}>{done ? '✓' : n}</Text>
         </View>
     );
+
+
+    // ── Success screen ──
+    // Shown only after the API confirms a successful save.
+    if (successSO) {
+        return (
+            <SafeAreaView style={ns.successScreen}>
+                <View style={ns.successInner}>
+                    <View style={ns.successIcon}>
+                        <Text style={ns.successTick}>✓</Text>
+                    </View>
+
+                    <Text style={ns.successTitle}>
+                        Sent for authorization
+                    </Text>
+
+                    <Text style={ns.successSub}>
+                        Sales order saved successfully and sent for manager approval.
+                    </Text>
+
+                    <View style={ns.successSOBox}>
+                        <Text style={ns.successSOLabel}>
+                            SO NUMBER
+                        </Text>
+
+                        <Text style={ns.successSONo}>
+                            {successSO}
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity
+                        style={ns.newOrderBtn}
+                        onPress={resetForm}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={ns.newOrderBtnText}>
+                            + New Order
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <ScrollView
@@ -783,81 +1251,80 @@ export function NewOrderTab({ token, userid }: Props) {
 
             {/* =========================================================
                 PROPERTY & YEAR
-                Always visible at the top — no accordion behaviour.
+                Existing two-field layout. Only picker opening is custom.
             ========================================================== */}
             <View style={ns.propertyYearTopRow}>
 
                 {/* PROPERTY */}
-                <View style={[ns.propertyTopCard, { flex: 1.45 }]}>
+                <View style={[ns.propertyTopCard, { flex: 1.55 }]}>
                     <Text style={ns.topCardLabel}>PROPERTY</Text>
 
-                    <SearchableDropdown
-                        label=""
-                        placeholder="Select property"
-                        value={prpcode}
-                        items={propertyItems}
-                        onSelect={(item) => {
-                            setPrpCode(item.id);
-
-                            // Changing property means the party selection
-                            // should start fresh.
-                            setCustId('');
-                            setSalesExecId('');
-                            setSelectedExec(null);
-                            setMdId('');
-                            setSelectedDesign(null);
-                            setSelectedItem(null);
-                            setItemList([]);
-                            setShadeList([]);
-                            setLatestCosting(null);
-                            setPrice('');
-                            setColorLines([
-                                {
-                                    shadeId: '',
-                                    shadeName: '',
-                                    qty: '',
-                                },
-                            ]);
+                    <TouchableOpacity
+                        style={ns.propertyYearField}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            setPropertySearch('');
+                            setPropertyPickerOpen(true);
                         }}
-                    />
+                    >
+                        <View style={ns.propertyYearFieldText}>
+                            <Text
+                                style={[
+                                    ns.propertyYearValue,
+                                    !prpcode && ns.propertyYearPlaceholder,
+                                ]}
+                                numberOfLines={1}
+                            >
+                                {propertyItems.find(
+                                    (item: DropdownItem) =>
+                                        String(item.id) === String(prpcode)
+                                )?.label || 'Select'}
+                            </Text>
+
+                            {!!prpcode && (
+                                <Text style={ns.propertyYearSub} numberOfLines={1}>
+                                    {propertyItems.find(
+                                        (item: DropdownItem) =>
+                                            String(item.id) === String(prpcode)
+                                    )?.sub || ''}
+                                </Text>
+                            )}
+                        </View>
+
+                        <Text style={ns.propertyYearArrow}>▾</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* YEAR */}
-                <View style={[ns.propertyTopCard, { flex: 0.7 }]}>
+                <View style={[ns.propertyTopCard, { flex: 0.72 }]}>
                     <Text style={ns.topCardLabel}>YEAR</Text>
 
-                    <SearchableDropdown
-                        label=""
-                        placeholder="Select year"
-                        value={yearno}
-                        items={yearOptions}
-                        onSelect={(item) => {
-                            setYearNo(item.id);
-
-                            // Year change -> refresh the dependent selections.
-                            setCustId('');
-                            setSalesExecId('');
-                            setSelectedExec(null);
-                            setMdId('');
-                            setSelectedDesign(null);
-                            setSelectedItem(null);
-                            setItemList([]);
-                            setShadeList([]);
-                            setLatestCosting(null);
-                            setPrice('');
-                            setColorLines([
-                                {
-                                    shadeId: '',
-                                    shadeName: '',
-                                    qty: '',
-                                },
-                            ]);
+                    <TouchableOpacity
+                        style={ns.propertyYearField}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            setYearSearch('');
+                            setYearPickerOpen(true);
                         }}
-                    />
+                    >
+                        <Text
+                            style={[
+                                ns.propertyYearValue,
+                                !yearno && ns.propertyYearPlaceholder,
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {yearOptions.find(
+                                (item: DropdownItem) =>
+                                    String(item.id) === String(yearno)
+                            )?.label || yearno || 'Select'}
+                        </Text>
+
+                        <Text style={ns.propertyYearArrow}>▾</Text>
+                    </TouchableOpacity>
                 </View>
 
             </View>
-
 
             {/* =========================================================
                 CUSTOMER
@@ -1079,7 +1546,7 @@ export function NewOrderTab({ token, userid }: Props) {
 
                             {design && (
                                 <Text style={ns.stepSub}>
-                                    {design.ItmName ?? design.Itmname ?? ''} · {fabType}
+                                    {design.ItmName ?? design.Itmname ?? ''} · {fabricType}
                                 </Text>
                             )}
                         </View>
@@ -1114,11 +1581,6 @@ export function NewOrderTab({ token, userid }: Props) {
                                             ) === String(item.id)
                                     );
 
-                                    console.log(
-                                        'SELECTED ITEM:',
-                                        selected
-                                    );
-
                                     setSelectedDesign(selected || item);
                                     setMdId(item.id);
 
@@ -1127,13 +1589,9 @@ export function NewOrderTab({ token, userid }: Props) {
                                     setSelectedItem(null);
                                     setShadeList([]);
                                     setLatestCosting(null);
-                                    setColorLines([
-                                        {
-                                            shadeId: '',
-                                            shadeName: '',
-                                            qty: '',
-                                        },
-                                    ]);
+                                    setSelectedShade(null);
+                                    setQty('');
+                                    setColourways([]);
 
                                     if (selected) {
                                         // ITEM selected -> load DESIGN list.
@@ -1157,23 +1615,15 @@ export function NewOrderTab({ token, userid }: Props) {
                                             items={itemDesignOptions}
                                             onSelect={(item) => {
                                                 setSelectedItem(item);
-
-                                                setColorLines([
-                                                    {
-                                                        shadeId: '',
-                                                        shadeName: '',
-                                                        qty: '',
-                                                    },
-                                                ]);
-
+                                                setSelectedShade(null);
+                                                setQty('');
+                                                setColourways([]);
                                                 setShadeList([]);
                                                 setLatestCosting(null);
-
                                                 loadShades(
                                                     selectedDesign,
                                                     item
                                                 );
-
                                                 loadLatestCosting(
                                                     selectedDesign,
                                                     item
@@ -1185,7 +1635,7 @@ export function NewOrderTab({ token, userid }: Props) {
                             )}
 
                             {/* Selected item information */}
-                            {selectedItem && (
+                            {/* {selectedItem && (
                                 <>
                                     <Text style={ns.fieldLabel}>
                                         FABRIC TYPE
@@ -1230,7 +1680,130 @@ export function NewOrderTab({ token, userid }: Props) {
                                         ))}
                                     </View>
                                 </>
-                            )}
+                            )} */}
+                        </View>
+                    )}
+
+                </Card>
+            )}
+
+
+            {custId && salesExecId && selectedItem && (
+                <Card style={ns.card}>
+
+                    <TouchableOpacity
+                        style={ns.stepHead}
+                        onPress={() =>
+                            setSoTypeExpanded(prev => !prev)
+                        }
+                        activeOpacity={0.7}
+                    >
+                        <StepDot
+                            n={4}
+                            done={!!selectedItem}
+                        />
+
+                        <View style={{ flex: 1 }}>
+                            <Text style={ns.stepTitle}>
+                                SO Type &amp; Fabric Type
+                            </Text>
+
+                            <Text style={ns.stepSub}>
+                                {soType === 1
+                                    ? 'MTO'
+                                    : 'Stock Order'}{' '}
+                                · {fabricType}
+                            </Text>
+                        </View>
+
+                        <Text style={ns.chevron}>
+                            {soTypeExpanded ? '▾' : '›'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {soTypeExpanded && (
+                        <View style={ns.stepBody}>
+
+                            {/* SO TYPE */}
+                            <Text style={ns.fieldLabel}>
+                                SO TYPE
+                            </Text>
+
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    gap: 10,
+                                    marginBottom: 14,
+                                }}
+                            >
+                                {[
+                                    { value: 0, label: 'MTO' },
+                                    { value: 1, label: 'Stock Order' },
+                                ].map(option => (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        onPress={() => setSoType(option.value)}
+                                        style={[
+                                            ns.fabBtn,
+                                            soType === option.value && ns.fabBtnActive,
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text
+                                            style={[
+                                                ns.fabBtnTxt,
+                                                soType === option.value && {
+                                                    color: T.copper,
+                                                    fontWeight: '800',
+                                                },
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            {/* FABRIC TYPE */}
+                            <Text style={ns.fieldLabel}>
+                                FABRIC TYPE
+                            </Text>
+
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    gap: 10,
+                                    marginBottom: 4,
+                                }}
+                            >
+                                {[
+                                    { value: 0, label: 'Greige' },
+                                    { value: 1, label: 'Finished' },
+                                ].map(option => (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        onPress={() => setFabricType(option.value)}
+                                        style={[
+                                            ns.fabBtn,
+                                            fabricType === option.value && ns.fabBtnActive,
+                                        ]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text
+                                            style={[
+                                                ns.fabBtnTxt,
+                                                fabricType === option.value && {
+                                                    color: T.copper,
+                                                    fontWeight: '800',
+                                                },
+                                            ]}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
                         </View>
                     )}
 
@@ -1304,13 +1877,37 @@ export function NewOrderTab({ token, userid }: Props) {
                                         DELIVERY DATE
                                     </Text>
 
-                                    <TextInput
-                                        value={delivDate}
-                                        onChangeText={setDelivDate}
-                                        placeholder="YYYY-MM-DD"
-                                        placeholderTextColor={T.muted}
-                                        style={ns.inp}
-                                    />
+                                    <TouchableOpacity
+                                        style={ns.datePickerField}
+                                        activeOpacity={0.8}
+                                        onPress={() => setDatePickerOpen(true)}
+                                    >
+                                        <View style={ns.datePickerTextWrap}>
+                                            <Text
+                                                style={[
+                                                    ns.datePickerValue,
+                                                    !delivDate && ns.datePickerPlaceholder,
+                                                ]}
+                                            >
+                                                {displayDate(delivDate) || 'DD-MM-YYYY'}
+                                            </Text>
+                                        </View>
+
+                                        <View style={ns.calendarIconBox}>
+                                            <Text style={ns.calendarIcon}>▣</Text>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {datePickerOpen && (
+                                        <DateTimePicker
+                                            value={parseDateValue(delivDate)}
+                                            mode="date"
+                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                            minimumDate={new Date()}
+                                            onChange={handleDeliveryDateChange}
+                                            themeVariant="light"
+                                        />
+                                    )}
                                 </View>
                             </View>
 
@@ -1367,7 +1964,7 @@ export function NewOrderTab({ token, userid }: Props) {
 
             {/* =========================================================
                 SHADES & QUANTITIES
-                Independent accordion.
+                Multiple shades are added one-by-one.
             ========================================================== */}
             {price && delivDate && (
                 <Card style={ns.card}>
@@ -1381,7 +1978,7 @@ export function NewOrderTab({ token, userid }: Props) {
                     >
                         <StepDot
                             n={5}
-                            done={validLines.length > 0}
+                            done={colourways.length > 0}
                         />
 
                         <View style={{ flex: 1 }}>
@@ -1389,13 +1986,12 @@ export function NewOrderTab({ token, userid }: Props) {
                                 Shades & quantities
                             </Text>
 
-                            {validLines.length > 0 && (
+                            {colourways.length > 0 && (
                                 <Text style={ns.stepSub}>
-                                    {validLines.length} shade
-                                    {validLines.length > 1
-                                        ? 's'
-                                        : ''}{' '}
-                                    · {fmt(totalM)} m total
+                                    {colourways.length} shade
+                                    {colourways.length > 1 ? 's' : ''}
+                                    {' · '}
+                                    {fmt(totalM)} m total
                                 </Text>
                             )}
                         </View>
@@ -1408,191 +2004,250 @@ export function NewOrderTab({ token, userid }: Props) {
                     {shadeExpanded && (
                         <View style={ns.stepBody}>
 
+                            <Text style={ns.fieldLabel}>
+                                SHADE
+                            </Text>
+
                             {shadeLoading ? (
-                                <ActivityIndicator color={T.copper} />
+                                <View
+                                    style={{
+                                        paddingVertical: 12,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        color={T.copper}
+                                    />
+                                </View>
                             ) : (
-                                colorLines.map((line, i) => (
-                                    <View
-                                        key={i}
-                                        style={ns.shadeLine}
-                                    >
-                                        <View style={ns.lineNum}>
-                                            <Text
-                                                style={ns.lineNumTxt}
-                                            >
-                                                {i + 1}
-                                            </Text>
-                                        </View>
-
-                                        <View style={{ flex: 1 }}>
-                                            <ShadeDropdown
-                                                value={line.shadeId}
-                                                items={shadeOptions}
-                                                placeholder="Search shade / colour…"
-                                                onSelect={item => {
-                                                    updateLine(
-                                                        i,
-                                                        'shadeId',
-                                                        item.id
-                                                    );
-                                                    updateLine(
-                                                        i,
-                                                        'shadeName',
-                                                        item.label
-                                                    );
-                                                }}
-                                            />
-
-                                            {line.shadeId && (
-                                                <View
-                                                    style={{
-                                                        flexDirection: 'row',
-                                                        alignItems: 'center',
-                                                        gap: 10,
-                                                    }}
-                                                >
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text
-                                                            style={
-                                                                ns.fieldLabel
-                                                            }
-                                                        >
-                                                            QUANTITY (METRES)
-                                                        </Text>
-
-                                                        <TextInput
-                                                            value={line.qty}
-                                                            onChangeText={v =>
-                                                                updateLine(
-                                                                    i,
-                                                                    'qty',
-                                                                    v.replace(
-                                                                        /[^0-9]/g,
-                                                                        ''
-                                                                    )
-                                                                )
-                                                            }
-                                                            keyboardType="number-pad"
-                                                            placeholder="0"
-                                                            placeholderTextColor={
-                                                                T.muted
-                                                            }
-                                                            style={ns.inp}
-                                                        />
-                                                    </View>
-
-                                                    {line.qty && (
-                                                        <Text
-                                                            style={
-                                                                ns.lineTotal
-                                                            }
-                                                        >
-                                                            {rupee(
-                                                                parseInt(
-                                                                    line.qty
-                                                                ) *
-                                                                parseFloat(
-                                                                    price ||
-                                                                    '0'
-                                                                )
-                                                            )}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            )}
-                                        </View>
-
-                                        {colorLines.length > 1 && (
-                                            <TouchableOpacity
-                                                onPress={() =>
-                                                    removeLine(i)
-                                                }
-                                                style={ns.removeBtn}
-                                            >
-                                                <Text style={ns.removeTxt}>
-                                                    ×
-                                                </Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                ))
+                                <SearchableDropdown
+                                    label=""
+                                    placeholder="Search shade / colour..."
+                                    value={
+                                        selectedShade?.id ??
+                                        selectedShade?.ShdCode ??
+                                        ''
+                                    }
+                                    items={shadeOptions}
+                                    onSelect={(item) => {
+                                        setSelectedShade(item);
+                                    }}
+                                />
                             )}
 
-                            <TouchableOpacity
-                                style={ns.addLineBtn}
-                                onPress={addLine}
+                            <Text
+                                style={[
+                                    ns.fieldLabel,
+                                    { marginTop: 4 },
+                                ]}
                             >
-                                <Text style={ns.addLineTxt}>
-                                    + Add another shade
+                                QUANTITY (METRES)
+                            </Text>
+
+                            <TextInput
+                                value={qty}
+                                onChangeText={v =>
+                                    setQty(
+                                        v.replace(/[^0-9]/g, '')
+                                    )
+                                }
+                                keyboardType="number-pad"
+                                placeholder="0"
+                                placeholderTextColor={T.muted}
+                                style={ns.inp}
+                            />
+
+                            <TouchableOpacity
+                                style={[
+                                    ns.addCwBtn,
+                                    (!selectedShade || !qty) && {
+                                        opacity: 0.4,
+                                    },
+                                ]}
+                                onPress={addColourway}
+                                disabled={
+                                    !selectedShade || !qty
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Text style={ns.addCwBtnText}>
+                                    + Add Shade
                                 </Text>
                             </TouchableOpacity>
 
-                            {validLines.length > 0 && (
-                                <View style={ns.totalBox}>
+                            {colourways.map((c: any) => {
+                                const shadeCode =
+                                    c?.shade?.ShdCode ??
+                                    c?.shade?.id ??
+                                    '';
+
+                                const shadeName =
+                                    c?.shade?.ShdName ??
+                                    c?.shade?.label ??
+                                    '';
+
+                                return (
                                     <View
-                                        style={{
-                                            flexDirection: 'row',
-                                            justifyContent:
-                                                'space-between',
-                                        }}
+                                        key={String(shadeCode)}
+                                        style={ns.cwChip}
                                     >
-                                        <Text style={ns.totalLabel}>
-                                            Total metres
-                                        </Text>
-
-                                        <Text style={ns.totalVal}>
-                                            {fmt(totalM)} m
-                                        </Text>
-                                    </View>
-
-                                    <View
-                                        style={{
-                                            flexDirection: 'row',
-                                            justifyContent:
-                                                'space-between',
-                                            marginTop: 4,
-                                        }}
-                                    >
-                                        <Text style={ns.totalLabel}>
-                                            Order value
-                                        </Text>
-
-                                        <Text
+                                        <View
                                             style={[
-                                                ns.totalVal,
+                                                ns.cwSwatch,
                                                 {
-                                                    color: T.copper,
+                                                    backgroundColor:
+                                                        c?.shade
+                                                            ?.ShdColor ??
+                                                        '#334155',
                                                 },
                                             ]}
+                                        />
+
+                                        <View
+                                            style={{ flex: 1 }}
                                         >
-                                            {rupee(
-                                                totalM *
-                                                parseFloat(
-                                                    price || '0'
-                                                )
+                                            <Text
+                                                style={ns.cwName}
+                                            >
+                                                {shadeName}
+                                            </Text>
+
+                                            <Text
+                                                style={ns.cwSub}
+                                            >
+                                                Shade Code:{' '}
+                                                {shadeCode}
+                                            </Text>
+                                        </View>
+
+                                        <Text
+                                            style={ns.cwQty}
+                                        >
+                                            {Number(
+                                                c?.qty || 0
+                                            ).toLocaleString(
+                                                'en-IN'
                                             )}
                                         </Text>
+
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                removeColourway(
+                                                    String(
+                                                        shadeCode
+                                                    )
+                                                )
+                                            }
+                                            style={{
+                                                paddingLeft: 10,
+                                            }}
+                                        >
+                                            <Text
+                                                style={ns.cwX}
+                                            >
+                                                ×
+                                            </Text>
+                                        </TouchableOpacity>
                                     </View>
+                                );
+                            })}
+
+                            {colourways.length > 0 && (
+                                <View style={ns.totalRow}>
+                                    <Text
+                                        style={ns.totalLabel}
+                                    >
+                                        Total
+                                    </Text>
+
+                                    <Text
+                                        style={ns.totalValue}
+                                    >
+                                        {totalM.toLocaleString(
+                                            'en-IN'
+                                        )}
+                                        {' m  '}
+                                        ₹
+                                        {totalAmt.toLocaleString(
+                                            'en-IN'
+                                        )}
+                                    </Text>
                                 </View>
                             )}
-                            {latestCosting && (
+
+                            {/* VS Latest Costing */}
+                            {price && latestCosting && (
                                 <View style={ns.costingBox}>
-                                    <Text style={ns.costingTitle}>
-                                        LATEST COSTING
-                                    </Text>
-                                    <Text style={ns.costingText}>
-                                        {typeof latestCosting === 'object'
-                                            ? JSON.stringify(latestCosting)
-                                            : String(latestCosting)}
-                                    </Text>
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'flex-start',
+                                        }}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={ns.costingLabel}>
+                                                VS LATEST COSTING
+                                                {costMonth
+                                                    ? ` (${costMonth})`
+                                                    : ''}
+                                            </Text>
+
+                                            <Text style={ns.costingDetail}>
+                                                Cost ₹{latestCost.toFixed(0)}
+                                                {'  '}
+                                                Rate ₹{price}
+                                            </Text>
+                                        </View>
+
+                                        <View
+                                            style={{
+                                                alignItems: 'flex-end',
+                                            }}
+                                        >
+                                            <Text
+                                                style={[
+                                                    ns.costingDiff,
+                                                    {
+                                                        color:
+                                                            costDiff >= 0
+                                                                ? '#16a34a'
+                                                                : '#dc2626',
+                                                    },
+                                                ]}
+                                            >
+                                                ₹
+                                                {costDiff >= 0
+                                                    ? '+'
+                                                    : ''}
+                                                {Math.round(costDiff)}
+                                            </Text>
+
+                                            {marginPct !== null && (
+                                                <Text
+                                                    style={[
+                                                        ns.marginText,
+                                                        {
+                                                            color:
+                                                                marginPct >=
+                                                                    0
+                                                                    ? '#16a34a'
+                                                                    : '#dc2626',
+                                                        },
+                                                    ]}
+                                                >
+                                                    {marginPct.toFixed(1)}%
+                                                    {' '}margin
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
                                 </View>
                             )}
                         </View>
                     )}
-
                 </Card>
             )}
-
 
             {/* =========================================================
                 SUBMIT
@@ -1602,8 +2257,8 @@ export function NewOrderTab({ token, userid }: Props) {
                     ns.submitBtn,
                     !canSubmit && { opacity: 0.4 },
                 ]}
-                onPress={submit}
-                disabled={!canSubmit}
+                onPress={submitOrder}
+                disabled={!canSubmit || submitting}
                 activeOpacity={0.8}
             >
                 <Text style={ns.submitBtnTxt}>
@@ -1612,6 +2267,229 @@ export function NewOrderTab({ token, userid }: Props) {
             </TouchableOpacity>
 
             <View style={{ height: 40 }} />
+
+            <Modal
+                visible={propertyPickerOpen}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setPropertyPickerOpen(false)}
+            >
+                <SafeAreaView style={ns.pickerModalRoot} edges={['top', 'bottom']}>
+                    <StatusBar barStyle="light-content" backgroundColor={T.nav} />
+
+                    <View style={ns.pickerHeader}>
+                        <Text style={ns.pickerTitle}>Property</Text>
+                        <TouchableOpacity
+                            onPress={() => setPropertyPickerOpen(false)}
+                            style={ns.pickerCloseButton}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Text style={ns.pickerClose}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={ns.pickerBody}>
+                        <TextInput
+                            value={propertySearch}
+                            onChangeText={setPropertySearch}
+                            placeholder="Search property..."
+                            placeholderTextColor={T.muted}
+                            style={ns.pickerSearch}
+                            autoCorrect={false}
+                            clearButtonMode="while-editing"
+                        />
+
+                        <View style={ns.pickerCountBar}>
+                            <Text style={ns.pickerCount}>
+                                {propertyPickerItems.length} results
+                            </Text>
+                        </View>
+
+                        <FlatList
+                            style={ns.pickerList}
+                            data={propertyPickerItems}
+                            keyExtractor={(item: DropdownItem) => String(item.id)}
+                            initialNumToRender={30}
+                            maxToRenderPerBatch={50}
+                            windowSize={10}
+                            getItemLayout={(_, index) => ({
+                                length: 60,
+                                offset: 60 * index,
+                                index,
+                            })}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        ns.pickerRow,
+                                        String(item.id) === String(prpcode) &&
+                                        ns.pickerRowSelected,
+                                    ]}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        setPrpCode(item.id);
+                                        setPropertyPickerOpen(false);
+                                        setPropertySearch('');
+
+                                        setCustId('');
+                                        setSalesExecId('');
+                                        setSelectedExec(null);
+                                        setMdId('');
+                                        setSelectedDesign(null);
+                                        setSelectedItem(null);
+                                        setItemList([]);
+                                        setShadeList([]);
+                                        setLatestCosting(null);
+                                        setPrice('');
+                                        setSelectedShade(null);
+                                        setQty('');
+                                        setColourways([]);
+                                    }}
+                                >
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text
+                                            style={[
+                                                ns.pickerRowTitle,
+                                                String(item.id) === String(prpcode) &&
+                                                ns.pickerRowTitleSelected,
+                                            ]}
+                                            numberOfLines={1}
+                                        >
+                                            {item.label}
+                                        </Text>
+                                        {!!item.sub && (
+                                            <Text style={ns.pickerRowSub} numberOfLines={1}>
+                                                {item.sub}
+                                            </Text>
+                                        )}
+                                    </View>
+
+                                    {String(item.id) === String(prpcode) && (
+                                        <Text style={ns.pickerCheck}>✓</Text>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                <View style={ns.pickerEmpty}>
+                                    <Text style={ns.pickerEmptyTitle}>No results</Text>
+                                    <Text style={ns.pickerEmptySub}>
+                                        Try a different search term
+                                    </Text>
+                                </View>
+                            }
+                        />
+                    </View>
+                </SafeAreaView>
+            </Modal>
+
+            <Modal
+                visible={yearPickerOpen}
+                animationType="slide"
+                presentationStyle="pageSheet"
+                onRequestClose={() => setYearPickerOpen(false)}
+            >
+                <SafeAreaView style={ns.pickerModalRoot} edges={['top', 'bottom']}>
+                    <StatusBar barStyle="light-content" backgroundColor={T.nav} />
+
+                    <View style={ns.pickerHeader}>
+                        <Text style={ns.pickerTitle}>Year</Text>
+                        <TouchableOpacity
+                            onPress={() => setYearPickerOpen(false)}
+                            style={ns.pickerCloseButton}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Text style={ns.pickerClose}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={ns.pickerBody}>
+                        <TextInput
+                            value={yearSearch}
+                            onChangeText={setYearSearch}
+                            placeholder="Search year..."
+                            placeholderTextColor={T.muted}
+                            style={ns.pickerSearch}
+                            autoCorrect={false}
+                            clearButtonMode="while-editing"
+                        />
+
+                        <View style={ns.pickerCountBar}>
+                            <Text style={ns.pickerCount}>
+                                {yearPickerItems.length} results
+                            </Text>
+                        </View>
+
+                        <FlatList
+                            style={ns.pickerList}
+                            data={yearPickerItems}
+                            keyExtractor={(item: DropdownItem) => String(item.id)}
+                            initialNumToRender={30}
+                            maxToRenderPerBatch={50}
+                            windowSize={10}
+                            getItemLayout={(_, index) => ({
+                                length: 60,
+                                offset: 60 * index,
+                                index,
+                            })}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={[
+                                        ns.pickerRow,
+                                        String(item.id) === String(yearno) &&
+                                        ns.pickerRowSelected,
+                                    ]}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        setYearNo(item.id);
+                                        setYearPickerOpen(false);
+                                        setYearSearch('');
+
+                                        setCustId('');
+                                        setSalesExecId('');
+                                        setSelectedExec(null);
+                                        setMdId('');
+                                        setSelectedDesign(null);
+                                        setSelectedItem(null);
+                                        setItemList([]);
+                                        setShadeList([]);
+                                        setLatestCosting(null);
+                                        setPrice('');
+                                        setSelectedShade(null);
+                                        setQty('');
+                                        setColourways([]);
+                                    }}
+                                >
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text
+                                            style={[
+                                                ns.pickerRowTitle,
+                                                String(item.id) === String(yearno) &&
+                                                ns.pickerRowTitleSelected,
+                                            ]}
+                                            numberOfLines={1}
+                                        >
+                                            {item.label}
+                                        </Text>
+                                    </View>
+
+                                    {String(item.id) === String(yearno) && (
+                                        <Text style={ns.pickerCheck}>✓</Text>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                                <View style={ns.pickerEmpty}>
+                                    <Text style={ns.pickerEmptyTitle}>No results</Text>
+                                    <Text style={ns.pickerEmptySub}>
+                                        Try a different search term
+                                    </Text>
+                                </View>
+                            }
+                        />
+                    </View>
+                </SafeAreaView>
+            </Modal>
 
         </ScrollView>
     );
@@ -1622,26 +2500,31 @@ const ns = StyleSheet.create({
     card: { marginBottom: 12, overflow: 'hidden' },
 
     // Property & Year: compact cards like the requested UI.
+    // Property + Year compact top section.
+    // Keep both cards short; the dropdown component handles its own modal.
     propertyYearTopRow: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 14,
+        gap: 10,
+        marginBottom: 10,
+        alignItems: 'flex-start',
     },
     propertyTopCard: {
         backgroundColor: T.surface,
-        borderRadius: 18,
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 4,
-        minHeight: 86,
-        overflow: 'hidden',
+        borderRadius: 14,
+        paddingHorizontal: 10,
+        paddingTop: 9,
+        paddingBottom: 6,
+        minHeight: 74,
+        overflow: 'visible',
+        borderWidth: 1,
+        borderColor: T.border,
     },
     topCardLabel: {
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '800',
         color: T.ink,
-        letterSpacing: 0.5,
-        marginBottom: 1,
+        letterSpacing: 0.45,
+        marginBottom: 0,
     },
     addressText: {
         fontSize: 12,
@@ -1667,16 +2550,26 @@ const ns = StyleSheet.create({
         padding: 10,
         marginTop: 10,
     },
-    costingTitle: {
+    costingLabel: {
         fontSize: 9,
         fontWeight: '800',
         color: T.muted,
         letterSpacing: 0.5,
         marginBottom: 5,
     },
-    costingText: {
+    costingDetail: {
         fontSize: 10,
         color: T.ink,
+        marginTop: 3,
+    },
+    costingDiff: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    marginText: {
+        fontSize: 11,
+        fontWeight: '700',
+        marginTop: 2,
     },
     stepHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
     stepBody: { padding: 14, paddingTop: 4, borderTopWidth: 1, borderTopColor: T.alt },
@@ -1814,6 +2707,314 @@ const ns = StyleSheet.create({
         color: T.muted,
         fontSize: 13,
     },
+    addCwBtn: {
+        height: 46,
+        borderWidth: 0.5,
+        borderColor: T.border,
+        borderRadius: 12,
+        backgroundColor: T.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 10,
+        marginBottom: 2,
+    },
+    addCwBtnText: {
+        fontSize: 14,
+        color: T.ink,
+    },
+    cwChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 12,
+        backgroundColor: T.sub,
+        borderRadius: 12,
+        marginTop: 8,
+        borderWidth: 0.5,
+        borderColor: T.border,
+    },
+    cwSwatch: {
+        width: 42,
+        height: 42,
+        borderRadius: 10,
+        flexShrink: 0,
+    },
+    cwName: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: T.ink,
+    },
+    cwSub: {
+        fontSize: 12,
+        color: T.muted,
+        marginTop: 2,
+    },
+    cwQty: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: T.ink,
+    },
+    cwX: {
+        fontSize: 24,
+        fontWeight: '300',
+        color: T.red,
+        lineHeight: 28,
+    },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderTopWidth: 0.5,
+        borderTopColor: T.alt,
+        marginTop: 10,
+    },
     submitBtn: { backgroundColor: T.copper, borderRadius: 10, padding: 15, alignItems: 'center' },
     submitBtnTxt: { fontSize: 14, fontWeight: '800', color: '#fff' },
+
+
+
+
+
+
+
+
+    propertyYearField: {
+        height: 44,
+        borderWidth: 0,
+        borderColor: T.border,
+        borderRadius: 10,
+        backgroundColor: T.surface,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+    },
+    propertyYearFieldText: {
+        flex: 1,
+        minWidth: 0,
+        justifyContent: 'center',
+    },
+    propertyYearValue: {
+        fontSize: 12,
+        lineHeight: 18,
+        fontWeight: '600',
+        color: T.ink,
+        flexShrink: 1,
+    },
+    propertyYearSub: {
+        fontSize: 10,
+        lineHeight: 13,
+        color: T.muted,
+        marginTop: 1,
+    },
+    propertyYearPlaceholder: {
+        color: T.muted,
+    },
+    propertyYearArrow: {
+        fontSize: 12,
+        color: T.muted,
+        marginLeft: 5,
+    },
+
+    pickerOverlay: {
+        flex: 1,
+        backgroundColor: T.bg,
+    },
+    pickerSheet: {
+        flex: 1,
+        width: '100%',
+        backgroundColor: T.bg,
+    },
+    pickerHeader: {
+        minHeight: 58,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: T.nav,
+    },
+    pickerTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#fff',
+    },
+    pickerClose: {
+        fontSize: 20,
+        lineHeight: 20,
+        color: '#A9C0D4',
+    },
+    pickerModalRoot: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    pickerBody: {
+        flex: 1,
+        backgroundColor: T.bg,
+    },
+    pickerCloseButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    pickerCountBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingBottom: 8,
+    },
+    pickerList: {
+        flex: 1,
+    },
+    pickerRowSelected: {
+        backgroundColor: T.copper + '12',
+    },
+    pickerRowTitleSelected: {
+        color: T.copper,
+        fontWeight: '800',
+    },
+    pickerEmptyTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: T.muted,
+    },
+    pickerEmptySub: {
+        fontSize: 12,
+        color: T.muted,
+        marginTop: 6,
+    },
+    pickerSearch: {
+        margin: 12,
+        backgroundColor: T.surface,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: T.border,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: T.ink,
+    },
+    pickerCount: {
+        fontSize: 11,
+        color: T.muted,
+    },
+    pickerRow: {
+        height: 60,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: T.alt,
+        backgroundColor: T.bg,
+    },
+    pickerRowTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: T.ink,
+    },
+    pickerRowSub: {
+        fontSize: 11,
+        color: T.muted,
+        marginTop: 2,
+    },
+    pickerCheck: {
+        fontSize: 16,
+        color: T.copper,
+        marginLeft: 8,
+        fontWeight: '800',
+    },
+    pickerEmpty: {
+        textAlign: 'center',
+        paddingVertical: 30,
+        color: T.muted,
+        fontSize: 13,
+        paddingTop: 60,
+    },
+
+    // pickerEmpty: {
+    //     alignItems: 'center',
+    //     paddingTop: 60,
+    // },
+    // ── Save success screen ──
+    successScreen: {
+        flex: 1,
+        backgroundColor: T.bg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+    },
+    successInner: {
+        width: '100%',
+        maxWidth: 520,
+        alignItems: 'center',
+    },
+    successIcon: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+        backgroundColor: T.green + '18',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 18,
+    },
+    successTick: {
+        fontSize: 42,
+        lineHeight: 48,
+        fontWeight: '900',
+        color: T.green,
+    },
+    successTitle: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: T.ink,
+        textAlign: 'center',
+    },
+    successSub: {
+        marginTop: 8,
+        fontSize: 14,
+        lineHeight: 21,
+        color: T.muted,
+        textAlign: 'center',
+        maxWidth: 360,
+    },
+    successSOBox: {
+        width: '100%',
+        marginTop: 24,
+        paddingVertical: 18,
+        paddingHorizontal: 18,
+        borderRadius: 16,
+        backgroundColor: T.surface,
+        borderWidth: 1,
+        borderColor: T.border,
+        alignItems: 'center',
+    },
+    successSOLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 1.2,
+        color: T.muted,
+    },
+    successSONo: {
+        marginTop: 7,
+        fontSize: 22,
+        fontWeight: '900',
+        color: T.copper,
+    },
+    newOrderBtn: {
+        width: '100%',
+        minHeight: 52,
+        marginTop: 18,
+        borderRadius: 14,
+        backgroundColor: T.copper,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 18,
+    },
+    newOrderBtnText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '900',
+    },
+
 });

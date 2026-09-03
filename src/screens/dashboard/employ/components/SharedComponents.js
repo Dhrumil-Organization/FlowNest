@@ -82,7 +82,7 @@ export const SectionHeader = ({
 //     </View>
 //     <View style={[styles.totalSide, styles.totalSideRight]}>
 //       <Text style={styles.totalLabel}>{rightLabel}</Text>
-//       <Text style={styles.totalValue}>{rightValue}</Text>
+//       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={styles.totalValue}>{rightValue}</Text>
 //     </View>
 //   </View>
 // );
@@ -109,7 +109,7 @@ export const TotalRow = ({
           prefix={tooltipPrefix}
         />
       ) : (
-        <Text style={[styles.totalValue, tealLeft && { color: COLORS.teal }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={[styles.totalValue, tealLeft && { color: COLORS.teal }]}>
           {leftValue}
         </Text>
       )}
@@ -124,7 +124,7 @@ export const TotalRow = ({
           prefix={tooltipPrefix}
         />
       ) : (
-        <Text style={styles.totalValue}>{rightValue}</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={styles.totalValue}>{rightValue}</Text>
       )}
     </View>
   </View>
@@ -209,7 +209,7 @@ export const RankRow = ({
           style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}
         />
       ) : (
-        <Text style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={[styles.rankVal, { color: COLORS.teal, marginRight: 12 }]}>
           {leftVal}
         </Text>
       ))}
@@ -227,6 +227,9 @@ export const RankRow = ({
         />
       ) : (
         <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.58}
           style={[
             styles.rankVal,
             trendUp === true && { color: COLORS.green },
@@ -283,7 +286,7 @@ export const LongPressValue = ({
         delayLongPress={300}
         activeOpacity={1}
       >
-        <Text style={style}>{formattedValue}</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={style}>{formattedValue}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -312,7 +315,7 @@ export const AvatarCircle = ({ name, color, size = 36 }) => (
 // export const SummaryCard = ({ label, value, bgColor }) => (
 //   <View style={[styles.summaryCard, bgColor && { backgroundColor: bgColor }]}>
 //     <Text style={styles.summaryCardLabel}>{label}</Text>
-//     <Text style={styles.summaryCardValue}>{value}</Text>
+//     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={styles.summaryCardValue}>{value}</Text>
 //   </View>
 // );
 export const SummaryCard = ({
@@ -332,7 +335,7 @@ export const SummaryCard = ({
         prefix={prefix}
       />
     ) : (
-      <Text style={styles.summaryCardValue}>{value}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.58} style={styles.summaryCardValue}>{value}</Text>
     )}
   </View>
 );

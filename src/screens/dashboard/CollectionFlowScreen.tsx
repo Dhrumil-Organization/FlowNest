@@ -1,303 +1,896 @@
-import {
-  AnalyticsPartyRow,
-  DashboardAPI,
-  DashboardView,
-} from '@/src/api/dashboard';
-import { ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
+import { AmountDisplayModeControl, formatSummaryAmount, useDashboardAmountMode } from '@/src/components/dashboard/AmountDisplayModeControl';
+import { SubScreenHeader } from '@/src/components/layout/SubScreenHeader';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { api } from './employ/api/api';
 
-function one(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value || '';
-}
+type Mode = 'collection' | 'outstanding';
+type Level = 'executives' | 'parties' | 'party_detail';
 
-function money(value: number) {
-  const n = Number(value || 0);
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(2)} Cr`;
-  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(2)} L`;
-  return `${sign}₹${abs.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-}
+type Row = {
+  code?: string;
+  name?: string;
+  today_amount?: number;
+  today_amount_exact?: string;
+  amount?: number;
+  amount_exact?: string;
+};
 
-function initials(name: string) {
-  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  return ((words[0]?.[0] || '') + (words[1]?.[0] || words[0]?.[1] || '')).toUpperCase();
-}
+type HistoryRow = {
+  date_ymd?: number | string;
+  date_label?: string;
+  entry_count?: number;
+  amount?: number;
+  amount_exact?: string;
+};
 
-function achievementTone(pct: number) {
-  if (pct >= 100) return T.green;
-  if (pct >= 70) return T.blue;
-  if (pct >= 40) return T.copper;
-  return T.red;
-}
+type AgeingBucket = { key?: string; label?: string; amount?: number; amount_exact?: string };
+type AgeingInvoice = {
+  uid?: string;
+  bill_no?: string;
+  bill_date?: number | string;
+  ageing_days?: number;
+  outstanding?: number;
+  outstanding_exact?: string;
+  prp_code?: string;
+};
+type Ageing = {
+  total?: number;
+  total_exact?: string;
+  open_invoice_count?: number;
+  buckets?: AgeingBucket[];
+  open_invoices?: AgeingInvoice[];
+  account_outstanding?: number;
+  account_outstanding_exact?: string;
+  net_adjustment?: number;
+  net_adjustment_exact?: string;
+  reconciliation_difference?: number;
+  reconciliation_difference_exact?: string;
+  is_reconciled?: boolean;
+  message?: string;
+};
+
+type Report = {
+  type?: Mode;
+  level?: Level;
+  period?: {
+    label?: string;
+    month_name?: string;
+    historical_supported?: boolean;
+    mode?: string;
+  };
+  total?: {
+    amount?: number;
+    amount_exact?: string;
+    row_count?: number;
+  };
+  rows?: Row[];
+  reconciliation?: {
+    expected_amount?: number | null;
+    expected_amount_exact?: string | null;
+    list_amount?: number;
+    list_amount_exact?: string;
+    amount_difference?: number | null;
+    amount_difference_exact?: string | null;
+    amount_reconciled?: boolean | null;
+    expected_generated_at?: string | null;
+    current_generated_at?: string | null;
+    status?: string;
+  };
+  generated_at?: string;
+  ageing?: Ageing;
+  history?: HistoryRow[];
+  collection_history?: HistoryRow[];
+  message?: string | null;
+};
+
+type MonthChip = { ym: string; label: string; requestDate: string };
+
+const one = (value: unknown): string => {
+  if (Array.isArray(value)) return String(value[0] ?? '');
+  return String(value ?? '');
+};
+
+const ymdFromDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const validAnchorDate = (raw: string): Date => {
+  const match = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return new Date();
+};
+
+const sixMonthChips = (anchorRaw: string): MonthChip[] => {
+  const anchor = validAnchorDate(anchorRaw);
+  const anchorYm = `${anchor.getFullYear()}${String(anchor.getMonth() + 1).padStart(2, '0')}`;
+  const result: MonthChip[] = [];
+
+  for (let offset = 0; offset < 6; offset += 1) {
+    const monthDate = new Date(anchor.getFullYear(), anchor.getMonth() - offset, 1);
+    const year = monthDate.getFullYear();
+    const monthIndex = monthDate.getMonth();
+    const ym = `${year}${String(monthIndex + 1).padStart(2, '0')}`;
+    const requestDate =
+      ym === anchorYm
+        ? ymdFromDate(anchor)
+        : ymdFromDate(new Date(year, monthIndex + 1, 0));
+
+    result.push({
+      ym,
+      requestDate,
+      label: monthDate.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }),
+    });
+  }
+
+  return result;
+};
 
 export default function CollectionFlowScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const session = useAppSessionStore((s: any) => s.appSession || s.session);
+  const session = useAppSessionStore((state: any) => state.appSession || state.session);
 
-  const view = (one(params.view as any) || 'my') as DashboardView;
-  const monthno = Number(one(params.monthno as any) || new Date().getMonth() + 1);
-  const executiveCode = one(params.executive_code as any);
-  const executiveName = one(params.executive_name as any) || 'Collection Executive';
+  const mode = (one(params.mode) || 'collection') as Mode;
+  const level = (one(params.level) || 'executives') as Level;
+  const anchorDate = one(params.date) || ymdFromDate(new Date());
+  const monthChips = useMemo(() => sixMonthChips(anchorDate), [anchorDate]);
+  const initialMonth = one(params.report_month) || monthChips[0]?.ym || '';
 
-  const context = session?.business_context || session?.businessContext || {};
-  const yearno = context?.year_no ?? context?.yearno ?? session?.year_no ?? 27;
-  const prptype = context?.prp_group ?? context?.prptype ?? 'S';
+  const businessContext = session?.business_context || session?.businessContext || {};
+  const prptype =
+    one(params.prptype) ||
+    String(businessContext?.prp_group || businessContext?.prptype || 'S');
 
-  const [rows, setRows] = useState<AnalyticsPartyRow[]>([]);
-  const [periodTitle, setPeriodTitle] = useState('Monthly Collection');
+  const executiveCode = one(params.executive_code);
+  const executiveName = one(params.executive_name);
+  const partyCode = one(params.party_code);
+  const partyName = one(params.party_name);
+  const expectedMonth = one(params.expected_month);
+  const expectedAmount = one(params.expected_amount);
+  const expectedGeneratedAt = one(params.expected_generated_at);
+
+  const [selectedMonth, setSelectedMonth] = useState(initialMonth);
+  const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: 'target' | 'actual'; direction: 'asc' | 'desc'; }>({
-    key: 'target', direction: 'desc',
-  });
+  const [sortAscending, setSortAscending] = useState(false);
+  const [ageingExpanded, setAgeingExpanded] = useState(false);
+  const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
+  const hasFocusedOnce = useRef(false);
 
-  const load = useCallback(async (pull = false) => {
-    pull ? setRefreshing(true) : setLoading(true);
-    setError('');
-    try {
-      const result = await DashboardAPI.analyticsParties({
-        metric: 'COLLECTION',
-        prptype,
-        yearno,
-        monthno,
-        view,
-        executive_code: executiveCode || undefined,
-      });
-      setRows(result.response.data || []);
-      setPeriodTitle(result.response.period?.month_name || 'Monthly Collection');
-    } catch (e: any) {
-      setRows([]);
-      setError(e?.message || 'Unable to load collection parties.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  useEffect(() => {
+    if (!monthChips.some(chip => chip.ym === selectedMonth)) {
+      setSelectedMonth(monthChips[0]?.ym || '');
     }
-  }, [executiveCode, monthno, prptype, view, yearno]);
+  }, [monthChips, selectedMonth]);
 
-  useEffect(() => { load(); }, [load]);
+  const selectedChip =
+    monthChips.find(chip => chip.ym === selectedMonth) || monthChips[0];
 
-  const totals = useMemo(() => rows.reduce((acc, row) => ({
-    target: acc.target + Number(row.target || 0),
-    actual: acc.actual + Number(row.actual || 0),
-    remaining: acc.remaining + Number(row.remaining || 0),
-  }), { target: 0, actual: 0, remaining: 0 }), [rows]);
+  const load = useCallback(
+    async (pull = false, silent = false) => {
+      if (!selectedChip) return;
 
-  const totalPct = totals.target > 0 ? (totals.actual / totals.target) * 100 : 0;
+      if (!silent) {
+        pull ? setRefreshing(true) : setLoading(true);
+      }
+      setError('');
 
+      try {
+        const includeExpected = expectedMonth !== '' && expectedMonth === selectedChip.ym;
+        const response = await api.getOwnerCardReport({
+          date: selectedChip.requestDate,
+          prptype,
+          report_type: mode,
+          level,
+          executive_code: executiveCode || undefined,
+          executive_name: executiveName || undefined,
+          party_code: partyCode || undefined,
+          party_name: partyName || undefined,
+          expected_amount: includeExpected ? expectedAmount : undefined,
+          expected_generated_at: includeExpected ? expectedGeneratedAt : undefined,
+        });
+
+        if (!response?.success) {
+          throw new Error(response?.message || `Unable to load ${mode} report.`);
+        }
+
+        setReport(response?.data?.report || null);
+      } catch (err: any) {
+        setReport(null);
+        setError(err?.message || `Unable to load ${mode} report.`);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }, [executiveCode, executiveName, expectedAmount, expectedGeneratedAt, expectedMonth, level, mode, partyCode, partyName, prptype, selectedChip],
+  );
+
+  useEffect(() => {
+    void load(false);
+  }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnce.current) {
+        hasFocusedOnce.current = true;
+        return undefined;
+      }
+
+      void load(false, true);
+      return undefined;
+    }, [load]),
+  );
+
+  const rows = useMemo(() => report?.rows || [], [report]);
   const sortedRows = useMemo(() => {
-    return [...rows].sort((a: any, b: any) => {
-      const aValue = Number(
-        sortConfig.key === 'target' ? a.target || 0 : a.actual || 0
-      );
+    const copy = [...rows];
+    copy.sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
+    return sortAscending ? copy : copy.reverse();
+  }, [rows, sortAscending]);
 
-      const bValue = Number(
-        sortConfig.key === 'target' ? b.target || 0 : b.actual || 0
-      );
+  const title = mode === 'collection' ? 'Collection Report' : 'Outstanding Report';
+  const panelTitle = level === 'executives'
+    ? 'By Sales Executive'
+    : level === 'party_detail'
+      ? 'Party Outstanding'
+      : 'By Party';
+  const accent = mode === 'collection' ? T.green : '#B85C00';
 
-      return sortConfig.direction === 'asc'
-        ? aValue - bValue
-        : bValue - aValue;
-    });
-  }, [rows, sortConfig]);
+  const openRow = (row: Row) => {
+    if (!selectedChip) return;
+
+    if (level === 'executives') {
+      router.push({
+        pathname: '/new/(tabs)/reports/collection-flow',
+        params: {
+          mode,
+          view: one(params.view) || 'owner',
+          date: anchorDate,
+          report_month: selectedChip.ym,
+          expected_month: selectedChip.ym,
+          prptype,
+          level: 'parties',
+          executive_code: String(row.code || ''),
+          executive_name: String(row.name || ''),
+          expected_amount: String(Number(row.amount || 0)),
+          expected_generated_at: String(report?.generated_at || ''),
+        },
+      } as any);
+      return;
+    }
+
+    if (mode === 'outstanding' && level === 'parties') {
+      router.push({
+        pathname: '/new/(tabs)/reports/collection-flow',
+        params: {
+          mode,
+          view: one(params.view) || 'owner',
+          date: anchorDate,
+          report_month: selectedChip.ym,
+          expected_month: selectedChip.ym,
+          prptype,
+          level: 'party_detail',
+          executive_code: executiveCode || undefined,
+          executive_name: executiveName || undefined,
+          party_code: String(row.code || ''),
+          party_name: String(row.name || ''),
+          expected_amount: String(Number(row.amount || 0)),
+          expected_generated_at: String(report?.generated_at || ''),
+        },
+      } as any);
+    }
+  };
+
+  const reconciliation = report?.reconciliation;
+  const hasReconciliation = reconciliation?.expected_amount != null;
+  const reconciled = reconciliation?.amount_reconciled !== false;
+  const historyRows: HistoryRow[] = mode === 'collection'
+    ? (report?.history || [])
+    : (report?.collection_history || []);
+  const showPaymentHistory =
+    (mode === 'collection' && Boolean(executiveName || partyName))
+    || (mode === 'outstanding' && level === 'party_detail');
+  const historyTotal = historyRows.reduce(
+    (sum, row) => sum + Number(row?.amount || 0),
+    0,
+  );
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-          <Text style={styles.backText}>‹</Text>
-        </TouchableOpacity>
-        <View style={styles.headerMain}>
-          <Text style={styles.kicker}>COLLECTION REPORT · {view.toUpperCase()} VIEW</Text>
-          <Text numberOfLines={1} style={styles.title}>{executiveName}</Text>
-          <Text style={styles.period}>{periodTitle}</Text>
-        </View>
-        <TouchableOpacity onPress={() => load(true)} style={styles.headerButton}>
-          <Text style={styles.refreshText}>↻</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.root}>
+      <SubScreenHeader backLabel="Back" title={title} />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={T.nav} />}
-      >
-        <View style={styles.hero}>
-          <View style={styles.heroTop}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{initials(executiveName)}</Text></View>
-            <View style={styles.heroNameWrap}>
-              <Text style={styles.heroKicker}>EXECUTIVE COLLECTION</Text>
-              <Text numberOfLines={1} style={styles.heroName}>{executiveName}</Text>
-              <Text style={styles.heroSub}>{rows.length} parties assigned</Text>
-            </View>
-            <View style={[styles.pctBadge, { backgroundColor: achievementTone(totalPct) }]}>
-              <Text style={styles.pctValue}>{totalPct.toFixed(1)}%</Text>
-              <Text style={styles.pctLabel}>ACHIEVED</Text>
-            </View>
-          </View>
+      <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void load(true)}
+              tintColor={T.nav}
+            />
+          }
+        >
+          <View style={[styles.contextCard, { borderLeftColor: accent }]}>
+            <Text style={[styles.kicker, { color: accent }]}>
+              {mode === 'collection' ? 'PAYMENT COLLECTION' : 'OUTSTANDING'} · {selectedChip?.label?.toUpperCase()}
+            </Text>
+            <Text style={styles.reportTitle}>{panelTitle}</Text>
+            <Text style={styles.reportSub}>
+              {executiveName
+                ? `Executive: ${executiveName}`
+                : partyName
+                  ? `Party: ${partyName}`
+                  : `Complete ${mode === 'collection' ? 'Collection' : 'Outstanding'} card report.`}
+            </Text>
 
-          <View style={styles.heroMetrics}>
-            <View style={styles.heroMetric}><Text style={styles.metricLabel}>TARGET</Text><Text style={styles.metricValue}>{money(totals.target)}</Text></View>
-            <View style={styles.heroDivider} />
-            <View style={styles.heroMetric}><Text style={styles.metricLabel}>COLLECTED</Text><Text style={[styles.metricValue, { color: T.green }]}>{money(totals.actual)}</Text></View>
-            <View style={styles.heroDivider} />
-            <View style={styles.heroMetric}><Text style={styles.metricLabel}>BALANCE</Text><Text style={[styles.metricValue, { color: T.copper }]}>{money(totals.remaining)}</Text></View>
-          </View>
-          <ProgressBar value={Math.min(totalPct, 100)} tone={totalPct >= 100 ? 'green' : totalPct >= 60 ? 'blue' : 'orange'} />
-        </View>
-
-        <View style={styles.notice}>
-          <View style={styles.noticeIcon}><Text style={styles.noticeIconText}>₹</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.noticeTitle}>Party-wise collection performance</Text>
-            <Text style={styles.noticeText}>Target is due outstanding. Actual is receipt allocation linked through the production-safe collection engine.</Text>
-          </View>
-        </View>
-
-        <View style={styles.panel}>
-          <View style={styles.panelHeader}>
-            <View><Text style={styles.panelKicker}>COLLECTION BREAKDOWN</Text><Text style={styles.panelTitle}>By Party</Text></View>
-            <View style={styles.count}><Text style={styles.countText}>{rows.length}</Text></View>
-          </View>
-          <View style={styles.columns}>
-            <Text style={styles.columnName}>PARTY</Text>
-            {/* <Text style={styles.columnValue}>TARGET · ACTUAL</Text> */}
-            <TouchableOpacity
-              activeOpacity={0.6}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={() =>
-                setSortConfig(prev => ({
-                  key: prev.key === 'target' ? 'actual' : 'target',
-                  direction:
-                    prev.key === 'target' && prev.direction === 'asc'
-                      ? 'desc'
-                      : 'asc',
-                }))
-              }
-            >
-              <Text style={styles.columnValue}>
-                TARGET · ACTUAL
-                {sortConfig.direction === 'asc' ? ' ▲' : ' ▼'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <View style={styles.state}><ActivityIndicator size="large" color={T.nav} /><Text style={styles.stateText}>Loading party collection…</Text></View>
-          ) : error ? (
-            <View style={styles.state}><Text style={styles.errorTitle}>Unable to load report</Text><Text style={styles.stateText}>{error}</Text><TouchableOpacity onPress={() => load()} style={styles.retry}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>
-          ) : rows.length === 0 ? (
-            <View style={styles.state}><Text style={styles.emptyTitle}>No collection records</Text><Text style={styles.stateText}>No party-wise collection data is available for this executive and month.</Text></View>
-          // ) : rows.map((row, index) => {
-          ) : sortedRows.map((row, index) => {
-            const pct = Number(row.achievement_pct || 0);
-            const tone = achievementTone(pct);
-            return (
-              <View key={`${row.party_code}-${index}`} style={styles.row}>
-                <View style={[styles.rank, { backgroundColor: [T.nav, T.blue, T.green, T.copper, T.purple][index % 5] }]}><Text style={styles.rankText}>{index + 1}</Text></View>
-                <View style={styles.rowMain}>
-                  <Text numberOfLines={1} style={styles.partyName}>{row.party_name || 'Unspecified Party'}</Text>
-                  <Text numberOfLines={1} style={styles.partyCode}>{row.party_code || 'No code'}</Text>
-                  <View style={styles.miniBarTrack}><View style={[styles.miniBarFill, { width: `${Math.min(Math.max(pct, 0), 100)}%`, backgroundColor: tone }]} /></View>
-                </View>
-                <View style={styles.rowRight}>
-                  <Text style={styles.targetText}>{money(row.target)}</Text>
-                  <Text style={styles.actualText}>{money(row.actual)}</Text>
-                  <Text style={[styles.rowPct, { color: tone }]}>{row.target > 0 ? `${pct.toFixed(2)}%` : 'No target'}</Text>
-                </View>
+            {executiveName || partyName ? (
+              <View style={styles.contextPills}>
+                {executiveName ? (
+                  <View style={styles.contextPill}>
+                    <Text style={styles.contextPillLabel}>Executive</Text>
+                    <Text style={styles.contextPillValue}>{executiveName}</Text>
+                  </View>
+                ) : null}
+                {partyName ? (
+                  <View style={styles.contextPill}>
+                    <Text style={styles.contextPillLabel}>Party</Text>
+                    <Text style={styles.contextPillValue}>{partyName}</Text>
+                  </View>
+                ) : null}
               </View>
-            );
-          })}
+            ) : null}
+          </View>
 
-          {!loading && !error && rows.length > 0 ? (
-            <View style={styles.totalRow}>
-              <View><Text style={styles.totalKicker}>TOTAL COLLECTION</Text><Text style={styles.totalSub}>{rows.length} parties</Text></View>
-              <View style={{ alignItems: 'flex-end' }}><Text style={styles.totalValue}>{money(totals.actual)}</Text><Text style={styles.totalTarget}>of {money(totals.target)}</Text></View>
+          {/* Last six months remain visible on every drill-down level. */}
+          <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.monthRow}
+            >
+              {monthChips.map(chip => {
+                const active = chip.ym === selectedMonth;
+                return (
+                  <TouchableOpacity
+                    key={chip.ym}
+                    onPress={() => setSelectedMonth(chip.ym)}
+                    style={[styles.monthChip, active && styles.monthChipActive]}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>
+                      {chip.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+          </ScrollView>
+
+          <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} />
+
+          <View style={[styles.totalCard, { borderLeftColor: accent }]}>
+            <View>
+              <Text style={styles.totalLabel}>
+                {mode === 'collection' ? 'TOTAL COLLECTION' : 'TOTAL OUTSTANDING'}
+              </Text>
+              <Text style={[styles.totalValue, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.68}>
+                {formatSummaryAmount(report?.total?.amount, amountMode, report?.total?.amount_exact)}
+              </Text>
+            </View>
+            <View style={styles.totalRight}>
+              <Text style={styles.totalLabel}>{level === 'party_detail' ? 'OPEN INVOICES' : 'ROWS'}</Text>
+              <Text style={styles.totalCount}>
+                {level === 'party_detail'
+                  ? Number(report?.ageing?.open_invoice_count || 0)
+                  : Number(report?.total?.row_count || 0)}
+              </Text>
+            </View>
+          </View>
+
+          {hasReconciliation ? (
+            <View style={[styles.reconcile, reconciled ? styles.reconcileOk : styles.reconcileWarn]}>
+              <Text style={[styles.reconcileTitle, { color: reconciled ? T.green : '#B85C00' }]}>
+                {reconciled
+                  ? '✓ Total reconciled with previous screen'
+                  : '↻ Current live total changed from the carried value'}
+              </Text>
+              {!reconciled ? (
+                <Text style={styles.reconcileDetail}>
+                  Previous {formatSummaryAmount(reconciliation?.expected_amount || 0, amountMode, reconciliation?.expected_amount_exact)} · Current {formatSummaryAmount(reconciliation?.list_amount || 0, amountMode, reconciliation?.list_amount_exact)}
+                  {'\n'}The current database value is authoritative.
+                </Text>
+              ) : null}
             </View>
           ) : null}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+          {report?.message ? (
+            <View style={styles.messageBox}>
+              <Text style={styles.messageTitle}>Data availability</Text>
+              <Text style={styles.messageText}>{report.message}</Text>
+            </View>
+          ) : null}
+
+          {showPaymentHistory ? (
+            <View style={styles.historyPanel}>
+              <View style={styles.historyHeader}>
+                <View>
+                  <Text style={styles.historyKicker}>PAYMENT COLLECTION</Text>
+                  <Text style={styles.historyTitle}>Payment History · {selectedChip?.label}</Text>
+                </View>
+                <View style={styles.historyTotalWrap}>
+                  <Text style={styles.historyTotalLabel}>MONTH TOTAL</Text>
+                  <Text style={styles.historyTotalValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(historyTotal, amountMode)}</Text>
+                </View>
+              </View>
+
+              {historyRows.length === 0 ? (
+                <View style={styles.historyEmpty}>
+                  <Text style={styles.historyEmptyTitle}>No payment entries</Text>
+                  <Text style={styles.historyEmptyText}>
+                    No Collection transactions match this exact Executive / Party context for {selectedChip?.label}.
+                  </Text>
+                </View>
+              ) : (
+                historyRows.map((item, index) => (
+                  <View key={`${item?.date_ymd || index}-${index}`} style={styles.historyRow}>
+                    <View style={styles.historyDateWrap}>
+                      <Text style={styles.historyDate}>{item?.date_label || String(item?.date_ymd || '')}</Text>
+                      <Text style={styles.historyEntries}>
+                        {Number(item?.entry_count || 0)} entr{Number(item?.entry_count || 0) === 1 ? 'y' : 'ies'}
+                      </Text>
+                    </View>
+                    <Text style={styles.historyAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(item?.amount, amountMode, item?.amount_exact)}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+          ) : null}
+
+          {level === 'party_detail' && mode === 'outstanding' ? (
+            <View style={styles.ageingPanel}>
+              <View style={styles.ageingHeader}>
+                <View>
+                  <Text style={[styles.panelKicker, { color: accent }]}>OUTSTANDING DETAIL</Text>
+                  <Text style={styles.panelTitle}>Invoices & Ageing</Text>
+                </View>
+                <View style={styles.ageingHeaderRight}>
+                  <Text style={styles.ageingHeaderLabel}>OPEN INVOICES</Text>
+                  <Text style={styles.ageingHeaderCount}>{Number(report?.ageing?.open_invoice_count || 0)}</Text>
+                </View>
+              </View>
+
+              {loading ? (
+                <View style={styles.state}>
+                  <ActivityIndicator size="large" color={T.nav} />
+                  <Text style={styles.stateText}>Loading invoice ageing…</Text>
+                </View>
+              ) : error ? (
+                <View style={styles.state}>
+                  <Text style={styles.errorTitle}>Unable to load ageing</Text>
+                  <Text style={styles.stateText}>{error}</Text>
+                  <TouchableOpacity onPress={() => void load(false)} style={styles.retry}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : report?.message ? (
+                <View style={styles.state}>
+                  <Text style={styles.emptyTitle}>Historical outstanding unavailable</Text>
+                  <Text style={styles.stateText}>{report.message}</Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.ageingSummary}>
+                    <View>
+                      <Text style={styles.totalLabel}>NET OUTSTANDING</Text>
+                      <Text style={[styles.ageingSummaryValue, { color: accent }]}>
+                        {formatSummaryAmount(
+                          report?.ageing?.account_outstanding ?? report?.total?.amount,
+                          amountMode,
+                          report?.ageing?.account_outstanding_exact ?? report?.total?.amount_exact,
+                        )}
+                      </Text>
+                    </View>
+                    <View style={styles.ageingSummaryRight}>
+                      <Text style={styles.totalLabel}>OPEN INVOICE BALANCE</Text>
+                      <Text style={styles.ageingInvoiceTotal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(report?.ageing?.total, amountMode, report?.ageing?.total_exact)}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.ageingBody}>
+                    {(report?.ageing?.buckets || []).map((bucket, index) => {
+                      const bucketAmount = Number(bucket?.amount || 0);
+                      const maxBucket = Math.max(
+                        0,
+                        ...(report?.ageing?.buckets || []).map(item => Number(item?.amount || 0)),
+                      );
+                      const width = maxBucket > 0 ? Math.max(2, Math.min(100, (bucketAmount / maxBucket) * 100)) : 0;
+                      return (
+                        <View key={bucket?.key || String(index)} style={styles.ageingRow}>
+                          <Text style={styles.ageingLabel}>{bucket?.label || ''}</Text>
+                          <View style={styles.ageingTrack}>
+                            <View
+                              style={[
+                                styles.ageingFill,
+                                {
+                                  width: `${width}%`,
+                                  backgroundColor: ['#2E7D5B', '#D58A00', '#C14335', '#8B2F2F'][index % 4],
+                                },
+                              ]}
+                            />
+                          </View>
+                          <Text style={styles.ageingAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(bucketAmount, amountMode, bucket?.amount_exact)}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {Math.abs(Number(report?.ageing?.net_adjustment || 0)) > 1 ? (
+                    <View style={styles.adjustmentBox}>
+                      <Text style={styles.adjustmentTitle}>Net balance adjustment</Text>
+                      <Text style={styles.adjustmentText}>
+                        Open invoices {formatSummaryAmount(report?.ageing?.total, amountMode, report?.ageing?.total_exact)} · credits / other account adjustments {formatSummaryAmount(report?.ageing?.net_adjustment, amountMode, report?.ageing?.net_adjustment_exact)}.
+                        {'\n'}The Outstanding card continues to use the net FamAcc.ClBal balance.
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <TouchableOpacity
+                    style={styles.ageingFooter}
+                    activeOpacity={(report?.ageing?.open_invoices || []).length > 0 ? 0.7 : 1}
+                    onPress={() => {
+                      if ((report?.ageing?.open_invoices || []).length > 0) {
+                        setAgeingExpanded(value => !value);
+                      }
+                    }}
+                  >
+                    <Text style={styles.ageingFooterText}>
+                      View {Number(report?.ageing?.open_invoice_count || 0)} open invoice{Number(report?.ageing?.open_invoice_count || 0) === 1 ? '' : 's'}
+                    </Text>
+                    <Text style={styles.ageingChevron}>
+                      {(report?.ageing?.open_invoices || []).length > 0 && ageingExpanded ? '⌃' : '⌄'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {ageingExpanded && (report?.ageing?.open_invoices || []).length > 0 ? (
+                    <View style={styles.invoiceList}>
+                      {(report?.ageing?.open_invoices || []).map((invoice, index) => (
+                        <View key={invoice?.uid || `${invoice?.bill_no || 'invoice'}-${index}`} style={styles.invoiceRow}>
+                          <View style={styles.invoiceInfo}>
+                            <Text style={styles.invoiceNo}>{invoice?.bill_no || `Invoice ${index + 1}`}</Text>
+                            <Text style={styles.invoiceMeta}>
+                              {String(invoice?.bill_date || '')} · {Number(invoice?.ageing_days || 0)}d
+                              {invoice?.prp_code ? ` · ${invoice.prp_code}` : ''}
+                            </Text>
+                          </View>
+                          <Text style={styles.invoiceAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(invoice?.outstanding, amountMode, invoice?.outstanding_exact)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              )}
+            </View>
+          ) : (
+            <View style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <View>
+                  <Text style={[styles.panelKicker, { color: accent }]}>
+                    {mode === 'collection' ? 'COLLECTION BREAKDOWN' : 'OUTSTANDING BREAKDOWN'}
+                  </Text>
+                  <Text style={styles.panelTitle}>{panelTitle}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSortAscending(value => !value)}
+                  style={styles.sortButton}
+                >
+                  <Text style={styles.sortText}>{sortAscending ? 'LOWEST ▲' : 'HIGHEST ▼'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.columns}>
+                <Text style={styles.columnName}>{level === 'executives' ? 'EXECUTIVE' : 'PARTY'}</Text>
+                <Text style={styles.columnValue}>
+                  {mode === 'collection' ? 'TODAY · MONTH' : 'OUTSTANDING'}
+                </Text>
+              </View>
+
+              {loading ? (
+                <View style={styles.state}>
+                  <ActivityIndicator size="large" color={T.nav} />
+                  <Text style={styles.stateText}>Loading {mode} report…</Text>
+                </View>
+              ) : error ? (
+                <View style={styles.state}>
+                  <Text style={styles.errorTitle}>Unable to load report</Text>
+                  <Text style={styles.stateText}>{error}</Text>
+                  <TouchableOpacity onPress={() => void load(false)} style={styles.retry}>
+                    <Text style={styles.retryText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : sortedRows.length === 0 ? (
+                <View style={styles.state}>
+                  <Text style={styles.emptyTitle}>No {mode} data</Text>
+                  <Text style={styles.stateText}>
+                    {report?.message || `No records match this filter for ${selectedChip?.label || 'the selected month'}.`}
+                  </Text>
+                </View>
+              ) : (
+                sortedRows.map((row, index) => {
+                  const canOpen = level === 'executives' || (mode === 'outstanding' && level === 'parties');
+                  return (
+                    <TouchableOpacity
+                      key={`${row.code || index}-${index}`}
+                      onPress={() => openRow(row)}
+                      disabled={!canOpen}
+                      activeOpacity={canOpen ? 0.65 : 1}
+                      style={styles.row}
+                    >
+                      <View style={[styles.rank, { backgroundColor: [T.yd, T.green, T.copper, T.purple, T.blue][index % 5] }]}>
+                        <Text style={styles.rankText}>{index + 1}</Text>
+                      </View>
+
+                      <View style={styles.rowMain}>
+                        <Text numberOfLines={2} style={styles.rowName}>{row.name || 'Unspecified'}</Text>
+                        {row.code ? <Text style={styles.rowCode}>{row.code}</Text> : null}
+                      </View>
+
+                      <View style={styles.rowRight}>
+                        {mode === 'collection' ? (
+                          <Text style={styles.todayAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(row.today_amount, amountMode, row.today_amount_exact)}</Text>
+                        ) : null}
+                        <Text style={[styles.rowAmount, { color: mode === 'outstanding' ? T.red : T.ink }]}>
+                          {formatSummaryAmount(row.amount, amountMode, row.amount_exact)}
+                        </Text>
+                      </View>
+
+                      {canOpen ? <Text style={styles.chevron}>›</Text> : null}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              {!loading && !error && sortedRows.length > 0 ? (
+                <View style={styles.footerTotal}>
+                  <View>
+                    <Text style={styles.footerKicker}>TOTAL</Text>
+                    <Text style={styles.footerSub}>{sortedRows.length} rows</Text>
+                  </View>
+                  <Text style={[styles.footerAmount, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+                    {formatSummaryAmount(report?.total?.amount, amountMode, report?.total?.amount_exact)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: T.bg },
   safe: { flex: 1, backgroundColor: T.bg },
-  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, alignItems: 'center', justifyContent: 'center' },
-  backText: { color: T.nav, fontSize: 28, marginTop: -3 },
-  refreshText: { color: T.nav, fontSize: 19, fontWeight: '900' },
-  headerMain: { flex: 1, minWidth: 0 },
-  kicker: { color: T.copper, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
-  title: { color: T.ink, fontSize: 21, fontWeight: '900', marginTop: 2 },
-  period: { color: T.muted, fontSize: 10, marginTop: 2 },
-  content: { paddingHorizontal: 16, paddingBottom: 36 },
-  hero: { backgroundColor: T.nav, borderRadius: 18, padding: 15, ...S.card },
-  heroTop: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 48, height: 48, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.13)', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  heroNameWrap: { flex: 1, minWidth: 0, marginLeft: 11 },
-  heroKicker: { color: 'rgba(255,255,255,0.58)', fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
-  heroName: { color: '#fff', fontSize: 16, fontWeight: '900', marginTop: 2 },
-  heroSub: { color: 'rgba(255,255,255,0.62)', fontSize: 9, marginTop: 3 },
-  pctBadge: { minWidth: 68, borderRadius: 13, paddingVertical: 8, paddingHorizontal: 7, alignItems: 'center' },
-  pctValue: { color: '#fff', fontSize: 14, fontWeight: '900' },
-  pctLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 7, fontWeight: '900', marginTop: 1 },
-  heroMetrics: { marginTop: 15, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
-  heroMetric: { flex: 1 },
-  heroDivider: { width: 1, height: 31, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 7 },
-  metricLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 7, fontWeight: '900', letterSpacing: 0.5 },
-  metricValue: { color: '#fff', fontSize: 12, fontWeight: '900', marginTop: 4 },
-  notice: { marginTop: 12, backgroundColor: T.surface, borderRadius: 15, borderWidth: 1, borderColor: T.border, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, ...S.card },
-  noticeIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: T.alt, alignItems: 'center', justifyContent: 'center' },
-  noticeIconText: { color: T.green, fontSize: 17, fontWeight: '900' },
-  noticeTitle: { color: T.ink, fontSize: 11, fontWeight: '900' },
-  noticeText: { color: T.muted, fontSize: 9, lineHeight: 14, marginTop: 3 },
-  panel: { marginTop: 12, backgroundColor: T.surface, borderRadius: 17, borderWidth: 1, borderColor: T.border, overflow: 'hidden', ...S.card },
-  panelHeader: { padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: T.surface },
-  panelKicker: { color: T.copper, fontSize: 8, fontWeight: '900', letterSpacing: 0.75 },
-  panelTitle: { color: T.ink, fontSize: 17, fontWeight: '900', marginTop: 2 },
-  count: { minWidth: 34, borderRadius: 999, backgroundColor: T.alt, paddingVertical: 7, paddingHorizontal: 8 },
-  countText: { color: T.nav, textAlign: 'center', fontSize: 10, fontWeight: '900' },
-  columns: { minHeight: 35, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderBottomWidth: 1, borderColor: T.hair },
+  content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 34 },
+
+  contextCard: {
+    backgroundColor: T.surface,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderLeftWidth: 5,
+    padding: 14,
+    ...S.card,
+  },
+  kicker: { fontSize: 9, fontWeight: '900', letterSpacing: 0.75 },
+  reportTitle: { color: T.ink, fontSize: 19, fontWeight: '900', marginTop: 3 },
+  reportSub: { color: T.muted, fontSize: 9, lineHeight: 14, marginTop: 3 },
+  contextPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
+  contextPill: { maxWidth: '100%', backgroundColor: T.alt, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6 },
+  contextPillLabel: { color: T.muted, fontSize: 7, fontWeight: '900', textTransform: 'uppercase' },
+  contextPillValue: { color: T.ink, fontSize: 10, fontWeight: '800', marginTop: 1, maxWidth: 235 },
+
+  monthRow: { gap: 7, paddingVertical: 12, paddingRight: 8 },
+  monthChip: {
+    minWidth: 70,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  monthChipActive: { backgroundColor: T.nav, borderColor: T.nav },
+  monthChipText: { color: T.muted, fontSize: 10, fontWeight: '800' },
+  monthChipTextActive: { color: '#fff' },
+
+  totalCard: {
+    backgroundColor: T.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderLeftWidth: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...S.card,
+  },
+  totalLabel: { color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.7 },
+  totalValue: { fontSize: 19, fontWeight: '900', marginTop: 3 },
+  totalRight: { alignItems: 'flex-end' },
+  totalCount: { color: T.ink, fontSize: 15, fontWeight: '900', marginTop: 3 },
+
+  reconcile: { marginTop: 10, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1 },
+  reconcileOk: { backgroundColor: '#EFF7F2', borderColor: '#CFE4D5' },
+  reconcileWarn: { backgroundColor: '#FFF4EC', borderColor: '#EBC9AF' },
+  reconcileTitle: { fontSize: 9, fontWeight: '900' },
+  reconcileDetail: { color: T.muted, fontSize: 8, marginTop: 3 },
+  messageBox: { marginTop: 10, backgroundColor: '#FFF5E9', borderRadius: 12, padding: 11, borderWidth: 1, borderColor: '#EFD5B6' },
+  messageTitle: { color: '#8A5B25', fontSize: 9, fontWeight: '900' },
+  messageText: { color: '#8A5B25', fontSize: 9, lineHeight: 14, marginTop: 3 },
+
+  panel: {
+    marginTop: 12,
+    backgroundColor: T.surface,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: T.border,
+    overflow: 'hidden',
+    ...S.card,
+  },
+  panelHeader: { padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  panelKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 0.7 },
+  panelTitle: { color: T.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
+  sortButton: { backgroundColor: T.alt, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 },
+  sortText: { color: T.nav, fontSize: 8, fontWeight: '900' },
+  columns: { height: 34, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderBottomWidth: 1, borderColor: T.hair },
   columnName: { flex: 1, color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
   columnValue: { color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
-  state: { minHeight: 190, padding: 24, alignItems: 'center', justifyContent: 'center' },
+
+  state: { minHeight: 180, alignItems: 'center', justifyContent: 'center', padding: 24 },
   stateText: { color: T.muted, fontSize: 10, lineHeight: 16, textAlign: 'center', marginTop: 8 },
-  errorTitle: { color: T.red, fontSize: 14, fontWeight: '900' },
-  emptyTitle: { color: T.ink, fontSize: 14, fontWeight: '900' },
-  retry: { marginTop: 12, backgroundColor: T.nav, paddingHorizontal: 15, paddingVertical: 9, borderRadius: 10 },
+  errorTitle: { color: T.red, fontSize: 13, fontWeight: '900' },
+  emptyTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
+  retry: { marginTop: 12, backgroundColor: T.nav, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10 },
   retryText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  row: { minHeight: 76, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: T.hair },
-  rank: { width: 29, height: 29, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
-  rankText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+
+  row: { minHeight: 66, paddingHorizontal: 11, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: T.hair },
+  rank: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
+  rankText: { color: '#fff', fontSize: 8, fontWeight: '900' },
   rowMain: { flex: 1, minWidth: 0 },
-  partyName: { color: T.ink, fontSize: 12, fontWeight: '800' },
-  partyCode: { color: T.muted, fontSize: 8, marginTop: 3 },
-  miniBarTrack: { height: 4, borderRadius: 999, backgroundColor: T.hair, overflow: 'hidden', marginTop: 7 },
-  miniBarFill: { height: '100%', borderRadius: 999 },
-  rowRight: { alignItems: 'flex-end', marginLeft: 10 },
-  targetText: { color: T.muted, fontSize: 9, fontWeight: '700' },
-  actualText: { color: T.ink, fontSize: 11, fontWeight: '900', marginTop: 3 },
-  rowPct: { fontSize: 8, fontWeight: '900', marginTop: 3 },
-  totalRow: { minHeight: 58, backgroundColor: T.alt, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  totalKicker: { color: T.nav, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
-  totalSub: { color: T.muted, fontSize: 8, marginTop: 3 },
-  totalValue: { color: T.green, fontSize: 14, fontWeight: '900' },
-  totalTarget: { color: T.muted, fontSize: 8, marginTop: 2 },
+  rowName: { color: T.ink, fontSize: 11, fontWeight: '800' },
+  rowCode: { color: T.muted, fontSize: 8, marginTop: 3 },
+  rowRight: { alignItems: 'flex-end', marginLeft: 8, minWidth: 105, maxWidth: 165 },
+  todayAmount: { color: T.green, fontSize: 8, fontWeight: '800' },
+  rowAmount: { fontSize: 11, fontWeight: '900', marginTop: 3 },
+  chevron: { color: T.muted, fontSize: 22, marginLeft: 6 },
+
+  historyPanel: {
+    marginTop: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: T.border,
+    overflow: 'hidden',
+  },
+  historyHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+  },
+  historyKicker: {
+    color: T.green,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  historyTitle: {
+    marginTop: 4,
+    color: T.ink,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  historyTotalWrap: { alignItems: 'flex-end', paddingLeft: 10 },
+  historyTotalLabel: {
+    color: T.muted,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  historyTotalValue: {
+    marginTop: 3,
+    color: T.green,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  historyRow: {
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+  },
+  historyDateWrap: { flex: 1, paddingRight: 12 },
+  historyDate: { color: T.ink, fontSize: 13, fontWeight: '800' },
+  historyEntries: { marginTop: 3, color: T.muted, fontSize: 10, fontWeight: '600' },
+  historyAmount: { color: T.green, fontSize: 14, fontWeight: '900' },
+  historyEmpty: { paddingHorizontal: 16, paddingVertical: 18 },
+  historyEmptyTitle: { color: T.ink, fontSize: 13, fontWeight: '800' },
+  historyEmptyText: { marginTop: 4, color: T.muted, fontSize: 11, lineHeight: 16 },
+  ageingPanel: {
+    marginTop: 12, backgroundColor: T.surface, borderRadius: 17, borderWidth: 1,
+    borderColor: T.border, overflow: 'hidden', ...S.card,
+  },
+  ageingHeader: {
+    padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderBottomWidth: 1, borderBottomColor: T.hair,
+  },
+  ageingHeaderRight: { alignItems: 'flex-end' },
+  ageingHeaderLabel: { color: T.muted, fontSize: 7, fontWeight: '900', letterSpacing: 0.6 },
+  ageingHeaderCount: { color: T.ink, fontSize: 16, fontWeight: '900', marginTop: 2 },
+  ageingSummary: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    paddingHorizontal: 13, paddingVertical: 12, backgroundColor: T.alt,
+  },
+  ageingSummaryValue: { fontSize: 18, fontWeight: '900', marginTop: 3 },
+  ageingSummaryRight: { alignItems: 'flex-end' },
+  ageingInvoiceTotal: { color: T.ink, fontSize: 13, fontWeight: '900', marginTop: 3 },
+  ageingBody: { paddingHorizontal: 13, paddingTop: 12, paddingBottom: 6 },
+  ageingRow: { flexDirection: 'row', alignItems: 'center', minHeight: 31 },
+  ageingLabel: { width: 72, color: T.muted, fontSize: 9, fontWeight: '700' },
+  ageingTrack: { flex: 1, height: 6, backgroundColor: T.hair, borderRadius: 3, overflow: 'hidden', marginHorizontal: 8 },
+  ageingFill: { height: 6, borderRadius: 3 },
+  ageingAmount: { width: 125, textAlign: 'right', color: T.ink, fontSize: 8.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  adjustmentBox: { marginHorizontal: 13, marginVertical: 8, backgroundColor: '#FFF5E9', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#EFD5B6' },
+  adjustmentTitle: { color: '#8A5B25', fontSize: 9, fontWeight: '900' },
+  adjustmentText: { color: '#8A5B25', fontSize: 8, lineHeight: 13, marginTop: 3 },
+  ageingFooter: {
+    minHeight: 44, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderTopWidth: 1, borderTopColor: T.hair,
+  },
+  ageingFooterText: { color: T.nav, fontSize: 10, fontWeight: '900' },
+  ageingChevron: { color: T.muted, fontSize: 15 },
+  invoiceList: { borderTopWidth: 1, borderTopColor: T.hair },
+  invoiceRow: { minHeight: 54, paddingHorizontal: 13, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: T.hair },
+  invoiceInfo: { flex: 1, minWidth: 0 },
+  invoiceNo: { color: T.ink, fontSize: 10, fontWeight: '900' },
+  invoiceMeta: { color: T.muted, fontSize: 8, marginTop: 3 },
+  invoiceAmount: { color: T.red, fontSize: 10, fontWeight: '900', marginLeft: 10 },
+
+  footerTotal: { minHeight: 55, backgroundColor: T.alt, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  footerKicker: { color: T.nav, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  footerSub: { color: T.muted, fontSize: 8, marginTop: 2 },
+  footerAmount: { fontSize: 13, fontWeight: '900' },
 });

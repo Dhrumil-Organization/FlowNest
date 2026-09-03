@@ -17,7 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { API } from '../../../common/API/dynamicAPI';
 import axios from 'axios';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../../common/API/Functions';
-import Icon from "react-native-vector-icons/MaterialIcons";
+import Icon from '@expo/vector-icons/MaterialIcons';
+import { useRouter } from 'expo-router';
 
 const BLUE = '#2148C8';
 const HEADER_BG = '#1A3DB8';
@@ -75,6 +76,7 @@ const ToggleRow = ({ label, value, onToggle }) => (
 
 export default function CriteriaScreen({ navigation, token }) {
     // const [formState, setFormState] = useState(INITIAL_FORM_STATE);
+    const router = useRouter();
     const [getStockTypesFilterForm, setStockTypesFilterForm] = useState([
         { 'label': 'All', 'value': 'A' },
         { 'label': 'In house', 'value': 'I' },
@@ -249,6 +251,11 @@ export default function CriteriaScreen({ navigation, token }) {
     //     });
     // };
 
+    const goBack = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace('/');
+    };
+
     return (
         <SafeAreaView style={styles.safeArea} edges={['top']}>
             <StatusBar backgroundColor={'#0f8f9a'} barStyle="light-content" />
@@ -256,7 +263,7 @@ export default function CriteriaScreen({ navigation, token }) {
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
-                    onPress={() => navigation.goBack()}
+                    onPress={() => goBack()}
                     activeOpacity={0.8}
                 >
                     <Icon

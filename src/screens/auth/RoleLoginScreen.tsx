@@ -1,7 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // FILE: src/screens/auth/RoleLoginScreen.tsx
-// FIXED: removes repeated iOS password-save / biometric prompt loop.
-// Login still stores token + app_session and opens dashboard directly.
+//
+// Production-safe New ERP manual login.
+//
+// Key navigation rules:
+//   - Back always returns to New ERP Property Selection.
+//   - Successful login explicitly replaces this route with
+//     /new/(tabs).
+//   - The parent app/new/role-login.tsx also redirects when the
+//     session store becomes authenticated, giving us two safe paths
+//     into the New ERP dashboard without allowing Legacy routing.
 // ─────────────────────────────────────────────────────────────
 
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -20,8 +28,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { performLogin } from '../../core/authFlow';
-import { getBiometricLabel, isBiometricSupported } from '../../lib/biometricAuth';
+import {
+  getBiometricLabel,
+  isBiometricSupported,
+} from '../../lib/biometricAuth';
 import { T } from '../../theme';
 
 const COLORS = {
@@ -38,6 +50,7 @@ const COLORS = {
 
 export function RoleLoginScreen() {
   const router = useRouter();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -48,42 +61,107 @@ export function RoleLoginScreen() {
   const [rememberMe, setRememberMe] = useState(true);
 
   useEffect(() => {
-    (async () => {
+    let active = true;
+
+    void (async () => {
       const supported = await isBiometricSupported();
+
+      if (!active) return;
+
       setBioSupported(supported);
-      if (supported) setBioLabel(await getBiometricLabel());
+
+      if (supported) {
+        const label = await getBiometricLabel();
+
+        if (active) {
+          setBioLabel(label);
+        }
+      }
     })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const canSubmit = useMemo(
-    () => username.trim().length > 0 && password.trim().length > 0 && !loading,
+    () =>
+      username.trim().length > 0 &&
+      password.trim().length > 0 &&
+      !loading,
     [username, password, loading]
   );
+
+  const openNewErpDashboard = () => {
+    router.replace('/new/(tabs)');
+  };
 
   const handleLogin = async () => {
     if (!canSubmit) return;
 
     setLoading(true);
+
     try {
-      const rememberAction = bioSupported && rememberMe ? 'save' : bioSupported ? 'clear' : undefined;
-      const outcome = await performLogin(username, password, rememberAction);
+      const rememberAction =
+        bioSupported && rememberMe
+          ? 'save'
+          : bioSupported
+            ? 'clear'
+            : undefined;
+
+      const outcome = await performLogin(
+        username,
+        password,
+        rememberAction
+      );
+
       if (!outcome.success) {
-        Alert.alert('Login failed', outcome.message);
-      } else if (outcome.message) {
-        // e.g. "Remember me" was requested but the device lock confirm failed.
-        Alert.alert('Note', outcome.message);
+        Alert.alert(
+          'Login failed',
+          outcome.message || 'Unable to login.'
+        );
+        return;
       }
-      // On success, AppSessionStore's token flips to truthy and the
-      // route watching it (app/new/role-login.tsx) redirects into the
-      // app automatically — no navigation call needed here.
+
+      // performLogin() has already persisted the token/session and
+      // updated AppSessionStore before returning success.
+      //
+      // If "Remember me" could not be saved, login itself is still
+      // valid. Show the note, then enter the New ERP dashboard.
+      if (outcome.message) {
+        Alert.alert(
+          'Note',
+          outcome.message,
+          [
+            {
+              text: 'OK',
+              onPress: openNewErpDashboard,
+            },
+          ],
+          {
+            cancelable: false,
+          }
+        );
+        return;
+      }
+
+      // Deterministic post-login navigation. This is intentionally
+      // New ERP only and never points at the Legacy dashboard.
+      openNewErpDashboard();
+    } catch (error: any) {
+      Alert.alert(
+        'Login failed',
+        error?.message || 'Unable to login.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const goBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/');
+    // Do not trust navigation history here. New ERP login belongs to
+    // the New ERP property-selection flow.
+    router.replace('/new/property-select');
   };
 
   return (
@@ -93,7 +171,6 @@ export function RoleLoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.hero}>
-          {/* <Text style={styles.brand}>MADHUSUDHAN FABRICS</Text> */}
           <View style={styles.topRow}>
             <TouchableOpacity
               activeOpacity={0.9}
@@ -117,25 +194,35 @@ export function RoleLoginScreen() {
               MADHUSUDHAN FABRICS
             </Text>
 
-            {/* Right Side Spacer */}
             <View style={{ width: 70 }} />
           </View>
+
           <Text style={styles.title}>Sign in</Text>
+
           <Text style={styles.sub}>
-            Username and password only. Year, property, group and store are derived automatically from your ERP user defaults.
+            Username and password only. Year, property, group and store
+            are derived automatically from your ERP user defaults.
           </Text>
         </View>
 
         <View style={styles.panel}>
           <View style={styles.contextCard}>
-            <Text style={styles.contextLabel}>MOBILE PLATFORM CORE</Text>
-            <Text style={styles.contextTitle}>Secure ERP session</Text>
+            <Text style={styles.contextLabel}>
+              MOBILE PLATFORM CORE
+            </Text>
+
+            <Text style={styles.contextTitle}>
+              Secure ERP session
+            </Text>
+
             <Text style={styles.contextSub}>
-              Login creates business context + permission context for every screen.
+              Login creates business context + permission context for
+              every screen.
             </Text>
           </View>
 
           <Text style={styles.label}>USERNAME</Text>
+
           <TextInput
             value={username}
             onChangeText={setUsername}
@@ -150,6 +237,7 @@ export function RoleLoginScreen() {
           />
 
           <Text style={styles.label}>PASSWORD</Text>
+
           <View style={styles.passwordRow}>
             <TextInput
               value={password}
@@ -164,8 +252,14 @@ export function RoleLoginScreen() {
               placeholderTextColor={T.muted}
               style={[styles.input, styles.passwordInput]}
             />
-            <TouchableOpacity onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn}>
-              <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
+
+            <TouchableOpacity
+              onPress={() => setShowPassword((value) => !value)}
+              style={styles.eyeBtn}
+            >
+              <Text style={styles.eyeText}>
+                {showPassword ? 'Hide' : 'Show'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -173,7 +267,10 @@ export function RoleLoginScreen() {
             onPress={handleLogin}
             disabled={!canSubmit}
             activeOpacity={0.85}
-            style={[styles.loginBtn, !canSubmit && styles.loginBtnDisabled]}
+            style={[
+              styles.loginBtn,
+              !canSubmit && styles.loginBtnDisabled,
+            ]}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -185,12 +282,16 @@ export function RoleLoginScreen() {
           {bioSupported && (
             <View style={styles.bioBox}>
               <Text style={styles.bioIcon}>◉</Text>
+
               <View style={{ flex: 1 }}>
                 <Text style={styles.bioTitle}>Remember me</Text>
+
                 <Text style={styles.bioSub}>
-                  We'll confirm with your {bioLabel} and save this login for next time.
+                  We&apos;ll confirm with your {bioLabel} and save this
+                  login for next time.
                 </Text>
               </View>
+
               <Switch
                 value={rememberMe}
                 onValueChange={setRememberMe}
@@ -205,9 +306,34 @@ export function RoleLoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: T.nav },
-  wrap: { flex: 1 },
-  hero: { paddingHorizontal: 24, paddingTop: 34, paddingBottom: 26 },
+  safe: {
+    flex: 1,
+    backgroundColor: T.nav,
+  },
+  wrap: {
+    flex: 1,
+  },
+  hero: {
+    paddingHorizontal: 24,
+    paddingTop: 34,
+    paddingBottom: 26,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  backButton: {
+    width: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  backText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   brand: {
     flex: 1,
     textAlign: 'center',
@@ -217,8 +343,19 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     paddingHorizontal: 10,
   },
-  title: { fontSize: 32, lineHeight: 38, fontWeight: '900', color: '#fff', marginBottom: 8 },
-  sub: { fontSize: 13, color: '#A9C0D4', lineHeight: 19, maxWidth: 340 },
+  title: {
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '900',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  sub: {
+    fontSize: 13,
+    color: '#A9C0D4',
+    lineHeight: 19,
+    maxWidth: 340,
+  },
   panel: {
     flex: 1,
     backgroundColor: T.bg,
@@ -235,10 +372,32 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 18,
   },
-  contextLabel: { fontSize: 10, color: T.copper, fontWeight: '900', letterSpacing: 0.8, marginBottom: 5 },
-  contextTitle: { fontSize: 18, color: T.ink, fontWeight: '900', marginBottom: 4 },
-  contextSub: { fontSize: 12, color: T.muted, lineHeight: 17 },
-  label: { fontSize: 10, color: T.muted, fontWeight: '900', letterSpacing: 0.7, marginTop: 12, marginBottom: 7 },
+  contextLabel: {
+    fontSize: 10,
+    color: T.copper,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginBottom: 5,
+  },
+  contextTitle: {
+    fontSize: 18,
+    color: T.ink,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  contextSub: {
+    fontSize: 12,
+    color: T.muted,
+    lineHeight: 17,
+  },
+  label: {
+    fontSize: 10,
+    color: T.muted,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+    marginTop: 12,
+    marginBottom: 7,
+  },
   input: {
     backgroundColor: T.surface,
     borderWidth: 1,
@@ -249,10 +408,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: T.ink,
   },
-  passwordRow: { position: 'relative' },
-  passwordInput: { paddingRight: 70 },
-  eyeBtn: { position: 'absolute', right: 8, top: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  eyeText: { color: T.copper, fontSize: 12, fontWeight: '800' },
+  passwordRow: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 70,
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  eyeText: {
+    color: T.copper,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   loginBtn: {
     marginTop: 22,
     height: 52,
@@ -263,10 +436,20 @@ const styles = StyleSheet.create({
     shadowColor: T.copper,
     shadowOpacity: 0.25,
     shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
   },
-  loginBtnDisabled: { opacity: 0.45 },
-  loginText: { color: '#fff', fontSize: 15, fontWeight: '900', letterSpacing: 0.3 },
+  loginBtnDisabled: {
+    opacity: 0.45,
+  },
+  loginText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
   bioBox: {
     flexDirection: 'row',
     gap: 12,
@@ -278,27 +461,22 @@ const styles = StyleSheet.create({
     padding: 13,
     marginTop: 16,
   },
-  bioIcon: { color: T.green, fontSize: 18, fontWeight: '900' },
-  bioTitle: { color: T.ink, fontSize: 13, fontWeight: '900' },
-  bioSub: { color: T.muted, fontSize: 11, marginTop: 2 },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 30,
+  bioIcon: {
+    color: T.copper,
+    fontSize: 22,
+    fontWeight: '900',
   },
-
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 70,
+  bioTitle: {
+    color: T.ink,
+    fontSize: 13,
+    fontWeight: '900',
   },
-
-  backText: {
-    color: COLORS.white,
-    fontSize: 15,
-    marginLeft: 4,
-    fontWeight: '600',
+  bioSub: {
+    color: T.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 2,
   },
 });
+
 export default RoleLoginScreen;

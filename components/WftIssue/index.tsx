@@ -48,7 +48,7 @@ type YarnIssueItem = {
 
 };
 
-const WftIssue: React.FC<Props> = ({ token, username }) => {
+const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     // const { hasPermission, requestPermission } = useCameraPermission();
     const [isLoading, setIsLoading] = useState(false);
     const [getDataSaved, setDataSaved] = useState(false)
@@ -57,6 +57,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     const [isDrawerVisible, setIsDrawerVisible] = useState(false);
     const [isDetailVisible, setIsDetailVisible] = useState(false);
     const [isItemdetailvisible, setisItemdetailvisible] = useState(false);
+    const [hasIssueDesignAccess, setHasIssueDesignAccess] = useState(false);
     const [selectedYear, setSelectedYear] = useState(null);
     const [getAllPropertyData, setAllPropertyData] = useState([]);
     const [FormState, setFormState] = useState({
@@ -166,7 +167,13 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
         setIsDetailVisible(true);
     };
 
-    const openItemDetailDrawer = () => {
+    const openItemDetailDrawer = (data?: { hasIssueDesignAccess?: boolean }) => {
+        // Receive Issue Design access from the first detail screen.
+        // Keep the existing edit flow unchanged when no value is supplied.
+        if (typeof data?.hasIssueDesignAccess === 'boolean') {
+            setHasIssueDesignAccess(data.hasIssueDesignAccess);
+        }
+
         setIsDetailVisible(false);
         setIsItemVisible(false);
         setisItemdetailvisible(true);
@@ -656,7 +663,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
     return (
         <>
             {/* {isLoading && <FullScreenLoader />} */}
-            
+
             {isLoading && (
                 <View
                     style={{
@@ -791,7 +798,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
             <TouchableOpacity style={yarnmanagementsystemstyle.fabAdd}
                 // onPress={detailopenDrawer}
                 onPress={() => {
-									   
+
                     resetAllData();
                     resetDrawerStates();
                     openDetailDrawer();
@@ -863,6 +870,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                     getAllYearData={getAllYearData}
                     setAllYearData={setAllYearData}
                     token={token}
+                    userid={userid}
 
                     isEditMode={isEditMode}
                     mainUId={mainUId}
@@ -889,6 +897,7 @@ const WftIssue: React.FC<Props> = ({ token, username }) => {
                     getAllYearData={getAllYearData}
                     setAllYearData={setAllYearData}
                     token={token}
+                    hasIssueDesignAccess={hasIssueDesignAccess}
 
                     isEditMode={isEditMode}
                     mainUId={mainUId}

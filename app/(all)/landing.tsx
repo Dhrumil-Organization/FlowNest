@@ -398,7 +398,6 @@
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -417,10 +416,7 @@ import logo from '../../assets/images/logo.png';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.72;
 const CARD_SPACING = 14;
-type Nav = any;
-
 export default function LandingPage() {
-    const navigation = useNavigation<Nav>();
     const router = useRouter();
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollRef = useRef(null);
@@ -433,9 +429,9 @@ export default function LandingPage() {
             const l = await AsyncStorage.getItem('LOOKUP_PLATFORM');
             console.log('L:', l);
             if (token && l === 'NEW') {
-                navigation.navigate('Main')
+                router.replace('/new');
             } else if (token && l !== 'NEW') {
-                router.replace('/');
+                router.replace('/(tabs)');
             }
         };
         check();

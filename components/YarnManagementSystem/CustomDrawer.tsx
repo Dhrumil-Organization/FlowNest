@@ -86,10 +86,56 @@ const CustomDrawer = (props) => {
     return (
         <>
             <Modal visible={isVisible} transparent animationType="none"
-            onRequestClose={onClose}
+                onRequestClose={onClose}
             >
                 <View style={styles.modalOverlay}>
-                    {isLoadingMore && <FullScreenLoader />}
+                    {isLoadingMore && (
+                        // <FullScreenLoader />
+                        <View
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+
+                                justifyContent: 'center',
+                                alignItems: 'center',
+
+                                backgroundColor: 'rgba(255,255,255,0.45)',
+
+                                zIndex: 9999,
+                                elevation: 9999,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 70,
+                                    height: 70,
+                                    borderRadius: 35,
+                                    backgroundColor: '#fff',
+
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+
+                                    elevation: 8,
+
+                                    shadowColor: '#000',
+                                    shadowOffset: {
+                                        width: 0,
+                                        height: 3,
+                                    },
+                                    shadowOpacity: 0.25,
+                                    shadowRadius: 6,
+                                }}
+                            >
+                                <ActivityIndicator
+                                    size="large"
+                                    color="#0788A8"
+                                />
+                            </View>
+                        </View>
+                    )}
                     <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
                         <LinearGradient
                             colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
@@ -119,13 +165,13 @@ const CustomDrawer = (props) => {
                                                 ...FormState,
                                                 values: {
                                                     ...FormState.values,
-                                                    PrpOf: item?.PrpOf || '',                                                    
+                                                    PrpOf: item?.PrpOf || '',
                                                 }
                                             }));
                                         }}
                                         multiple={false}
                                         emptyMessage="No properties available" />
-                                </View>                                
+                                </View>
                             </ScrollView>
                             <TouchableOpacity
                                 style={styles.centerFabButton}

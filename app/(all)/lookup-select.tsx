@@ -965,6 +965,7 @@
 //         paddingHorizontal: 10,
 //     },
 // });
+import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -1011,11 +1012,37 @@ const LookupSelectionScreen = () => {
 
         try {
             setLoading(true);
+
+            // Platform selection is an authentication boundary. A token issued
+            // for another ERP/platform must never be reused to enter a dashboard.
+            await AsyncStorage.multiRemove([
+                'access_token',
+                'app_session',
+                'user_details',
+                'user_id',
+                'user_prptype',
+                'yno',
+                'user_login_role',
+                'user_menu_apps',
+                'mobile_user',
+                'mobile_raw_login_response',
+            ]);
+            useAppSessionStore.setState({
+                token: null,
+                user: null,
+                appSession: null,
+                rawLoginResponse: null,
+                hydrated: true,
+                freshLogin: false,
+            });
+
             await AsyncStorage.setItem(STORAGE_KEY, selected);
 
             if (selected === 'NEW') {
-                router.replace('/new');
+                // New ERP has its own themed property-selection and login flow.
+                router.replace('/new/property-select');
             } else {
+                // Legacy ERP keeps the existing property + login screen.
                 router.replace('/(auth)/login');
             }
         } catch (e) {
@@ -1135,7 +1162,7 @@ const LookupSelectionScreen = () => {
                                 style={{ marginRight: 5 }}
                             />
                             <Text style={styles.underDevelopmentText}>
-                                Under Development | Only for Sudamo Users
+                                Under Development
                             </Text>
                         </View>
                     )}
@@ -1160,8 +1187,10 @@ const LookupSelectionScreen = () => {
     };
 
     const goBack = () => {
-        if (router.canGoBack()) router.back();
-        else router.replace('/');
+        // Never trust navigation history here. A protected dashboard may still
+        // exist underneath this screen from an older stack. Always return to
+        // the public landing screen explicitly.
+        router.replace('/(all)/landing');
     };
 
     return (

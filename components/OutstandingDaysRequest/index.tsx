@@ -15,7 +15,7 @@ import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import Header from '@/components/Header';
-import PartyHistoryModal from '@/components/OutstandingDaysRequest/PartyHistoryModal'; // 👈 path adjust
+import PartyHistoryModal from '@/components/OutstandingDaysRequest/PartyHistoryModal';
 import { theme } from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -27,31 +27,75 @@ interface Props {
     duration?: number;
 }
 
-// export default function CreditLimit() {
+interface CardData {
+    uid: string;
+    prptypename: string;
+    date: string;
+    parname: string;
+    limit1: string;
+    limit2: string;
+    remark: string;
+    prpcode: string;
+    prptype: string;
+    yearno: string;
+    parcode: string;
+    outstanding: string;
+    overdue: string;
+    sexename: string;
+    BrkAccName: string;
+    crdays: string;
+    crday1: string;
+    crday2: string;
+    isProcessed?: boolean;
+    actionType?: 'accept' | 'reject';
+}
+
+interface AllHistoryData {
+    uid: string;
+    prptypename: string;
+    date: string;
+    parname: string;
+    limit1: string;
+    limit2: string;
+    limit3: string;
+    isauth: string;
+    adate: string;
+    ausrname: string;
+    revertdate: string;
+    status: string;
+    remark: string;
+    BrkAccName: string;
+    sexename: string;
+}
+
 const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
-    // const { token, username } = useAuth();
     const flatListRef = useRef<FlatList>(null);
     const flatHistoryListRef = useRef<FlatList>(null);
 
-    const [data, setData] = useState<any[]>([]);
-    const [allhistoryData, setAllHistoryData] = useState<any[]>([]);
+    const [data, setData] = useState<CardData[]>([]);
+    const [allhistoryData, setAllHistoryData] = useState<AllHistoryData[]>([]);
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [partyList, setPartyList] = useState<any[]>([]);
     const [getParname, setParname] = useState('');
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchhistoryQuery, setSearchhistoryQuery] = useState('');
+    const [billsSearchQuery, setBillsSearchQuery] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
     const [historyLoading, setIsHistoryLoading] = useState(false);
     const [partyLoading, setIsPartyLoading] = useState(false);
+    const [billsLoading, setBillsLoading] = useState(false);
 
     const [editableValues, setEditableValues] = useState<any>({});
-    const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [selectedAction, setSelectedAction] = useState<any>(null);
+    const [selectedItem, setSelectedItem] = useState<CardData | null>(null);
+    const [selectedAction, setSelectedAction] = useState<'accept' | 'reject' | 'list' | 'info' | null>(null);
 
     const [showOverlay, setShowOverlay] = useState(false);
     const [showPartyHistoryModal, setShowPartyHistoryModal] = useState(false);
+    const [showBillsAccordion, setShowBillsAccordion] = useState(false);
+    const [billsData, setBillsData] = useState<any[]>([]);
+    const [mainParData, setMainParData] = useState<any>(null);
 
     const [activeTab, setActiveTab] = useState<'party' | 'history'>('party');
     const [activeTab1, setActiveTab1] = useState<'requests' | 'history'>('requests');
@@ -59,6 +103,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
     const [responsemessage, setresponsemessage] = useState('');
     const [getSuccess, setSuccess] = useState(false);
     const [showTopButton, setShowTopButton] = useState(false);
+    const [isInfoLoading, setInfoLoading] = useState(false);
     const [limitInWords, setLimitInWords] = useState('');
     const { width } = useWindowDimensions();
     let cancelToken: any;
@@ -74,26 +119,14 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
     });
 
     const getColumns = () => {
-        if (width < 600) return 1;     // mobile
-        if (width < 1000) return 2;    // tablet
-        return 3;                      // large / web
+        if (width < 600) return 1;
+        if (width < 1000) return 2;
+        return 3;
     };
 
     const numColumns = getColumns();
 
-    // 🔥 LOAD TOKEN
-    // useEffect(() => {
-    //     const load = async () => {
-    //         const t = await AsyncStorage.getItem('access_token');
-    //         const u = await AsyncStorage.getItem('user_details');
-
-    //         setToken(t || '');
-    //         setUsername(u || 'User');
-    //     };
-    //     load();
-    // }, []);
-
-    // 🔥 FETCH REQUEST
+    // Fetch Data
     const fetchData = async () => {
         setIsLoading(true);
         try {
@@ -101,11 +134,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { txntype: 'outstandingdaysrequest', referrer: 'dashboard' }
             });
-            console.log("res", res);
-
             setData(res.data.success ? res.data.data : []);
             setAllHistoryData([]);
-
         } catch {
             Alert.alert("Error", "Server error");
         } finally {
@@ -113,7 +143,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         }
     };
 
-    // 🔥 FETCH ALL HISTORY
+    // Fetch All History
     const fetchAllHistoryData = async () => {
         setIsLoading(true);
         try {
@@ -125,10 +155,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                     referrer: 'dashboard',
                 }
             });
-
             setAllHistoryData(res.data.success ? res.data.data : []);
             setData([]);
-
         } finally {
             setIsLoading(false);
         }
@@ -140,7 +168,6 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         setIsHistoryLoading(true);
         try {
             const historyPayload = {
-                // text: parcode,
                 acccode: parcode,
                 txntype: 'outstandingdaysrequesthistory',
                 referrer: 'dashboard',
@@ -149,15 +176,9 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             };
             const response = await axios.get(
                 `${API}/api/osdaysreqbrowse`,
-                getRequestConfig({
-                    params: {
-                        ...historyPayload
-                    }
-                })
+                getRequestConfig({ params: { ...historyPayload } })
             );
-            console.log('🔵 history payload', historyPayload);
             if (response.data.success && response.data.data.length > 0) {
-                console.log('✅History Data:', response.data.data);
                 setHistoryData(response.data.data);
             } else {
                 setHistoryData([]);
@@ -171,74 +192,27 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         }
     };
 
-    // const fetchAllHistoryData = async () => {
-    //     // setActiveTab('allhistory');
-    //     if (cancelToken?.cancel) cancelToken.cancel();
-    //     cancelToken = axios.CancelToken.source();
-    //     setIsLoading(true);
-    //     try {
-    //         const allhistoryPayload = {
-    //             txntype: 'creditlimithistory',
-    //             referrer: 'dashboard',
-    //             action: 'allpartyhistory',
-    //         };
-    //         const response = await axios.get(
-    //             // `https://apig.tms-webapp.com/api/crlimitreqbrowse`,
-    //             `${API}/api/crlimitreqbrowse`,
-    //             getRequestConfig({
-    //                 params: {
-    //                     ...allhistoryPayload
-    //                 }
-    //             })
-    //         );
-    //         console.log('🔵all history payload', allhistoryPayload);
-    //         if (response.data.success && response.data.data.length > 0) {
-    //             console.log('✅All History Data:', response.data.data);
-    //             setAllHistoryData(response.data.data);
-    //             setData([]);
-
-    //         } else {
-    //             setAllHistoryData([]);
-    //             // setPartyList([]);
-    //             // setHistoryData([]);
-    //         }
-    //     } catch (error) {
-    //         if (!axios.isCancel(error)) {
-    //             Alert.alert('Error', 'Server error');
-    //         }
-    //     } finally {
-    //         setIsLoading(false);
-    //     }
-    // };
-
     useEffect(() => {
         if (activeTab1 === 'history') {
             fetchAllHistoryData();
         }
-        // else if (activeTab1 === 'requests') {
-        //     fetchData();
-        // }
     }, [activeTab1]);
 
     useEffect(() => {
         if (!selectedItem) {
-            setLimitInWords(''); // Reset if no item is selected
+            setLimitInWords('');
             return;
         }
-
         const currentItem = data.find(item => item.uid === selectedItem.uid);
         if (!currentItem) {
             setLimitInWords('');
             return;
         }
-
         const editedLimit2 = editableValues[currentItem.uid]?.limit2;
         const rawValue = editedLimit2 ? editedLimit2.replace(/[₹,]/g, '') : currentItem.limit2;
         const numericValue = parseFloat(rawValue);
-
         if (!isNaN(numericValue)) {
             setLimitInWords(numberToWordsIndian(numericValue) + '');
-            console.log('Limit in words:', numberToWordsIndian(numericValue)); // Debug log
         } else {
             setLimitInWords('');
         }
@@ -246,10 +220,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
 
     useEffect(() => {
         if (!token) return;
-
         if (activeTab1 === 'requests') fetchData();
         else fetchAllHistoryData();
-
     }, [activeTab1, token]);
 
     const handleListIconClick = async (prpcode: string, prptype: string, yearno: string, parcode: string) => {
@@ -268,18 +240,10 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                 fetch: 'dr'
             };
             const response = await axios.get(
-                // `https://apig.tms-webapp.com/api/get_criterion`,
                 `${API}/api/get_criterion`,
-                getRequestConfig({
-                    params: {
-                        ...historyPayload
-                    }
-                })
+                getRequestConfig({ params: { ...historyPayload } })
             );
-            console.log('🔵 Party payload', historyPayload);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ PartyList Data:', response);
-                console.log('✅ PartyList Data1:', response.data.response.data);
                 setPartyList(response.data.response.data);
                 fetchHistoryData(parcode, prptype);
             } else {
@@ -294,7 +258,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         }
     };
 
-    // 🔥 SEARCH
+    // Search Logic
     const filteredData = useMemo(() => {
         if (!searchQuery) return data;
         return data.filter(i =>
@@ -313,10 +277,9 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         );
     }, [allhistoryData, searchhistoryQuery]);
 
-    // 🔥 EDIT VALUE
+    // Edit Value Logic
     const handleEdit = (uid: string, field: string, value: string) => {
         if (field === 'limit2') {
-            // Allow empty value temporarily
             if (value === '') {
                 setEditableValues(prev => ({
                     ...prev,
@@ -324,7 +287,6 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                 }));
                 return;
             }
-            // Parse as integer to remove leading zeros or decimals
             const numericValue = parseInt(value, 10);
             if (isNaN(numericValue) || numericValue < 0) {
                 Alert.alert('Invalid Input', 'Please enter a valid positive integer.');
@@ -341,7 +303,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             }));
         }
     };
-    // 🔥 ICON CLICK
+
+    // Icon Press Logic
     const handleIconPress = (item: any, action: any) => {
         if (action === 'list') {
             setSelectedItem(item);
@@ -351,12 +314,10 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             setParname(item.parname);
             return;
         }
-
         setSelectedItem(item);
         setSelectedAction(action);
         setShowOverlay(true);
     };
-
 
     const scrollToTop = () => {
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -364,73 +325,27 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
     const scrollHistoryToTop = () => {
         flatHistoryListRef.current?.scrollToOffset({ offset: 0, animated: true });
     };
-    // 🔥 CONFIRM ACTION
-    // const handleConfirmAction = async () => {
-    //     if (!selectedItem) return;
 
-    //     const payload = {
-    //         ...selectedItem,
-    //         limit2: editableValues[selectedItem.uid]?.limit2 || selectedItem.limit2,
-    //         crday2: editableValues[selectedItem.uid]?.crday2 || selectedItem.crday2,
-    //         isauth: selectedAction === 'accept' ? 1 : 2,
-    //         action: 'edit'
-    //     };
-
-
-    //     try {
-    //         setSuccess(true);
-    //         setresponsemessage('Loading...');
-
-    //         const res = await axios.post(`${API}/api/crlimitreqedit`, payload, {
-    //             headers: { Authorization: `Bearer ${token}` }
-    //         });
-    //         console.log("cr limit auth", payload, res);
-
-    //         setresponsemessage(res.data.message || 'Success');
-
-    //         setTimeout(() => {
-    //             setShowOverlay(false);
-    //             setSuccess(false);
-    //             fetchData();
-    //         }, 1500);
-
-    //     } catch {
-    //         setresponsemessage('Server Error');
-    //     }
-    // };
-
-    const getToken = () => {
-        return token;
-    };
-
+    // Validation Logic
     const handleValidation = (updatedItem: any) => {
         if (selectedAction === 'accept') {
             const numericNewLimit2 = parseInt(updatedItem.limit2, 10);
             const numericLimit1 = parseFloat(updatedItem.limit1.replace(/,/g, ''));
-
             if (isNaN(numericNewLimit2)) {
-                Alert.alert(
-                    'Validation Error',
-                    'Requested OS Days cannot be empty or invalid for Party Name: ' + updatedItem.parname
-                );
+                Alert.alert('Validation Error', 'Requested OS Days cannot be empty or invalid for Party Name: ' + updatedItem.parname);
                 return false;
             } else if (numericNewLimit2 === 0) {
-                Alert.alert(
-                    'Validation Error',
-                    'Requested OS Days cannot be 0 for Party Name: ' + updatedItem.parname
-                );
+                Alert.alert('Validation Error', 'Requested OS Days cannot be 0 for Party Name: ' + updatedItem.parname);
                 return false;
             } else if (numericNewLimit2 < 0) {
-                Alert.alert(
-                    'Validation Error',
-                    'Requested OS Days cannot be negative for Party Name: ' + updatedItem.parname
-                );
+                Alert.alert('Validation Error', 'Requested OS Days cannot be negative for Party Name: ' + updatedItem.parname);
                 return false;
             }
         }
         return true;
     };
 
+    // Confirm Action Logic
     const handleConfirmAction = async () => {
         if (!selectedItem) return;
         const currentLimit2 = editableValues[selectedItem.uid]?.limit2 || selectedItem.limit2;
@@ -443,8 +358,6 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             ...selectedItem,
             limit2: parseInt(editableValues[selectedItem.uid]?.limit2 || selectedItem.limit2, 10).toString(),
             limit3: parseInt(editableValues[selectedItem.uid]?.limit2 || selectedItem.limit2, 10).toString(),
-            // crday2: editableValues[selectedItem.uid]?.crday2 || (selectedItem.crday2 || '0'),
-            // crday3: editableValues[selectedItem.uid]?.crday2 || (selectedItem.crday2 || '0'),
             isauth: 1,
             referrer: 'dashboard',
             txntype: 'outstandingdaysrequest',
@@ -454,8 +367,6 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             ...selectedItem,
             limit2: parseInt(selectedItem.limit2, 10).toString(),
             limit3: parseInt(editableValues[selectedItem.uid]?.limit2 || selectedItem.limit2, 10).toString(),
-            // crday2: formatToIndianCurrency(selectedItem.crday2 || '0'),
-            // crday3: editableValues[selectedItem.uid]?.crday2 || (selectedItem.crday2 || '0'),
             isauth: 2,
             referrer: 'dashboard',
             txntype: 'outstandingdaysrequest',
@@ -466,64 +377,19 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         if (handleValidation(payload)) {
             setSuccess(true);
             setresponsemessage('Loading...');
-
-            console.log(`${selectedAction} confirmed for:`, payload);
             const headers = {
-                Authorization: `Bearer ${getToken()}`,
+                Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
                 'X-Requested-with': 'XMLHttpRequest',
             };
-            console.log("API CALL START", API);
             try {
-
                 const response = await axios.post(`${API}/api/osdaysreqedit`, payload, { headers });
-                // const response = {
-                //     "data": {
-                //         "main": [
-                //             {
-                //                 "uid": "300000303",
-                //                 "prptype": "K",
-                //                 "prpcode": "DK",
-                //                 "crlimitreqdt": "02-02-2026",
-                //                 "parcode": "24246",
-                //                 "subparcode": "24246",
-                //                 "limit1": "4335000.00",
-                //                 "limit2": "5135000.00",
-                //                 "limit3": "5135000.00",
-                //                 "isauth": "1",
-                //                 "ausrcode": "1",
-                //                 "alastdate": "20260210",
-                //                 "alasttime": "14.36",
-                //                 "aremark": "os-4150912",
-                //                 "usrcode": "",
-                //                 "lastdate": "20260202",
-                //                 "lasttime": "10.37",
-                //                 "uusrcode": "",
-                //                 "ulastdate": "20260210",
-                //                 "ulasttime": "14.36",
-                //                 "yearno": "26",
-                //                 "setdate": "0",
-                //                 "crday1": "60",
-                //                 "crday2": "60",
-                //                 "crday3": "60",
-                //                 "parname": "DHRUV CREATIONS",
-                //                 "subparname": "DHRUV CREATIONS",
-                //                 "ausrname": "admin"
-                //             }
-                //         ]
-                //     },
-                //     "success": true,
-                //     "message": ""
-                // }
-                console.log('🔵 response', response);
                 if (response.data.success) {
-                    console.log('✅ aaa 113 response.data.response.data');
                     setresponsemessage(response.data.message || 'Success');
                     setTimeout(() => {
                         setSuccess(false);
                         setShowOverlay(false);
                     }, 2000);
-                    // setProcessedCards(prev => new Set(prev).add(selectedItem.uid));
                     setData(prevData => {
                         const newData = prevData.filter(item => item.uid !== selectedItem.uid);
                         newData.push({ ...selectedItem, isProcessed: true, actionType: selectedAction });
@@ -533,7 +399,6 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                         flatListRef.current?.scrollToEnd({ animated: true });
                     }, 300);
                 } else {
-                    console.log('✅ aaa 114 response.data.response.data');
                     setresponsemessage(response.data.message || 'Success');
                     setTimeout(() => {
                         setSuccess(false);
@@ -545,49 +410,16 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                     setSuccess(false);
                 }, 2000);
             }
-
         }
     };
 
-    const numberToWordsIndian = num => {
-        const ones = [
-            '',
-            'One',
-            'Two',
-            'Three',
-            'Four',
-            'Five',
-            'Six',
-            'Seven',
-            'Eight',
-            'Nine'
-        ];
-        const teens = [
-            'Ten',
-            'Eleven',
-            'Twelve',
-            'Thirteen',
-            'Fourteen',
-            'Fifteen',
-            'Sixteen',
-            'Seventeen',
-            'Eighteen',
-            'Nineteen'
-        ];
-        const tens = [
-            '',
-            'Ten',
-            'Twenty',
-            'Thirty',
-            'Forty',
-            'Fifty',
-            'Sixty',
-            'Seventy',
-            'Eighty',
-            'Ninety'
-        ];
+    // Number to Words Logic
+    const numberToWordsIndian = (num: number) => {
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+        const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const tens = ['', 'Ten', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
-        const convertLessThanOneThousand = n => {
+        const convertLessThanOneThousand = (n: number) => {
             if (n === 0) return '';
             let res = '';
             if (n >= 100) {
@@ -610,13 +442,12 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         if (num === 0) return 'Zero';
         if (num === null || num === undefined || isNaN(num)) return '';
 
-        num = parseFloat(num);
+        num = parseFloat(num as any);
         if (isNaN(num)) return '';
 
         let res = '';
         if (num >= 10000000) {
-            res +=
-                convertLessThanOneThousand(Math.floor(num / 10000000)) + ' Crore ';
+            res += convertLessThanOneThousand(Math.floor(num / 10000000)) + ' Crore ';
             num %= 10000000;
         }
         if (num >= 100000) {
@@ -624,8 +455,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             num %= 100000;
         }
         if (num >= 1000) {
-            res +=
-                convertLessThanOneThousand(Math.floor(num / 1000)) + ' Thousand ';
+            res += convertLessThanOneThousand(Math.floor(num / 1000)) + ' Thousand ';
             num %= 1000;
         }
         if (num > 0) {
@@ -633,21 +463,263 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         }
         return res.trim();
     };
+
+    // Fetch Bills Data
+    const fetchBillsData = async (parcode: string, prptype: string, uid: string, prpcode: string) => {
+        setInfoLoading(true);
+        setBillsLoading(true);
+        try {
+            const payload = {
+                uid: uid,
+                prpcode: prpcode,
+                acccode: parcode,
+                txntype: 'outstandingdaysrequestbills',
+                referrer: 'dashboard',
+                action: 'partybills',
+                prptype: prptype,
+            };
+            const response = await axios.get(
+                `${API}/api/osdaysreqbills`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params: payload,
+                }
+            );
+            if (response.data.success) {
+                const data = response.data.data;
+                setMainParData(data.mainpardata);
+                setBillsData(data.osbills || []);
+            } else {
+                Alert.alert('Error', response.data.message || 'Failed to fetch bills');
+                closeBillsModal();
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Server error');
+            closeBillsModal();
+        } finally {
+            setInfoLoading(false);
+            setBillsLoading(false);
+        }
+    };
+
+    const closeBillsModal = () => {
+        setShowBillsAccordion(false);
+        setBillsData([]);
+        setMainParData(null);
+        setBillsSearchQuery('');
+    };
+
+    const handleInfoIconClick = (item: CardData) => {
+        setSelectedItem(item);
+        setSelectedAction('info');
+        setBillsData([]);
+        setMainParData(null);
+        setShowBillsAccordion(true);
+        fetchBillsData(item.parcode, item.prptype, item.uid, item.prpcode);
+    };
+
+    // Render Bills Accordion with Bills Count and Formatting for osdays/diffdays
+    const renderBillsAccordion = () => {
+        if (!showBillsAccordion) return null;
+
+        const filteredBillsData = billsSearchQuery
+            ? billsData.filter((bill) =>
+                  Object.values(bill).some((value) =>
+                      String(value).toLowerCase().includes(billsSearchQuery.toLowerCase())
+                  )
+              )
+            : billsData;
+
+        const numAccordionColumns = width < 600 ? 1 : width < 1000 ? 2 : 3;
+
+        const formatLabel = (key: string) =>
+            key
+                .split(/(?=[A-Z])|_/)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+
+        const isNumeric = (val: any) => !isNaN(parseFloat(val)) && isFinite(val);
+
+        return (
+            <Modal
+                visible={showBillsAccordion}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={closeBillsModal}
+            >
+                <View style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+                    <Header
+                        userName={username}
+                        onSearch={setBillsSearchQuery}
+                        placeholder="Search bills..."
+                    />
+
+                    {billsLoading ? (
+                        <FullScreenLoader message="Loading bills..." />
+                    ) : (
+                        <>
+                            {mainParData && (
+                                <View style={styles.billsHeaderContainer}>
+                                    <Text style={styles.billsHeaderTitle}>{mainParData.mainparname}</Text>
+                                    <Text style={styles.billsHeaderSub}>
+                                        Party Code: {mainParData.mainparcode} | Bills: {filteredBillsData.length}
+                                    </Text>
+                                </View>
+                            )}
+
+                            <FlatList
+                                data={filteredBillsData}
+                                keyExtractor={(item, index) => `${item.billno || index}-${index}`}
+                                numColumns={numAccordionColumns}
+                                key={numAccordionColumns}
+                                contentContainerStyle={{ padding: 8 }}
+                                renderItem={({ item }) => (
+                                    <View style={styles.billCard}>
+                                        {Object.entries(item).map(([key, value]) => {
+                                            const shouldSkipFormatting = key.toLowerCase() === 'osdays' || key.toLowerCase() === 'diffdays';
+                                            let displayValue: string;
+
+                                            if (shouldSkipFormatting) {
+                                                const numericValue = parseFloat(String(value));
+                                                displayValue = !isNaN(numericValue) ? Math.floor(numericValue).toString() : String(value);
+                                            } else {
+                                                displayValue = isNumeric(value) ? formatToIndianCurrency(String(value)) : String(value);
+                                            }
+
+                                            return (
+                                                <View key={key} style={styles.billRow}>
+                                                    <Text style={styles.billLabel}>{formatLabel(key)}</Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.billValue,
+                                                            isNumeric(value) && styles.billValueNumeric,
+                                                        ]}
+                                                    >
+                                                        {displayValue}
+                                                    </Text>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>No bills found</Text>
+                                    </View>
+                                }
+                            />
+                        </>
+                    )}
+
+                    <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={closeBillsModal}
+                    >
+                        <Icon name="close" size={28} color="white" />
+                    </TouchableOpacity>
+                </View>
+            </Modal>
+        );
+    };
+
+    // Styles for Bills Accordion
+    const styles = {
+        billsHeaderContainer: {
+            backgroundColor: '#fff',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: '#e0e0e0',
+        },
+        billsHeaderTitle: {
+            fontSize: 18,
+            fontWeight: '700',
+            color: '#1a1a1a',
+        },
+        billsHeaderSub: {
+            fontSize: 14,
+            color: '#6c757d',
+            marginTop: 2,
+        },
+        billCard: {
+            flex: 1,
+            margin: 6,
+            backgroundColor: '#ffffff',
+            borderRadius: 10,
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            elevation: 2,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+            borderWidth: 1,
+            borderColor: '#f0f0f0',
+        },
+        billRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingVertical: 4,
+            borderBottomWidth: 1,
+            borderBottomColor: '#f5f5f5',
+        },
+        billLabel: {
+            fontSize: 13,
+            color: '#495057',
+            fontWeight: '500',
+            flex: 0.45,
+        },
+        billValue: {
+            fontSize: 13,
+            color: '#212529',
+            flex: 0.55,
+            textAlign: 'left',
+        },
+        billValueNumeric: {
+            textAlign: 'right',
+            fontWeight: '500',
+            color: '#0d6efd',
+        },
+        closeButton: {
+            position: 'absolute',
+            bottom: 24,
+            right: 24,
+            backgroundColor: '#F44336',
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4,
+        },
+        emptyContainer: {
+            padding: 30,
+            alignItems: 'center',
+        },
+        emptyText: {
+            fontSize: 16,
+            color: '#6c757d',
+        },
+    };
+
+    // Format to Indian Currency
     const formatToIndianCurrency = (value: string | number) => {
         const numericValue = typeof value === 'string'
-            ? value.replace(/[^0-9]/g, '') // Remove all non-numeric characters
+            ? value.replace(/[^0-9]/g, '')
             : String(value).replace(/[^0-9]/g, '');
         const num = parseInt(numericValue, 10) || 0;
-        return num.toLocaleString('en-IN', { maximumFractionDigits: 0 }); // Ensure no decimals
+        return num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
     };
-    // 🔥 CARD UI (DITTO)
-    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => {
 
+    // Render Card Logic
+    const renderCard = ({ item }: { item: CardData & { isProcessed?: boolean; actionType?: 'accept' | 'reject' } }) => {
         const editedLimit2 = editableValues[item.uid]?.limit2 || item.limit2;
         const rawValue = editedLimit2 ? editedLimit2.replace(/[₹,]/g, '') : item.limit2;
-        console.log('rawValue:', rawValue);
         const numericValue = parseInt(rawValue, 10);
-        console.log('numericValue:', numericValue);
         const itemLimitInWords = !isNaN(numericValue) ? numberToWordsIndian(numericValue) : '';
 
         return (
@@ -661,9 +733,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                             : null
                 ]}>
                     {item.isProcessed && (
-                        <View style={[
-                            crlimtreq_styles.stampContainer,
-                        ]}>
+                        <View style={[crlimtreq_styles.stampContainer]}>
                             <View style={[
                                 crlimtreq_styles.stamp,
                                 item.actionType === 'accept' ? crlimtreq_styles.stampAccepted : crlimtreq_styles.stampRejected
@@ -696,13 +766,11 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                             <View style={crlimtreq_styles.keyValuePair}>
                                 <Text style={crlimtreq_styles.key}>OS Days:</Text>
                                 <Text style={crlimtreq_styles.valuegreen}>
-                                    {/* {formatToIndianCurrency(item.limit1 || '0')} */}
                                     {parseInt(item.limit1 || '0', 10)}
                                 </Text>
                             </View>
                         </View>
                         <View style={crlimtreq_styles.twoColumnRow}>
-
                             <View style={crlimtreq_styles.keyValuePair}>
                                 <Text style={crlimtreq_styles.key}>Overdue:</Text>
                                 <Text style={crlimtreq_styles.value}>
@@ -718,12 +786,10 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                                         : parseInt(item.limit2, 10).toString()
                                     }
                                     onChangeText={(text) => {
-                                        // Allow empty input temporarily
                                         if (text === '') {
                                             handleEdit(item.uid, 'limit2', text);
                                             return;
                                         }
-                                        // Only allow integers (no decimals)
                                         if (!/^\d*$/.test(text)) {
                                             Alert.alert('Invalid Input', 'Please enter a valid integer (no decimals allowed).');
                                             return;
@@ -731,30 +797,10 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                                         handleEdit(item.uid, 'limit2', text);
                                     }}
                                     keyboardType="numeric"
-                                    autoFocus={false} // Prevent auto-focus to avoid keyboard issues
+                                    autoFocus={false}
                                 />
                             </View>
                         </View>
-                        {/* <View style={crlimtreq_styles.fullWidthRow}>
-                          
-                            <Text style={crlimtreq_styles.valueWord}>{itemLimitInWords}</Text>
-                        </View> */}
-                        {/* <View style={crlimtreq_styles.twoColumnRow}>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Cr. Days:</Text>
-                                <Text style={crlimtreq_styles.valuegreen}>{item.crday1}</Text>
-                            </View>
-                            <View style={crlimtreq_styles.keyValuePair}>
-                                <Text style={crlimtreq_styles.key}>Req. Cr. Days:</Text>
-                                <RNTextInput
-                                    style={crlimtreq_styles.editableValue}
-                                    value={editableValues[item.uid]?.crday2 !== undefined ? editableValues[item.uid].crday2 : item.crday2}
-                                    onChangeText={(text) => handleEdit(item.uid, 'crday2', text)}
-                                    keyboardType="numeric"
-                                    placeholder={String(item.crday2)}
-                                />
-                            </View>
-                        </View> */}
                         <View style={crlimtreq_styles.fullWidthRow}>
                             <Text style={crlimtreq_styles.key}>Remark:</Text>
                             <Text style={crlimtreq_styles.value}>{item.remark}</Text>
@@ -775,6 +821,16 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                         <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={item.isProcessed}>
                             <Icon name="cancel" size={40} color={item.isProcessed ? "#ccc" : "#F44336"} />
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => handleInfoIconClick(item)}
+                            disabled={item.isProcessed || isInfoLoading}
+                        >
+                            {isInfoLoading ? (
+                                <ActivityIndicator size={40} color="#FF9800" />
+                            ) : (
+                                <Icon name="info" size={40} color={item.isProcessed ? "#ccc" : "#FF9800"} />
+                            )}
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => handleIconPress(item, 'list')} disabled={item.isProcessed}>
                             <Icon name="list" size={40} color={item.isProcessed ? "#ccc" : "#2196F3"} />
                         </TouchableOpacity>
@@ -784,6 +840,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         );
     };
 
+    // Render All Card History Logic
     const renderAllCardHistory = ({ item }: { item: AllHistoryData }) => (
         <View style={crlimtreq_styles.gridCardWrapper}>
             <View style={[
@@ -833,23 +890,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                             <Text style={crlimtreq_styles.key}>Revert Date:</Text>
                             <Text style={crlimtreq_styles.value}>{item.revertdate || 'N/A'}</Text>
                         </View>
-                        {/* <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Auth. Days:</Text>
-                            <Text style={crlimtreq_styles.Authvalue}>{item.crday3}</Text>
-                        </View> */}
                     </View>
-                    {/* <View style={crlimtreq_styles.twoColumnRow}>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Old Cr. Days:</Text>
-                            <Text style={crlimtreq_styles.valuegreen}>{item.crday1}</Text>
-                        </View>
-                        <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Req. Cr. Days:</Text>
-                            <Text style={crlimtreq_styles.editableValue1}>{item.crday2}</Text>
-                        </View>
-                    </View> */}
                     <View style={crlimtreq_styles.twoColumnRow}>
-
                         <View style={crlimtreq_styles.keyValuePair}>
                             <Text style={crlimtreq_styles.key}>Authorised Date:</Text>
                             <Text style={crlimtreq_styles.Authvalue}>{item.adate || 'N/A'}</Text>
@@ -866,15 +908,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                                 : item.status === 'Rejected' ? <Text style={crlimtreq_styles.valueRejected}>{item.status}</Text>
                                     : item.status === 'Pending' ? <Text style={crlimtreq_styles.value}>{item.status}</Text>
                                         : <Text style={crlimtreq_styles.value}>{item.status}</Text>}
-                            {/* <Text style={crlimtreq_styles.value}>{item.status}</Text> */}
                         </View>
-                        {/* <View style={crlimtreq_styles.keyValuePair}>
-                            <Text style={crlimtreq_styles.key}>Revert Date:</Text>
-                            <Text style={crlimtreq_styles.value}>{item.revertdate || 'N/A'}</Text>
-                        </View> */}
                     </View>
-
-
                     <View style={crlimtreq_styles.fullWidthRow}>
                         <Text style={crlimtreq_styles.key}>Remark:</Text>
                         <Text style={crlimtreq_styles.value}>{item.remark}</Text>
@@ -892,8 +927,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         </View>
     );
 
-
-    const TabBar = ({ activeTab, setActiveTab }) => (
+    // TabBar Component
+    const TabBar = ({ activeTab, setActiveTab }: any) => (
         <View style={crlimtreq_styles.tabContainer1}>
             <TouchableOpacity
                 style={[crlimtreq_styles.tab1, activeTab === 'requests' && crlimtreq_styles.activeTab1]}
@@ -912,12 +947,6 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
 
     return (
         <View style={{ flex: 1 }}>
-
-            {/* HEADER */}
-            {/* <Header
-                userName={username}
-                onSearch={activeTab1 === 'requests' ? setSearchQuery : setSearchhistoryQuery}
-            /> */}
             {activeTab1 === 'requests' ? (
                 <Header
                     userName={username}
@@ -934,19 +963,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
 
             {isLoading && <FullScreenLoader message="Loading..." />}
 
-            {/* TAB SWITCH */}
-            {/* <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-                <TouchableOpacity onPress={() => setActiveTab1('requests')}>
-                    <Text>Request</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => setActiveTab1('history')}>
-                    <Text>History</Text>
-                </TouchableOpacity>
-            </View> */}
             <TabBar activeTab={activeTab1} setActiveTab={setActiveTab1} />
 
-            {/* LIST */}
             {activeTab1 === 'requests' ? (
                 <FlatList
                     ref={flatListRef}
@@ -954,7 +972,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                     renderItem={renderCard}
                     keyExtractor={(item) => item.uid}
                     numColumns={numColumns}
-                    key={numColumns} // 🔥 VERY IMPORTANT (re-render fix)
+                    key={numColumns}
                     contentContainerStyle={crlimtreq_styles.list}
                     onScroll={({ nativeEvent }) => {
                         setShowTopButton(nativeEvent.contentOffset.y > 100);
@@ -988,6 +1006,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                     }
                 />
             ) : null}
+
             {activeTab1 === 'requests' ? (
                 <>
                     {showTopButton && (
@@ -999,31 +1018,19 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                         </TouchableOpacity>
                     )}
                 </>
+            ) : activeTab1 === 'history' ? (
+                <>
+                    {showTopButton && (
+                        <TouchableOpacity
+                            style={crlimtreq_styles.topButton}
+                            onPress={scrollHistoryToTop}
+                        >
+                            <Icon name="arrow-upward" size={24} color="black" />
+                        </TouchableOpacity>
+                    )}
+                </>
+            ) : null}
 
-            ) : activeTab1 === 'history' ? (<>
-                {showTopButton && (
-                    <TouchableOpacity
-                        style={crlimtreq_styles.topButton}
-                        onPress={scrollHistoryToTop}
-                    >
-                        <Icon name="arrow-upward" size={24} color="black" />
-                    </TouchableOpacity>
-                )}</>) : null}
-
-            {/* MODAL */}
-            {/* <Modal visible={showOverlay} transparent>
-                <View style={crlimtreq_styles.overlay}>
-                    <Text>Confirm {selectedAction}</Text>
-
-                    <TouchableOpacity onPress={handleConfirmAction}>
-                        <Text>YES</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => setShowOverlay(false)}>
-                        <Text>NO</Text>
-                    </TouchableOpacity>
-                </View>
-            </Modal> */}
             {getSuccess === true ? (
                 <Modal
                     visible={showOverlay}
@@ -1089,7 +1096,8 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                 </Modal>
             )}
 
-            {/* PARTY HISTORY */}
+            {renderBillsAccordion()}
+
             <PartyHistoryModal
                 visible={showPartyHistoryModal}
                 onClose={() => {
@@ -1098,19 +1106,14 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                 }}
                 partyList={partyList}
                 historyData={historyData}
-                // allhistoryData={allhistoryData}
                 partyLoading={partyLoading}
                 historyLoading={historyLoading}
-                // allhistoryLoading={allhistoryLoading}
-                // showAllHistoryOnly={!!allhistoryData.length}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
-                // setParname={setParname}
                 getParname={getParname}
             />
-
         </View>
     );
-}
+};
 
 export default OutstandingDaysRequest;

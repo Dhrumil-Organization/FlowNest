@@ -52,6 +52,13 @@ function addMonth(year: number, month: number, delta: number) {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
+function monthlyReportAnchorDate(year: number, month: number) {
+  const now = new Date();
+  const isCurrent = now.getFullYear() === year && now.getMonth() + 1 === month;
+  const d = isCurrent ? now : new Date(year, month, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function resolveFinancialYearNo(baseYearNo: string | number, calendarYear: number, calendarMonth: number) {
   const fyEndYear = calendarMonth >= 4 ? calendarYear + 1 : calendarYear;
   const numericBase = Number(baseYearNo);
@@ -401,6 +408,17 @@ export function MonthlyReportScreen() {
       ? Boolean(scope.owner_view_allowed)
       : hasInitialOwnerAuthority;
 
+
+  /*
+   * Management My View intentionally means ALL executives.
+   * The backend already authorizes Director/Super Admin for Owner scope, so
+   * management My View uses that same server-authorized ALL_EXECUTIVES scope
+   * while the UI remains on the My View tab. Normal users still send view=my
+   * and remain locked to BaseController::DASHBOARD_MY_VIEW_SEXES.
+   */
+  const apiView: DashboardView =
+    view === 'my' && hasInitialOwnerAuthority ? 'owner' : view;
+
   useEffect(() => {
     if (!ownerAllowed && view === 'owner') {
       setView('my');
@@ -501,9 +519,9 @@ export function MonthlyReportScreen() {
           prptype,
           yearno: selectedYearNo,
           monthno: month,
-          view,
+          view: apiView,
           sexe:
-            view === 'my' && selectedExecutiveCode
+            apiView === 'my' && selectedExecutiveCode
               ? selectedExecutiveCode
               : undefined,
         });
@@ -553,7 +571,7 @@ export function MonthlyReportScreen() {
         }
 
         const effectiveExecutiveCode =
-          view === 'my'
+          apiView === 'my'
             ? String(
                 enforcedScope?.selected_executive_code ||
                   (
@@ -570,7 +588,7 @@ export function MonthlyReportScreen() {
           prptype,
           yearno: selectedYearNo,
           monthno: month,
-          view,
+          view: apiView,
           executive_code: effectiveExecutiveCode || undefined,
         };
 
@@ -593,19 +611,19 @@ export function MonthlyReportScreen() {
         const nextSalesRows = normalizeScopedExecutiveRows(
           salesResult.response.data || [],
           'SALES_ORDER',
-          view,
+          apiView,
           enforcedScope,
         );
         const nextBillingRows = normalizeScopedExecutiveRows(
           billingResult.response.data || [],
           'BILLING',
-          view,
+          apiView,
           enforcedScope,
         );
         const nextCollectionRows = normalizeScopedExecutiveRows(
           collectionResult.response.data || [],
           'COLLECTION',
-          view,
+          apiView,
           enforcedScope,
         );
 
@@ -619,7 +637,7 @@ export function MonthlyReportScreen() {
          * and executive rows on the identical SELF/inspection scope.
          */
         if (
-          view === 'my' &&
+          apiView === 'my' &&
           (enforcedScope?.executive_codes || []).length === 1
         ) {
           const baseCards = cardResult.response.cards || [];
@@ -678,6 +696,7 @@ export function MonthlyReportScreen() {
       selectedExecutiveCode,
       selectedExecutiveName,
       selectedYearNo,
+      apiView,
       view,
       year,
       yearno,
@@ -725,15 +744,27 @@ export function MonthlyReportScreen() {
     row: AnalyticsExecutiveRow,
     metric: DashboardMetricKey,
   ) => {
+    const commonParams = {
+      source: 'monthly_report',
+      api_view: apiView,
+      view,
+      date: monthlyReportAnchorDate(year, month),
+      report_month: `${year}${String(month).padStart(2, '0')}`,
+      yearno: selectedYearNo,
+      monthno: month,
+      prptype,
+      metric,
+      executive_code: row.executive_code,
+      executive_name: row.executive_name,
+    };
+
     if (metric === 'COLLECTION') {
       router.push({
         pathname: '/new/(tabs)/reports/collection-flow',
         params: {
-          view,
-          monthno: month,
-          metric,
-          executive_code: row.executive_code,
-          executive_name: row.executive_name,
+          ...commonParams,
+          mode: 'collection',
+          level: 'parties',
         },
       } as any);
       return;
@@ -742,12 +773,8 @@ export function MonthlyReportScreen() {
     router.push({
       pathname: '/new/(tabs)/reports/sales-flow',
       params: {
-        view,
-        monthno: month,
-        metric,
+        ...commonParams,
         level: 'parties',
-        executive_code: row.executive_code,
-        executive_name: row.executive_name,
       },
     } as any);
   };
@@ -755,6 +782,10 @@ export function MonthlyReportScreen() {
   const scopeNote = useMemo(() => {
     if (view === 'owner') {
       return `All executives · FY ${selectedYearNo}`;
+    }
+
+    if (view === 'my' && hasInitialOwnerAuthority) {
+      return `My View · All executives · FY ${selectedYearNo}`;
     }
 
     if (scope?.my_view_mode === 'SELF_EXECUTIVE' || scope?.my_view_mode === 'ASSIGNED_EXECUTIVE') {
@@ -774,6 +805,7 @@ export function MonthlyReportScreen() {
 
     return `My View · FY ${selectedYearNo}`;
   }, [
+    hasInitialOwnerAuthority,
     scope,
     scopeExecutiveCode,
     scopeExecutiveName,

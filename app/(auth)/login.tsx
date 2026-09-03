@@ -272,7 +272,7 @@ export default function LoginScreen() {
                                             const key = normalizePrptype(itm.prptype ?? itm.PrpType ?? '');
                                             const summary = await getPrptypeSummary(key);
                                             console.log(`→ summary for requested prptype "${itm.prptype}":`, summary);
-                                        } x
+                                        }
 
                                         // await printCachedPrptypesWithData();
                                         console.log("💾 SAVED SUCCESS");
@@ -374,7 +374,7 @@ export default function LoginScreen() {
             >
 
                 <TouchableOpacity
-                    onPress={() => router.replace('/(all)/landing')}
+                    onPress={() => router.replace('/(all)/lookup-select')}
 
                 >
 
@@ -396,7 +396,7 @@ export default function LoginScreen() {
             /> */}
             <View style={styles.heroContainer}>
                 <View style={{ alignSelf: 'flex-start' }}>
-                    <TouchableOpacity onPress={() => router.replace('/(all)/landing')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => router.replace('/(all)/lookup-select')} style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Icon name="arrow-back" size={22} color={theme.BRAND_GRADIENT_END} />
                         <Text style={{ color: theme.BRAND_GRADIENT_END }}>Back</Text>
                     </TouchableOpacity>

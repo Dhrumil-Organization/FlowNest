@@ -40,6 +40,18 @@ type TrendPoint = {
   value: number;
 };
 
+type DesignRow = {
+  dsncode?: string | number | null;
+  design_code?: string | number | null;
+  dsnname?: string;
+  design_name?: string;
+  name?: string;
+  today_meters?: number;
+  mtd_meters?: number;
+  share_pct?: number;
+  unresolved?: boolean;
+};
+
 type CategoryRow = {
   itmcode?: string | number | null;
   name?: string;
@@ -47,6 +59,14 @@ type CategoryRow = {
   mtd_meters?: number;
   share_pct?: number;
   unresolved?: boolean;
+  by_design?: DesignRow[];
+  designs?: DesignRow[];
+  design_reconciliation?: {
+    category_mtd_meters?: number;
+    design_mtd_meters?: number;
+    difference_meters?: number;
+    is_reconciled?: boolean;
+  };
 };
 
 function points(source: any): TrendPoint[] {
@@ -227,6 +247,20 @@ function CategorySummaryCard({
   const unresolved = Number(reconciliation?.unresolved_meters || 0);
   const unresolvedPct = Number(reconciliation?.unresolved_pct || 0);
   const reconciled = reconciliation?.is_reconciled !== false;
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const rowKey = (row: CategoryRow, index: number) =>
+    `${String(row?.itmcode ?? 'unresolved')}-${index}`;
+
+  const designsFor = (row: CategoryRow): DesignRow[] => {
+    const source = Array.isArray(row?.by_design)
+      ? row.by_design
+      : Array.isArray(row?.designs)
+        ? row.designs
+        : [];
+
+    return source.filter(Boolean);
+  };
 
   return (
     <View style={s.card}>
@@ -243,40 +277,140 @@ function CategorySummaryCard({
         </View>
       ) : (
         <>
-          {safeRows.map((row, index) => (
-            <View
-              key={`${String(row?.itmcode ?? 'unresolved')}-${index}`}
-              style={s.categoryRow}
-            >
-              <View style={s.categoryLeft}>
-                <Text
-                  style={[
-                    s.categoryName,
-                    row?.unresolved && s.categoryUnresolved,
-                  ]}
-                  numberOfLines={2}
+          {safeRows.map((row, index) => {
+            const key = rowKey(row, index);
+            const designRows = designsFor(row);
+            const isExpanded = !!expanded[key];
+            const categoryMtd = Number(row?.mtd_meters || 0);
+            const designTotal = designRows.reduce(
+              (sum, design) => sum + Number(design?.mtd_meters || 0),
+              0,
+            );
+            const designDifference = Number(
+              row?.design_reconciliation?.difference_meters ??
+                categoryMtd - designTotal,
+            );
+            const designsReconciled =
+              row?.design_reconciliation?.is_reconciled ??
+              Math.abs(designDifference) <= 0.01;
+
+            return (
+              <View key={key}>
+                <TouchableOpacity
+                  style={s.categoryRow}
+                  activeOpacity={designRows.length > 0 ? 0.72 : 1}
+                  disabled={designRows.length === 0}
+                  onPress={() =>
+                    setExpanded(current => ({
+                      ...current,
+                      [key]: !current[key],
+                    }))
+                  }
                 >
-                  {row?.name || 'UNRESOLVED ITEM'}
-                </Text>
+                  <View style={s.categoryLeft}>
+                    <View style={s.categoryTitleLine}>
+                      {designRows.length > 0 ? (
+                        <Text style={s.expandIcon}>
+                          {isExpanded ? '−' : '+'}
+                        </Text>
+                      ) : null}
 
-                <Text style={s.categoryMeta} numberOfLines={1}>
-                  {row?.unresolved
-                    ? 'Item not resolved · included in total'
-                    : `Item ${String(row?.itmcode ?? '')}`}
-                </Text>
-              </View>
+                      <Text
+                        style={[
+                          s.categoryName,
+                          row?.unresolved && s.categoryUnresolved,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {row?.name || 'UNRESOLVED ITEM'}
+                      </Text>
+                    </View>
 
-              <View style={s.categoryRight}>
-                <Text style={s.categoryMtd}>
-                  {meters(Number(row?.mtd_meters || 0))}
-                </Text>
-                <Text style={s.categoryDetail}>
-                  Yday {meters(Number(row?.today_meters || 0))} ·{' '}
-                  {Number(row?.share_pct || 0).toFixed(1)}%
-                </Text>
+                    <Text style={s.categoryMeta} numberOfLines={1}>
+                      {row?.unresolved
+                        ? 'Item not resolved · included in total'
+                        : designRows.length > 0
+                          ? `${designRows.length} design${designRows.length === 1 ? '' : 's'} · tap to ${isExpanded ? 'collapse' : 'expand'}`
+                          : `Item ${String(row?.itmcode ?? '')}`}
+                    </Text>
+                  </View>
+
+                  <View style={s.categoryRight}>
+                    <Text style={s.categoryMtd}>{meters(categoryMtd)}</Text>
+                    <Text style={s.categoryDetail}>
+                      Yday {meters(Number(row?.today_meters || 0))} ·{' '}
+                      {Number(row?.share_pct || 0).toFixed(1)}%
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {isExpanded ? (
+                  <View style={s.designPanel}>
+                    {designRows.map((design, designIndex) => {
+                      const designMtd = Number(design?.mtd_meters || 0);
+                      const designShare = Number(
+                        design?.share_pct ??
+                          (categoryMtd > 0 ? (designMtd / categoryMtd) * 100 : 0),
+                      );
+                      const designCode = String(
+                        design?.dsncode ?? design?.design_code ?? '',
+                      ).trim();
+                      const designName = String(
+                        design?.dsnname ??
+                          design?.design_name ??
+                          design?.name ??
+                          (designCode ? `DESIGN ${designCode}` : 'NO DESIGN'),
+                      ).trim();
+
+                      return (
+                        <View
+                          key={`${designCode || 'design'}-${designIndex}`}
+                          style={s.designRow}
+                        >
+                          <View style={s.designLeft}>
+                            <Text
+                              style={[
+                                s.designName,
+                                design?.unresolved && s.categoryUnresolved,
+                              ]}
+                              numberOfLines={2}
+                            >
+                              {designName}
+                            </Text>
+                            <Text style={s.designMeta} numberOfLines={1}>
+                              {designCode ? `Design ${designCode}` : 'Design not resolved'}
+                            </Text>
+                          </View>
+
+                          <View style={s.designRight}>
+                            <Text style={s.designMtd}>{meters(designMtd)}</Text>
+                            <Text style={s.designShare}>
+                              {designShare.toFixed(1)}%
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+
+                    <View style={s.designTotalRow}>
+                      <Text style={s.designTotalLabel}>DESIGN TOTAL</Text>
+                      <Text style={s.designTotalValue}>{meters(designTotal)}</Text>
+                    </View>
+
+                    {!designsReconciled ? (
+                      <Text style={s.designWarning}>
+                        ⚠ Design total differs from category by {meters(Math.abs(designDifference))}.
+                      </Text>
+                    ) : (
+                      <Text style={s.designReconciled}>
+                        ✓ Design total matches category production
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
               </View>
-            </View>
-          ))}
+            );
+          })}
 
           <View style={s.categoryTotalRow}>
             <Text style={s.categoryTotalLabel}>MACHINE TOTAL</Text>
@@ -735,6 +869,18 @@ const s = StyleSheet.create({
     minWidth: 0,
     paddingRight: 10,
   },
+  categoryTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  expandIcon: {
+    width: 18,
+    color: '#6D287F',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 18,
+  },
   categoryRight: {
     minWidth: 118,
     alignItems: 'flex-end',
@@ -761,6 +907,85 @@ const s = StyleSheet.create({
     color: T.muted,
     fontSize: 8,
     marginTop: 4,
+  },
+  designPanel: {
+    backgroundColor: '#FBF9FC',
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    paddingLeft: 28,
+  },
+  designRow: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE7F0',
+  },
+  designLeft: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 10,
+  },
+  designRight: {
+    minWidth: 96,
+    alignItems: 'flex-end',
+  },
+  designName: {
+    color: T.nav,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  designMeta: {
+    color: T.muted,
+    fontSize: 8,
+    marginTop: 3,
+  },
+  designMtd: {
+    color: '#6D287F',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  designShare: {
+    color: T.muted,
+    fontSize: 8,
+    marginTop: 3,
+  },
+  designTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingLeft: 12,
+    paddingRight: 14,
+  },
+  designTotalLabel: {
+    color: T.muted,
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  designTotalValue: {
+    color: T.nav,
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  designReconciled: {
+    color: '#236A4A',
+    fontSize: 8,
+    fontWeight: '800',
+    paddingLeft: 12,
+    paddingRight: 14,
+    paddingBottom: 9,
+  },
+  designWarning: {
+    color: '#A85B00',
+    fontSize: 8,
+    fontWeight: '800',
+    paddingLeft: 12,
+    paddingRight: 14,
+    paddingBottom: 9,
   },
   categoryTotalRow: {
     flexDirection: 'row',

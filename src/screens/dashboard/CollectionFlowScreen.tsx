@@ -16,9 +16,26 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from './employ/api/api';
+import { DashboardAPI } from '@/src/api/dashboard';
 
 type Mode = 'collection' | 'outstanding';
 type Level = 'executives' | 'parties' | 'party_detail';
+
+type DateBreakdownRow = {
+  date_ymd?: number | string;
+  date_label?: string;
+  entry_count?: number;
+  amount?: number;
+  amount_exact?: string;
+};
+
+type PartyBreakdownRow = {
+  code?: string;
+  name?: string;
+  entry_count?: number;
+  amount?: number;
+  amount_exact?: string;
+};
 
 type Row = {
   code?: string;
@@ -27,6 +44,13 @@ type Row = {
   today_amount_exact?: string;
   amount?: number;
   amount_exact?: string;
+  dates?: DateBreakdownRow[];
+  date_reconciliation?: {
+    party_amount?: number;
+    date_amount?: number;
+    difference?: number;
+    is_reconciled?: boolean;
+  };
 };
 
 type HistoryRow = {
@@ -35,6 +59,13 @@ type HistoryRow = {
   entry_count?: number;
   amount?: number;
   amount_exact?: string;
+  parties?: PartyBreakdownRow[];
+  party_reconciliation?: {
+    date_amount?: number;
+    party_amount?: number;
+    difference?: number;
+    is_reconciled?: boolean;
+  };
 };
 
 type AgeingBucket = { key?: string; label?: string; amount?: number; amount_exact?: string };
@@ -145,10 +176,27 @@ const sixMonthChips = (anchorRaw: string): MonthChip[] => {
   return result;
 };
 
+const analyticsYearNo = (year: number, month: number): number =>
+  (month >= 4 ? year + 1 : year) % 100;
+
+const analyticsPeriodFromYm = (ym: string) => {
+  const clean = String(ym || '').replace(/[^0-9]/g, '');
+  const year = Number(clean.slice(0, 4));
+  const month = Number(clean.slice(4, 6));
+  return {
+    year,
+    month,
+    yearno: analyticsYearNo(year, month),
+  };
+};
+
+
 export default function CollectionFlowScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const session = useAppSessionStore((state: any) => state.appSession || state.session);
+  const isMonthlyReport = one(params.source) === 'monthly_report';
+  const analyticsView = (one(params.api_view) || one(params.view) || 'my') as 'owner' | 'my';
 
   const mode = (one(params.mode) || 'collection') as Mode;
   const level = (one(params.level) || 'executives') as Level;
@@ -176,6 +224,8 @@ export default function CollectionFlowScreen() {
   const [error, setError] = useState('');
   const [sortAscending, setSortAscending] = useState(false);
   const [ageingExpanded, setAgeingExpanded] = useState(false);
+  const [expandedHistoryDates, setExpandedHistoryDates] = useState<Record<string, boolean>>({});
+  const [expandedParties, setExpandedParties] = useState<Record<string, boolean>>({});
   const { mode: amountMode, setMode: setAmountMode } = useDashboardAmountMode();
   const hasFocusedOnce = useRef(false);
 
@@ -184,6 +234,12 @@ export default function CollectionFlowScreen() {
       setSelectedMonth(monthChips[0]?.ym || '');
     }
   }, [monthChips, selectedMonth]);
+
+
+  useEffect(() => {
+    setExpandedHistoryDates({});
+    setExpandedParties({});
+  }, [selectedMonth, executiveCode, partyCode, mode, level]);
 
   const selectedChip =
     monthChips.find(chip => chip.ym === selectedMonth) || monthChips[0];
@@ -199,6 +255,61 @@ export default function CollectionFlowScreen() {
 
       try {
         const includeExpected = expectedMonth !== '' && expectedMonth === selectedChip.ym;
+
+        if (isMonthlyReport && mode === 'collection') {
+          if (level !== 'parties') {
+            throw new Error('Unsupported Monthly Report Collection drill-down level.');
+          }
+
+          const period = analyticsPeriodFromYm(selectedChip.ym);
+          const response = await DashboardAPI.analyticsParties({
+            prptype,
+            yearno: period.yearno,
+            monthno: period.month,
+            view: analyticsView,
+            metric: 'COLLECTION',
+            executive_code: executiveCode || undefined,
+            party_code: partyCode || undefined,
+          });
+
+          if (!response?.success || response?.response?.configured === false) {
+            throw new Error(
+              response?.response?.scope?.message ||
+                response?.response?.message ||
+                response?.message ||
+                'Unable to load Monthly Report Collection drill-down.',
+            );
+          }
+
+          const normalizedRows: Row[] = (response?.response?.data || []).map((row: any) => ({
+            code: String(row?.party_code ?? row?.code ?? ''),
+            name: String(row?.party_name ?? row?.name ?? 'UNSPECIFIED PARTY'),
+            amount: Number(row?.actual ?? row?.amount ?? 0),
+          }));
+          const totalAmount = normalizedRows.reduce(
+            (sum, row) => sum + Number(row.amount || 0),
+            0,
+          );
+
+          setReport({
+            type: 'collection',
+            level: 'parties',
+            period: {
+              label: selectedChip.label,
+              month_name: selectedChip.label,
+              historical_supported: true,
+              mode: 'MONTH_TO_DATE',
+            },
+            total: {
+              amount: totalAmount,
+              row_count: normalizedRows.length,
+            },
+            rows: normalizedRows,
+            generated_at: new Date().toISOString(),
+          });
+          return;
+        }
+
         const response = await api.getOwnerCardReport({
           date: selectedChip.requestDate,
           prptype,
@@ -224,7 +335,7 @@ export default function CollectionFlowScreen() {
         setLoading(false);
         setRefreshing(false);
       }
-    }, [executiveCode, executiveName, expectedAmount, expectedGeneratedAt, expectedMonth, level, mode, partyCode, partyName, prptype, selectedChip],
+    }, [analyticsView, executiveCode, executiveName, expectedAmount, expectedGeneratedAt, expectedMonth, isMonthlyReport, level, mode, partyCode, partyName, prptype, selectedChip],
   );
 
   useEffect(() => {
@@ -260,6 +371,9 @@ export default function CollectionFlowScreen() {
 
   const openRow = (row: Row) => {
     if (!selectedChip) return;
+
+    // Monthly Report Collection currently terminates at Party level.
+    if (isMonthlyReport) return;
 
     if (level === 'executives') {
       router.push({
@@ -452,17 +566,76 @@ export default function CollectionFlowScreen() {
                   </Text>
                 </View>
               ) : (
-                historyRows.map((item, index) => (
-                  <View key={`${item?.date_ymd || index}-${index}`} style={styles.historyRow}>
-                    <View style={styles.historyDateWrap}>
-                      <Text style={styles.historyDate}>{item?.date_label || String(item?.date_ymd || '')}</Text>
-                      <Text style={styles.historyEntries}>
-                        {Number(item?.entry_count || 0)} entr{Number(item?.entry_count || 0) === 1 ? 'y' : 'ies'}
-                      </Text>
+                historyRows.map((item, index) => {
+                  const dateKey = String(item?.date_ymd || index);
+                  const parties = item?.parties || [];
+                  const canExpand = mode === 'collection' && parties.length > 0;
+                  const expanded = Boolean(expandedHistoryDates[dateKey]);
+                  const childTotal = parties.reduce((sum, party) => sum + Number(party?.amount || 0), 0);
+                  const parentTotal = Number(item?.amount || 0);
+                  const reconciledChildren = Math.abs(parentTotal - childTotal) <= 0.01;
+
+                  return (
+                    <View key={`${dateKey}-${index}`} style={styles.historyGroup}>
+                      <TouchableOpacity
+                        style={styles.historyRow}
+                        activeOpacity={canExpand ? 0.7 : 1}
+                        disabled={!canExpand}
+                        onPress={() => {
+                          if (!canExpand) return;
+                          setExpandedHistoryDates(current => ({
+                            ...current,
+                            [dateKey]: !current[dateKey],
+                          }));
+                        }}
+                      >
+                        <View style={styles.historyDateWrap}>
+                          <Text style={styles.historyDate}>{item?.date_label || String(item?.date_ymd || '')}</Text>
+                          <Text style={styles.historyEntries}>
+                            {Number(item?.entry_count || 0)} entr{Number(item?.entry_count || 0) === 1 ? 'y' : 'ies'}
+                          </Text>
+                        </View>
+                        <Text style={styles.historyAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(item?.amount, amountMode, item?.amount_exact)}</Text>
+                        {canExpand ? <Text style={styles.expandChevron}>{expanded ? '⌃' : '⌄'}</Text> : null}
+                      </TouchableOpacity>
+
+                      {expanded ? (
+                        <View style={styles.historyChildren}>
+                          <View style={styles.childColumns}>
+                            <Text style={styles.childColumnName}>PARTY</Text>
+                            <Text style={styles.childColumnValue}>AMOUNT</Text>
+                          </View>
+                          {parties.map((party, partyIndex) => (
+                            <View key={`${dateKey}-${party?.code || partyIndex}`} style={styles.childRow}>
+                              <View style={[styles.childRank, { backgroundColor: [T.yd, T.green, T.copper, T.purple, T.blue][partyIndex % 5] }]}>
+                                <Text style={styles.childRankText}>{partyIndex + 1}</Text>
+                              </View>
+                              <View style={styles.childMain}>
+                                <Text style={styles.childName}>{party?.name || 'Unspecified'}</Text>
+                                {party?.code ? <Text style={styles.childCode}>{party.code}</Text> : null}
+                              </View>
+                              <Text style={styles.childAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                                {formatSummaryAmount(party?.amount, amountMode, party?.amount_exact)}
+                              </Text>
+                            </View>
+                          ))}
+                          <View style={styles.childTotalRow}>
+                            <View>
+                              <Text style={styles.childTotalLabel}>DATE TOTAL</Text>
+                              <Text style={styles.childTotalMeta}>{parties.length} part{parties.length === 1 ? 'y' : 'ies'}</Text>
+                            </View>
+                            <View style={styles.childTotalRight}>
+                              <Text style={styles.childTotalAmount}>{formatSummaryAmount(childTotal, amountMode)}</Text>
+                              <Text style={[styles.childReconcile, { color: reconciledChildren ? T.green : T.red }]}>
+                                {reconciledChildren ? '✓ MATCHED' : `Δ ${formatSummaryAmount(parentTotal - childTotal, amountMode)}`}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      ) : null}
                     </View>
-                    <Text style={styles.historyAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>{formatSummaryAmount(item?.amount, amountMode, item?.amount_exact)}</Text>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           ) : null}
@@ -637,11 +810,29 @@ export default function CollectionFlowScreen() {
                 </View>
               ) : (
                 sortedRows.map((row, index) => {
-                  const canOpen = level === 'executives' || (mode === 'outstanding' && level === 'parties');
+                  const partyKey = String(row.code || index);
+                  const partyDates = row?.dates || [];
+                  const canExpandParty = mode === 'collection' && level === 'parties' && partyDates.length > 0;
+                  const canNavigate = level === 'executives' || (mode === 'outstanding' && level === 'parties');
+                  const canOpen = canExpandParty || canNavigate;
+                  const partyExpanded = Boolean(expandedParties[partyKey]);
+                  const dateTotal = partyDates.reduce((sum, item) => sum + Number(item?.amount || 0), 0);
+                  const partyTotal = Number(row?.amount || 0);
+                  const partyReconciled = Math.abs(partyTotal - dateTotal) <= 0.01;
+
                   return (
+                    <View key={`${row.code || index}-${index}`} style={styles.partyGroup}>
                     <TouchableOpacity
-                      key={`${row.code || index}-${index}`}
-                      onPress={() => openRow(row)}
+                      onPress={() => {
+                        if (canExpandParty) {
+                          setExpandedParties(current => ({
+                            ...current,
+                            [partyKey]: !current[partyKey],
+                          }));
+                          return;
+                        }
+                        if (canNavigate) openRow(row);
+                      }}
                       disabled={!canOpen}
                       activeOpacity={canOpen ? 0.65 : 1}
                       style={styles.row}
@@ -664,8 +855,45 @@ export default function CollectionFlowScreen() {
                         </Text>
                       </View>
 
-                      {canOpen ? <Text style={styles.chevron}>›</Text> : null}
+                      {canExpandParty ? (
+                        <Text style={styles.expandChevron}>{partyExpanded ? '⌃' : '⌄'}</Text>
+                      ) : canNavigate ? <Text style={styles.chevron}>›</Text> : null}
                     </TouchableOpacity>
+
+                    {partyExpanded ? (
+                      <View style={styles.partyDateChildren}>
+                        <View style={styles.childColumns}>
+                          <Text style={styles.childColumnName}>DATE</Text>
+                          <Text style={styles.childColumnValue}>AMOUNT</Text>
+                        </View>
+                        {partyDates.map((dateRow, dateIndex) => (
+                          <View key={`${partyKey}-${dateRow?.date_ymd || dateIndex}`} style={styles.partyDateRow}>
+                            <View style={styles.partyDateMain}>
+                              <Text style={styles.partyDateLabel}>{dateRow?.date_label || String(dateRow?.date_ymd || '')}</Text>
+                              <Text style={styles.partyDateEntries}>
+                                {Number(dateRow?.entry_count || 0)} entr{Number(dateRow?.entry_count || 0) === 1 ? 'y' : 'ies'}
+                              </Text>
+                            </View>
+                            <Text style={styles.childAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.62}>
+                              {formatSummaryAmount(dateRow?.amount, amountMode, dateRow?.amount_exact)}
+                            </Text>
+                          </View>
+                        ))}
+                        <View style={styles.childTotalRow}>
+                          <View>
+                            <Text style={styles.childTotalLabel}>PARTY TOTAL</Text>
+                            <Text style={styles.childTotalMeta}>{partyDates.length} date{partyDates.length === 1 ? '' : 's'}</Text>
+                          </View>
+                          <View style={styles.childTotalRight}>
+                            <Text style={styles.childTotalAmount}>{formatSummaryAmount(dateTotal, amountMode)}</Text>
+                            <Text style={[styles.childReconcile, { color: partyReconciled ? T.green : T.red }]}>
+                              {partyReconciled ? '✓ MATCHED' : `Δ ${formatSummaryAmount(partyTotal - dateTotal, amountMode)}`}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ) : null}
+                    </View>
                   );
                 })
               )}
@@ -789,6 +1017,32 @@ const styles = StyleSheet.create({
   todayAmount: { color: T.green, fontSize: 8, fontWeight: '800' },
   rowAmount: { fontSize: 11, fontWeight: '900', marginTop: 3 },
   chevron: { color: T.muted, fontSize: 22, marginLeft: 6 },
+
+  historyGroup: { borderBottomWidth: 1, borderBottomColor: T.border },
+  expandChevron: { color: T.muted, fontSize: 17, fontWeight: '900', marginLeft: 9, minWidth: 16, textAlign: 'center' },
+  historyChildren: { backgroundColor: T.alt, borderTopWidth: 1, borderTopColor: T.border, paddingBottom: 4 },
+  childColumns: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
+  childColumnName: { color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
+  childColumnValue: { color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 0.6 },
+  childRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: T.border },
+  childRank: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  childRankText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  childMain: { flex: 1, paddingRight: 12 },
+  childName: { color: T.ink, fontSize: 11, fontWeight: '800' },
+  childCode: { marginTop: 2, color: T.muted, fontSize: 8, fontWeight: '600' },
+  childAmount: { color: T.green, fontSize: 12, fontWeight: '900', maxWidth: 115, textAlign: 'right' },
+  childTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: T.border },
+  childTotalLabel: { color: T.ink, fontSize: 9, fontWeight: '900' },
+  childTotalMeta: { marginTop: 2, color: T.muted, fontSize: 8, fontWeight: '600' },
+  childTotalRight: { alignItems: 'flex-end' },
+  childTotalAmount: { color: T.green, fontSize: 12, fontWeight: '900' },
+  childReconcile: { marginTop: 2, fontSize: 7, fontWeight: '900', letterSpacing: 0.4 },
+  partyGroup: { borderBottomWidth: 1, borderBottomColor: T.border },
+  partyDateChildren: { backgroundColor: T.alt, borderTopWidth: 1, borderTopColor: T.border },
+  partyDateRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: 1, borderTopColor: T.border },
+  partyDateMain: { flex: 1, paddingRight: 12 },
+  partyDateLabel: { color: T.ink, fontSize: 11, fontWeight: '800' },
+  partyDateEntries: { marginTop: 2, color: T.muted, fontSize: 8, fontWeight: '600' },
 
   historyPanel: {
     marginTop: 14,

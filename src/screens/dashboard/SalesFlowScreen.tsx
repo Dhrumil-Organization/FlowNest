@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from './employ/api/api';
+import { DashboardAPI, DashboardMetricKey } from '@/src/api/dashboard';
 
 type SalesLevel =
   | 'categories'
@@ -155,12 +156,92 @@ const prettyDate = (value: number | string | undefined): string => {
   return `${raw.slice(6, 8)}-${raw.slice(4, 6)}-${raw.slice(0, 4)}`;
 };
 
+const analyticsYearNo = (year: number, month: number): number =>
+  (month >= 4 ? year + 1 : year) % 100;
+
+const analyticsPeriodFromYm = (ym: string) => {
+  const clean = String(ym || '').replace(/[^0-9]/g, '');
+  const year = Number(clean.slice(0, 4));
+  const month = Number(clean.slice(4, 6));
+  return {
+    year,
+    month,
+    yearno: analyticsYearNo(year, month),
+  };
+};
+
+const analyticsRowsToSalesRows = (level: SalesLevel, rows: any[]): SalesRow[] =>
+  (Array.isArray(rows) ? rows : []).map((row: any) => {
+    if (level === 'parties') {
+      return {
+        code: String(row?.party_code ?? row?.code ?? ''),
+        name: String(row?.party_name ?? row?.name ?? 'UNSPECIFIED PARTY'),
+        amount: Number(row?.actual ?? row?.amount ?? 0),
+        qty: Number(row?.qty ?? 0),
+        party_code: String(row?.party_code ?? row?.code ?? ''),
+        party_name: String(row?.party_name ?? row?.name ?? ''),
+      };
+    }
+
+    if (level === 'designs') {
+      return {
+        code: String(row?.design_code ?? row?.code ?? ''),
+        name: String(row?.design_name ?? row?.name ?? 'NO DESIGN'),
+        amount: Number(row?.amount ?? row?.actual ?? 0),
+        qty: Number(row?.qty ?? 0),
+        document_count: Number(row?.document_count ?? 0),
+        design_code: String(row?.design_code ?? row?.code ?? ''),
+        design_name: String(row?.design_name ?? row?.name ?? ''),
+        party_code: String(row?.party_code ?? ''),
+        party_name: String(row?.party_name ?? ''),
+        executive_code: String(row?.executive_code ?? ''),
+        executive_name: String(row?.executive_name ?? ''),
+      };
+    }
+
+    if (level === 'documents') {
+      return {
+        code: String(row?.document_uid ?? row?.code ?? ''),
+        name: String(row?.document_no ?? row?.name ?? row?.document_uid ?? ''),
+        amount: Number(row?.amount ?? row?.actual ?? 0),
+        qty: Number(row?.qty ?? 0),
+        document_uid: String(row?.document_uid ?? row?.code ?? ''),
+        document_no: String(row?.document_no ?? row?.name ?? ''),
+        document_date: row?.document_date,
+        party_code: String(row?.party_code ?? ''),
+        party_name: String(row?.party_name ?? ''),
+        executive_code: String(row?.executive_code ?? ''),
+        executive_name: String(row?.executive_name ?? ''),
+      };
+    }
+
+    return {
+      code: String(row?.line_no ?? row?.code ?? ''),
+      name: String(row?.design_name ?? row?.name ?? `Line ${row?.line_no ?? ''}`),
+      amount: Number(row?.amount ?? row?.actual ?? 0),
+      qty: Number(row?.qty ?? 0),
+      line_no: row?.line_no,
+      document_uid: String(row?.document_uid ?? ''),
+      document_no: String(row?.document_no ?? ''),
+      document_date: row?.document_date,
+      design_code: String(row?.design_code ?? ''),
+      design_name: String(row?.design_name ?? ''),
+      party_code: String(row?.party_code ?? ''),
+      party_name: String(row?.party_name ?? ''),
+      executive_code: String(row?.executive_code ?? ''),
+      executive_name: String(row?.executive_name ?? ''),
+    };
+  });
+
 export default function SalesFlowScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const session = useAppSessionStore((state: any) => state.appSession || state.session);
+  const isMonthlyReport = one(params.source) === 'monthly_report';
+  const analyticsMetric = (one(params.metric) || 'SALES_ORDER') as DashboardMetricKey;
+  const analyticsView = (one(params.api_view) || one(params.view) || 'my') as 'owner' | 'my';
 
-  const level = (one(params.level) || 'categories') as SalesLevel;
+  const level = (one(params.level) || (isMonthlyReport ? 'parties' : 'categories')) as SalesLevel;
   const anchorDate = one(params.date) || ymdFromDate(new Date());
   const monthChips = useMemo(() => sixMonthChips(anchorDate), [anchorDate]);
   const initialMonth = one(params.report_month) || monthChips[0]?.ym || '';
@@ -232,6 +313,83 @@ export default function SalesFlowScreen() {
       try {
         const includeExpected = expectedMonth !== '' && expectedMonth === selectedChip.ym;
 
+        if (isMonthlyReport) {
+          const period = analyticsPeriodFromYm(selectedChip.ym);
+          const common = {
+            prptype,
+            yearno: period.yearno,
+            monthno: period.month,
+            view: analyticsView,
+            metric: analyticsMetric === 'BILLING' ? 'BILLING' : 'SALES_ORDER',
+            executive_code: routeContext.executive_code || undefined,
+            party_code: routeContext.party_code || undefined,
+          } as const;
+
+          let response: any;
+          if (level === 'parties') {
+            response = await DashboardAPI.analyticsParties(common as any);
+          } else if (level === 'designs') {
+            response = await DashboardAPI.analyticsDesigns({
+              ...common,
+              design_code: routeContext.design_code || undefined,
+            } as any);
+          } else if (level === 'documents') {
+            response = await DashboardAPI.analyticsDocuments({
+              ...common,
+              design_code: routeContext.design_code || undefined,
+              document_uid: routeContext.document_uid || undefined,
+            } as any);
+          } else if (level === 'lines') {
+            response = await DashboardAPI.analyticsLines({
+              ...common,
+              design_code: routeContext.design_code || undefined,
+              document_uid: routeContext.document_uid || undefined,
+            } as any);
+          } else {
+            throw new Error('Unsupported Monthly Report sales drill-down level.');
+          }
+
+          if (!response?.success || response?.response?.configured === false) {
+            throw new Error(
+              response?.response?.scope?.message ||
+                response?.response?.message ||
+                response?.message ||
+                'Unable to load Monthly Report drill-down.',
+            );
+          }
+
+          const normalizedRows = analyticsRowsToSalesRows(
+            level,
+            response?.response?.data || [],
+          );
+          const totalAmount = normalizedRows.reduce(
+            (sum, row) => sum + Number(row.amount || 0),
+            0,
+          );
+          const totalQty = normalizedRows.reduce(
+            (sum, row) => sum + Number(row.qty || 0),
+            0,
+          );
+
+          setReport({
+            type: analyticsMetric.toLowerCase(),
+            level,
+            period: {
+              label: selectedChip.label,
+              month_name: selectedChip.label,
+            },
+            context: routeContext,
+            total: {
+              amount: totalAmount,
+              qty: totalQty,
+              row_count: normalizedRows.length,
+            },
+            rows: normalizedRows,
+            generated_at: new Date().toISOString(),
+          });
+          return;
+        }
+
         const response = await api.getOwnerCardReport({
           date: selectedChip.requestDate,
           prptype,
@@ -255,7 +413,7 @@ export default function SalesFlowScreen() {
         setLoading(false);
         setRefreshing(false);
       }
-    }, [expectedAmount, expectedGeneratedAt, expectedMonth, expectedQty, level, prptype, routeContext, selectedChip],
+    }, [analyticsMetric, analyticsView, expectedAmount, expectedGeneratedAt, expectedMonth, expectedQty, isMonthlyReport, level, prptype, routeContext, selectedChip],
   );
 
   useEffect(() => {
@@ -333,6 +491,9 @@ export default function SalesFlowScreen() {
       expected_month: selectedChip.ym,
       prptype,
       view: one(params.view) || 'owner',
+      source: isMonthlyReport ? 'monthly_report' : '',
+      api_view: isMonthlyReport ? analyticsView : '',
+      metric: isMonthlyReport ? analyticsMetric : '',
       level: next,
       category_code: routeContext.category_code,
       category_name: routeContext.category_name,
@@ -384,7 +545,7 @@ export default function SalesFlowScreen() {
 
   return (
     <View style={styles.root}>
-      <SubScreenHeader backLabel="Back" title="Sales Report" />
+      <SubScreenHeader backLabel="Back" title={isMonthlyReport ? (analyticsMetric === 'BILLING' ? 'Billing Report' : 'Sales Order Report') : 'Sales Report'} />
 
       <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
         <ScrollView

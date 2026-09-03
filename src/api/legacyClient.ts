@@ -270,3 +270,44 @@ export const SalesOrderAPI = {
 };
 
 export default client;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Grey Packing mobile live-session API.
+// Existing Web Grey Packing routes are not used/replaced here.
+// One successful scan response means the backend transaction committed.
+// ─────────────────────────────────────────────────────────────────────────
+export const GreyPackingAPI = {
+  transactionTypes: (params: Record<string, any>) =>
+    client.get('/get_criterion', { params }),
+
+  departments: (params: Record<string, any>) =>
+    client.get('/getdepartment', { params }),
+
+  packingTypes: (params: Record<string, any>) =>
+    client.get('/packtypedrop', { params }),
+
+  checkedBy: (params: Record<string, any>) =>
+    client.get('/getcheckby', { params }),
+
+  voucherNo: (params: Record<string, any>) =>
+    client.get('/checkvoucherno', { params }),
+
+  startSession: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_start_session', body),
+
+  scanSave: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_scan_save', body, { timeout: 20000 }),
+
+  getSession: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_get_session', body),
+
+  removeScan: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_remove_scan', body),
+
+  cancelSession: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_cancel_session', body),
+
+  completeSession: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_complete_session', body),
+};
+

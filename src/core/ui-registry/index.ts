@@ -1,6 +1,7 @@
 // import './modules/checking.ui';
 // import './modules/beam-close.ui';
 import './modules/core-navigation.ui';
+import './modules/greyPacking.ui';
 import './modules/design.ui';
 import './modules/management.ui';
 import './modules/production.ui';
@@ -20,4 +21,3 @@ export * from './components/PermissionUi';
 export * from './components/RegistryRenderer';
 export * from './types';
 export * from './uiRegistry';
-

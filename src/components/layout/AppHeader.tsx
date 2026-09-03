@@ -1,5 +1,5 @@
 import Icon from '@expo/vector-icons/MaterialIcons';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAppSessionStore } from '../../stores/AppSessionStore';
@@ -38,6 +38,8 @@ function getInitials(u: any): string {
 export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, right, showSignOut = true }: Props) {
   const logout = useAppSessionStore(s => s.logout);
   const router = useRouter();
+  const pathname = usePathname();
+  const isGreyPackingRoute = pathname?.includes('grey-packing') || pathname?.includes('greypacking');
   const sessionUser = useAppSessionStore(s => s.user);
   const rawLoginResponse = useAppSessionStore(s => s.rawLoginResponse);
   const profileUser = rawLoginResponse?.user || sessionUser;
@@ -60,22 +62,40 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   const signOut = () => Alert.alert('Sign out?', 'This will clear the mobile session on this device.', [
     { text: 'Cancel', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: logout }
   ]);
+  const displayTitle = isGreyPackingRoute ? 'Grey Packing' : title;
+  const displayEyebrow = isGreyPackingRoute ? 'SUDAMO TEXTILE ERP' : eyebrow;
+
   return <View style={s.safe}>
     <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-    <View style={s.header}><View style={s.left}>
-      {/* <Text style={s.eyebrow} numberOfLines={1}>{`${title === 'Permission Manager' ? `Rights: ` : `${eyebrow}`}`}</Text> */}
-      <Text style={s.eyebrow} numberOfLines={1}>{eyebrow}</Text>
-
-      {title !== 'Permission Manager' && (
-        <>
-          <Text style={s.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{title}</Text>
-        </>
+    <View style={[s.header, isGreyPackingRoute && s.headerCompact]}>
+      {isGreyPackingRoute && (
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={s.backButton}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
+          <Icon name="arrow-back-ios-new" size={19} color="#fff" />
+        </TouchableOpacity>
       )}
-      {!!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
-      {<Text style={s.subtitle} numberOfLines={1}>Version: {appVersion}</Text>}
-      {/* <Text style={s.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{title}</Text>
-   {!!subtitle&&<Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
-   {<Text style={s.subtitle} numberOfLines={1}>Version: {appVersion}</Text>} */}
+
+      <View style={s.left}>
+      <Text style={s.eyebrow} numberOfLines={1}>{displayEyebrow}</Text>
+
+      {displayTitle !== 'Permission Manager' && (
+        <Text
+          style={[s.title, isGreyPackingRoute && s.titleCompact]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {displayTitle}
+        </Text>
+      )}
+
+      {!isGreyPackingRoute && !!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
+      {!isGreyPackingRoute && <Text style={s.subtitle} numberOfLines={1}>Version: {appVersion}</Text>}
     </View>
       <View style={s.right}>
         {right}
@@ -103,6 +123,16 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
 // `flexShrink:0` so it can no longer be the thing that gets squeezed
 // unpredictably.
 const s = StyleSheet.create({
-  safe: { backgroundColor: T.nav }, header: { backgroundColor: T.nav, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 22, flexDirection: 'row', alignItems: 'center' }, left: { flex: 1, paddingRight: 12, minWidth: 0 }, eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2, color: '#8EA6BA' }, title: { fontSize: 28, fontWeight: '900', color: '#fff', marginTop: 4 }, subtitle: { fontSize: 13, fontWeight: '700', color: '#9FB0BF', marginTop: 6 }, right: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  safe: { backgroundColor: T.nav }, header: { backgroundColor: T.nav, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 22, flexDirection: 'row', alignItems: 'center' }, headerCompact: { paddingTop: 10, paddingBottom: 12, paddingHorizontal: 18 }, left: { flex: 1, paddingRight: 12, minWidth: 0 }, eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2, color: '#8EA6BA' }, title: { fontSize: 28, fontWeight: '900', color: '#fff', marginTop: 4 }, titleCompact: { fontSize: 22, marginTop: 2 }, subtitle: { fontSize: 13, fontWeight: '700', color: '#9FB0BF', marginTop: 6 }, right: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#2A4055',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
   signOut: { borderWidth: 1.5, borderColor: '#2A4055', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 12 }, signOutText: { color: '#fff', fontWeight: '900', fontSize: 13 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' }, avatarText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }
 });

@@ -20,6 +20,9 @@ export const PermissionKeys = {
     creelBrowser: 'creel.browser',
     creelEntry: 'creel.entry',
     creelScanner: 'creel.scanner',
+    greyPacking: 'grey_packing',
+    greyPackingEntry: 'grey_packing.entry',
+    greyPackingScanner: 'grey_packing.scanner',
   },
   commercial: {
     costing: 'costing',

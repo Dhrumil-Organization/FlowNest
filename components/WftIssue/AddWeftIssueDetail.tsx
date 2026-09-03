@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, FlatList, ActivityIndicator, Alert, TextInput as RNTextInput, } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
 // import LinearGradient from 'react-native-linear-gradient';
@@ -35,7 +35,8 @@ const AddWeftIssueDetail = (props) => {
         mainUId,
         isEditMode,
         isItemdetailvisible,
-        resetFlag
+        resetFlag,
+        userid
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -56,6 +57,9 @@ const AddWeftIssueDetail = (props) => {
     const [showNextModal, setShowNextModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [errors, setErrors] = useState({});
+    const [IssueDesigndata, setIssueDesigndata] = useState([]);
+    const [selectedissuedesign, setselectedissuedesign] = useState([]);
+    const [canShowIssueDesign, setCanShowIssueDesign] = useState(false);
 
     // console.log("maindesigndata", maindesigndata);
 
@@ -63,7 +67,9 @@ const AddWeftIssueDetail = (props) => {
 
     // console.log("FormState.values", FormState.values)
     console.log("Formstate.values.PrpCode", FormState.values.PrpCode);
-    console.log("Formstate.values.YearNo", FormState.values.YearNo);
+    console.log("Formstate.values.YearNo", FormState.values.YearNo, userid);
+
+
 
     React.useEffect(() => {
         Animated.timing(slideAnim, {
@@ -158,6 +164,7 @@ const AddWeftIssueDetail = (props) => {
     //     }
     // };
 
+
     const prp = FormState.values.PrpCode;
     const year = FormState.values.YearNo;
 
@@ -189,11 +196,21 @@ const AddWeftIssueDetail = (props) => {
                 }
             });
 
-            console.log("✅ API RESPONSE:", response.data);
+            console.log("✅ API RESPONSE:", response);
 
             if (response?.data?.success) {
                 const resData = response?.data?.data || {};
                 const mainData = resData?.main?.[0] || {};
+
+                const issueDesignUsers = Array.isArray(resData?.issuedesignuser)
+                    ? resData.issuedesignuser
+                    : [];
+
+                const hasIssueDesignAccess = issueDesignUsers.some(
+                    user => String(user) === String(userid)
+                );
+
+                setCanShowIssueDesign(hasIssueDesignAccess);
 
                 // 🔥 SAFE MERGE (NO OVERWRITE IF BLANK)
                 const safeData = {};
@@ -571,7 +588,10 @@ const AddWeftIssueDetail = (props) => {
         // await fetchdesignwiseitem();
         // isItemdetailvisible(true);
         setShowNextModal(false);
-        props.onNext && props.onNext();
+        // props.onNext && props.onNext();
+        props.onNext && props.onNext({
+            hasIssueDesignAccess: canShowIssueDesign
+        });
     };
 
     useEffect(() => {
@@ -603,6 +623,49 @@ const AddWeftIssueDetail = (props) => {
 
     const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
     const selectedYear = getAllYearData?.find((y) => y.YearNo == FormState.values.YearNo) || null;
+
+
+    const fetchissuedesign = async (values) => {
+        try {
+            const payload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                strcode: '012',
+                txntype: 'beam_weft_issue',
+                dsncode: values?.DsnCode || '',
+            };
+
+            console.log("Issue Design Payload:", payload);
+
+            const response = await axios.get(
+                `${API}/api/get_weftissuedesign_help`,
+                getRequestConfig({
+                    params: payload,
+                })
+            );
+
+            console.log("Issue Design API Response:", response?.data);
+
+            const data =
+                response?.data?.data?.IssueDesign || [];
+
+            console.log("Issue Design List:", data);
+
+            if (response?.data?.success) {
+                setIssueDesigndata(data);
+            } else {
+                setIssueDesigndata([]);
+            }
+
+        } catch (error: any) {
+            console.log(
+                "Issue Design API Error:",
+                error?.response?.data || error?.message
+            );
+
+            setIssueDesigndata([]);
+        }
+    };
 
     return (
         <>
@@ -939,6 +1002,30 @@ const AddWeftIssueDetail = (props) => {
                                             }));
                                         }}
 
+                                        // setSelected={(val) => {
+                                        //     if (!val) {
+                                        //         setFormState(prev => ({
+                                        //             ...prev,
+                                        //             values: {
+                                        //                 ...prev.values,
+                                        //                 DsnCode: "",
+                                        //                 DsnName: ""
+                                        //             }
+                                        //         }));
+                                        //     } else {
+                                        //         setFormState(prev => ({
+                                        //             ...prev,
+                                        //             values: {
+                                        //                 ...prev.values,
+                                        //                 DsnCode: val?.DsnCode,
+                                        //                 DsnName: val?.DsnName
+                                        //             }
+                                        //         }));
+
+                                        //         fetchissuedesign(updatedValues);
+                                        //     }
+                                        // }}
+
                                         setSelected={(val) => {
                                             if (!val) {
                                                 setFormState(prev => ({
@@ -950,19 +1037,74 @@ const AddWeftIssueDetail = (props) => {
                                                     }
                                                 }));
                                             } else {
+                                                const updatedValues = {
+                                                    ...FormState.values,
+                                                    DsnCode: val?.DsnCode || "",
+                                                    DsnName: val?.DsnName || ""
+                                                };
+
                                                 setFormState(prev => ({
                                                     ...prev,
-                                                    values: {
-                                                        ...prev.values,
-                                                        DsnCode: val?.DsnCode,
-                                                        DsnName: val?.DsnName
-                                                    }
+                                                    values: updatedValues
                                                 }));
+
+                                                console.log("Selected Design:", val);
+
+                                                fetchissuedesign(updatedValues);
                                             }
                                         }}
                                     />
 
                                 </View>
+                                {canShowIssueDesign && (
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Issue Design *</Text>
+                                        <PartyDropdownforweft
+                                            data={IssueDesigndata}
+                                            placeholder="Select Design"
+                                            labelKey={["IssDsnCode", "IssDsnName"]}
+                                            valueKey="IssDsnCode"
+                                            pageSize={12}
+                                            initialValue={selectedissuedesign ?? null}
+                                            selected={selectedissuedesign ?? null}
+                                            type="issuedesign"
+                                            onSelect={(item) => {
+                                                setselectedissuedesign(item);
+                                                const updatedValues = {
+                                                    ...FormState.values,
+                                                    IssDsnCode: item?.IssDsnCode || "",
+                                                    IssDsnName: item?.IssDsnName || ""
+                                                };
+                                                setFormState(prev => ({
+                                                    ...prev,
+                                                    values: updatedValues
+                                                }));
+                                            }}
+
+                                            setSelected={(val) => {
+                                                if (!val) {
+                                                    setFormState(prev => ({
+                                                        ...prev,
+                                                        values: {
+                                                            ...prev.values,
+                                                            IssDsnCode: "",
+                                                            IssDsnName: ""
+                                                        }
+                                                    }));
+                                                } else {
+                                                    setFormState(prev => ({
+                                                        ...prev,
+                                                        values: {
+                                                            ...prev.values,
+                                                            IssDsnCode: val?.IssDsnCode,
+                                                            IssDsnName: val?.IssDsnName
+                                                        }
+                                                    }));
+                                                }
+                                            }}
+                                        />
+                                    </View>
+                                )}
                             </View>
                         </ScrollView>
 

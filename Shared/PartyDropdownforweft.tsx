@@ -210,6 +210,14 @@ interface stock {
     stktypename: string
 }
 
+interface IssueDesign {
+    DsnCode: string,
+    DsnName: string,
+    IssDsnCode: string,
+    IssDsnName: string,
+
+}
+
 
 const extractLocation = (addr?: string) => {
     if (!addr) return '';
@@ -840,6 +848,26 @@ const PartyDropdownforweft: React.FC<Props> = ({
     };
 
 
+    const renderRowContentWeftIssueDesign = (item: IssueDesign, isSelected: boolean) => {
+        return (
+            <View style={rowStyles.rowInner}>
+                <View style={[rowStyles.avatar, isSelected && rowStyles.avatarSelected]}>
+                    <Text style={[rowStyles.avatarText]}>{initialsOf(item.IssDsnName)}</Text>
+                </View>
+
+                <View style={rowStyles.main}>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Design : {`${item.IssDsnName || '—'}`}
+                    </Text>
+                    <Text style={[rowStyles.title, isSelected && rowStyles.titleSelected]}>
+                        Code : {`${item.IssDsnCode || '—'}`}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+
     return (
         <View>
             {/* If loading: show a disabled trigger with spinner */}
@@ -905,7 +933,8 @@ const PartyDropdownforweft: React.FC<Props> = ({
                                                                                                                     : type == 'weftbeam' ? renderRowContentWeftBeamData
                                                                                                                         : type == 'Designdata' ? renderRowContentWeftDesign
                                                                                                                             : type == 'partydata' ? renderRowContentpartydata
-                                                                                                                                : renderRowContentEmpty}
+                                                                                                                                : type == 'issuedesign' ? renderRowContentWeftIssueDesign
+                                                                                                                                    : renderRowContentEmpty}
                 />
             )}
 

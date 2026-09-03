@@ -7,11 +7,41 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { API } from '../../common/API/dynamicAPI';
 
-//export const API_BASE_URL = 'https://apig.tms-webapp.com';
-// For local testing, replace above with your local Laravel API base:
-// export const API_BASE_URL = API;
-export const API_BASE_URL = 'https://apig.tms-webapp.com';
-export const API = 'https://apig.tms-webapp.com';
+const NEW_ERP_API_URLS = {
+  sudamo_knits: 'https://apig.tms-webapp.com',
+  rayons: 'https://apiy.tms-webapp.com',
+} as const;
+
+export type NewErpProperty = keyof typeof NEW_ERP_API_URLS;
+
+// Keep these exports because existing New ERP screens already import them.
+// They are live bindings and are refreshed from selected_property.
+export let API_BASE_URL: string = NEW_ERP_API_URLS.sudamo_knits;
+export let API: string = API_BASE_URL;
+
+export function resolveNewErpApiBaseUrl(property: string | null | undefined): string {
+  return property === 'rayons'
+    ? NEW_ERP_API_URLS.rayons
+    : NEW_ERP_API_URLS.sudamo_knits;
+}
+
+export async function initNewErpAPI(): Promise<string> {
+  const property = await AsyncStorage.getItem('selected_property');
+  API_BASE_URL = resolveNewErpApiBaseUrl(property);
+  API = API_BASE_URL;
+
+  console.log('NEW ERP API initialized:', { property, api: API_BASE_URL });
+  return API_BASE_URL;
+}
+
+export async function setNewErpProperty(property: NewErpProperty): Promise<string> {
+  await AsyncStorage.setItem('selected_property', property);
+  API_BASE_URL = resolveNewErpApiBaseUrl(property);
+  API = API_BASE_URL;
+
+  console.log('NEW ERP property selected:', { property, api: API_BASE_URL });
+  return API_BASE_URL;
+}
 
 export type LoginPayload = {
   name: string;
@@ -68,6 +98,10 @@ export type LoginResponse = {
 };
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Resolve on every request as a safety net. This prevents a stale module-level
+  // URL from sending Rayons credentials/data to the Sudamo API after the user
+  // changes property.
+  const apiBase = await initNewErpAPI();
   const token = await AsyncStorage.getItem('access_token');
 
   const headers: Record<string, string> = {
@@ -81,12 +115,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  // const res = await fetch(`${API_BASE_URL}${path}`, {
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(`${apiBase}${path}`, {
     ...options,
     headers,
   });
-  console.log('API URL NEW LOGIN:', `${API}${path}`);
+  console.log('API URL NEW:', `${apiBase}${path}`);
 
   const text = await res.text();
   // console.log('API URL:', `${API_BASE_URL}${path}`);

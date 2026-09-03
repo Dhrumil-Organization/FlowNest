@@ -32,7 +32,8 @@ const AddWeftIssueDetail = (props) => {
         handleclick,
         editData,
         mainUId,
-        isEditMode
+        isEditMode,
+        hasIssueDesignAccess = false
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +61,12 @@ const AddWeftIssueDetail = (props) => {
     let cancelToken: any;
 
     // console.log("FormState.values", FormState.values)
+
+    console.log("========== ISSUE DESIGN DEBUG ==========");
+    console.log("hasIssueDesignAccess =", hasIssueDesignAccess);
+    console.log("DsnCode =", FormState.values.DsnCode);
+    console.log("IssDsnCode =", FormState.values.IssDsnCode);
+    console.log("========================================");
 
     React.useEffect(() => {
         Animated.timing(slideAnim, {
@@ -109,9 +116,11 @@ const AddWeftIssueDetail = (props) => {
     }, [
         isEditMode,
         FormState.values.DsnCode,
+        FormState.values.IssDsnCode,
         FormState.values.PrpCode,
         FormState.values.YearNo,
-        FormState.values.BeamUId   // 🔥 dependency add karo
+        FormState.values.BeamUId,
+        hasIssueDesignAccess
     ]);
 
     useEffect(() => {
@@ -194,9 +203,11 @@ const AddWeftIssueDetail = (props) => {
     }, [
         isEditMode,
         FormState.values.DsnCode,
+        FormState.values.IssDsnCode,
         FormState.values.PrpCode,
         FormState.values.YearNo,
-        FormState.values.BeamUId   // 🔥 dependency add karo
+        FormState.values.BeamUId,
+        hasIssueDesignAccess
     ]);
 
     useEffect(() => {
@@ -210,7 +221,9 @@ const AddWeftIssueDetail = (props) => {
     }, [
         FormState.values.PrpCode,
         FormState.values.YearNo,
-        FormState.values.DsnCode
+        FormState.values.DsnCode,
+        FormState.values.IssDsnCode,
+        hasIssueDesignAccess
     ]);
 
     const fetchdesignwiseitem = async () => {
@@ -219,11 +232,19 @@ const AddWeftIssueDetail = (props) => {
             setIsLoading(true);
             if (cancelToken?.cancel) cancelToken.cancel();
             cancelToken = axios.CancelToken.source();
+            const issueDsnCode = FormState.values.IssDsnCode?.toString().trim();
+            const normalDsnCode = FormState.values.DsnCode?.toString().trim();
+
             const historyPayload = {
                 prpcode: FormState.values.PrpCode,
                 yearno: FormState.values.YearNo,
                 txntype: 'weft_selvedge_issue',
-                dsncode: FormState.values.DsnCode
+                // If the current user has Issue Design access and an Issue Design
+                // is selected, use IssDsnCode. Otherwise always use DsnCode.
+                dsncode:
+                    hasIssueDesignAccess === true && issueDsnCode
+                        ? issueDsnCode
+                        : normalDsnCode
             };
             console.log("designwise_mainitem_for_weftissue_help Payload:", historyPayload);
             const response = await axios.get(

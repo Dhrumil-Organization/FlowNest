@@ -1,0 +1,3190 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
+    Platform
+} from 'react-native';
+// import LinearGradient from 'react-native-linear-gradient';
+import Icon from '@expo/vector-icons/MaterialIcons';
+import axios from 'axios';
+// import DateTimePicker from '@react-native-community/datetimepicker';
+// import FullScreenLoader from '../Loader/Loader';
+// import { checkingScannerStyles } from '../../common/Styles/Style';
+import { API, PRINTSTICKER, PRINTERSLISTAPI } from '../../common/API/dynamicAPI';
+import { CameraView as Camera, useCameraPermissions as useCameraPermission } from 'expo-camera';
+import { useCameraDevice } from '@/Shared/expoScannerHelper';
+import { BarcodeScanningResult } from 'expo-camera';
+// import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
+// import { Picker } from '@react-native-picker/picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ScrollView } from 'react-native';
+// import Snackbar from 'react-native-snackbar';
+import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
+import { Switch } from 'react-native';
+import CustomDrawer from './CustomDrawer';
+import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
+// import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
+// import PartyDropdown from '../Shared/PartyDropdown';
+// import SearchableDropdown from '../Shared/SearchableDropdown';
+
+interface Props {
+    token: string;
+    navigation: any;
+    isConnected: boolean | null;
+    username: string;
+}
+
+type GridItem = {
+    srNo: number;
+    CartonNo: string;
+    design: string;
+};
+
+const WeftIssueItemDrawer = ({
+    isVisible,
+    onClose,
+    FormState,
+    setFormState,
+    token,
+    isEditMode,
+    mainUId,
+    editData,
+    closeAllDrawers,
+    resetAllData,
+    fetchbrowse
+}) => {
+    // const device = useCameraDevice('back');
+    // ✅ REPLACE with this:
+    const device = useCameraDevice('back');
+    const [hasPermission, requestPermission] = useCameraPermission();
+    const scanLock = useRef(false);
+    const [isScanning, setIsScanning] = useState(false);
+    // const { hasPermission, requestPermission } = useCameraPermission();
+    const [scannedValue, setScannedValue] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [getData, setData] = useState([]);
+    const [yearNo, setYearNo] = useState('');
+    const [design, setDesign] = useState('');
+    const [getWarpLen, setWarpLen] = useState('0');
+    const [getchees, setchees] = useState('0');
+    const [checker, setChecker] = useState('');
+    const [getScannedObj, setScannedObj] = useState({})
+    const [shift, setShift] = useState('')
+    const [stocktype, setstocktype] = useState('')
+    const [getShiftData, setShiftData] = useState([]);
+    const [getStockTypes, setStockTypes] = useState([
+        { stktypename: 'In house', StkType: 'I' },
+        { stktypename: 'Process house', StkType: 'P' }
+    ]);
+    const [getDataSaved, setDataSaved] = useState(false)
+    const [isCreelModalVisible, setIsCreelModalVisible] = useState(false);
+    const [setupDate, setSetupDate] = useState(new Date());
+    const [showPicker, setShowPicker] = useState(false);
+    const [CartonNo, setCartonNo] = useState('');
+    const [designName, setDesignName] = useState('');
+    const [gridData, setGridData] = useState<GridItem[]>([]);
+    const [isScanModalVisible, setIsScanModalVisible] = useState(false);
+    const [creelId, setCreelId] = useState('');
+    const [getavgwt, setavgwt] = useState('0');
+    const [cartonSummary, setCartonSummary] = useState<any[]>([]);
+    const [showList, setShowList] = useState(false);
+    const [Remark, setRemark] = useState('');
+    const [showManualSearch, setShowManualSearch] = useState(false);
+    // Keeps the Manual tab selected separately from the search popup visibility.
+    const [isManualSearchVisible, setIsManualSearchVisible] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+    const [selectedYear, setSelectedYear] = useState(null);
+    const [getAllPropertyData, setAllPropertyData] = useState([]);
+
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const formatDate = (date) => date.toISOString().split('T')[0];
+    const [getAllYearData, setAllYearData] = useState([]);
+    const [selectedstocktype, setselectedstocktype] = useState([]);
+    const [activeCreels, setActiveCreels] = useState([]);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [showListAfterSave, setShowListAfterSave] = useState(false);
+    const [deleteshowSuccess, setdeleteShowSuccess] = useState(false);
+    const [showApiError, setShowApiError] = useState(false);
+    const [apiErrorMessage, setApiErrorMessage] = useState('');
+    const [selectedCreel, setSelectedCreel] = useState(null);
+    // UID of the already-created ADD entry. Used for ADD MORE -> MODIFY flow.
+    const [savedEntryUId, setSavedEntryUId] = useState('');
+    // True only after the user explicitly clicks Add More.
+    // A fresh Fab/Add entry must always use ADD API first.
+    const [isAddMoreMode, setIsAddMoreMode] = useState(false);
+    const [availableChees, setAvailableChees] = useState('');
+    const [availableQty, setAvailableQty] = useState('');
+    // Parent/entry UID used to refresh the entry after a single-carton delete.
+    const [pendingShowEntryUid, setPendingShowEntryUid] = useState('');
+    // const [mainUId, setMainUId] = useState(null);
+    // const [isEditMode, setIsEditMode] = useState(false);
+    const [propertydata, setpropertydata] = useState([]);
+    const screenWidth = Dimensions.get('window').width;
+    const selectedProperty = getAllPropertyData?.find((p) => p.PrpCode == FormState.values.PrpCode) || null;
+
+    // A true browse-modify session requires the actual edit record.
+    // Do NOT let a stale parent isEditMode value turn a fresh FAB entry into MODIFY.
+    const isBrowseModifyMode = Boolean(isEditMode && editData && mainUId);
+
+    console.log("Formstate.values", FormState.values);
+
+
+    const styles = StyleSheet.create({
+        container: { flex: 1, backgroundColor: '#f4f6f8' },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingTop: Platform.OS === 'android' ? 40 : 50,
+            paddingBottom: 14,
+            paddingHorizontal: 16,
+            backgroundColor: '#0e7490',
+        },
+        backBtn: {
+            width: 38,
+            height: 38,
+            borderRadius: 8,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: 10
+        },
+        headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+        headerSub: { color: '#d0eef2', fontSize: 12 },
+        segment: {
+            flexDirection: 'row',
+            marginHorizontal: 0,
+            // marginTop: -20,
+            backgroundColor: '#fff',
+            borderRadius: 0,
+            padding: 4,
+            elevation: 5,
+        },
+        segmentBtn: { flex: 1, padding: 10, alignItems: 'center', borderRadius: 30 },
+        segmentActive: { backgroundColor: '#0e7490', },
+        segmentText: { color: '#64748b', fontWeight: '600' },
+        segmentTextActive: { color: '#fff', fontWeight: '700' },
+        scanRow: {
+            margin: 12,
+            backgroundColor: '#fff',
+            padding: 12,
+            borderRadius: 10,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+        scanTitle: { fontWeight: '600' },
+        scanSub: { fontSize: 11, color: '#666' },
+        scanBtn: {
+            backgroundColor: '#0e7490',
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            borderRadius: 8
+        },
+
+        scanBtnText: { color: '#fff', fontWeight: '600' },
+        card: {
+            backgroundColor: '#fff',
+            margin: 10,
+            padding: 16,
+            borderRadius: 16,
+            elevation: 5,
+        },
+        cardTitle: { fontWeight: '700', marginBottom: 10, color: '#000' },
+        label: { fontSize: 12, color: '#000', marginBottom: 6 },
+        searchRow: { flexDirection: 'row', alignItems: 'center' },
+        searchInput: {
+            flex: 1,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: '#f8fafc',
+            paddingHorizontal: 12,
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+            color: '#000'
+        },
+        searchBtn: {
+            marginLeft: 10,
+            width: 50,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: '#0e7490',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        scanCard: {
+            margin: 10,
+            backgroundColor: '#0e7490',
+            borderRadius: 16,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            alignItems: 'center',
+        },
+        scanText: {
+            color: '#fff',
+            marginTop: 10,
+            fontWeight: '600',
+        },
+        field: {
+            marginBottom: 12
+        },
+        input: {
+            backgroundColor: '#f1f3f6',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            height: 42,
+            borderWidth: 1,
+            borderColor: '#ddd',
+            color: '#000'
+        },
+        inputDisabled: {
+            backgroundColor: '#e9ecef',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            height: 42,
+            borderWidth: 1,
+            borderColor: '#ddd',
+            color: '#000'
+        },
+        fieldFlex: {
+            flex: 1,
+            marginRight: 8
+        },
+        row: {
+            flexDirection: 'row',
+            gap: 10,   // 👈 cleaner spacing (RN 0.71+)
+            marginBottom: 12
+        },
+
+        fieldHalf: {
+            flex: 1
+        },
+        inputFlex: {
+            flex: 1,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: '#f8fafc',
+            paddingHorizontal: 12,
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+        },
+        bottomBar: {
+            flexDirection: 'row',
+            padding: 15,
+            backgroundColor: '#fff',
+            borderTopWidth: 1,
+            borderColor: '#eee',
+        },
+
+        primaryBtn: {
+            flex: 1,
+            backgroundColor: '#0e7490',
+            padding: 14,
+            borderRadius: 25,
+            alignItems: 'center',
+            marginLeft: 10,
+        },
+
+        secondaryBtn: {
+            flex: 1,
+            backgroundColor: '#e5e7eb',
+            padding: 14,
+            borderRadius: 25,
+            alignItems: 'center',
+        },
+
+        primaryText: { color: '#fff', fontWeight: '700' },
+        secondaryText: { color: '#333', fontWeight: '600' },
+        btnContainer: {
+            flexDirection: 'row',
+            marginHorizontal: 12,
+            marginTop: 8,
+            gap: 10
+        },
+
+        resultItem: {
+            padding: 8,
+            borderBottomWidth: 1,
+            borderColor: '#eee'
+        },
+
+        cameraHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 40,
+            paddingBottom: 10,
+            backgroundColor: '#000'
+        },
+
+        cameraTitle: {
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: '600'
+        },
+
+        cameraContainer: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        camera: {
+            ...StyleSheet.absoluteFillObject
+        },
+
+        overlay: {
+            justifyContent: 'center',
+            alignItems: 'center'
+        },
+
+        scanBox: {
+            width: 220,
+            height: 220,
+            borderWidth: 2,
+            borderColor: '#0e7490',
+            borderRadius: 14
+        },
+
+        cameraFooter: {
+            padding: 20,
+            backgroundColor: '#000'
+        },
+
+        closeScanBtn: {
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 10,
+            alignItems: 'center'
+        },
+
+        closeScanText: {
+            color: '#fff',
+            fontWeight: '600'
+        },
+        resultCard: {
+            backgroundColor: '#fff',
+            marginHorizontal: 20,
+            marginTop: 10,
+            borderRadius: 14,
+            paddingVertical: 6,
+            elevation: 4,
+            maxHeight: 220,
+        },
+
+        resultTitle: {
+            fontWeight: '700',
+            color: '#0f172a',
+        },
+
+        resultSub: {
+            fontSize: 12,
+            color: '#64748b',
+            marginTop: 2,
+        },
+        segmentInner: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6   // 👈 spacing between icon & text
+        },
+        // listCard: {
+        //     flexDirection: 'row',
+        //     justifyContent: 'space-between',
+        //     backgroundColor: '#fff',
+        //     padding: 14,
+        //     borderRadius: 14,
+        //     marginBottom: 12,
+        //     elevation: 3
+        // },
+        listCard: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start', // 🔥 important (top align)
+            padding: 10,
+            backgroundColor: '#fff',
+            marginBottom: 8,
+            borderRadius: 8,
+            marginHorizontal: 6,
+            elevation: 3
+        },
+
+        // leftSection: {
+        //     flexDirection: 'row',
+        //     alignItems: 'center'
+        // },
+
+        leftSection: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            flex: 1,
+        },
+
+        indexCircle: {
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            backgroundColor: '#0e7490',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10
+        },
+
+        indexText: {
+            color: '#fff',
+            fontWeight: 'bold'
+        },
+
+        cartonNo: {
+            fontSize: 15,
+            fontWeight: 'bold',
+            color: '#0e7490'
+        },
+
+        subText: {
+            fontSize: 12,
+            color: '#666',
+            marginTop: 2
+        },
+
+        rightSection: {
+            alignItems: 'flex-end',
+            justifyContent: 'center'
+        },
+
+        qtyText: {
+            fontSize: 13,
+            color: '#444'
+        },
+
+        cheesText: {
+            fontSize: 13,
+            color: '#0e7490',
+            marginTop: 4,
+            fontWeight: '600'
+        },
+
+        addMoreBtn: {
+            backgroundColor: '#0e7490',
+            paddingVertical: 14,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginTop: 0,
+
+            elevation: 4,
+            shadowColor: '#000',
+            shadowOpacity: 0.15,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 3 }
+        },
+
+        addMoreText: {
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: '500',
+            letterSpacing: 0.5
+        },
+        apiErrorOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 24,
+        },
+        apiErrorModal: {
+            width: '100%',
+            maxWidth: 380,
+            backgroundColor: '#fff',
+            borderRadius: 22,
+            paddingHorizontal: 24,
+            paddingTop: 28,
+            paddingBottom: 22,
+            alignItems: 'center',
+            elevation: 12,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.25,
+            shadowRadius: 12,
+        },
+        apiErrorIconWrap: {
+            width: 58,
+            height: 58,
+            borderRadius: 29,
+            backgroundColor: '#FFF1F1',
+            borderWidth: 1,
+            borderColor: '#FFD5D5',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 16,
+        },
+        apiErrorIcon: {
+            fontSize: 34,
+            lineHeight: 38,
+            fontWeight: '800',
+            color: '#D32F2F',
+        },
+        apiErrorTitle: {
+            fontSize: 21,
+            fontWeight: '700',
+            color: '#1F2937',
+            textAlign: 'center',
+            marginBottom: 10,
+        },
+        apiErrorText: {
+            fontSize: 16,
+            lineHeight: 24,
+            fontWeight: '500',
+            color: '#4B5563',
+            textAlign: 'center',
+            marginBottom: 24,
+        },
+        apiErrorButton: {
+            width: '100%',
+            height: 48,
+            borderRadius: 12,
+            backgroundColor: '#0e7490',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        apiErrorButtonText: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: '#fff',
+        },
+
+        bottomRow: {
+            flexDirection: 'row',
+            marginTop: 10,
+            justifyContent: 'space-between'
+        },
+
+        backBtn1: {
+            flex: 1,
+            backgroundColor: '#e5e7eb',
+            paddingVertical: 12,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginRight: 6
+        },
+
+        submitBtn: {
+            flex: 1,
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginLeft: 6
+        },
+        deleteEntryBtn: {
+            flex: 1,
+            backgroundColor: '#dc2626',
+            paddingVertical: 12,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginHorizontal: 3
+        },
+        doneBtn: {
+            flex: 1,
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 20,
+            alignItems: 'center',
+            marginLeft: 3
+        },
+
+        backText: {
+            color: '#333',
+            fontWeight: '600',
+            fontSize: 13
+        },
+
+        submitText: {
+            color: '#fff',
+            fontWeight: '600',
+            fontSize: 13
+        },
+        deleteIcon: {
+            alignSelf: 'flex-end',
+            marginBottom: 6
+        },
+        viewListBtn: {
+            margin: 10,
+            backgroundColor: '#e0f2f1',
+            padding: 12,
+            borderRadius: 12,
+            alignItems: 'center'
+        },
+
+        viewListText: {
+            color: '#0e7490',
+            fontWeight: '700'
+        },
+        summaryBar: {
+            flexDirection: 'row',
+            backgroundColor: '#f1f5f9',
+            borderRadius: 8,
+            paddingVertical: 6,
+            marginTop: 8,
+            alignItems: 'center'
+        },
+
+        summaryItem: {
+            flex: 1,
+            alignItems: 'center'
+        },
+
+        summaryLabel: {
+            fontSize: 10,
+            color: '#64748b'
+        },
+
+        summaryValue: {
+            fontSize: 14,
+            fontWeight: '700',
+            color: '#0f172a',
+            marginTop: 1
+        },
+
+        divider: {
+            width: 1,
+            height: 20,
+            backgroundColor: '#e2e8f0'
+        },
+        overlayContainer: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.4)', // 👈 dim background
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999
+        },
+
+        overlayCard: {
+            width: '85%',
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 16,
+            elevation: 10
+        },
+        selectedItem: {
+            backgroundColor: '#dbeafe',   // light blue
+            borderWidth: 1,
+            borderColor: '#2563eb'
+        },
+        overlayContainer1: {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)', // darker blur
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999
+        },
+
+        overlayCardNew: {
+            width: '80%',
+            backgroundColor: '#fff',
+            borderRadius: 20,
+            padding: 20,
+            alignItems: 'center',
+            elevation: 10
+        },
+
+        successIcon: {
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: '#e6f9f0',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 10
+        },
+
+        successTitle: {
+            fontSize: 18,
+            fontWeight: '700',
+            color: '#0f172a',
+            marginBottom: 6
+        },
+
+        successMessage: {
+            fontSize: 14,
+            color: '#475569',
+            textAlign: 'center',
+            marginBottom: 20
+        },
+
+        okButton: {
+            width: '100%',
+            backgroundColor: '#0e7490',
+            paddingVertical: 12,
+            borderRadius: 12,
+            alignItems: 'center'
+        },
+
+        okButtonText: {
+            color: '#fff',
+            fontWeight: '700',
+            fontSize: 15
+        },
+
+        saveOverlay: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 99999,
+        },
+
+        saveCard: {
+            width: 180,
+            backgroundColor: "#fff",
+            borderRadius: 18,
+            paddingVertical: 24,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            elevation: 12,
+        },
+
+        saveTitle: {
+            marginTop: 15,
+            fontSize: 16,
+            fontWeight: "700",
+            color: "#000",
+        },
+
+        saveSubTitle: {
+            marginTop: 6,
+            fontSize: 13,
+            color: "#000",
+        },
+        loaderOverlay: {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999999,
+            elevation: 999999,
+        },
+    });
+
+    let cancelToken: any;
+
+    const getRequestConfig = (props: any) => ({
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+        params: props.params,
+        cancelToken: cancelToken?.token,
+    });
+
+    useEffect(() => {
+        if (typeof FormState.values.PrpCode != 'undefined' && FormState.values.PrpCode != null && FormState.values.PrpCode != '') {
+            const testFinct = async () => {
+                const allyeardata = await fetchAllYeardata(token, FormState.values.PrpCode)
+                setAllYearData(allyeardata)
+            }
+            testFinct();
+        }
+    }, [FormState.values.PrpCode])
+
+    const openDrawer = () => setIsDrawerVisible(true);
+    const closeDrawer = () => setIsDrawerVisible(false);
+
+    useEffect(() => {
+        requestPermission();
+    }, []);
+
+    const parseDate = (dateStr) => {
+        const [year, month, day] = dateStr.split('-');
+        return new Date(year, month - 1, day);
+    };
+
+    const LIGHT_CARD_COLORS = [
+        ["#E3F2FD", "#BBDEFB"],
+        ["#E8F5E9", "#C8E6C9"],
+        ["#FFF3E0", "#FFE0B2"],
+        ["#F3E5F5", "#E1BEE7"],
+        ["#E0F7FA", "#B2EBF2"],
+    ];
+
+    const getCurrentFinancialYear = () => {
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+
+        const financialYear = currentMonth >= 4 ? currentYear + 1 : currentYear;
+        return financialYear.toString().substring(2);
+    };
+
+
+    // const codeScanner = useCodeScanner({
+    //     codeTypes: ['qr'],
+    //     onCodeScanned: (codes) => {
+    //         const value = codes[0]?.value || '';
+    //         console.log("📦 Raw QR Value 👉", value);
+    //         try {
+    //             const parts = value.split("~");
+    //             if (parts.length < 13) {
+    //                 throw new Error("Invalid format");
+    //             }
+    //             const parsed = {
+    //                 PUId: parts[0],
+    //                 PSrNo: parts[1],
+    //                 PSubSr: parts[2],
+    //                 TranType: parts[3],
+    //                 CartNo: parts[4],
+    //                 ItmCode: parts[5],
+    //                 MerCode: parts[6],
+    //                 GrdCode: parts[7],
+    //                 ShdCode: parts[8],
+    //                 Denier: parts[9],
+    //                 Wt: parts[10],
+    //                 Chees: parts[11],
+    //                 yearNo: parts[12]
+    //             };
+
+    //             console.log("✅ Parsed 👉", parsed);
+    //             setScannedObj(parsed);
+    //             setCartonNo(parsed.CartNo || '');
+    //             setYearNo(parsed.yearNo || '');
+    //             setchees(parsed.Chees || '');
+    //             setavgwt(parsed.Wt || '');
+
+    //             fetchitmgrdshdname(parsed);
+
+    //             sendScannedValue(value);
+    //         } catch (err) {
+    //             Alert.alert("Invalid QR", "QR format not valid");
+    //         }
+    //         setIsScanning(false);
+    //     },
+    // });
+
+    // ✅ REPLACE with this function:
+    // const handleBarCodeScanned = (result: BarcodeScanningResult) => {
+    //     // Prevent multiple scans
+    //     if (scanLock.current) return;
+    //     scanLock.current = true;
+    //     setTimeout(() => (scanLock.current = false), 2000);
+
+    //     const value = result?.data || '';
+    //     console.log("📦 Raw QR Value 👉", value);
+
+    //     try {
+    //         const parts = value.split("~");
+    //         if (parts.length < 13) {
+    //             throw new Error("Invalid format");
+    //         }
+    //         const parsed = {
+    //             PUId: parts[0],
+    //             PSrNo: parts[1],
+    //             PSubSr: parts[2],
+    //             TranType: parts[3],
+    //             CartNo: parts[4],
+    //             ItmCode: parts[5],
+    //             MerCode: parts[6],
+    //             GrdCode: parts[7],
+    //             ShdCode: parts[8],
+    //             Denier: parts[9],
+    //             Wt: parts[10],
+    //             Chees: parts[11],
+    //             yearNo: parts[12]
+    //         };
+
+    //         console.log("✅ Parsed 👉", parsed);
+    //         setScannedObj(parsed);
+    //         setCartonNo(parsed.CartNo || '');
+    //         setYearNo(parsed.yearNo || '');
+    //         setchees('');
+    //         setavgwt('');
+
+    //         // setchees(parsed.Chees || '');
+    //         // setavgwt(parsed.Wt || '');
+
+    //         setAvailableChees(parsed.Chees || '');
+    //         setAvailableQty(parsed.Wt || '');
+
+    //         fetchitmgrdshdname(parsed);
+    //         sendScannedValue(value);
+    //     } catch (err) {
+    //         Alert.alert("Invalid QR", "QR format not valid");
+    //     }
+    //     setIsScanning(false);
+    // };
+
+
+    const handleBarCodeScanned = (result: BarcodeScanningResult) => {
+        // Prevent multiple scans
+        if (scanLock.current) return;
+        scanLock.current = true;
+        setTimeout(() => (scanLock.current = false), 2000);
+
+        const value = result?.data || '';
+        console.log("📦 Raw QR Value 👉", value);
+
+        try {
+            const parts = value.split("~");
+            let parsed = {};
+
+            if (parts.length === 16) {
+                parsed = {
+                    PUId: parts[0] || '',
+                    PSrNo: parts[1] || '',
+                    PSubSr: parts[2] || '',
+                    TranType: parts[3] || '',
+                    CartNo: parts[4] || '',
+                    ItmCode: parts[5] || '',
+                    ItmName: parts[6] || '',
+                    MerCode: parts[7] || '',
+                    MerName: parts[8] || '',
+                    GrdCode: parts[9] || '',
+                    GrdName: parts[10] || '',
+                    ShdCode: parts[11] || '',
+                    ShdName: parts[12] || '',
+                    Wt: parts[13] || 0,
+                    Chees: parts[14] || 0,
+                    yearNo: parts[15] || ''
+                };
+
+                console.log("✅ Parsed New Format 👉", parsed);
+            } else if (parts.length >= 13) {
+                // Full format
+                parsed = {
+                    PrpCode: parts[0] || '',
+                    PUId: parts[1] || '',
+                    PSrNo: parts[2] || '',
+                    PSubSr: parts[3] || '',
+                    TranType: parts[4] || '',
+                    CartNo: parts[5] || '',
+                    ItmCode: parts[6] || '',
+                    MerCode: parts[7] || '',
+                    GrdCode: parts[8] || '',
+                    ShdCode: parts[9] || '',
+                    Denier: parts[10] || '',
+                    Wt: parts[11] || 0,
+                    Chees: parts[12] || 0,
+                    Rate: parts[13] || 0,
+                    yearNo: parts[14] || ''
+                };
+                console.log("✅ Parsed 1111 👉", parsed);
+            } else if (parts.length >= 11) {
+                // Short format (without Chees)
+                parsed = {
+                    PUId: parts[0] || '',
+                    PSrNo: parts[1] || '',
+                    PSubSr: parts[2] || '',
+                    TranType: parts[3] || '',
+                    CartNo: parts[4] || '',
+                    ItmCode: parts[5] || '',
+                    MerCode: parts[6] || '',
+                    GrdCode: parts[7] || '',
+                    ShdCode: parts[8] || '',
+                    Denier: parts[9] || '',
+                    Wt: parts[10] || 0,
+                    Chees: 0,
+                    yearNo: parts[11] || ''
+                };
+                console.log("✅ Parsed 22", parsed);
+            } else {
+                throw new Error("Invalid format");
+            }
+            // const parsed = {}
+            // if (parts.length < 13) {
+            //     throw new Error("Invalid format");
+            // } else
+            //     parsed = {
+            //         PUId: parts[0],
+            //         PSrNo: parts[1],
+            //         PSubSr: parts[2],
+            //         TranType: parts[3],
+            //         CartNo: parts[4],
+            //         ItmCode: parts[5],
+            //         MerCode: parts[6],
+            //         GrdCode: parts[7],
+            //         ShdCode: parts[8],
+            //         Denier: parts[9],
+            //         Wt: parts[10],
+            //         Chees: parts[11],
+            //         yearNo: parts[12]
+            //     };
+
+
+            setScannedObj(parsed);
+            setCartonNo(parsed.CartNo || '');
+            setYearNo(parsed.yearNo || '');
+            setchees('');
+            setavgwt('');
+
+            // setchees(parsed.Chees || '');
+            // setavgwt(parsed.Wt || '');
+
+            setAvailableChees(parsed.Chees || '');
+            setAvailableQty(parsed.Wt || '');
+
+            fetchitmgrdshdname(parsed);
+            sendScannedValue(value);
+        } catch (err) {
+            Alert.alert("Invalid QR", "QR format not valid");
+        }
+        setIsScanning(false);
+    };
+
+    const fetchitmgrdshdname = async (parsedData) => {
+        setIsLoading(true); // ✅ start loader
+        try {
+            const payload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                strcode: FormState.values.yarnstrcode,
+                itmcode: parsedData?.ItmCode,
+                mercode: parsedData?.MerCode,
+                grdcode: parsedData?.GrdCode,
+                shdcode: parsedData?.ShdCode,
+
+            };
+            console.log("payload", payload)
+            const res = await axios.post(`${API}/api/get_item_detail_from_carton`, payload, {
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    'X-Requested-with': 'XMLHttpRequest',
+                }
+            });
+            console.log(res);
+            if (res.data.success && res.data.response?.data) {
+
+                const data = res.data.response.data;
+                // 🔥 SIRF NAME SET KARNA
+                setScannedObj(prev => ({
+                    ...prev,
+                    ItmName: data.ItmName || '',
+                    MerName: data.MerName || '',
+                    ShdName: data.ShdName || '',
+                    GrdName: data.GrdName || '',
+                }));
+
+            }
+
+        } catch (e) {
+            console.log("API ERROR:", e);
+        } finally {
+            setIsLoading(false); // ✅ stop loader
+        }
+    };
+
+    const handleSearch = async () => {
+        if (!searchText) {
+            Alert.alert('Enter carton number');
+            return;
+        }
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            const yno = await AsyncStorage.getItem('yno');
+            const payload = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                strcode: FormState.values.yarnstrcode,
+                mitmcode: FormState.values.ItmCode,
+                txntype: 'beam_weft_issue',
+                searchcarton: searchText.trim()
+            };
+            console.log("Payload:", payload);
+            const response = await axios.post(
+                `${API}/api/get_carton_search`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json',
+                        'X-Requested-with': 'XMLHttpRequest',
+                    },
+                    cancelToken: cancelToken.token
+                }
+            );
+            console.log("Search Response:", response);
+            const data = response?.data?.response?.data || [];
+            if (response?.data?.success && data.length > 0) {
+                setSearchResults(data);
+            } else {
+                setSearchResults([]);
+                Alert.alert('No data found');
+            }
+
+        } catch (error) {
+            if (axios.isCancel(error)) {
+                // console.log("Request cancelled");
+            } else {
+                // console.log("API Error:", error);
+                Alert.alert('Error while searching');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Get the UID belonging to THIS CARTON from the ADD/MODIFY response.
+    // The entry/header UID must never be used as the carton UID for single delete.
+    const getCartonUidFromResponse = (responseData, cartonNo) => {
+        const target = String(cartonNo || '');
+        const visited = new Set();
+
+        const walk = (value) => {
+            if (!value || typeof value !== 'object' || visited.has(value)) return '';
+            visited.add(value);
+
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    const found = walk(item);
+                    if (found) return found;
+                }
+                return '';
+            }
+
+            const valueCartonNo = value.CartNo ?? value.cartonNo ?? value.CartonNo;
+            if (target && valueCartonNo != null && String(valueCartonNo) === target) {
+                return value.UId ?? value.uid ?? value.CartonUId ?? value.cartonuid ?? '';
+            }
+
+            for (const key of Object.keys(value)) {
+                const found = walk(value[key]);
+                if (found) return found;
+            }
+            return '';
+        };
+
+        return walk(responseData);
+    };
+
+    const normalizeCarton = (item) => ({
+        ...item,
+        UId: item?.UId ?? item?.uid ?? item?.CartonUId ?? item?.cartonuid ?? '',
+        uid: item?.uid ?? item?.UId ?? item?.CartonUId ?? item?.cartonuid ?? '',
+        SrNo: item?.SrNo ?? item?.srno ?? item?.PSrNo ?? '',
+        SubSr: item?.SubSr ?? item?.subsrno ?? item?.PSubSr ?? '',
+        PSrNo: item?.PSrNo ?? item?.SrNo ?? item?.srno ?? '',
+        PSubSr: item?.PSubSr ?? item?.SubSr ?? item?.subsrno ?? '',
+    });
+
+    const handleAddCarton = async () => {
+        const isManualMode = showManualSearch === true;
+        const cartonValue = String(CartonNo ?? '').trim();
+        const cheesValue = String(getchees ?? '').trim();
+        const qtyValue = String(getavgwt ?? '').trim();
+
+        // Carton validation depends on the currently selected tab.
+        if (!cartonValue) {
+            Alert.alert(
+                "Validation Error",
+                isManualMode ? "Please select carton first." : "Please scan carton first."
+            );
+            return;
+        }
+
+        // Once the carton is selected, validate Chees and Quantity separately.
+        if (!cheesValue && !qtyValue) {
+            Alert.alert(
+                "Validation Error",
+                "Please enter Chees and Quantity."
+            );
+            return;
+        }
+
+        if (!cheesValue) {
+            Alert.alert("Validation Error", "Please enter Chees.");
+            return;
+        }
+
+        if (!qtyValue) {
+            Alert.alert("Validation Error", "Please enter Quantity.");
+            return;
+        }
+
+        const isDuplicate = cartonSummary.some(
+            item => item.cartonNo === cartonValue
+        );
+
+        if (isDuplicate) {
+            Alert.alert("Duplicate Error", `Carton No ${cartonValue} already added.`);
+            return;
+        }
+
+        const enteredChees = parseFloat(cheesValue);
+        const enteredQty = parseFloat(qtyValue);
+        // Use the same values shown in red above the textboxes.
+        const availableCheesValue = String(availableChees ?? getScannedObj?.Chees ?? '').trim();
+        const availableQtyValue = String(availableQty ?? getScannedObj?.Wt ?? '').trim();
+        const availableCheesNumber = parseFloat(availableCheesValue);
+        const availableQtyNumber = parseFloat(availableQtyValue);
+
+        if (!Number.isFinite(enteredChees) || enteredChees <= 0) {
+            Alert.alert("Validation Error", "Chees must be greater than 0.");
+            return;
+        }
+
+        if (!Number.isFinite(enteredQty) || enteredQty <= 0) {
+            Alert.alert("Validation Error", "Quantity must be greater than 0.");
+            return;
+        }
+
+        if (Number.isFinite(availableCheesNumber) && enteredChees > availableCheesNumber) {
+            Alert.alert(
+                "Validation Error",
+                `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableCheesNumber}).`
+            );
+            return;
+        }
+
+        if (Number.isFinite(availableQtyNumber) && enteredQty > availableQtyNumber) {
+            Alert.alert(
+                "Validation Error",
+                `Entered Quantity (${enteredQty}) cannot be greater than Available Quantity (${availableQtyNumber}).`
+            );
+            return;
+        }
+
+        const newCarton = {
+            cartonNo: CartonNo,
+            chees: getchees,
+            qty: getavgwt,
+            PUId: getScannedObj?.PUId || '',
+            PSrNo: getScannedObj?.PSrNo || '',
+            PSubSr: getScannedObj?.PSubSr || '',
+            // Keep both names because delete API uses SrNo/SubSr while
+            // add API payload uses PSrNo/PSubSr.
+            SrNo: getScannedObj?.SrNo || getScannedObj?.PSrNo || '',
+            SubSr: getScannedObj?.SubSr || getScannedObj?.PSubSr || '',
+            TranType: getScannedObj?.TranType || '',
+            ItmCode: getScannedObj?.ItmCode || '',
+            ItmName: getScannedObj?.ItmName || '',
+            MerCode: getScannedObj?.MerCode || '',
+            MerName: getScannedObj?.MerName || '',
+            GrdCode: getScannedObj?.GrdCode || '',
+            GrdName: getScannedObj?.GrdName || '',
+            ShdCode: getScannedObj?.ShdCode || '',
+            ShdName: getScannedObj?.ShdName || '',
+            Denier: getScannedObj?.Denier || '',
+            yearNo: getScannedObj?.yearNo || '',
+            DsnRcpSrNo: getScannedObj?.DsnRcpSrNo || editData?.cartonSummary?.[0]?.DsnRcpSrNo || '',
+            UId: getScannedObj?.UId || '',
+        };
+
+        console.log("Form srno:", FormState.values.srno);
+        console.log("newCarton:", newCarton);
+        console.log("newCarton DsnRcpSrNo:", newCarton?.DsnRcpSrNo);
+
+        const expQty = await ExpectedProdQty(newCarton);
+        newCarton.ExpProdQty = expQty;
+
+        // BROWSE -> MODIFY MODE: this carton is being added from an
+        // already-saved entry. Submit must immediately call MODIFY API.
+        if (isBrowseModifyMode) {
+            const updatedCartons = [...cartonSummary, newCarton];
+            setCartonSummary(updatedCartons);
+            setFormState(prev => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    Cartons: updatedCartons,
+                    UId: mainUId || prev.values.UId || ''
+                }
+            }));
+
+            await handleSubmitScan(false, updatedCartons, mainUId || FormState.values.UId);
+            return;
+        }
+
+        // ADD MORE MODE: use MODIFY only when the user explicitly clicked
+        // Add More after the first carton was already saved.
+        // Do NOT use FormState.values.UId alone here because a fresh/new
+        // entry can already contain a UID from the parent form.
+        if (isAddMoreMode && (savedEntryUId || FormState.values.UId)) {
+            const updatedCartons = [...cartonSummary, newCarton];
+            setCartonSummary(updatedCartons);
+            setFormState(prev => ({
+                ...prev,
+                values: {
+                    ...prev.values,
+                    Cartons: updatedCartons,
+                    UId: savedEntryUId || prev.values.UId || ''
+                }
+            }));
+
+            await handleSubmitScan(false, updatedCartons, savedEntryUId || FormState.values.UId);
+            return;
+        }
+
+        // FIRST ADD MODE: save immediately when the carton Submit button is pressed.
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsSaving(true);
+
+        try {
+            const payloadObj = {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                BeamNo: FormState.values.BeamNo,
+                BeamUId: FormState.values.BeamUId,
+                StkType: FormState.values.StkType,
+                IssNo: FormState.values.IssNo,
+                WarpLen: FormState.values.WarpLen,
+                Issdate: formatDisplayDate(FormState.values.IssDate),
+                SetupDate: formatDisplayDate(FormState.values.IssDate),
+                uid: '',
+                month: FormState.values.month,
+                suffix: FormState.values.suffix,
+                strcode: FormState.values.yarnstrcode,
+                txntype: 'beam_weft_issue',
+                RecipeUId: '2',
+                DsnCode: FormState.values.DsnCode,
+                Cartons: [{
+                    uid: '',
+                    CartNo: newCarton.cartonNo || '',
+                    Chees: newCarton.chees || '',
+                    Wt: newCarton.qty || '',
+                    PUId: newCarton.PUId || '',
+                    PSrNo: newCarton.PSrNo || '',
+                    PSubSr: newCarton.PSubSr || '',
+                    TranType: newCarton.TranType || '',
+                    ItmCode: newCarton.ItmCode || '',
+                    ItmName: newCarton.ItmName || '',
+                    MerCode: newCarton.MerCode || '',
+                    MerName: newCarton.MerName || '',
+                    GrdCode: newCarton.GrdCode || '',
+                    GrdName: newCarton.GrdName || '',
+                    ShdCode: newCarton.ShdCode || '',
+                    ShdName: newCarton.ShdName || '',
+                    Denier: newCarton.Denier || '',
+                    yearno: newCarton.yearNo || '',
+                    ExpProdQty: newCarton.ExpProdQty || 0,
+                    DsnRcpSrNo: FormState.values.srno,
+                    DsnCode: FormState.values.DsnCode,
+                }]
+            };
+
+            console.log("direct add payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(
+                `${API}/api/add_creel_data`,
+                payloadObj,
+                { headers }
+            );
+
+            console.log("direct add response", response);
+
+            const res = response.data;
+            if (res.success && res.response?.error !== true) {
+                // API is called on carton Submit. Keep the API payload exactly as before.
+                // Store the UID returned by the ADD API so the same carton can be
+                // deleted through the single-delete API immediately after saving.
+                const savedEntryUid =
+                    res.response?.data?.UId ??
+                    res.response?.data?.uid ??
+                    res.response?.UId ??
+                    res.response?.uid ??
+                    res.data?.UId ??
+                    res.data?.uid ??
+                    res.UId ??
+                    res.uid ??
+                    '';
+
+                // IMPORTANT: entry UID and carton UID are different.
+                // Keep the header/entry UID only for MODIFY.
+                setSavedEntryUId(savedEntryUid || '');
+
+                // Find the UID assigned to the exact carton that was just saved.
+                const savedCartonUid = getCartonUidFromResponse(res, newCarton.cartonNo);
+
+                const savedCarton = normalizeCarton({
+                    ...newCarton,
+                    // Never use the entry UID as the carton UID.
+                    UId: savedCartonUid || newCarton.UId || '',
+                    uid: savedCartonUid || newCarton.uid || '',
+                    PSrNo: newCarton.PSrNo || newCarton.SrNo || '',
+                    PSubSr: newCarton.PSubSr || newCarton.SubSr || '',
+                    SrNo: newCarton.SrNo || newCarton.PSrNo || '',
+                    SubSr: newCarton.SubSr || newCarton.PSubSr || '',
+                });
+
+                // IMPORTANT: ADD API success must update BOTH local carton list
+                // and FormState. Otherwise delete receives blank SrNo/SubSr.
+                setCartonSummary(prev => {
+                    const updatedCartons = [...prev, savedCarton];
+
+                    setFormState(formPrev => ({
+                        ...formPrev,
+                        values: {
+                            ...formPrev.values,
+                            // Keep the complete saved carton collection in FormState.
+                            Cartons: updatedCartons,
+                            // Keep last saved carton fields available as well.
+                            UId: savedCarton.UId || formPrev.values.UId || '',
+                            PSrNo: savedCarton.PSrNo,
+                            PSubSr: savedCarton.PSubSr,
+                            SrNo: savedCarton.SrNo,
+                            SubSr: savedCarton.SubSr,
+                        }
+                    }));
+
+                    return updatedCartons;
+                });
+
+                setDataSaved(true);
+                setSuccessMessage(res.response?.message || res.message || 'Data Saved Successfully ✅');
+                setShowListAfterSave(true);
+                setShowSuccess(true);
+            } else {
+                // HTTP 200 can still contain a business error from the API.
+                // Show the exact backend message in the custom professional modal.
+                setDataSaved(false);
+
+                const apiError =
+                    res?.error === true ||
+                    res?.response?.error === true;
+
+                const message =
+                    res?.response?.message ||
+                    res?.message ||
+                    '';
+
+                console.log("ADD API BUSINESS ERROR:", {
+                    apiError,
+                    message,
+                    response: res,
+                });
+
+                if (apiError && message) {
+                    setApiErrorMessage(String(message));
+                    setShowApiError(true);
+                }
+
+                return;
+            }
+        } catch (error) {
+            setDataSaved(false);
+            console.log("API handleAddCarton error:", error);
+
+            const message =
+                error?.response?.data?.response?.message ||
+                error?.response?.data?.message ||
+                '';
+
+            if (message) {
+                setApiErrorMessage(String(message));
+                setShowApiError(true);
+            }
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    {
+        (!device || !hasPermission) && (
+            <View style={{ alignItems: 'center', marginTop: 20 }}>
+                <Text>No camera permission or device not available</Text>
+            </View>
+        )
+    }
+
+    const handleFinalSubmit = () => {
+        const currentD2 = Array.isArray(FormState?.values?.d2)
+            ? FormState.values.d2
+            : [];
+
+        if (currentD2.length === 0) {
+            Alert.alert(
+                "Validation",
+                "Please add at least one carton."
+            );
+            return;
+        }
+        // Done always means: finish this entry, clear local state,
+        // close the drawer and refresh the browse list.
+        console.log('DONE clicked');
+        resetAllData();
+        resetCurrentItem();
+        closeAllDrawers();
+        fetchbrowse();
+    };
+
+    const getToken = () => {
+        return token;
+    };
+
+    const getShifts = async () => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+
+            const historyPayload = {
+                // text: parcode,
+                txntype: 'creel_yarn_issue',
+                // referrer: 'dashboard',
+                fetch: 'shift',
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo
+
+            };
+            console.log("historyPayload", historyPayload);
+            const response = await axios.get(
+                `${API}/api/get_criterion`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+            console.log("response", response);
+            if (response.data.success && response.data.response.data.length > 0) {
+                setShiftData(response.data.response.data);
+            } else {
+                setShiftData([]);
+            }
+        } catch (error) {
+            // console.log("API getshifts error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    const ExpectedProdQty = async (newCarton) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+
+        try {
+            const historyPayload = {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                txntype: 'beam_weft_issue',
+                WfIssQty: newCarton?.qty,
+                MRUId: '0',
+                MRSrNo: '0',
+                ItmCode: newCarton?.ItmCode,
+                ShdCode: newCarton?.ShdCode,
+                // PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo,
+                PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo || '',
+                beamuid: FormState.values.BeamUId,
+                dsncode: FormState.values.DsnCode
+            };
+
+            console.log("get_expprodqty_from_issueqty historyPayload", historyPayload);
+            const response = await axios.get(
+                `${API}/api/get_expprodqty_from_issueqty`, getRequestConfig(
+                    {
+                        params: { ...historyPayload }
+                    }
+                )
+            );
+            console.log("get_expprodqty_from_issueqty", response);
+            const dataArray = response?.data?.data?.data;
+
+            if (Array.isArray(dataArray) && dataArray.length > 0) {
+
+                const expQty = dataArray[0].ExpProdQty || 0;
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        ExpProdQty: expQty
+                    }
+                }));
+
+                return expQty;
+            }
+
+            return 0;
+
+        } catch (error) {
+            console.log("API ExpectedProdQty error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        const { PrpCode, YearNo } = FormState.values;
+        if (PrpCode && YearNo) {
+            getShifts();
+        }
+    }, [FormState.values.PrpCode, FormState.values.YearNo]);
+
+
+    useEffect(() => {
+        if (isCreelModalVisible) {
+            getShifts();
+            // getdesign();
+        }
+    }, [isCreelModalVisible]);
+
+
+    const sendScannedValue = async (qrValue: string) => {
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+
+        try {
+            let temp = JSON.parse(qrValue)
+            let yno = await AsyncStorage.getItem('yno');
+
+            let infoPyload = {
+                txntype: 'chekingScanner',
+                referrer: 'dashboard',
+                scannedString: temp,
+                prpcode: temp.prpcode,
+                yearno: yno
+            };
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/get_auto_checking_help`, infoPyload, { headers });
+
+            if (response.data.success && response.data.response.data) {
+                setData(response.data.response.data);
+                setIsLoading(false);
+            } else {
+                setIsLoading(false);
+                console.error('Unexpected response structure:', response.data);
+                Alert.alert(`${response.data}`);
+            }
+        } catch (error) {
+            //console.log("API sendScannedValue error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSubmitScan = async (closeAfterSave = true, cartonsOverride = null, uidOverride = '') => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsSaving(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                // txntype: 'creel_yarn_issue',
+                CreelId: creelId,
+                // setupDate: setupDate,
+                SetupDate: setupDate.toISOString().split('T')[0],
+                Issdate: formatDisplayDate(FormState.values.IssDate),
+                Shift: shift,
+                Remark: Remark || '',
+                StkType: FormState.values.StkType || stocktype || '',
+                uid: uidOverride || mainUId || savedEntryUId || FormState.values.UId || '',
+                DsnCode: FormState.values.DsnCode,
+                txntype: 'beam_weft_issue',
+                RecipeUId: '2',
+                Cartons: (cartonsOverride || cartonSummary).map(item => ({
+                    uid: item.UId || mainUId,
+                    CartNo: item.cartonNo || '',
+                    Chees: item.chees || '',
+                    Wt: item.qty || '',
+                    PUId: item.PUId || '',
+                    PSrNo: item.PSrNo || '',
+                    PSubSr: item.PSubSr || '',
+                    TranType: item.TranType || '',
+                    ItmCode: item.ItmCode || '',
+                    ItmName: item.ItmName || '',
+                    MerCode: item.MerCode || '',
+                    MerName: item.MerName || '',
+                    GrdCode: item.GrdCode || '',
+                    GrdName: item.GrdName || '',
+                    ShdCode: item.ShdCode || '',
+                    ShdName: item.ShdName || '',
+                    Denier: item.Denier || '',
+                    yearno: item.yearNo || '',
+                    ExpProdQty: item.ExpProdQty || 0,
+                    DsnRcpSrNo: FormState.values.srno,
+                    DsnCode: FormState.values.DsnCode,
+                }))
+            };
+
+            console.log("edit payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/modify_creel_data`, payloadObj, { headers });
+            console.log("edit response", response);
+
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+
+            //     // ✅ Snackbar REMOVE → Modal use karo
+            //     setSuccessMessage('Data Updated Successfully ✅');
+            //     setShowSuccess(true);
+
+            // }
+            const modifyResponse = response?.data || {};
+            const modifyResponseError = modifyResponse?.response?.error === true;
+            const modifyErrorMessage =
+                modifyResponse?.response?.message ||
+                modifyResponse?.message ||
+                'Unable to update data.';
+
+            // IMPORTANT: backend can return HTTP 200 + success:true while
+            // response.error:true. That must be treated as MODIFY failure.
+            if (modifyResponse.success === true && !modifyResponseError) {
+                setDataSaved(true);
+
+                setSuccessMessage(
+                    modifyResponse?.response?.message ||
+                    modifyResponse?.message ||
+                    'Data Updated Successfully ✅'
+                );
+
+                // ADD MORE -> MODIFY: stay on the carton list and preserve
+                // the currently selected Scan/Manual tab.
+                if (!closeAfterSave) {
+                    setShowListAfterSave(true);
+                    setShowSuccess(true);
+                    return;
+                }
+
+                // Browse MODIFY: close only after a real success.
+                setShowSuccess(true);
+                resetAllData();
+                setIsScanModalVisible(false);
+            } else {
+                // Example: success:true + response.error:true + message.
+                setIsSaving(false);
+                setDataSaved(false);
+                showError(modifyErrorMessage, {
+                    text: 'OK',
+                    onPress: () => { },
+                });
+                // Do not reset/close and do not change the selected tab.
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsSaving(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsSaving(false);
+        }
+
+    }
+
+    const formatDisplayDate = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        if (isNaN(d)) return '';
+
+        return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')
+            }-${d.getFullYear()}`;
+    };
+
+    const handleaddCreel = async () => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsSaving(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            const payloadObj = {
+                PrpCode: FormState.values.PrpCode,
+                YearNo: FormState.values.YearNo,
+                BeamNo: FormState.values.BeamNo,
+                BeamUId: FormState.values.BeamUId,
+                StkType: FormState.values.StkType,
+                IssNo: FormState.values.IssNo,
+                WarpLen: FormState.values.WarpLen,
+                Issdate: formatDisplayDate(FormState.values.IssDate),
+                SetupDate: formatDisplayDate(FormState.values.IssDate),
+                // uid: FormState.values.UId,
+                uid: '',
+                month: FormState.values.month,
+                suffix: FormState.values.suffix,
+                strcode: FormState.values.yarnstrcode,
+                txntype: 'beam_weft_issue',
+                RecipeUId: '2',
+                // mitmcode: FormState.values.ItmCode,
+                DsnCode: FormState.values.DsnCode,
+                Cartons: cartonSummary.map(item => ({
+                    // uid: item.UId || FormState.values.UId || '',
+                    uid: '',
+                    CartNo: item.cartonNo || '',
+                    Chees: item.chees || '',
+                    Wt: item.qty || '',
+                    PUId: item.PUId || '',
+                    PSrNo: item.PSrNo || '',
+                    PSubSr: item.PSubSr || '',
+                    TranType: item.TranType || '',
+                    ItmCode: item.ItmCode || '',
+                    ItmName: item.ItmName || '',
+                    MerCode: item.MerCode || '',
+                    MerName: item.MerName || '',
+                    GrdCode: item.GrdCode || '',
+                    GrdName: item.GrdName || '',
+                    ShdCode: item.ShdCode || '',
+                    ShdName: item.ShdName || '',
+                    Denier: item.Denier || '',
+                    yearno: item.yearNo || '',
+                    ExpProdQty: item.ExpProdQty || 0,
+                    DsnRcpSrNo: FormState.values.srno,
+                    DsnCode: FormState.values.DsnCode,
+                }))
+            };
+
+            console.log("add payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+            const response = await axios.post(`${API}/api/add_creel_data`, payloadObj, { headers });
+            console.log("add response", response);
+
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+
+            //     // ✅ Snackbar REMOVE → Modal use karo
+            //     setSuccessMessage('Data Saved Successfully ✅');
+            //     setShowSuccess(true);
+
+            // }
+            // if (response.data.success === true) {
+            //     setDataSaved(true);
+            //     setSuccessMessage('Data Updated Successfully ✅');
+            //     setShowSuccess(true);
+            // }
+            // else if (response.data.success === false) {
+            //     setIsLoading(false);
+            //     setDataSaved(false);
+            //     Snackbar.show({
+            //         text: response.data.message,
+            //         duration: Snackbar.LENGTH_LONG,
+            //         backgroundColor: '#000',
+            //         textColor: '#fff',
+            //         action: { text: 'OK', textColor: 'yellow' },
+            //     });
+            // } 
+            // else {
+            //     setIsLoading(false);
+            //     setDataSaved(false);
+            //     Snackbar.show({
+            //         text: response.data.message,
+            //         duration: Snackbar.LENGTH_LONG,
+            //         backgroundColor: '#000',
+            //         textColor: '#fff',
+            //         action: { text: 'OK', textColor: 'red' },
+            //     });
+            // }
+            const res = response.data;
+            if (res.success && res.response?.error !== true) {
+                console.log("SUCCESS BLOCK HIT");
+                setDataSaved(true);
+                // setSuccessMessage(
+                //     typeof res.message === 'string'
+                //         ? res.message
+                //         : 'Data Saved Successfully ✅'
+                // );
+                if (res.success) {
+                    setDataSaved(true);
+
+                    setSuccessMessage(
+                        res.response?.message || res.message
+                    );
+
+                    setShowSuccess(true);
+                }
+                setShowSuccess(true);
+            } else {
+                setDataSaved(false);
+                // Snackbar.show({
+                //     text:
+                //         typeof res.response?.message === 'string'
+                //             ? res.response.message
+                //             : 'Save failed (Invalid data / permission issue)',
+                //     duration: Snackbar.LENGTH_LONG,
+                //     backgroundColor: '#000',
+                //     textColor: '#fff',
+                // });
+                showError(`Save failed (Invalid data / permission issue)`, {
+                    text: 'OK',
+                    onPress: () => { },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsSaving(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsSaving(false);
+        }
+
+    }
+
+
+    useEffect(() => {
+        if (isEditMode && editData?.cartonSummary?.length > 0) {
+            // Preserve each carton UID exactly as returned by browse/modify data.
+            setCartonSummary(editData.cartonSummary.map(normalizeCarton));
+        }
+    }, [editData]);
+
+    useEffect(() => {
+        console.log("FormState UPDATED:", FormState.values);
+    }, [FormState.values]);
+
+    const d1 = FormState?.values?.d1 || [];
+    const d2 = FormState?.values?.d2 || [];
+
+    console.log("d1", d1);
+
+    // Resolve the UID of the exact carton being deleted.
+    // The parent entry UID must NEVER be used as the carton UID.
+    const resolveCartonUidForDelete = async (item) => {
+        const cartonNo = String(item?.cartonNo ?? item?.CartNo ?? '').trim();
+
+        // 1) First use the UID already stored on the selected carton.
+        const directUid = item?.UId ?? item?.uid ?? item?.CartonUId ?? item?.cartonuid ?? '';
+        if (directUid !== '') return String(directUid);
+
+        // 2) Try the current carton list / FormState using the SAME carton number.
+        const localCartons = [
+            ...(Array.isArray(cartonSummary) ? cartonSummary : []),
+            ...(Array.isArray(FormState?.values?.Cartons) ? FormState.values.Cartons : []),
+        ];
+
+        const localMatch = localCartons.find(x =>
+            String(x?.cartonNo ?? x?.CartNo ?? '').trim() === cartonNo
+        );
+        const localUid = localMatch?.UId ?? localMatch?.uid ?? localMatch?.CartonUId ?? localMatch?.cartonuid ?? '';
+        if (localUid !== '') return String(localUid);
+
+        // 3) If the current data still has no carton UID, call SHOW and get
+        // the UID from d1 for this exact carton. This is important for a newly
+        // added carton when ADD returns only the parent/entry UID.
+        const entryUid = mainUId || savedEntryUId || FormState.values.UId || '';
+        if (!entryUid || !cartonNo) return '';
+
+        try {
+            const response = await axios.post(
+                `${API}/api/get_yarn_issue_show`,
+                {
+                    uid: entryUid,
+                    prpcode: FormState.values.PrpCode,
+                    strcode: '002',
+                    yearno: FormState.values.YearNo,
+                    txntype: 'beam_weft_issue',
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+
+            const resData = response?.data?.response || {};
+            const d1 = Array.isArray(resData.d1) ? resData.d1 : [];
+            const d2 = Array.isArray(resData.d2) ? resData.d2 : [];
+            const d1BySrNo = {};
+            d1.forEach(x => {
+                d1BySrNo[String(x?.SrNo ?? x?.srno ?? '')] = x;
+            });
+
+            const match = d2.find(x =>
+                String(x?.CartNo ?? x?.cartonNo ?? '').trim() === cartonNo
+            );
+            if (!match) return '';
+
+            const d1Item = d1BySrNo[String(match?.SrNo ?? match?.srno ?? '')] || {};
+            const resolvedUid =
+                d1Item?.UId ?? d1Item?.uid ?? d1Item?.CartonUId ?? d1Item?.cartonuid ??
+                match?.UId ?? match?.uid ?? match?.CartonUId ?? match?.cartonuid ?? '';
+
+            if (resolvedUid !== '') {
+                // Put the exact carton UID back into both UI state and FormState
+                // so subsequent deletes never lose it.
+                setCartonSummary(prev => prev.map(x =>
+                    String(x?.cartonNo ?? x?.CartNo ?? '').trim() === cartonNo
+                        ? { ...x, UId: String(resolvedUid), uid: String(resolvedUid) }
+                        : x
+                ));
+
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        Cartons: (prev.values.Cartons || []).map(x =>
+                            String(x?.cartonNo ?? x?.CartNo ?? '').trim() === cartonNo
+                                ? { ...x, UId: String(resolvedUid), uid: String(resolvedUid) }
+                                : x
+                        )
+                    }
+                }));
+
+                return String(resolvedUid);
+            }
+        } catch (e) {
+            console.log('RESOLVE CARTON UID ERROR:', e);
+        }
+
+        return '';
+    };
+
+    const handledeletecarton = async (item) => {
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+        try {
+            let yno = await AsyncStorage.getItem('yno');
+            // Use the saved values from the carton first, then fall back to
+            // the equivalent QR/add-payload fields. This prevents blank
+            // srno/subsrno after an immediate ADD -> DELETE flow.
+            const deleteSrNo = item?.SrNo || item?.PSrNo || '';
+            const deleteSubSrNo = item?.SubSr || item?.PSubSr || '';
+
+            // UID must ALWAYS be sent for a saved carton.
+            // For newly-added cartons the UID is stored on the carton; for
+            // existing/browse cartons it can also be available in FormState
+            // or savedEntryUId. Do not allow the payload to go with blank uid.
+            // SINGLE DELETE MUST USE THE UID OF THE SELECTED CARTON ONLY.
+            // Never fall back to FormState.UId/savedEntryUId because those are
+            // the parent entry UID, not the selected carton's UID.
+            const deleteUid = await resolveCartonUidForDelete(item);
+
+            // Single-carton UID is used for DELETE. For the refresh/show call
+            // we need the parent entry UID, not the deleted carton's UID.
+            const entryUidForShow = mainUId || savedEntryUId || FormState.values.UId || '';
+            setPendingShowEntryUid(entryUidForShow);
+
+            if (!deleteUid) {
+                console.log('SINGLE DELETE: UID MISSING', { item, FormState: FormState?.values });
+                showError('Carton UID is missing. Cannot delete this carton.', {
+                    text: 'OK',
+                    onPress: () => { },
+                });
+                setIsLoading(false);
+                return;
+            }
+
+            const payloadObj = {
+                cartonno: item?.cartonNo || '',
+                srno: deleteSrNo,
+                subsrno: deleteSubSrNo,
+                uid: deleteUid,
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                txntype: 'beam_weft_issue',
+            };
+            console.log("delete payload", payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(`${API}/api/delete_creel_single_data`, payloadObj, { headers });
+
+            console.log("delete response", response);
+
+            if (response.data.success === true) {
+                // Remove from UI only after the delete API succeeds.
+                const currentCartons = Array.isArray(cartonSummary) ? cartonSummary : [];
+                const updatedCartons = currentCartons.filter(carton =>
+                    deleteUid
+                        ? String(carton?.UId ?? carton?.uid ?? '') !== String(deleteUid)
+                        : String(carton?.cartonNo ?? carton?.CartNo ?? '') !== String(item?.cartonNo ?? item?.CartNo ?? '')
+                );
+
+                setCartonSummary(updatedCartons);
+
+                // Keep FormState in sync after DELETE as well.
+                setFormState(formPrev => ({
+                    ...formPrev,
+                    values: {
+                        ...formPrev.values,
+                        Cartons: updatedCartons,
+                        d2: updatedCartons,
+                    }
+                }));
+
+                setDataSaved(true);
+                setSuccessMessage('Data deleted Successfully ✅');
+
+                // IMPORTANT: if the deleted carton was the LAST carton, the
+                // backend may remove the complete parent entry automatically.
+                // In that case get_yarn_issue_show has nothing to return, so
+                // NEVER call SHOW API after the last carton is deleted.
+                // Instead, close/reset this entry and refresh Browse.
+                if (updatedCartons.length === 0) {
+                    setPendingShowEntryUid('');
+                    setShowList(false);
+                    setSavedEntryUId('');
+                    setIsAddMoreMode(false);
+                    setdeleteShowSuccess(true);
+                } else {
+                    setdeleteShowSuccess(true);
+                }
+
+            }
+            else {
+                setIsLoading(false);
+                setDataSaved(false);
+                // Snackbar.show({
+                //     text: response.data.message,
+                //     duration: Snackbar.LENGTH_LONG,
+                //     backgroundColor: '#000',
+                //     textColor: '#fff',
+                //     action: { text: 'OK', textColor: 'red' },
+                // });
+                showError(`${response.data.message}`, {
+                    text: 'OK',
+                    onPress: () => { },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            setIsLoading(false);
+            console.log("API handleSubmitScan error:", error);
+        } finally {
+            setIsLoading(false);
+        }
+
+    }
+
+    const handleDeleteEntry = async () => {
+        const entryUid = mainUId || savedEntryUId || FormState.values.UId || '';
+
+        if (!entryUid) {
+            Alert.alert('Delete Error', 'Entry UID not found.');
+            return;
+        }
+
+        if (cancelToken?.cancel) cancelToken.cancel();
+        cancelToken = axios.CancelToken.source();
+        setIsLoading(true);
+
+        try {
+            const payloadObj = {
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
+                uid: entryUid,
+            };
+
+            console.log('FULL ENTRY DELETE payload', payloadObj);
+
+            const headers = {
+                Authorization: `Bearer ${getToken()}`,
+                'Content-Type': 'application/json',
+                'X-Requested-with': 'XMLHttpRequest',
+            };
+
+            const response = await axios.post(
+                `${API}/api/delete_creel_data`,
+                payloadObj,
+                { headers }
+            );
+
+            console.log('FULL ENTRY DELETE response', response);
+
+            if (response.data.success === true) {
+                setDataSaved(true);
+                setSuccessMessage('Data deleted Successfully ✅');
+                setShowSuccess(true);
+
+                // Clear everything only for FULL ENTRY delete.
+                setCartonSummary([]);
+                setFormState(prev => ({
+                    ...prev,
+                    values: { ...prev.values, Cartons: [], UId: '' }
+                }));
+                setIsAddMoreMode(false);
+                setSavedEntryUId('');
+                setShowList(false);
+            } else {
+                setDataSaved(false);
+                showError(`${response.data.message || 'Delete failed'}`, {
+                    text: 'OK',
+                    onPress: () => { },
+                });
+            }
+        } catch (error) {
+            setDataSaved(false);
+            console.log('API handleDeleteEntry error:', error);
+            showError('Error while deleting entry', {
+                text: 'OK',
+                onPress: () => { },
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Refresh the current entry from the same SHOW API used by Browse -> Modify.
+    // This is called only after single-delete success and after the user presses OK.
+    const refreshAfterSingleDelete = async () => {
+        const uid = pendingShowEntryUid || mainUId || savedEntryUId || FormState.values.UId || '';
+
+        if (!uid) {
+            console.log('SHOW AFTER SINGLE DELETE: parent entry UID missing');
+            setShowList(true);
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+
+            const payload = {
+                uid,
+                prpcode: FormState.values.PrpCode,
+                strcode: '002',
+                yearno: FormState.values.YearNo,
+                txntype: 'beam_weft_issue',
+            };
+
+            console.log('SHOW AFTER SINGLE DELETE PAYLOAD:', payload);
+
+            const response = await axios.post(
+                `${API}/api/get_yarn_issue_show`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${getToken()}`,
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+
+            console.log('SHOW AFTER SINGLE DELETE RESPONSE:', response);
+
+            if (response?.data?.success) {
+                const resData = response.data.response || {};
+                const d1 = resData.d1 || [];
+                const d2 = resData.d2 || [];
+                const mainData = resData.main || [];
+                const mainItem = mainData[0] || {};
+
+                const d1Map = {};
+                d1.forEach(x => {
+                    d1Map[String(x.SrNo)] = x;
+                });
+
+                const mappedData = d2
+                    .filter(d2Item => d1Map[String(d2Item.SrNo)])
+                    .map(d2Item => {
+                        const d1Item = d1Map[String(d2Item.SrNo)];
+
+                        return normalizeCarton({
+                            cartonNo: d2Item.CartNo || '',
+                            qty: d2Item.Qty || '',
+                            chees: d2Item.Chees || '',
+                            DsnRcpSrNo: d2Item.DsnRcpSrNo || '',
+                            RecipeUId: d2Item.RecipeUId || '',
+                            PUId: d2Item.PUId || '',
+                            PSrNo: d2Item.PSrNo || '',
+                            PSubSr: d2Item.PSubSr || '',
+                            TranType: d2Item.TranType || '',
+                            d2SrNo: String(d2Item.SrNo || ''),
+                            // Carton UID comes from d1 for this API response.
+                            UId: d1Item.UId ?? d1Item.uid ?? d1Item.CartonUId ?? d1Item.cartonuid ?? d2Item.UId ?? d2Item.uid ?? '',
+                            uid: d1Item.uid ?? d1Item.UId ?? d1Item.CartonUId ?? d1Item.cartonuid ?? d2Item.uid ?? d2Item.UId ?? '',
+                            SrNo: d2Item.SrNo ?? d2Item.srno ?? d2Item.PSrNo ?? '',
+                            SubSr: d2Item.SubSr ?? d2Item.subsrno ?? d2Item.PSubSr ?? '',
+                            BalQty: d2Item.BalQty,
+                            ProdType: d2Item.ProdType,
+                            ExpProdQty: d2Item.ExpProdQty,
+                            ItmCode: d1Item.ItmCode || '',
+                            ItmName: d1Item.ItmName || '',
+                            MerCode: d1Item.MerCode || '',
+                            MerName: d1Item.MerName || '',
+                            GrdCode: d1Item.GrdCode || '',
+                            GrdName: d1Item.GrdName || '',
+                            ShdCode: d1Item.ShdCode || '',
+                            ShdName: d1Item.ShdName || '',
+                            Denier: d1Item.Denier || '',
+                            d1SrNo: String(d1Item.SrNo || ''),
+                            yearNo: FormState.values.YearNo || '',
+                        });
+                    });
+
+                setCartonSummary(mappedData);
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        UId: mainItem.UId || uid,
+                        PrpCode: mainItem.PrpCode || prev.values.PrpCode,
+                        IssNo: mainItem.IssNo || prev.values.IssNo,
+                        IssDate: mainItem.IssDate || prev.values.IssDate,
+                        Remark: mainItem.Remark || prev.values.Remark,
+                        BatchNo: mainItem.BatchNo || prev.values.BatchNo,
+                        RecipeUId: mainItem.RecipeUId || prev.values.RecipeUId,
+                        BeamUId: mainItem.BeamUId || prev.values.BeamUId,
+                        DsnCode: mainItem.DsnCode || prev.values.DsnCode,
+                        month: mainItem.month || prev.values.month,
+                        suffix: mainItem.suffix || prev.values.suffix,
+                        yarnstrcode: mainItem.yarnstrcode || prev.values.yarnstrcode,
+                        Cartons: mappedData,
+                    }
+                }));
+
+                setSavedEntryUId(mainItem.UId || uid);
+                setShowList(true);
+            } else {
+                setShowList(true);
+                showError(
+                    response?.data?.response?.message || response?.data?.message || 'Unable to refresh entry.',
+                    { text: 'OK', onPress: () => { } }
+                );
+            }
+        } catch (error) {
+            console.log('SHOW AFTER SINGLE DELETE ERROR:', error);
+            setShowList(true);
+        } finally {
+            setIsLoading(false);
+            setPendingShowEntryUid('');
+        }
+    };
+
+    const confirmDeleteEntry = () => {
+        Alert.alert(
+            'Delete Complete Entry',
+            'Are you sure you want to delete the complete Weft Issue entry?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: handleDeleteEntry
+                }
+            ]
+        );
+    };
+
+    const confirmcartondelete = (item) => {
+        Alert.alert(
+            "Delete Creel",
+            `Are you sure you want to delete this Carton ${item.cartonNo}?`,
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => handledeletecarton(item)
+                }
+            ]
+        );
+    };
+
+    const handleDelete = (index) => {
+        Alert.alert(
+            "Delete",
+            "Are you sure you want to remove this carton?",
+            [
+                { text: "Cancel" },
+                {
+                    text: "Delete",
+                    onPress: () => {
+                        const updatedList = [...cartonSummary];
+                        updatedList.splice(index, 1);
+                        setCartonSummary(updatedList);
+                    },
+                    style: "destructive"
+                }
+            ]
+        );
+    };
+
+    const resetCurrentItem = () => {
+        setIsAddMoreMode(false);
+        setSavedEntryUId('');
+        setCartonSummary([]);
+        setGridData([]);
+        setSelectedCreel(null);
+
+        setShowManualSearch(false);
+        setSearchResults([]);
+        setSearchText('');
+        setSelectedItem(null);
+
+        setCartonNo('');
+        setScannedValue('');
+        setRemark('');
+
+        setShowList(false);
+
+        setIsScanning(false);
+        scanLock.current = false;
+    };
+
+    return (
+        <>
+            <Modal visible={isVisible} animationType="slide">
+                <View style={styles.container}>
+
+
+                    {showSuccess && (
+                        <View style={styles.overlayContainer1}>
+                            <View style={styles.overlayCardNew}>
+
+                                {/* ✅ ICON */}
+                                <View style={styles.successIcon}>
+                                    <Text style={{ fontSize: 28 }}>✅</Text>
+                                </View>
+
+                                {/* ✅ MESSAGE */}
+                                <Text style={styles.successTitle}>
+                                    Success
+                                </Text>
+
+                                <Text style={styles.successMessage}>
+                                    {successMessage}
+                                </Text>
+
+                                {/* ✅ BUTTON */}
+                                <TouchableOpacity
+                                    style={styles.okButton}
+                                    // onPress={() => {
+                                    //     setShowSuccess(false);
+                                    //     resetAllFields();
+                                    //     onClose();
+                                    // }}
+                                    onPress={() => {
+                                        setShowSuccess(false);
+
+                                        if (showListAfterSave) {
+                                            setShowListAfterSave(false);
+                                            setCartonNo('');
+                                            setchees('');
+                                            setavgwt('');
+                                            setAvailableChees('');
+                                            setAvailableQty('');
+                                            setSearchResults([]);
+                                            setSearchText('');
+                                            setSelectedItem(null);
+                                            setScannedObj({});
+                                            setShowList(true);
+                                            return;
+                                        }
+
+                                        resetAllData();
+                                        resetCurrentItem();
+                                        closeAllDrawers();
+                                        fetchbrowse();  // 🔥 sab band
+                                    }}
+                                >
+                                    <Text style={styles.okButtonText}>OK</Text>
+                                </TouchableOpacity>
+
+                            </View>
+                        </View>
+                    )}
+
+                    {deleteshowSuccess && (
+                        <View style={styles.overlayContainer1}>
+                            <View style={styles.overlayCardNew}>
+
+                                {/* ✅ ICON */}
+                                <View style={styles.successIcon}>
+                                    <Text style={{ fontSize: 28 }}>✅</Text>
+                                </View>
+
+                                {/* ✅ MESSAGE */}
+                                <Text style={styles.successTitle}>
+                                    Success
+                                </Text>
+
+                                <Text style={styles.successMessage}>
+                                    {successMessage}
+                                </Text>
+
+                                {/* ✅ BUTTON */}
+                                <TouchableOpacity
+                                    style={styles.okButton}
+                                    // onPress={() => {
+                                    //     setShowSuccess(false);
+                                    //     resetAllFields();
+                                    //     onClose();
+                                    // }}
+                                    onPress={async () => {
+                                        // Single carton delete only: keep the current
+                                        // Weft Issue entry/list open. Do NOT close drawers
+                                        // or reset the complete entry.
+                                        setdeleteShowSuccess(false);
+
+                                        // If no carton remains, the backend has
+                                        // no parent entry left to SHOW. Do not
+                                        // call the SHOW API because it will return
+                                        // an error/"something went wrong" response.
+                                        if (!Array.isArray(cartonSummary) || cartonSummary.length === 0) {
+                                            setPendingShowEntryUid('');
+                                            setCartonSummary([]);
+                                            setFormState(prev => ({
+                                                ...prev,
+                                                values: {
+                                                    ...prev.values,
+                                                    Cartons: [],
+                                                    d2: [],
+                                                    UId: ''
+                                                }
+                                            }));
+                                            setSavedEntryUId('');
+                                            setIsAddMoreMode(false);
+                                            setShowList(false);
+                                            resetCurrentItem();
+                                            closeAllDrawers();
+                                            fetchbrowse();
+                                            return;
+                                        }
+
+                                        await refreshAfterSingleDelete();
+                                    }}
+                                >
+                                    <Text style={styles.okButtonText}>OK</Text>
+                                </TouchableOpacity>
+
+                            </View>
+                        </View>
+                    )}
+                    {isSaving && (
+                        <View style={styles.loaderOverlay}>
+                            <ActivityIndicator size="large" color="#fff" />
+                        </View>
+                    )}
+                    {/* HEADER */}
+                    <View style={styles.header}>
+                        <TouchableOpacity style={styles.backBtn} onPress={onClose}>
+                            <Icon name="arrow-back" size={22} color="#fff" />
+                        </TouchableOpacity>
+
+                        <View>
+                            <Text style={styles.headerTitle}>Weft Issue Entry</Text>
+                            <Text style={styles.headerSub}>Scan / Search Carton</Text>
+                        </View>
+                    </View>
+
+                    {/* SEGMENT */}
+
+
+                    {!showList ? (
+                        <>
+                            <View style={styles.segment}>
+                                <TouchableOpacity
+                                    style={[styles.segmentBtn, !showManualSearch && styles.segmentActive]}
+                                    onPress={() => {
+                                        setShowManualSearch(false);
+                                        setIsManualSearchVisible(false);
+                                        setIsScanning(true); // 🔥 direct camera open
+                                    }}
+                                >
+                                    <View style={styles.segmentInner}>
+                                        <Icon
+                                            name="qr-code-scanner"
+                                            size={18}
+                                            color={!showManualSearch ? "#fff" : "#007EA7"}
+                                        />
+                                        <Text style={[
+                                            styles.segmentText,
+                                            !showManualSearch && styles.segmentTextActive
+                                        ]}>
+                                            Scan
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.segmentBtn, showManualSearch && styles.segmentActive]}
+                                    onPress={() => {
+                                        setShowManualSearch(true);
+                                        setIsManualSearchVisible(true);
+                                    }}
+                                >
+                                    <View style={styles.segmentInner}>
+                                        <Icon
+                                            name="search"
+                                            size={18}
+                                            color={showManualSearch ? "#fff" : "#007EA7"}
+                                        />
+                                        <Text style={[
+                                            styles.segmentText,
+                                            showManualSearch && styles.segmentTextActive
+                                        ]}>
+                                            Manual
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+
+                            {isManualSearchVisible && (
+                                <View style={styles.overlayContainer}>
+                                    <View style={styles.overlayCard}>
+                                        <Text style={styles.label}>Search Carton</Text>
+                                        <View style={styles.searchRow}>
+                                            <TextInput
+                                                placeholder="Enter carton no"
+                                                value={searchText}
+                                                onChangeText={setSearchText}
+                                                style={styles.searchInput}
+                                            />
+                                            <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+                                                <Icon name="search" size={20} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+                                        {isLoading && (
+                                            <ActivityIndicator
+                                                style={{ marginTop: 10 }}
+                                                size="small"
+                                                color="#0f766e"
+                                            />
+                                        )}
+                                        {searchResults.length > 0 && (
+                                            <FlatList
+                                                data={searchResults}
+                                                keyExtractor={(item, index) => index.toString()}
+                                                style={{ marginTop: 10, maxHeight: 200 }}
+                                                showsVerticalScrollIndicator={false}
+                                                // renderItem={({ item }) => (
+                                                //     <TouchableOpacity
+                                                //         style={styles.resultItem}
+                                                //         onPress={() => {
+                                                //             setSelectedItem(item);
+                                                //             setCartonNo(item.CartNo);
+                                                //             setchees(item.Chees || '0');
+                                                //             setavgwt(item.Wt || '0');
+                                                //         }}
+                                                //     >
+                                                //         <View>
+                                                //             <Text style={styles.resultTitle}>{item.CartNo}</Text>
+                                                //             <Text style={styles.resultSub}>
+                                                //                 Chees: {item.Chees}
+                                                //             </Text>
+                                                //             <Text style={styles.resultSub}>
+                                                //                 {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                //             </Text>
+                                                //         </View>
+                                                //     </TouchableOpacity>
+                                                // )}
+                                                renderItem={({ item }) => {
+                                                    const isSelected = selectedItem?.CartNo === item.CartNo;
+
+                                                    return (
+                                                        <TouchableOpacity
+                                                            style={[
+                                                                styles.resultItem,
+                                                                isSelected && styles.selectedItem   // 🔥 highlight
+                                                            ]}
+                                                            onPress={() => {
+                                                                setSelectedItem(item);
+                                                                setCartonNo(item.CartNo);
+                                                                setchees(item.Chees || '0');
+                                                                setavgwt(item.Wt || '0');
+                                                            }}
+                                                        >
+                                                            <View>
+                                                                <Text style={styles.resultTitle}>{item.CartNo}</Text>
+
+                                                                <Text style={styles.resultSub}>
+                                                                    Chees: {item.Chees}
+                                                                </Text>
+
+                                                                <Text style={styles.resultSub}>
+                                                                    {item.ItmName} / {item.MerName} / {item.ShdName}
+                                                                </Text>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    );
+                                                }}
+                                            />
+                                        )}
+                                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                                            <TouchableOpacity
+                                                style={[styles.primaryBtn, { flex: 1 }]}
+                                                onPress={() => {
+                                                    if (!selectedItem) {
+                                                        Alert.alert("Select carton first");
+                                                        return;
+                                                    }
+                                                    const data = {
+                                                        CartNo: selectedItem.CartNo,
+                                                        ItmName: selectedItem.ItmName,
+                                                        MerName: selectedItem.MerName,
+                                                        ShdName: selectedItem.ShdName,
+                                                        GrdName: selectedItem.GrdName,
+                                                        Chees: selectedItem.Chees,
+                                                        Wt: selectedItem.Wt,
+                                                        PUId: selectedItem.PUId,
+                                                        PSrNo: selectedItem.PSrNo,
+                                                        PSubSr: selectedItem.PSubSr,
+                                                        TranType: selectedItem.TranType,
+                                                        ItmCode: selectedItem.ItmCode,
+                                                        MerCode: selectedItem.MerCode,
+                                                        GrdCode: selectedItem.GrdCode,
+                                                        ShdCode: selectedItem.ShdCode,
+                                                        Denier: selectedItem.Denier,
+                                                        yearNo: selectedItem.yearno,
+                                                        SrNo: selectedItem.SrNo,
+                                                        SubSr: selectedItem.SubSr ?? selectedItem.subsrno ?? selectedItem.PSubSr ?? '',
+                                                        UId: selectedItem.UId ?? selectedItem.uid ?? selectedItem.CartonUId ?? selectedItem.cartonuid ?? '',
+                                                        uid: selectedItem.uid ?? selectedItem.UId ?? selectedItem.CartonUId ?? selectedItem.cartonuid ?? '',
+                                                    };
+                                                    setCartonNo(data.CartNo || '');
+                                                    setchees('');
+                                                    setavgwt('');
+
+                                                    // setchees(data.Chees || '');
+                                                    // setavgwt(data.Wt || '');
+
+                                                    setAvailableChees(data.Chees || '');
+                                                    setAvailableQty(data.Wt || '');
+
+                                                    setScannedObj(data);
+                                                    // Close only the Manual search popup. Keep Manual tab selected.
+                                                    setShowManualSearch(true);
+                                                    setIsManualSearchVisible(false);
+                                                    setIsScanning(false);
+                                                    setSearchText('');
+                                                    setSearchResults([]);
+                                                    setSelectedItem(null);
+                                                }}
+                                            >
+                                                <Text style={styles.primaryText}>OK</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.secondaryBtn, { flex: 1 }]}
+                                                onPress={() => {
+                                                    setSelectedItem(null);
+                                                    setSearchResults([]);
+                                                    setSearchText('');
+                                                    // Close only the Manual search popup. Keep Manual tab selected.
+                                                    setShowManualSearch(true);
+                                                    setIsManualSearchVisible(false);
+                                                    setIsScanning(false);
+                                                }}
+                                            >
+                                                <Text style={styles.secondaryText}>Close</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+
+                            {isScanning && (
+                                <Modal animationType="fade">
+                                    <View style={{ flex: 1, backgroundColor: '#000' }}>
+                                        <View style={styles.cameraHeader}>
+                                            <Text style={styles.cameraTitle}>Scan QR Code</Text>
+
+                                            <View style={{ width: 26 }} />
+                                        </View>
+                                        <View style={styles.cameraContainer}>
+                                            {device && hasPermission && (
+                                                // <Camera
+                                                //     style={styles.camera}
+                                                //     device={device}
+                                                //     isActive={true}
+                                                //     codeScanner={codeScanner}
+                                                // />
+                                                <Camera
+                                                    style={styles.camera}
+                                                    facing="back"
+                                                    onBarcodeScanned={handleBarCodeScanned}
+                                                    barcodeScannerSettings={{
+                                                        barcodeTypes: ['qr'],
+                                                    }}
+                                                />
+                                            )}
+                                            <View style={styles.overlay}>
+                                                <View style={styles.scanBox} />
+                                            </View>
+                                        </View>
+                                        <View style={styles.cameraFooter}>
+                                            <TouchableOpacity
+                                                style={styles.closeScanBtn}
+                                                onPress={() => setIsScanning(false)}
+                                            >
+                                                <Text style={styles.closeScanText}>Close Scanner</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </Modal>
+                            )}
+
+                            <ScrollView
+                                showsVerticalScrollIndicator={true}
+                                contentContainerStyle={{ paddingBottom: 20 }}
+                            >
+                                {cartonSummary.length > 0 && (
+                                    <TouchableOpacity
+                                        style={styles.viewListBtn}
+                                        onPress={() => setShowList(true)}
+                                    >
+                                        <Text style={styles.viewListText}>
+                                            📋 View Cartons ({cartonSummary.length})
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                                <View style={styles.card}>
+                                    <Text style={styles.cardTitle}>Carton Details</Text>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Carton Number</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={CartonNo}
+                                            editable={false}
+                                        />
+                                    </View>
+                                    <View style={styles.row}>
+                                        <View style={styles.fieldHalf}>
+                                            {/* <Text style={styles.label}>Chees</Text> */}
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    marginBottom: 6,
+                                                }}
+                                            >
+                                                <Text style={styles.label}>Chees</Text>
+
+                                                {!!availableChees && (
+                                                    <Text
+                                                        style={{
+                                                            color: 'red',
+                                                            fontWeight: '700',
+                                                            marginLeft: 8,
+                                                            fontSize: 12,
+                                                        }}
+                                                    >
+                                                        ({availableChees})
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={getchees}
+                                                onChangeText={setchees}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+
+                                        <View style={styles.fieldHalf}>
+                                            {/* <Text style={styles.label}>Quantity</Text> */}
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    marginBottom: 6,
+                                                }}
+                                            >
+                                                <Text style={styles.label}>Quantity</Text>
+
+                                                {!!availableQty && (
+                                                    <Text
+                                                        style={{
+                                                            color: 'red',
+                                                            fontWeight: '700',
+                                                            marginLeft: 8,
+                                                            fontSize: 12,
+                                                        }}
+                                                    >
+                                                        ({availableQty})
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={getavgwt}
+                                                onChangeText={setavgwt}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Item</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.ItmName || ''}
+                                            editable={false}
+                                        />
+                                    </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Merge</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.MerName || ''}
+                                            editable={false}
+                                        />
+                                    </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Shade</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.ShdName || ''}
+                                            editable={false}
+                                        />
+                                    </View>
+
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Grade</Text>
+                                        <TextInput
+                                            style={styles.inputDisabled}
+                                            value={getScannedObj?.GrdName || ''}
+                                            editable={false}
+                                        />
+                                    </View>
+
+                                </View>
+                                <View style={styles.bottomBar}>
+                                    <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
+                                        <Text style={styles.secondaryText}>Close</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.primaryBtn} onPress={handleAddCarton}>
+                                        <Text style={styles.primaryText}>Submit</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                            </ScrollView>
+                        </>
+                    ) : (
+                        <View style={styles.card}>
+                            <Text style={styles.cardTitle}>
+                                Yarn Issuance Summary ({cartonSummary.length})
+                            </Text>
+                            {/* <FlatList
+                                data={cartonSummary}
+                                keyExtractor={(item, index) => index.toString()}
+                                contentContainerStyle={{ paddingBottom: 10 }}
+                                renderItem={({ item, index }) => (
+                                    <View style={styles.listCard}>
+                                        <View style={styles.leftSection}>
+                                            <View style={styles.indexCircle}>
+                                                <Text style={styles.indexText}>{index + 1}</Text>
+                                            </View>
+
+                                            <View>
+                                                <Text style={styles.cartonNo}>
+                                                    {item.cartonNo}
+                                                </Text>
+                                                <Text style={styles.subText}>
+                                                    {item.ItmName} / {item.MerName}
+                                                </Text>
+                                                <Text style={styles.subText}>
+                                                    {item.ShdName} / {item.GrdName}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.rightSection}>
+                                            <TouchableOpacity
+                                                style={styles.deleteIcon}
+                                                onPress={() => {
+                                                    if (item?.UId) {
+                                                        confirmcartondelete(item);
+                                                    } else {
+                                                        handleDelete(index);
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.qtyText}>
+                                                Qty: {item.qty}
+                                            </Text>
+
+                                            <Text style={styles.cheesText}>
+                                                Chees: {item.chees}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                            /> */}
+
+                            <ScrollView
+                                style={{ maxHeight: 450 }}   // 🔥 IMPORTANT (adjust as needed)
+                                contentContainerStyle={{ paddingBottom: 10 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {cartonSummary.map((item, index) => (
+                                    <View style={styles.listCard}>
+                                        <View style={styles.leftSection}>
+                                            <View style={styles.indexCircle}>
+                                                <Text style={styles.indexText}>{index + 1}</Text>
+                                            </View>
+
+                                            <View>
+                                                <Text style={styles.cartonNo}>
+                                                    {item.cartonNo}
+                                                </Text>
+                                                <Text style={styles.subText}>
+                                                    {item.ItmName} / {item.MerName}
+                                                </Text>
+                                                <Text style={styles.subText}>
+                                                    {item.ShdName} / {item.GrdName}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.rightSection}>
+                                            <TouchableOpacity
+                                                style={styles.deleteIcon}
+                                                onPress={() => {
+                                                    // if (item?.UId) {
+                                                    confirmcartondelete(item);
+                                                    // }
+                                                    //  else {
+                                                    //     handleDelete(index);
+                                                    // }
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 16 }}>🗑️</Text>
+                                            </TouchableOpacity>
+                                            <Text style={styles.qtyText}>
+                                                Qty: {item.qty}
+                                            </Text>
+
+                                            <Text style={styles.cheesText}>
+                                                Chees: {item.chees}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </ScrollView>
+
+                            <View style={styles.summaryBar}>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Items</Text>
+                                    <Text style={styles.summaryValue}>
+                                        {cartonSummary.length}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.divider} />
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Total Qty</Text>
+                                    <Text style={styles.summaryValue}>
+                                        {/* {cartonSummary.reduce((sum, item) => sum + Number(item.qty || 0), 0)} */}
+                                        {cartonSummary
+                                            .reduce((sum, item) => sum + Number(item.qty || 0), 0)
+                                            .toFixed(3)
+                                        }
+                                    </Text>
+                                </View>
+
+                            </View>
+
+                            {/* <TouchableOpacity style={styles.addMoreBtn} onPress={() => setShowList(false)}>
+                                <Text style={styles.addMoreText}>＋ Add More</Text>
+                            </TouchableOpacity> */}
+
+
+                            <View style={styles.bottomRow}>
+                                <TouchableOpacity
+                                    style={styles.backBtn1}
+                                    onPress={() => {
+                                        setIsAddMoreMode(true);
+                                        setShowList(false);
+                                    }}
+                                >
+                                    <Text style={styles.backText}>＋ Add More</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.deleteEntryBtn}
+                                    onPress={confirmDeleteEntry}
+                                >
+                                    <Text style={styles.submitText}>🗑 Delete</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.doneBtn}
+                                    onPress={handleFinalSubmit}
+                                >
+                                    <Text style={styles.submitText}>✓ Done</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                        </View>
+
+                    )}
+
+                </View>
+
+                <Modal
+                    visible={showApiError}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => {
+                        setShowApiError(false);
+                        setApiErrorMessage('');
+                    }}
+                >
+                    <View style={styles.apiErrorOverlay}>
+                        <View style={styles.apiErrorModal}>
+                            <View style={styles.apiErrorIconWrap}>
+                                <Text style={styles.apiErrorIcon}>!</Text>
+                            </View>
+
+                            <Text style={styles.apiErrorTitle}>Unable to Save</Text>
+
+                            <Text style={styles.apiErrorText}>
+                                {apiErrorMessage}
+                            </Text>
+
+                            <TouchableOpacity
+                                style={styles.apiErrorButton}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                    setShowApiError(false);
+                                    setApiErrorMessage('');
+                                }}
+                            >
+                                <Text style={styles.apiErrorButtonText}>OK</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+            </Modal >
+
+        </>
+    );
+};
+
+
+
+export default WeftIssueItemDrawer;

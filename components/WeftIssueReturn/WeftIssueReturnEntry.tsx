@@ -584,23 +584,47 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
         }
     };
 
-    const handleSearch = (text) => {
+    // const handleSearch = (text) => {
+    //     setSearchText(text);
+
+    //     if (!text) {
+    //         setFilteredCreelData(linkData);
+    //         return;
+    //     }
+
+    //     const lowerText = text.toLowerCase();
+
+    //     const filtered = linkData.filter(item =>
+    //         item.ItmName?.toLowerCase().includes(lowerText) ||
+    //         item.BatchNo?.toLowerCase().includes(lowerText) ||
+    //         item.GrdName?.toLowerCase().includes(lowerText) ||
+    //         item.ShdName?.toLowerCase().includes(lowerText) ||
+    //         item.MerName?.toLowerCase().includes(lowerText) ||
+    //         item.BeamNo?.toLowerCase().includes(lowerText) ||
+    //         item.BeamNo?.toLowerCase().includes(lowerText) ||
+    //     );
+
+    //     setFilteredCreelData(filtered);
+    // };
+
+    const handleSearch = (text: string) => {
         setSearchText(text);
 
-        if (!text) {
+        const searchValue = text.trim().toLowerCase();
+
+        // Search empty hai -> original data show karo
+        if (!searchValue) {
             setFilteredCreelData(linkData);
             return;
         }
 
-        const lowerText = text.toLowerCase();
-
-        const filtered = linkData.filter(item =>
-            item.ItmName?.toLowerCase().includes(lowerText) ||
-            item.BatchNo?.toLowerCase().includes(lowerText) ||
-            item.GrdName?.toLowerCase().includes(lowerText) ||
-            item.ShdName?.toLowerCase().includes(lowerText) ||
-            item.MerName?.toLowerCase().includes(lowerText)
-        );
+        const filtered = linkData.filter((item) => {
+            return Object.values(item ?? {}).some((value) =>
+                String(value ?? "")
+                    .toLowerCase()
+                    .includes(searchValue)
+            );
+        });
 
         setFilteredCreelData(filtered);
     };

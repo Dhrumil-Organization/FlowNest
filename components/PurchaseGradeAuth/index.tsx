@@ -3,56 +3,31 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from "react";
-import { Animated, FlatList, Keyboard, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Animated, FlatList, Keyboard, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { API } from "../../common/API/dynamicAPI";
+import { fetchAllStoredata, } from '../../common/API/Functions';
 
-const ShimmerBox = ({ width, height, radius = 12 }: any) => {
-    const translateX = useRef(new Animated.Value(-250)).current;
-
-    useEffect(() => {
-        Animated.loop(
-            Animated.timing(translateX, {
-                toValue: 350,
-                duration: 1400,
-                useNativeDriver: true,
-            }),
-        ).start();
-    }, []);
-
-    return (
-        <View
-            style={{
-                width,
-                height,
-                borderRadius: radius,
-                backgroundColor: '#ECEFF3',
-                overflow: 'hidden',
-            }}
-        >
-            <Animated.View
-                style={{
-                    position: 'absolute',
-                    width: 120,
-                    height: '100%',
-                    backgroundColor: 'rgba(255,255,255,0.55)',
-                    transform: [{ translateX }],
-                }}
-            />
-        </View>
-    );
-};
-
-const PurchaseTransportAuth = ({ navigation, token }) => {
+const PurchaseGradeAuth = ({ token }) => {
     const router = useRouter();
-    const [searchPurchaseTransport, setsearchPurchaseTransport] = useState("");
-    const [PurchaseTransportData, setPurchaseTransportData] = useState([]);
-    const [PurchaseTransportloading, setPurchaseTransportloading] = useState(false);
+    const [search, setSearch] = useState("");
+    const [partyData, setPartyData] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState("request");
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [storeData, setstoreData] = useState([]);
+    const [selectedstore, setSelectedstore] = useState(null);
+    const [storeSearch, setstoreSearch] = useState("");
+    const [yearOptions, setYearOptions] = useState([]);
+    const [selectedYear, setSelectedYear] = useState("");
+    const [yearSearch, setYearSearch] = useState("");
     const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+    const [showYearList, setShowYearList] = useState(false);
+    const [showStoreList, setShowStoreList] = useState(false);
     const [FormState, setFormState] = useState({
         values: {
             YearNo: '',
+            StrCode: ''
         }
     })
     const [alertData, setAlertData] = useState({
@@ -61,11 +36,10 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
         type: "warning",
     });
     const [remarks, setRemarks] = useState({});
-    const [PurchaseTransportinitialLoaded, setPurchaseTransportinitialLoaded] = useState(false);
-    const [ProductionDetails, setProductionDetails] = useState({});
-    const [showPurchaseTransportInfo, setshowPurchaseTransportInfo] = useState({});
-    const [PurchaseTransportDetails, setPurchaseTransportDetails] = useState([]);
-    const [refreshing, setRefreshing] = useState(false);
+    const [initialLoaded, setInitialLoaded] = useState(false);
+    const [poDetails, setPoDetails] = useState({});
+    const [infoLoading, setInfoLoading] = useState({});
+    const [showInfo, setShowInfo] = useState({});
 
     const showWarning = msg =>
         setAlertData({
@@ -89,53 +63,99 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
         });
 
     useEffect(() => {
-        if(!token) return;
-        if (!PurchaseTransportinitialLoaded) {
-            fetchPurchaseTransportlist();
-            setPurchaseTransportinitialLoaded(true);
+
+        const y = new Date().getFullYear();
+
+        const arr = [];
+
+        for (let i = 0; i < 5; i++) {
+            arr.push(`${y - i}-${y - i + 1}`);
         }
+
+        setYearOptions(arr);
+
+        setSelectedYear(arr[0]);
+    }, []);
+
+    useEffect(() => {
+        if(!token) return
+
+        const load = async () => {
+
+            let yno = await AsyncStorage.getItem('yno');
+
+            const data = await fetchAllStoredata(token, '', yno, 'sales_order')
+
+            setstoreData(data || []);
+
+            if (data?.length) {
+
+                setSelectedstore(data[0]);
+
+                setFormState(prev => ({
+                    ...prev,
+                    values: {
+                        ...prev.values,
+                        StrCode: data[0]?.StrCode || data[0]?.strcode || ""
+                    }
+                }));
+            }
+            console.log("data ::", data)
+        };
+        load();
     }, [token]);
 
     useEffect(() => {
-        if(!token) return;
-        setshowPurchaseTransportInfo({});
-        setProductionDetails({});
-        if (PurchaseTransportinitialLoaded) {
-            fetchPurchaseTransportlist();
+        if(!token) return
+
+        if (selectedstore && selectedYear && !initialLoaded) {
+            fetchpartylist();
+
+            setInitialLoaded(true);
+        }
+    }, [token, selectedstore, selectedYear]);
+
+    useEffect(() => {
+        if(!token) return
+        setShowInfo({});
+        setPoDetails({});
+
+        if (initialLoaded) {
+            fetchpartylist();
         }
     }, [token, activeTab]);
 
-    const onRefresh = async () => {
-        setRefreshing(true);
+    const fetchpartylist = async () => {
 
-        await fetchPurchaseTransportlist();
+        if (!selectedstore) return;
 
-        setRefreshing(false);
-    };
+        setLoading(true);
 
-    const fetchPurchaseTransportlist = async () => {
-        setPurchaseTransportloading(true);
         const userPtype = await AsyncStorage.getItem('user_prptype');
 
         let yno = await AsyncStorage.getItem('yno');
         console.log("userPtype : => ", userPtype)
         console.log("yno : => ", yno)
+        console.log("selectedYear?.slice(-2) : => ", selectedYear?.slice(-2))
+
         let atype = 'B';
+
         if (activeTab === 'history') {
             atype = 'H';
         }
-        try {
-            const payload = {
-                prpcode: 'MT',
-                prptype: userPtype,
-                strcode: '',
-                yearno: yno,
-                txntype: 'purchase_transport_auth',
-                referrer: 'dashboard',
-                atype: atype,
-            };
 
-            console.log("browse payload", payload);
+        try {
+
+            const payload = {
+                prptype: userPtype,
+                yearno: selectedYear?.slice(-2),
+                strcode: selectedstore?.StrCode || selectedstore?.strcode || FormState.values.StrCode || '',
+                txntype: "mob_purchase_auth",
+                atype: atype,
+                referrer: 'dashboard',
+                fetch: "browsedata"
+            };
+            console.log("api payload => ", payload)
 
             const res = await axios.get(`${API}/api/purchasebrowse`, {
                 headers: {
@@ -145,110 +165,160 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                 },
                 params: payload,
             });
-            console.log("browse res", res)
-            console.log("rawData", res?.data?.response?.data)
-            console.log("rawDataD1", res?.data?.response?.d1)
+            console.log("api response => ", res)
 
             const rawData = res?.data?.response?.data || [];
-            const rawDataD1 = res?.data?.response?.d1 || [];
 
-            setPurchaseTransportData(rawData);
-            setPurchaseTransportDetails(rawDataD1);
+            setPartyData(rawData);
 
             if (res?.data?.response?.error == true) {
                 showWarning("Please Try Again !!!");
             }
         } catch (e) {
             console.log(e);
-            setPurchaseTransportData([]);
+
+            setPartyData([]);
         } finally {
-            setPurchaseTransportloading(false);
+
+            setLoading(false);
         }
     };
 
-    const filteredData = PurchaseTransportData.filter(item => {
-        const search = searchPurchaseTransport.trim().toLowerCase();
+    const fetchpurdatalist = async (item) => {
 
-        if (!search) return true;
+        if (showInfo[item.uid]) {
 
-        const itemDetails = PurchaseTransportDetails.filter(
-            d => d.uid === item.uid
+            setShowInfo(prev => ({
+                ...prev,
+                [item.uid]: false
+            }));
+
+            return;
+        }
+
+        if (!selectedstore) return;
+
+        const userPtype = await AsyncStorage.getItem('user_prptype');
+
+        let yno = await AsyncStorage.getItem('yno');
+        console.log("userPtype : => ", userPtype)
+        console.log("yno : => ", yno)
+        console.log("selectedYear?.slice(-2) : => ", selectedYear?.slice(-2))
+
+        let atype = 'B';
+
+        if (activeTab === 'history') {
+            atype = 'H';
+        }
+
+        try {
+
+            setInfoLoading(prev => ({
+                ...prev,
+                [item.uid]: true
+            }));
+
+            const payload = {
+                prptype: userPtype,
+                yearno: selectedYear?.slice(-2),
+                strcode: selectedstore?.StrCode || selectedstore?.strcode || FormState.values.StrCode || '',
+                txntype: "mob_purchase_auth",
+                atype: atype,
+                referrer: 'dashboard',
+                fetch: "purdata",
+                pouid: item?.pouid
+            };
+            console.log("api payload => ", payload)
+
+            const res = await axios.get(`${API}/api/purchasebrowse`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                params: payload,
+            });
+            console.log("api response => ", res)
+
+            const rawData = res?.data?.response?.data || [];
+
+            setPoDetails(prev => ({
+                ...prev,
+                [item.uid]: rawData
+            }));
+
+            setShowInfo(prev => ({
+                ...prev,
+                [item.uid]: !prev[item.uid]
+            }));
+
+            if (res?.data?.response?.error == true) {
+                showWarning("Please Try Again !!!");
+            }
+        } catch (e) {
+            console.log(e);
+
+            setPartyData([]);
+        } finally {
+
+            setInfoLoading(prev => ({
+                ...prev,
+                [item.uid]: false
+            }));
+        }
+    };
+
+    const filteredData = partyData.filter((i) => {
+
+        const searchText = search.toLowerCase();
+        return (
+            i?.parcode?.toLowerCase()?.includes(searchText) ||
+            i?.parname?.toLowerCase()?.includes(searchText) ||
+            i?.itmname?.toLowerCase()?.includes(searchText) ||
+            i?.mername?.toLowerCase()?.includes(searchText) ||
+            i?.inwno?.toLowerCase()?.includes(searchText) ||
+            i?.inwdate?.toLowerCase()?.includes(searchText) ||
+            i?.grdname?.toLowerCase()?.includes(searchText) ||
+            i?.shdname?.toLowerCase()?.includes(searchText) ||
+            i?.mainstrname?.toLowerCase()?.includes(searchText) ||
+            i?.authstatus?.toLowerCase()?.includes(searchText) ||
+            i?.authby?.toLowerCase()?.includes(searchText) ||
+            i?.authdate?.toLowerCase()?.includes(searchText) ||
+            i?.aremark?.toLowerCase()?.includes(searchText) ||
+            i?.pono?.toLowerCase()?.includes(searchText) ||
+            i?.podate?.toLowerCase()?.includes(searchText) ||
+            i?.qty1?.toLowerCase()?.includes(searchText) ||
+            i?.qty2?.toLowerCase()?.includes(searchText) ||
+            i?.qty3?.toLowerCase()?.includes(searchText)
         );
-
-        const headerValues = [
-            item.inwno,
-            item.inwdate,
-            item.parcode,
-            item.parname,
-            item.mainstrname,
-            item.invtype,
-            item.authstatus,
-            item.aremark,
-            item.authby,
-            item.authdate,
-            item.countofitem,
-        ];
-
-        const headerMatch = headerValues.some(v =>
-            String(v ?? "").toLowerCase().includes(search)
-        );
-
-        const detailMatch = itemDetails.some(detail => {
-            const detailValues = [
-                detail.srno,
-                detail.itmname,
-                detail.curr,
-                detail.currrate,
-                detail.exrate,
-                detail.porate,
-                detail.poamt,
-                detail.potrpper,
-                detail.potrpamt,
-                detail.purrate,
-                detail.puramt,
-                detail.purtrpper,
-                detail.purtrpamt,
-                detail.amount,
-            ];
-
-            return detailValues.some(v =>
-                String(v ?? "").toLowerCase().includes(search)
-            );
-        });
-
-        return headerMatch || detailMatch;
     });
-
-    console.log("PurchaseTransportData Length :", PurchaseTransportData?.length);
-    console.log("filteredData Length :", filteredData?.length);
-    console.log("searchPurchaseTransport :", searchPurchaseTransport);
 
     const getToken = () => {
         return token;
     };
 
-    const fetchauthoriseddata = async (item, isauthValue, authData) => {
-        setPurchaseTransportloading(true);
+    const fetchauthoriseddata = async (item, isauthValue) => {
+
+        setLoading(true);
+
         const userPtype = await AsyncStorage.getItem('user_prptype');
-        let yno = await AsyncStorage.getItem('yno');
-        console.log("userPtype : => ", userPtype)
-        console.log("yno : => ", yno)
+
         try {
+
             const params = {
                 prptype: userPtype,
-                yearno: yno,
-                ...item,
+                prpcode: item?.prpcode || "",
+                yearno: selectedYear?.slice(-2),
+                strcode: selectedstore?.StrCode || selectedstore?.strcode || FormState.values.StrCode || '',
+                uid: item?.uid || "",
+                srno: item?.srno || "",
                 isauth: isauthValue,
-                txntype: "purchase_transport_auth",
+                txntype: "mob_purchase_auth",
                 remark: remarks[item?.uid] || "",
-                action: 'edit',
-                referrer: "dashboard",
-                ARemark: remarks[item?.uid] || "",
-                aremark: remarks[item?.uid] || "",
             };
-            console.log("Purchase Transport Auth Auth Payload DATA=> ", params);
+            console.log("purchase grade auth payload => ", params);
 
-            const res = await axios.post(
+            const response = await axios.post(
                 `${API}/api/authpurchase`,
                 params,
                 {
@@ -256,23 +326,20 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                         Authorization: `Bearer ${getToken()}`,
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
-                    },
+                        Accept: 'application/json'
+                    }
                 }
             );
-            console.log("Purchase Transport Auth Auth Response => ", res);
+            console.log("purchase grade auth response => ", response);
 
-            if (res?.data?.response?.error == true) {
+            if (response?.data?.response?.error == true) {
                 showError("Please Try Again");
-            } else if (res?.data?.success == true) {
-                showSuccess(res?.data.response?.message);
-                const rawData = res?.data?.response?.data || [];
-                const rawDataD1 = res?.data?.response?.d1 || [];
-
-                setPurchaseTransportData(rawData);
-                setPurchaseTransportDetails(rawDataD1);
+            } else if (response?.data?.success == true) {
+                showSuccess(response?.data.response?.message);
+                fetchpartylist();
             }
         } catch (error) {
-            console.log("Purchase Transport Auth Auth ERROR:", error?.response?.data || error.message);
+            console.log("PURCHASE GRADE AUTH ERROR:", error?.response?.data || error.message);
             showError(
                 error?.response?.data?.message ||
                 error?.message ||
@@ -280,90 +347,22 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
             );
         } finally {
 
-            setPurchaseTransportloading(false);
+            setLoading(false);
         }
     };
-
-    // const renderSkeleton = () => {
-    //     return [1, 2, 3, 4].map((item) => (
-    //         <View key={item} style={styles.skeletonCard}>
-    //             <View style={styles.skeletonHeader}>
-    //                 <View style={styles.skeletonCircle} />
-    //                 <View style={{ flex: 1 }}>
-    //                     <View style={styles.skeletonLineLarge} />
-    //                     <View style={styles.skeletonLineSmall} />
-    //                 </View>
-    //             </View>
-    //             <View style={styles.skeletonMiddle} />
-    //             <View style={styles.skeletonFooter} />
-    //         </View>
-    //     ));
-    // };
 
     const renderSkeleton = () => {
         return [1, 2, 3, 4].map((item) => (
             <View key={item} style={styles.skeletonCard}>
-
                 <View style={styles.skeletonHeader}>
-                    <ShimmerBox
-                        width={56}
-                        height={56}
-                        radius={18}
-                    />
-
-                    <View
-                        style={{
-                            flex: 1,
-                            marginLeft: 14,
-                        }}
-                    >
-                        <ShimmerBox
-                            width={'80%'}
-                            height={18}
-                        />
-
-                        <View style={{ height: 10 }} />
-
-                        <ShimmerBox
-                            width={'45%'}
-                            height={14}
-                        />
+                    <View style={styles.skeletonCircle} />
+                    <View style={{ flex: 1 }}>
+                        <View style={styles.skeletonLineLarge} />
+                        <View style={styles.skeletonLineSmall} />
                     </View>
                 </View>
-
-                <View style={{ height: 20 }} />
-
-                <ShimmerBox
-                    width={'95%'}
-                    height={14}
-                />
-
-                <View style={{ height: 12 }} />
-
-                <ShimmerBox
-                    width={'70%'}
-                    height={14}
-                />
-
-                <View style={{ height: 20 }} />
-
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                    }}
-                >
-                    <ShimmerBox
-                        width={'45%'}
-                        height={18}
-                    />
-
-                    <ShimmerBox
-                        width={42}
-                        height={42}
-                        radius={12}
-                    />
-                </View>
+                <View style={styles.skeletonMiddle} />
+                <View style={styles.skeletonFooter} />
             </View>
         ));
     };
@@ -373,32 +372,35 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
         else router.replace('/');
     };
 
+
     return (
 
         <View style={styles.container}>
-            <LinearGradient colors={['#0B6477', '#14919B']} style={styles.header}>
-                <TouchableOpacity onPress={goBack} style={styles.headerIconBtn} >
+            <LinearGradient colors={['#0B6477', '#14919B']} style={styles.header} >
+                <TouchableOpacity  onPress={goBack} style={styles.headerIconBtn} >
                     <Icon name="arrow-back-ios-new" size={20} color="#fff" />
                 </TouchableOpacity>
 
-                <Text style={styles.headerTitle}> Purchase Transport Auth </Text>
+                <Text style={styles.headerTitle}> Purchase Grade Auth </Text>
 
-                <View style={{ width: 30 }} />
+                <TouchableOpacity onPress={() => setFilterVisible(true)} style={styles.headerIconBtn} >
+                    <Icon name="tune" size={22} color="#fff" />
+                </TouchableOpacity>
             </LinearGradient>
 
             <View style={styles.mainSearchBox}>
                 <Icon name="search" size={20} color="#000" />
                 <TextInput
-                    placeholder="Search an Purchase..."
+                    placeholder="Search purchase..."
                     placeholderTextColor="#000"
-                    value={searchPurchaseTransport}
-                    onChangeText={setsearchPurchaseTransport}
+                    value={search}
+                    onChangeText={setSearch}
                     style={styles.mainSearchInput}
                     returnKeyType="search"
                 />
 
-                {searchPurchaseTransport?.length > 0 && (
-                    <TouchableOpacity onPress={() => { setsearchPurchaseTransport(""); Keyboard.dismiss(); }} style={styles.clearBtn}>
+                {search?.length > 0 && (
+                    <TouchableOpacity onPress={() => { setSearch(""); Keyboard.dismiss(); }} style={styles.clearBtn}>
                         <Icon name="close" size={20} color="#666" />
                     </TouchableOpacity>
                 )}
@@ -440,33 +442,23 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                 </TouchableOpacity>
             </View>
 
-            {PurchaseTransportloading ? (
+            {loading ? (
                 <View style={{ paddingTop: 10 }}>
                     {renderSkeleton()}
                 </View>
             ) : (
                 <FlatList
                     data={filteredData}
-                    nestedScrollEnabled={true}
-                    keyboardShouldPersistTaps="handled"
                     keyExtractor={(item, index) => index.toString()}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={["#14919B"]}
-                            tintColor="#14919B"
-                        />
-                    }
                     contentContainerStyle={{
                         paddingBottom: 30,
                         paddingTop: 10,
                     }}
                     renderItem={({ item }) => {
                         return (
-                            <View style={[
+                            <TouchableOpacity activeOpacity={0.95} style={[
                                 styles.proCard,
-                                showPurchaseTransportInfo[item.uid] && {
+                                showInfo[item.uid] && {
                                     minHeight:
                                         activeTab === "history"
                                             ? 520
@@ -485,11 +477,11 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                                 }
                                 <View style={styles.cardTopNew}>
                                     <Text style={styles.topDate}>
-                                        {item.inwno}
+                                        {item.inwdate}
                                     </Text>
 
                                     <Text style={styles.topInward}>
-                                        {item.inwdate}
+                                        {item.inwno}
                                     </Text>
                                 </View>
 
@@ -524,69 +516,210 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                                     </View>
                                 </View>
 
-                                {activeTab !== "history" && (
-                                    <View
-                                        style={{
-                                            marginTop: 10,
-                                            marginBottom: 10,
-                                        }}
-                                    >
+                                <View style={styles.proDivider} />
+
+                                <View style={styles.topInfoRow}>
+
+                                    <View style={styles.topInfoBox}>
                                         <Text style={styles.newLabel}>
-                                            Str Name
+                                            Item
                                         </Text>
 
-                                        <Text
-                                            style={{
-                                                color: "#0F8F9A",
-                                                fontSize: 13,
-                                                fontWeight: "800",
-                                            }}
-                                        >
-                                            {item.mainstrname || "-"}
+                                        <Text style={styles.newValue}>
+                                            {item.itmname}
                                         </Text>
                                     </View>
-                                )}
+
+                                    <View
+                                        style={[
+                                            styles.topInfoBox,
+                                            { alignItems: "flex-end" }
+                                        ]}
+                                    >
+                                        <Text style={styles.newLabel}>
+                                            Merge
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {item.mername}
+                                        </Text>
+                                    </View>
+
+                                </View>
 
                                 <View style={styles.middleInfoRow}>
+
+                                    <View style={styles.middleInfoBox}>
+                                        <Text style={styles.newLabel}>
+                                            Grade
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {item.grdname}
+                                        </Text>
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.middleInfoBox,
+                                            { alignItems: "flex-end" }
+                                        ]}
+                                    >
+                                        <Text style={styles.newLabel}>
+                                            Shade
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {item.shdname}
+                                        </Text>
+                                    </View>
+
+                                </View>
+
+                                <View style={styles.middleInfoRow}>
+
+                                    <View style={styles.middleInfoBox}>
+                                        <Text style={styles.newLabel}>
+                                            Qty
+                                        </Text>
+
+                                        <Text style={styles.qtyNewValue}>
+                                            {Number(item.qty || 0).toFixed(3)}
+                                        </Text>
+                                    </View>
+
+                                    <View
+                                        style={[
+                                            styles.middleInfoBox,
+                                            { alignItems: "flex-end" }
+                                        ]}
+                                    >
+                                        <Text style={styles.newLabel}>
+                                            Store
+                                        </Text>
+
+                                        <Text style={styles.storeNewValue}>
+                                            {item.mainstrname}
+                                        </Text>
+                                    </View>
                                 </View>
 
                                 <View style={styles.poMainRow}>
-                                    <View style={{ flex: 1 }}>
 
-                                        {activeTab === "history" && (
-                                            <>
-                                                <Text style={[styles.newLabel, { marginTop: 12 }]}>
-                                                    Str Name
-                                                </Text>
+                                    <View style={styles.poBox}>
+                                        <Text style={styles.newLabel}>
+                                            PONO
+                                        </Text>
 
-                                                <Text style={{ color: "#0F8F9A", fontSize: 13, fontWeight: "800", }}>
-                                                    {item.mainstrname || "-"}
-                                                </Text>
-                                            </>
-                                        )}
+                                        <Text style={styles.newValue}>
+                                            {item.pono || "-"}
+                                        </Text>
                                     </View>
 
-                                    {activeTab === "history" && (
-                                        <TouchableOpacity
-                                            style={styles.poInfoIconBtn}
-                                            onPress={() =>
-                                                setshowPurchaseTransportInfo(prev => ({
-                                                    ...prev,
-                                                    [item.uid]: !prev[item.uid]
-                                                }))
-                                            }
-                                        >
-                                            <Text style={styles.poInfoCountText}>
-                                                {item.countofitem}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
+                                    <View style={styles.poDateBox}>
+                                        <Text style={styles.newLabel}>
+                                            PODATE
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {item.podate || "-"}
+                                        </Text>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={styles.poInfoIconBtn}
+                                        onPress={() => {
+                                            fetchpurdatalist(item);
+
+                                            console.log("PURCHASE BROWSE API HIT", item?.pouid);
+                                        }}
+                                    >
+                                        {
+                                            infoLoading[item.uid] ? (
+
+                                                <ActivityIndicator
+                                                    size="small"
+                                                    color="#2563EB"
+                                                />
+
+                                            ) : (
+
+                                                <Icon
+                                                    name="info-outline"
+                                                    size={18}
+                                                    color="#2563EB"
+                                                />
+                                            )
+                                        }
+                                    </TouchableOpacity>
+
                                 </View>
 
-                                <View style={styles.remarkRowBox}>
+                                {showInfo[item.uid] && (
 
-                                    {activeTab !== "history" ? (
-                                        <>
+                                    <View style={styles.poInfoBox}>
+                                        <View style={styles.poHeaderRow}>
+                                            <Text style={styles.poHeaderText}>
+                                                Purchase Date
+                                            </Text>
+
+                                            <Text style={styles.poHeaderText}>
+                                                Purchase No
+                                            </Text>
+                                        </View>
+
+                                        {poDetails[item.uid]?.map((poItem, index) => (
+
+                                            <View key={index} style={styles.poInfoRow} >
+                                                <Text style={styles.poInfoLabel}>
+                                                    {poItem?.inwdate}
+                                                </Text>
+
+                                                <Text style={styles.poInfoValue}>
+                                                    {poItem?.inwno}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+
+                                <View style={styles.bottomQtyRow}>
+
+                                    <View style={styles.bottomQtyBox}>
+                                        <Text style={styles.newLabel}>
+                                            POQty
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {Number(item.qty1 || 0).toFixed(3)}
+                                        </Text>
+                                    </View>
+
+                                    <View style={styles.bottomQtyBoxCenter}>
+                                        <Text style={styles.newLabel}>
+                                            1st
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {Number(item.qty2 || 0).toFixed(3)}
+                                        </Text>
+                                    </View>
+
+                                    <View style={styles.bottomQtyBoxRight}>
+                                        <Text style={styles.newLabel}>
+                                            Oth
+                                        </Text>
+
+                                        <Text style={styles.newValue}>
+                                            {Number(item.qty3 || 0).toFixed(3)}
+                                        </Text>
+                                    </View>
+
+                                </View>
+
+                                {activeTab !== "history" &&
+                                    item.authstatus?.toLowerCase() === "pending" && (
+                                        <View style={styles.remarkRowBox}>
                                             <Text style={styles.remarkLeftLabel}>
                                                 Remark
                                             </Text>
@@ -602,200 +735,29 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                                                     }))
                                                 }}
                                                 style={styles.remarkRightInput}
+                                                multiline
                                             />
-                                        </>
-                                    ) : (
-                                        <View style={{ flex: 1 }} />
-                                    )
-                                    }
-
-                                    {activeTab !== "history" && (
-                                        <TouchableOpacity
-                                            style={styles.poInfoIconBtn}
-                                            onPress={() =>
-                                                setshowPurchaseTransportInfo(prev => ({
-                                                    ...prev,
-                                                    [item.uid]: !prev[item.uid]
-                                                }))
-                                            }
-                                        >
-                                            <Text style={styles.poInfoCountText}>
-                                                {item.countofitem}
-                                            </Text>
-                                        </TouchableOpacity>
+                                        </View>
                                     )}
-
-                                </View>
-
-                                {showPurchaseTransportInfo[item.uid] && (
-                                    <View style={styles.poInfoBox}>
-                                        <ScrollView nestedScrollEnabled style={styles.poScrollArea} showsVerticalScrollIndicator={false}>
-                                            {PurchaseTransportDetails
-                                                .filter(d => d.uid === item.uid)
-                                                .map((detail, idx) => {
-
-                                                    console.log("DETAIL =>", {
-                                                        purrate: detail.purrate,
-                                                        porate: detail.porate,
-                                                        purtrpamt: detail.purtrpamt,
-                                                        potrpamt: detail.potrpamt,
-                                                    });
-
-                                                    console.log(
-                                                        "COMPARE =>",
-                                                        Number(detail.purrate || 0),
-                                                        ">",
-                                                        Number(detail.porate || 0),
-                                                        "=",
-                                                        Number(detail.purrate || 0) > Number(detail.porate || 0),
-
-                                                        " | ",
-
-                                                        Number(detail.purtrpamt || 0),
-                                                        ">",
-                                                        Number(detail.potrpamt || 0),
-                                                        "=",
-                                                        Number(detail.purtrpamt || 0) > Number(detail.potrpamt || 0)
-                                                    );
-
-                                                    return (
-                                                        <View
-                                                            key={idx}
-                                                            style={[
-                                                                styles.itemDetailCard,
-                                                                (
-                                                                    (
-                                                                        Number(Number(detail.porate || 0).toFixed(2)) > 0 &&
-                                                                        Number(Number(detail.purrate || 0).toFixed(2)) > Number(Number(detail.porate || 0).toFixed(2))
-                                                                    ) ||
-                                                                    (
-                                                                        Number(Number(detail.potrpamt || 0).toFixed(2)) > 0 &&
-                                                                        Number(Number(detail.purtrpamt || 0).toFixed(2)) > Number(Number(detail.potrpamt || 0).toFixed(2))
-                                                                    )
-                                                                ) && {
-                                                                    borderColor: "#EF4444",
-                                                                    borderWidth: 2,
-                                                                    backgroundColor: "#FEF2F2",
-                                                                }
-                                                            ]}
-                                                        >
-
-                                                            <View style={styles.itemHeader}>
-                                                                <View style={{ flex: 1 }}>
-                                                                    <Text style={styles.itemTitle}>
-                                                                        {detail.itmname}
-                                                                    </Text>
-                                                                </View>
-
-                                                                <View style={styles.srBadge}>
-                                                                    <Text style={styles.srBadgeText}>
-                                                                        #{detail.srno}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-
-                                                            <Text style={styles.sectionTitle}>
-                                                                Purchase Order
-                                                            </Text>
-
-                                                            <View style={styles.detailRow}>
-                                                                {/* <View style={styles.detailBox}>
-                                                                <Text style={styles.detailLabel}>PO Curr</Text>
-                                                                <Text style={styles.detailValue}>{detail.curr || '-'}</Text>
-                                                            </View> */}
-
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>PO Trp Per.</Text>
-                                                                    <Text style={styles.detailValue}>
-                                                                        {Number(detail.potrpper).toFixed(2) || '-'}
-                                                                    </Text>
-                                                                </View>
-
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>PO Trp Amount</Text>
-                                                                    <Text style={styles.detailValue}>
-                                                                        {Number(detail.potrpamt).toFixed(2) || '-'}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-
-                                                            <View style={styles.detailRow}>
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>PO Rate</Text>
-                                                                    <Text style={styles.detailValue}>
-                                                                        {Number(detail.porate).toFixed(2) || '-'}
-                                                                    </Text>
-                                                                </View>
-
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>PO Amount</Text>
-                                                                    <Text style={styles.amountValue}>{detail.poamt || '-'}</Text>
-                                                                </View>
-                                                            </View>
-
-                                                            <View style={styles.cardDividerLine} />
-
-                                                            <Text style={styles.sectionTitle}>
-                                                                Purchase
-                                                            </Text>
-
-                                                            {/* Row 1 */}
-                                                            <View style={styles.detailRow}>
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>Pur Trp Per.</Text>
-                                                                    <Text style={styles.detailValue}>
-                                                                        {Number(detail.purtrpper || 0).toFixed(2)}
-                                                                    </Text>
-                                                                </View>
-
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>Pur Trp Amount</Text>
-                                                                    <Text style={styles.amountValue}>
-                                                                        {Number(detail.purtrpamt || 0).toFixed(2)}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-
-                                                            {/* Row 2 */}
-                                                            <View style={styles.detailRow}>
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>Pur Rate</Text>
-                                                                    <Text style={styles.detailValue}>
-                                                                        {Number(detail.purrate || 0).toFixed(2)}
-                                                                    </Text>
-                                                                </View>
-
-                                                                <View style={styles.detailBox}>
-                                                                    <Text style={styles.detailLabel}>Pur Amount</Text>
-                                                                    <Text style={styles.amountValue}>
-                                                                        {Number(detail.puramt || detail.amount || 0).toFixed(2)}
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-                                                        </View>
-                                                    );
-                                                })}
-                                        </ScrollView>
-                                    </View>
-                                )}
 
                                 {activeTab === "history" && (
                                     <>
                                         <View style={styles.proDivider} />
 
-                                        <View style={styles.historyRemarkBox}>
-                                            <Text style={styles.historyRemarkLabel}>
-                                                Remark
-                                            </Text>
+                                        {item.aremark ? (
+                                            <View style={styles.historyRemarkBox}>
+                                                <Text style={styles.historyRemarkLabel}>
+                                                    Remark
+                                                </Text>
 
-                                            <Text style={styles.historyRemarkText}>
-                                                {item.aremark || "-"}
-                                            </Text>
-                                        </View>
+                                                <Text style={styles.historyRemarkText}>
+                                                    {item.aremark}
+                                                </Text>
+                                            </View>
+                                        ) : null}
 
                                         <View style={styles.authFooterRow}>
-
-                                            <View style={styles.authFooterBoxLeft}>
+                                            <View style={styles.authFooterBox}>
                                                 <Text style={styles.authFooterLabel}>
                                                     Auth By
                                                 </Text>
@@ -805,7 +767,7 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                                                 </Text>
                                             </View>
 
-                                            <View style={styles.authFooterBoxRight}>
+                                            <View style={styles.authFooterBox}>
                                                 <Text style={styles.authFooterLabel}>
                                                     Auth Date
                                                 </Text>
@@ -814,60 +776,266 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                                                     {item.authdate || "-"}
                                                 </Text>
                                             </View>
+
                                         </View>
                                     </>
                                 )}
 
-                                {activeTab !== "history" && (
-                                    <>
-                                        <View style={styles.proDivider} />
+                                {
+                                    activeTab !== "history" &&
+                                    item.authstatus?.toLowerCase() === "pending" && (
+                                        <>
+                                            <View style={styles.proDivider} />
+                                            <View style={styles.buttonRowPro}>
+                                                <TouchableOpacity
+                                                    style={styles.rejectIconBtn}
+                                                    onPress={() => fetchauthoriseddata(item, 2)}
+                                                >
+                                                    <Icon name="close" size={22} color="#DC2626" />
+                                                </TouchableOpacity>
 
-                                        <View style={styles.buttonRowPro}>
-                                            <TouchableOpacity
-                                                style={styles.rejectIconBtn}
-                                                onPress={() => fetchauthoriseddata(item, 2)}
-                                            >
-                                                <Icon name="close" size={22} color="#DC2626" />
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={styles.approveIconBtn}
-                                                onPress={() => {
-                                                    if (!(remarks[item?.uid] || "").trim()) {
-                                                        showWarning("Please enter remark before approval.");
-                                                        return;
-                                                    }
-
-                                                    fetchauthoriseddata(item, 1);
-                                                }}
-                                            >
-                                                <Icon name="check" size={22} color="#16A34A" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </>
-                                )}
-                            </View>
+                                                <TouchableOpacity
+                                                    style={styles.approveIconBtn}
+                                                    onPress={() => fetchauthoriseddata(item, 1)}
+                                                >
+                                                    <Icon name="check" size={22} color="#16A34A" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </>
+                                    )
+                                }
+                            </TouchableOpacity>
                         );
                     }}
 
                     ListEmptyComponent={
-                        < View style={styles.emptyContainer} >
+                        <View style={styles.emptyContainer}>
 
                             <View style={styles.emptyIconBox}>
                                 <Icon name="inventory-2" size={60} color="#AAB7C4" />
                             </View>
 
                             <Text style={styles.emptyTitle}>
-                                No Purchase Transport Auth Data
+                                No Purchase Data
                             </Text>
 
                             <Text style={styles.emptySubtitle}>
-                                Purchase Transport Auth records will appear here
+                                Purchase records will appear here
                             </Text>
-                        </View >
+                        </View>
                     }
                 />
             )}
+
+            <Modal transparent visible={filterVisible} animationType="slide" >
+                <View style={styles.overlay}>
+                    <View style={styles.sheet}>
+                        <View style={styles.modalHeader}>
+
+                            <Text style={styles.modalTitle}>
+                                Filters
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setFilterVisible(false);
+                                    setShowYearList(false);
+                                    setShowStoreList(false);
+                                }}
+                            >
+                                <Icon name="close" size={24} color="#000" />
+                            </TouchableOpacity>
+
+                        </View>
+
+                        <Text style={styles.label}>
+                            Select Year
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.selectBox}
+                            onPress={() => {
+                                setShowYearList(!showYearList);
+                                setShowStoreList(false);
+                            }}
+                        >
+
+                            <Text style={styles.selectText}>
+                                {selectedYear || "Select Year"}
+                            </Text>
+
+                            <Icon
+                                name={
+                                    showYearList
+                                        ? "keyboard-arrow-up"
+                                        : "keyboard-arrow-down"
+                                }
+                                size={22}
+                                color="#000"
+                            />
+
+                        </TouchableOpacity>
+
+                        {showYearList && (
+                            <View style={styles.dropdownBox}>
+                                <View style={styles.filterSearchBox}>
+
+                                    <Icon name="search" size={18} color="#000" />
+
+                                    <TextInput
+                                        placeholder="Search Year..."
+                                        placeholderTextColor="#000"
+                                        value={yearSearch}
+                                        onChangeText={setYearSearch}
+                                        style={styles.filterInput}
+                                    />
+
+                                </View>
+
+                                <FlatList
+                                    data={yearOptions.filter(i =>
+                                        i.includes(yearSearch)
+                                    )}
+                                    keyExtractor={(item, index) =>
+                                        index.toString()
+                                    }
+                                    style={{ maxHeight: 180 }}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.selectItem}
+                                            onPress={() => {
+                                                setSelectedYear(item);
+                                                setShowYearList(false);
+                                            }}
+                                        >
+
+                                            <Text style={{ color: "#000" }}>
+                                                {item}
+                                            </Text>
+
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        )}
+
+                        <Text style={styles.label}>
+                            Select Store
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.selectBox}
+                            onPress={() => {
+                                setShowStoreList(!showStoreList);
+                                setShowYearList(false);
+                            }}
+                        >
+
+                            <Text
+                                style={styles.selectText}
+                                numberOfLines={1}
+                            >
+                                {
+                                    selectedstore?.StrName ||
+                                    selectedstore?.LngName ||
+                                    selectedstore?.store_name ||
+                                    "Select Store"
+                                }
+                            </Text>
+
+                            <Icon
+                                name={
+                                    showStoreList
+                                        ? "keyboard-arrow-up"
+                                        : "keyboard-arrow-down"
+                                }
+                                size={22}
+                                color="#000"
+                            />
+
+                        </TouchableOpacity>
+
+                        {showStoreList && (
+                            <View style={styles.dropdownBox}>
+                                <View style={styles.filterSearchBox}>
+
+                                    <Icon name="search" size={18} color="#000" />
+
+                                    <TextInput
+                                        placeholder="Search Store..."
+                                        placeholderTextColor="#000"
+                                        value={storeSearch}
+                                        onChangeText={setstoreSearch}
+                                        style={styles.filterInput}
+                                    />
+
+                                </View>
+
+                                <FlatList
+                                    data={storeData.filter(i => {
+                                        const storeName =
+                                            i.StrName ||
+                                            i.LngName ||
+                                            i.store_name ||
+                                            "";
+                                        return storeName
+                                            .toLowerCase()
+                                            .includes(
+                                                storeSearch.toLowerCase()
+                                            );
+
+                                    })}
+                                    keyExtractor={(item, index) =>
+                                        index.toString()
+                                    }
+                                    style={{ maxHeight: 220 }}
+                                    renderItem={({ item }) => {
+                                        const storeName = item.StrName || item.LngName || item.store_name || "";
+                                        return (
+                                            <TouchableOpacity
+                                                style={styles.selectItem}
+                                                onPress={() => {
+                                                    setSelectedstore(item);
+                                                    setFormState(prev => ({
+                                                        ...prev,
+                                                        values: {
+                                                            ...prev.values,
+                                                            StrCode: item.StrCode || item.strcode || ""
+                                                        }
+                                                    }));
+                                                    setShowStoreList(false);
+                                                }}
+                                            >
+
+                                                <Text style={{ color: "#000", flex: 1 }} >
+                                                    {storeName}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    }}
+                                />
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.loadBtn}
+                            onPress={() => {
+                                fetchpartylist();
+                                setFilterVisible(false);
+                                setShowYearList(false);
+                                setShowStoreList(false);
+                            }}
+                        >
+
+                            <Icon name="refresh" size={18} color="#fff" />
+
+                            <Text style={styles.loadText}>
+                                Load Data
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             <Modal transparent visible={alertData.visible} animationType="fade">
                 <View style={styles.alertOverlay}>
@@ -921,11 +1089,11 @@ const PurchaseTransportAuth = ({ navigation, token }) => {
                     </View>
                 </View>
             </Modal>
-        </View >
+        </View>
     );
 };
 
-export default PurchaseTransportAuth;
+export default PurchaseGradeAuth;
 
 const styles = StyleSheet.create({
 
@@ -1145,7 +1313,7 @@ const styles = StyleSheet.create({
     },
     topDate: {
         color: "#111827",
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: "700",
     },
     topInward: {
@@ -1296,21 +1464,21 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         marginTop: 14,
     },
-    // detailBox: {
-    //     flex: 1,
-    //     marginRight: 6,
-    // },
-    // detailLabel: {
-    //     color: "#98A2B3",
-    //     fontSize: 10,
-    //     marginBottom: 4,
-    //     fontWeight: "700",
-    // },
-    // detailValue: {
-    //     color: "#111827",
-    //     fontSize: 12,
-    //     fontWeight: "700",
-    // },
+    detailBox: {
+        flex: 1,
+        marginRight: 6,
+    },
+    detailLabel: {
+        color: "#98A2B3",
+        fontSize: 10,
+        marginBottom: 4,
+        fontWeight: "700",
+    },
+    detailValue: {
+        color: "#111827",
+        fontSize: 12,
+        fontWeight: "700",
+    },
     bottomMainSection: {
         marginTop: 16,
         flexDirection: "row",
@@ -1451,11 +1619,11 @@ const styles = StyleSheet.create({
         fontSize: 11,
         marginBottom: 2,
     },
-    // amountValue: {
-    //     fontSize: 16,
-    //     fontWeight: "900",
-    //     color: "#111827",
-    // },
+    amountValue: {
+        fontSize: 16,
+        fontWeight: "900",
+        color: "#111827",
+    },
     bottomRowNew: {
         marginTop: 14,
         flexDirection: "row",
@@ -1572,21 +1740,6 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    authFooterBoxLeft: {
-        flex: 1,
-        alignItems: "flex-start",
-    },
-
-    authFooterBoxCenter: {
-        flex: 1,
-        alignItems: "center",
-    },
-
-    authFooterBoxRight: {
-        flex: 1,
-        alignItems: "flex-end",
-    },
-
     authFooterBox: {
         flex: 1,
     },
@@ -1649,7 +1802,12 @@ const styles = StyleSheet.create({
         color: "#111827",
         lineHeight: 18,
     },
-
+    remarkRowBox: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 4,
+        marginBottom: 8,
+    },
 
     remarkLeftLabel: {
         width: 70,
@@ -1658,7 +1816,18 @@ const styles = StyleSheet.create({
         fontWeight: "700",
     },
 
-
+    remarkRightInput: {
+        flex: 1,
+        minHeight: 42,
+        borderWidth: 1,
+        borderColor: "#000",
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: "#fff",
+        color: "#111827",
+        fontSize: 13,
+    },
     topInfoRow: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -1672,25 +1841,17 @@ const styles = StyleSheet.create({
     middleInfoRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 0,
-        // marginTop: 8,
+        marginBottom: 14,
     },
 
     middleInfoBox: {
-        flex: 1,
-    },
-
-    cartNoValue: {
-        color: "#7C3AED",
-        fontSize: 14,
-        fontWeight: "800",
+        width: "48%",
     },
 
     bottomQtyRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 14,
-        marginTop: 4,
+        marginBottom: 6,
     },
 
     bottomQtyBox: {
@@ -1710,20 +1871,20 @@ const styles = StyleSheet.create({
 
     newLabel: {
         color: "#111827",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: "700",
         marginBottom: 4,
     },
 
     newValue: {
         color: "#111827",
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: "800",
     },
 
     qtyNewValue: {
         color: "#111827",
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: "900",
     },
 
@@ -1751,17 +1912,12 @@ const styles = StyleSheet.create({
         marginBottom: 14,
         borderWidth: 1,
         borderColor: "#E2E8F0",
-
-        overflow: "visible",
     },
 
     poInfoRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 10,
-        paddingBottom: 8,
-        borderBottomWidth: 0.5,
-        borderBottomColor: "#E5E7EB",
+        marginBottom: 8,
     },
 
     poInfoLabel: {
@@ -1778,64 +1934,30 @@ const styles = StyleSheet.create({
 
     poMainRow: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 18,
+        alignItems: "flex-start",
+        marginBottom: 14,
     },
 
-    mergeMainCard: {
-        backgroundColor: "#F8FBFD",
+    poBox: {
+        width: "42%",
+    },
 
-        borderRadius: 22,
+    poDateBox: {
+        width: "42%",
+        alignItems: "flex-start",
+    },
 
-        padding: 16,
-
-        marginBottom: 16,
-
+    poInfoIconBtn: {
+        width: 40,
+        height: 40,
+        marginLeft: "auto",
+        borderRadius: 10,
+        backgroundColor: "#EFF6FF",
         borderWidth: 1,
-        borderColor: "#E4EDF2",
+        borderColor: "#BFDBFE",
+        justifyContent: "center",
+        alignItems: "center",
     },
-
-    mergeRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 14,
-        // marginBottom: 14,
-    },
-
-    mergeLeft: {
-        width: "48%",
-        marginRight: 8,
-    },
-
-    // mergeRight: {
-    //     width: "48%",
-    //     alignItems: "flex-end",
-    // },
-
-    mergeLabel: {
-        fontSize: 13,
-        fontWeight: "700",
-        color: "#111827",
-
-        marginBottom: 6,
-
-        // textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-
-    mergeValue: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: "#111827",
-    },
-
-    mergeDivider: {
-        height: 1,
-        backgroundColor: "#E5E7EB",
-
-        marginVertical: 14,
-    },
-
     poHeaderRow: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -1846,268 +1968,5 @@ const styles = StyleSheet.create({
         color: "#000",
         fontSize: 12,
         fontWeight: "800",
-    },
-    poScrollArea: {
-        maxHeight: 175,
-        minHeight: 175,
-        paddingRight: 4,
-    },
-    createdMainRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        // marginTop: 14,
-        marginBottom: 4,
-    },
-
-    createdLeftSection: {
-        flex: 1,
-    },
-
-    createdRightSection: {
-        width: 120,
-        alignItems: "flex-end",
-    },
-
-    createdLabel: {
-        fontSize: 13,
-        fontWeight: "700",
-        color: "#111827",
-        marginBottom: 3,
-    },
-
-    createdValue: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: "#111827",
-    },
-
-    remarkRowBox: {
-        flexDirection: "row",
-        alignItems: "center",
-        // marginTop: 8,
-        marginBottom: 8,
-    },
-
-    remarkRightInput: {
-        flex: 1,
-        height: 42,
-        borderWidth: 1,
-        borderColor: "#000",
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        backgroundColor: "#fff",
-        marginRight: 8,
-    },
-
-
-    // itemDetailCard: {
-    //     backgroundColor: "#FFFFFF",
-    //     borderRadius: 14,
-    //     padding: 12,
-    //     marginBottom: 10,
-    //     borderWidth: 1,
-    //     borderColor: "#E2E8F0",
-    //     minHeight: 110,
-    // },
-
-    itemHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 10,
-    },
-
-    // itemTitle: {
-    //     flex: 1,
-    //     color: "#111827",
-    //     fontSize: 14,
-    //     fontWeight: "800",
-    // },
-
-    srBadge: {
-        backgroundColor: "#E0F2FE",
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 20,
-    },
-
-    srBadgeText: {
-        color: "#0369A1",
-        fontWeight: "700",
-        fontSize: 11,
-    },
-
-    detailGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-    },
-
-    detailCell: {
-        width: "48%",
-        marginBottom: 10,
-    },
-
-    // detailLabel: {
-    //     color: "#000",
-    //     fontSize: 11,
-    //     fontWeight: "600",
-    // },
-
-    // detailValue: {
-    //     color: "#111827",
-    //     fontSize: 13,
-    //     fontWeight: "700",
-    // },
-
-    // amountValue: {
-    //     color: "#16A34A",
-    //     fontSize: 14,
-    //     fontWeight: "800",
-    // },
-
-    poInfoIconBtn: {
-        width: 42,
-        height: 42,
-        borderRadius: 15, // perfect circle
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#EFF6FF",
-        borderWidth: 1,
-        borderColor: "#BFDBFE",
-    },
-
-    poInfoCountText: {
-        color: "#2563EB",
-        fontSize: 16,
-        fontWeight: "900",
-    },
-
-    topRateRow: {
-        flexDirection: "row",
-        marginTop: 8,
-    },
-
-    topRateCell: {
-        width: "33.33%",
-    },
-
-    bottomDetailRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 8,
-    },
-
-    bottomDetailCell: {
-        flex: 1,
-    },
-
-    storeName: {
-        color: '#0F8F9A',
-        fontSize: 14,
-        fontWeight: '800',
-        textTransform: 'uppercase',
-    },
-
-    partyLabel: {
-        fontSize: 12,
-        color: '#000',
-        fontWeight: '700',
-        marginTop: 8,
-    },
-
-    partyName: {
-        fontSize: 12,
-        color: '#000',
-        fontWeight: '800',
-        marginTop: 2,
-    },
-    // detailRow: {
-    //     flexDirection: "row",
-    //     justifyContent: "space-between",
-    //     marginTop: 12,
-    // },
-
-    // detailBox: {
-    //     flex: 1,
-    // },
-
-    itemDetailCard: {
-        backgroundColor: "#FFFFFF",
-        borderRadius: 16,
-        padding: 14,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: "#f8f8f8",
-    },
-
-    itemTitle: {
-        flex: 1,
-        color: "#111827",
-        fontSize: 14,
-        fontWeight: "800",
-    },
-
-    // detailLabel: {
-    //     color: "#000",
-    //     fontSize: 12,
-    //     fontWeight: "600",
-    //     marginBottom: 4,
-    // },
-
-    // detailValue: {
-    //     color: "#000",
-    //     fontSize: 12,
-    //     fontWeight: "700",
-    // },
-
-    // amountValue: {
-    //     color: "#16A34A",
-    //     fontSize: 12,
-    //     fontWeight: "800",
-    // },
-
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: '800',
-        color: '#0F8F9A',
-        marginTop: 8,
-        marginBottom: 8,
-        textTransform: 'uppercase',
-    },
-
-    cardDividerLine: {
-        height: 1,
-        backgroundColor: '#E5E7EB',
-        marginVertical: 12,
-    },
-
-    detailRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 8,
-    },
-
-    detailBox: {
-        flex: 1,
-    },
-
-    detailLabel: {
-        color: '#000',
-        fontSize: 11,
-        fontWeight: '600',
-        marginBottom: 4,
-    },
-
-    detailValue: {
-        color: '#111827',
-        fontSize: 13,
-        fontWeight: '700',
-    },
-
-    amountValue: {
-        color: '#000',
-        fontSize: 13,
-        fontWeight: '800',
     },
 });

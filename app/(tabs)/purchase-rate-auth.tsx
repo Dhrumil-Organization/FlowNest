@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 // import { AuthProvider, useAuth } from '@/hooks/AuthContext';
 // import GreyPurchaseOrder from '@/components/GreyPurchaseOrder';
-import PurchaseAuth from '@/components/PurchaseAuth';
+import PurchaseRateAuth from '@/components/PurchaseRateAuth';
 
 export default function CRLimit_Request_Container() {
     // const { token, username } = useAuth();
@@ -24,7 +24,7 @@ export default function CRLimit_Request_Container() {
     return (
         <>
             {/* <AuthProvider> */}
-            <PurchaseAuth token={token || ''} username={username} />
+            <PurchaseRateAuth token={token || ''} username={username} />
             {/* <Footer/> */}
             {/* </AuthProvider> */}
         </>

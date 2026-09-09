@@ -2,6 +2,7 @@
 // import './modules/beam-close.ui';
 import './modules/core-navigation.ui';
 import './modules/greyPacking.ui';
+import './modules/priority.ui';
 import './modules/design.ui';
 import './modules/management.ui';
 import './modules/production.ui';

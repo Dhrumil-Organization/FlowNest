@@ -3782,7 +3782,12 @@ function MonthSettings({ d, monthKey }) {
 
 // ── Expense input coverage ─────────────────────────────────────────
 function ExpenseCoverageNotice({ d, month }) {
-  const daily = Array.isArray(d?.daily) ? d.daily : [];
+  // Coverage must use Sheet2/live daily rows. Sheet1 is intentionally
+  // capped to the common complete costing date and cannot independently
+  // show later electricity entry dates.
+  const daily = Array.isArray(d?.coverage_daily)
+    ? d.coverage_daily
+    : (Array.isArray(d?.daily) ? d.daily : []);
   if (!month || daily.length === 0) return null;
 
   const lastDayFor = (predicate) => {
@@ -3796,10 +3801,10 @@ function ExpenseCoverageNotice({ d, month }) {
   };
 
   const electricityLast = lastDayFor(
-    (row) => Number(row?.total_kwh || 0) !== 0,
+    (row) => Number(row?.total_kwh || 0) > 0,
   );
   const salaryLast = lastDayFor(
-    (row) => Number(row?.sal_t || 0) !== 0,
+    (row) => Number(row?.sal_t || 0) > 0,
   );
 
   const now = new Date();

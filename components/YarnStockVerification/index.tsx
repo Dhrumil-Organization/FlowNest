@@ -11,7 +11,7 @@ import YarnStockCard from './YarnStockCard';
 import theme from '@/components/theme';
 import { API, PRINTERSLISTAPI, PRINTSTICKER } from '../../common/API/dynamicAPI';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
 

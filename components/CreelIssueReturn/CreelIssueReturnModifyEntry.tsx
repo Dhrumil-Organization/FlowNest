@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Snackbar } from 'react-native-snackbar';
+import { Snackbar } from '@/common/utils/snackbarCompat';
 // import CustomSearchableDropdown from "../Shared/CustomSearchableDropdown";
 
 const CreelIssueReturnModifyEntry = ({ navigation, route }) => {

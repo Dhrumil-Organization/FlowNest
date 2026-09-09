@@ -4,7 +4,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '@/components/theme';
 import SearchableDropdown from '@/Shared/SearchableDropdown';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 // import FullScreenLoader from '../Loader/Loader';
 
 const { height } = Dimensions.get('window');

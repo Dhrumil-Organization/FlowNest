@@ -1,5 +1,6 @@
-// import { API } from '@/common/API/dynamicAPI';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError } from 'axios';
+import { resolveNewErpApiBaseUrl } from '@/src/api/client';
 
 export type ExpenseDashboardData = {
     period: { yearno: number; monthno: string; month_start_ymd: number; upto_date_ymd: number; requested_upto_ymd?: number; complete_through_ymd?: number | null; last_expense_entry_ymd?: number | null; label: string; display_range?: string; working_days: number; ongoing: boolean; coverage_status?: 'complete' | 'partial' | 'incomplete'; is_complete?: boolean; pending_expenses?: Array<{ key: string; label: string; last_entered_ymd?: number | null; pending_from_ymd: number; pending_to_ymd: number; pending_days: number }>; source_coverage?: Record<string, number | null> };
@@ -14,14 +15,19 @@ export type ExpenseDashboardData = {
 
 type Envelope = { success: boolean; response?: { data?: ExpenseDashboardData } | null; message?: string };
 
-const API = 'https://apig.tms-webapp.com';
-
 export async function fetchExpenseDashboardCard(args: {
     token: string; prptype?: string; yearno: number | string; monthno: number | string;
     date?: string; refresh?: boolean; prpcodes?: string[] | string;
 }): Promise<ExpenseDashboardData> {
     if (!String(args.token || '').trim()) throw new Error('Authentication token is missing.');
     try {
+        // FIX: this was a hardcoded 'https://apig.tms-webapp.com' (the Sudamo
+        // host) regardless of which property the user is logged into, so a
+        // Rayons session's expense dashboard card silently called the wrong
+        // ERP server. Resolve it fresh from selected_property, same as every
+        // other New ERP API call.
+        const selectedProperty = await AsyncStorage.getItem('selected_property');
+        const API = resolveNewErpApiBaseUrl(selectedProperty);
         const res = await axios.get<Envelope>(`${API}/api/mobile-dashboard/expense-card`, {
             headers: {
                 Authorization: `Bearer ${args.token}`,

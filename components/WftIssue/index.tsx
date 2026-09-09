@@ -16,7 +16,7 @@ import CustomDrawer from './CustomDrawer';
 import AddWeftIssueDetail from './AddWeftIssueDetail';
 import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
 import WeftIssueItemDrawer from './WeftIssueItemDrawer';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';

@@ -23,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchPropertyData } from '../../common/API/Functions';
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Snackbar } from 'react-native-snackbar';
+import { Snackbar } from '@/common/utils/snackbarCompat';
 
 const CreelIssueReturn = ({ token, navigation }) => {
     const router = useRouter();

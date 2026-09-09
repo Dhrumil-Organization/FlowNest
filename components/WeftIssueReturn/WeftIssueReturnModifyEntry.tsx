@@ -17,7 +17,7 @@ import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Snackbar } from 'react-native-snackbar';
+import { Snackbar } from '@/common/utils/snackbarCompat';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // import CustomSearchableDropdown from "../Shared/CustomSearchableDropdown";
 

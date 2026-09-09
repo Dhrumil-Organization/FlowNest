@@ -8,7 +8,7 @@ import theme from '@/components/theme';
 // import { Switch } from 'react-native';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';

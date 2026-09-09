@@ -1,0 +1,10 @@
+FlowNest Web fix
+================
+
+Fixed the Expo SDK 54 web error:
+Uncaught SyntaxError: Cannot use 'import.meta' outside a module
+
+Changed only babel.config.js to enable babel-preset-expo's
+unstable_transformImportMeta option.
+
+No native source files, package versions, or app.json settings were changed.

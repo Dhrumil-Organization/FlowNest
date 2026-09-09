@@ -1,0 +1,11 @@
+type ChatRow = { id:number; userText:string; aiText:string; userCreatedAt:number; aiCreatedAt:number; isEdited:number };
+const KEY='FlowNestWebChats';
+const read=():ChatRow[]=>{try{return JSON.parse(localStorage.getItem(KEY)||'[]')}catch{return[]}};
+const write=(v:ChatRow[])=>localStorage.setItem(KEY,JSON.stringify(v));
+export const initDB=async()=>{};
+export const saveChat=async(userText:any,aiText:any,userTimestamp=Date.now(),aiTimestamp=Date.now())=>{const a=read();a.push({id:a.length?Math.max(...a.map(x=>x.id))+1:1,userText:String(userText),aiText:String(aiText),userCreatedAt:Number(userTimestamp),aiCreatedAt:Number(aiTimestamp),isEdited:0});write(a);return true;};
+export const getChat=async(userText:any)=>{const a=read().filter(x=>x.userText===String(userText));return a.length?a[a.length-1]:null;};
+export const getAllChats=async()=>read().flatMap(x=>[{type:'user',text:x.userText,createdAt:x.userCreatedAt||Date.now(),id:`${x.id}_user`,isEdited:x.isEdited===1},{type:'ai',text:x.aiText,createdAt:x.aiCreatedAt||Date.now(),id:`${x.id}_ai`,isEdited:x.isEdited===1}]);
+export const deleteAfterMessage=async(userText:any)=>{const a=read();const i=[...a].reverse().findIndex(x=>x.userText===String(userText));if(i<0)return false;const idx=a.length-1-i;const id=a[idx].id;write(a.filter(x=>x.id<=id).map(x=>x.id===id?{...x,isEdited:1}:x));return true;};
+export const clearChat=async()=>{localStorage.removeItem(KEY);return true;};
+export const debugDB=async()=>read();

@@ -21,6 +21,16 @@ type SessionState = {
   // biometric gate it was just satisfied by. Reset on cold start.
   freshLogin: boolean;
 
+  // In-memory only. Bumped every time setLoggedIn() runs — a normal
+  // manual/auto login AND an in-app "Switch Property" (which calls
+  // performLogin() again under the hood). The New ERP tabs layout keys
+  // its content on this value so a property switch fully unmounts and
+  // remounts every tab screen, exactly like the very first mount after a
+  // fresh login. Without this, screens that fetch their data/token only
+  // once on mount (most New ERP tab routes) would keep showing the
+  // previous property's cached state after a switch.
+  sessionEpoch: number;
+
   setLoggedIn: (payload: {
     token: string;
     user: any;
@@ -67,6 +77,7 @@ export const useAppSessionStore = create<SessionState>((set, get) => ({
   biometricEnabled: false,
   hydrated: false,
   freshLogin: false,
+  sessionEpoch: 0,
 
   setLoggedIn: ({ token, user, appSession, rawLoginResponse }) => {
     // Persist the complete permission identity. Without this, a cold start only
@@ -77,7 +88,15 @@ export const useAppSessionStore = create<SessionState>((set, get) => ({
       ['mobile_user', JSON.stringify(user || null)],
       ['mobile_raw_login_response', JSON.stringify(rawLoginResponse || null)],
     ]);
-    set({ token, user, appSession, rawLoginResponse: rawLoginResponse || null, hydrated: true, freshLogin: true });
+    set((state) => ({
+      token,
+      user,
+      appSession,
+      rawLoginResponse: rawLoginResponse || null,
+      hydrated: true,
+      freshLogin: true,
+      sessionEpoch: state.sessionEpoch + 1,
+    }));
   },
 
   setAppSession: async (appSession) => {

@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Snackbar } from 'react-native-snackbar';
+import { Snackbar } from '@/common/utils/snackbarCompat';
 
 const WeftIssueReturn = ({ token, navigation }) => {
 

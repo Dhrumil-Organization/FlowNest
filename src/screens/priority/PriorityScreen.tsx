@@ -24,12 +24,28 @@
 //     ONLY here — we never recompute or overwrite it locally. Whatever value
 //     came from the browse API for a shade is the value we send straight
 //     back on save, untouched.
-//   - `SelfPriority` is OUR priority (this screen). The reorderable list is
-//     driven entirely by SelfPriority: initial sort order uses it, moving a
-//     card up/down updates it, and only SelfPriority is recalculated/sent as
-//     the new value on save.
+//   - `SelfPriority` is OUR priority (this screen). Moving a card up/down
+//     updates it, and only SelfPriority is recalculated/sent as the new
+//     value on save.
 //   - Every card shows BOTH values (a "Client #" meta chip + a "Self" badge)
 //     so the user can see what the client asked for vs. what they've set.
+//
+// NOTE ON DEFAULT ORDERING (decided independently, per chart):
+//   1. Self priority present                -> sort by Self priority.
+//   2. Self priority missing, Client present -> sort by Client priority
+//      (this is exactly the "nothing has been saved from this screen yet"
+//      case — the list defaults to the order the client originally asked
+//      for, until we save our own order).
+//   3. Both missing                          -> no sort key; the chart drops
+//      to the bottom (stable, original browse order among such charts) and
+//      gets its own fresh Self priority (its position) the next time we
+//      save.
+//   This is a pure ORDERING decision only — Client priority is NEVER copied
+//   into Self priority and vice-versa. Only the real saved value (or the
+//   lack of one) is ever shown for each field, and only Self priority is
+//   ever sent back as the reordered value on save. After every save the
+//   screen re-browses; once the backend returns a real Self priority for a
+//   chart, rule (1) takes over for it from then on.
 //
 // NOTE ON REORDERING (mobile UX):
 //   Reorder is started ONLY from the dedicated drag-handle icon. Normal card
@@ -197,18 +213,16 @@ function groupChartsForPriority(rows: any[]): PriorityChart[] {
       row?.ClientPriority ?? row?.Clientpriority ?? row?.clientpriority ?? null
         ? Number(row?.ClientPriority ?? row?.Clientpriority ?? row?.clientpriority)
         : null;
+    // Real SelfPriority only — never seeded from ClientPriority here. The
+    // Self-vs-Client fallback for ORDERING happens once per chart, further
+    // below (see NOTE ON DEFAULT ORDERING). Keeping this field pure means
+    // the "Self" badge and the save payload only ever carry a value we
+    // actually own, never a borrowed Client value.
     const rowSelfPriority = (() => {
       const rawValue = row?.SelfPriority ?? row?.selfpriority;
       const hasValue = !(rawValue === null || rawValue === undefined || String(rawValue).trim() === '');
       const parsed = hasValue ? Number(rawValue) : null;
-      if (parsed != null && parsed > 0) return parsed;
-      // --- TEMP fallback (cache-only — remove once real API is wired up) ---
-      // Browse didn't give us a usable SelfPriority (missing / blank / 0),
-      // so seed it from ClientPriority instead. Once the real API always
-      // returns a proper SelfPriority, this fallback is no longer needed —
-      // delete it and just `return parsed;` above.
-      return rowClientPriority != null && rowClientPriority > 0 ? rowClientPriority : null;
-      // --- END TEMP fallback ------------------------------------------------
+      return parsed != null && parsed > 0 ? parsed : null;
     })();
     const rowAllocationId =
       row?.AllocationId ?? row?.allocationid ?? row?.AllocationID ?? null
@@ -333,14 +347,25 @@ function groupChartsForPriority(rows: any[]): PriorityChart[] {
       .map((item) => item.SelfPriority)
       .filter((value): value is number => value != null && value > 0);
     chart.savedSelfPriority = selfVals.length ? Math.min(...selfVals) : null;
+
+    // ORDERING KEY ONLY — see NOTE ON DEFAULT ORDERING at the top of this
+    // file. Self wins whenever it exists; Client is used purely to decide
+    // order when Self hasn't been saved yet; neither value is ever mutated
+    // by this decision.
+    (chart as any)._sortPriority =
+      chart.savedSelfPriority != null
+        ? chart.savedSelfPriority
+        : chart.savedClientPriority != null
+          ? chart.savedClientPriority
+          : null;
   });
 
-  // Sort is driven by SELF priority only. Client priority is never used to
-  // decide order — it is carried along purely for display.
   charts.sort((a, b) => {
-    const aHas = a.savedSelfPriority != null;
-    const bHas = b.savedSelfPriority != null;
-    if (aHas && bHas) return a.savedSelfPriority! - b.savedSelfPriority!;
+    const aKey = (a as any)._sortPriority as number | null;
+    const bKey = (b as any)._sortPriority as number | null;
+    const aHas = aKey != null;
+    const bHas = bKey != null;
+    if (aHas && bHas) return aKey! - bKey!;
     if (aHas && !bHas) return -1;
     if (!aHas && bHas) return 1;
     return (a as any)._originalOrder - (b as any)._originalOrder;
@@ -400,12 +425,16 @@ export function PriorityScreen() {
       // const response: any = await mockBrowsePriority();
       console.log('[Priority] Browse response ->', response);
       const body: any = response?.data ?? response;
+      console.log('[Priority] Browse response body ->', body);
       const payload = body?.response?.data ?? body?.data ?? body ?? {};
       const inner = payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
         ? payload.data
         : payload;
       const rawDetails = Array.isArray(inner?.AllocationDetails) ? inner.AllocationDetails : [];
-      setCharts(groupChartsForPriority(rawDetails));
+      console.log('[Priority] Browse raw AllocationDetails ->', rawDetails);
+      const groupedCharts = groupChartsForPriority(rawDetails);
+      console.log('[Priority] Browse grouped & sorted charts ->', groupedCharts);
+      setCharts(groupedCharts);
       setDirty(false);
     } catch (err: any) {
       if (!silent) setCharts([]);
@@ -543,6 +572,7 @@ export function PriorityScreen() {
       console.log('[Priority] Save priority response ->', response);
 
       const body = response?.data ?? response;
+      console.log('[Priority] Save priority response body ->', body);
       const saved =
         body === true ||
         body?.status === true ||
@@ -779,6 +809,7 @@ function ShadeStatusModal({
       console.log('[Priority] save_priority_status response ->', response);
 
       const body = response?.data ?? response;
+      console.log('[Priority] save_priority_status response body ->', body);
       const saved =
         body === true ||
         body?.status === true ||
@@ -1230,7 +1261,7 @@ function ChartList({
                   <View style={s.chartInfoRow}>
                     <View style={s.chartIdentity}>
                       <Text style={s.chartNo} numberOfLines={1}>
-                        {chart.DesignName || '—'}
+                        {chart.ChartNo || '—'}
                       </Text>
                       {!!chart.PartyName && (
                         <Text style={s.partyName} numberOfLines={1}>
@@ -1256,7 +1287,7 @@ function ChartList({
                   <View style={s.secondaryRow}>
                     {!!chart.DesignName && (
                       <Text style={s.designName} numberOfLines={1}>
-                        {chart.ChartNo}
+                        {chart.DesignName}
                       </Text>
                     )}
                     {!!chart.ApcChartName && (

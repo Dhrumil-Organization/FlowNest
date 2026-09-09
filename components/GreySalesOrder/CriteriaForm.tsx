@@ -4,7 +4,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import theme from '../../android/app/src/theme';
 import SearchableDropdown from '../Shared/SearchableDropdown';
-import Snackbar from 'react-native-snackbar';
+import Snackbar from '@/common/utils/snackbarCompat';
 import FullScreenLoader from '../Loader/Loader';
 
 const { height } = Dimensions.get('window');

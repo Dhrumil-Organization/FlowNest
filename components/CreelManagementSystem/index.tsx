@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { API } from '../../common/API/dynamicAPI';
 
-import { Snackbar } from 'react-native-snackbar';
+import { Snackbar } from '@/common/utils/snackbarCompat';
 
 import { fetchAllYeardata, fetchPropertyData } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';

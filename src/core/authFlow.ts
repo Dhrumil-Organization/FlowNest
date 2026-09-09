@@ -15,6 +15,7 @@ import {
   authenticateWithBiometrics,
   clearCredentialsForBiometric,
   saveCredentialsForBiometric,
+  saveCredentialsForPropertySwitch,
 } from '../lib/biometricAuth';
 import { useAppSessionStore } from '../stores/AppSessionStore';
 import { useAppStore } from '../stores/AppStore';
@@ -65,6 +66,7 @@ export async function performLogin(
       name: username.trim(),
       password: password.trim(),
       noti_token: 'test',
+      // isclient: 1,
     });
 
     if (!res.success) {
@@ -90,6 +92,11 @@ export async function performLogin(
     if (!token || !user) {
       return { success: false, message: 'Login response is missing token or user.' };
     }
+
+    // Keep the successfully used credentials in OS secure storage for the
+    // in-app property switch. This does not alter the existing login/session
+    // or Remember Me flow.
+    await saveCredentialsForPropertySwitch(username.trim(), password.trim());
 
     await AsyncStorage.setItem('access_token', token);
     await AsyncStorage.setItem('app_session', JSON.stringify(appSession));

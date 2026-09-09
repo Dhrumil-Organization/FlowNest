@@ -28,6 +28,7 @@ import {
 import main from '../../assets/images/main.png';
 import { API, initAPI } from '../../common/API/dynamicAPI';
 import { theme } from '../../components/theme';
+import { saveCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 // import { getStoredToken } from '../../hooks/NotificationService';
 type Nav = any;
 
@@ -223,6 +224,20 @@ export default function LoginScreen() {
                     }
                     else {
                         if (token && user_details && user_menu_apps) {
+                            // Keep the exact credentials used by the successful login
+                            // in OS secure storage for the in-home property switch.
+                            await saveCredentialsForPropertySwitch(
+                                username.trim(),
+                                password.trim()
+                            );
+
+                            // Persist the complete login response so HomeScreen can
+                            // show the property switch only when switchuserlogin === 1.
+                            await AsyncStorage.setItem(
+                                'mobile_raw_login_response',
+                                JSON.stringify(response.data.response || {})
+                            );
+
                             await AsyncStorage.setItem('access_token', token);
                             await AsyncStorage.setItem('user_details', user_details);
                             await AsyncStorage.setItem('user_menu_apps', user_menu_apps);

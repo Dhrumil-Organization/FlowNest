@@ -59,6 +59,10 @@ export async function getBiometricLabel(): Promise<string> {
 // at rest using the OS-level secure enclave / keystore.
 // ─────────────────────────────────────────────────────────────
 const CRED_KEY = 'sudamo_biometric_credentials';
+// Separate secure credentials used only for the in-app property switch.
+// Keeping this separate means the existing biometric/Remember Me behavior
+// is not changed.
+const PROPERTY_SWITCH_CRED_KEY = 'sudamo_property_switch_credentials';
 
 export async function saveCredentialsForBiometric(username: string, password: string) {
   await SecureStore.setItemAsync(
@@ -82,6 +86,23 @@ export async function clearCredentialsForBiometric() {
     await SecureStore.deleteItemAsync(CRED_KEY);
   } catch {
     // ignore — nothing to clear
+  }
+}
+
+export async function saveCredentialsForPropertySwitch(username: string, password: string) {
+  await SecureStore.setItemAsync(
+    PROPERTY_SWITCH_CRED_KEY,
+    JSON.stringify({ username, password }),
+    { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }
+  );
+}
+
+export async function getCredentialsForPropertySwitch(): Promise<{ username: string; password: string } | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(PROPERTY_SWITCH_CRED_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 }
 

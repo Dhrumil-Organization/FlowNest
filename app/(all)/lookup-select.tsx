@@ -965,11 +965,11 @@
 //         paddingHorizontal: 10,
 //     },
 // });
+import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import {
     Alert,
     Dimensions,
@@ -1162,7 +1162,7 @@ const LookupSelectionScreen = () => {
                                 style={{ marginRight: 5 }}
                             />
                             <Text style={styles.underDevelopmentText}>
-                                Under Development | Only for Sudamo Users
+                                Under Development
                             </Text>
                         </View>
                     )}

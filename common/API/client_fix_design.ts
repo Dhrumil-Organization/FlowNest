@@ -1,12 +1,12 @@
 // src/api/client.ts  (or common/API/client.ts — match your path)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-// import { API, initAPI } from './dynamicAPI';
+import { API, initAPI } from './dynamicAPI';
 
-const API = 'https://apig.tms-webapp.com';
-const initAPI = async (): Promise<string> => {
-    return API;
-}
+// const API = 'https://apig.tms-webapp.com';
+// const initAPI = async (): Promise<string> => {
+//     return API;
+// }
 const cleanBase = (value?: string | null) => {
     const raw = String(value || API || '').trim();
     return raw.replace(/\/+$/, '').replace(/\/api$/i, '');

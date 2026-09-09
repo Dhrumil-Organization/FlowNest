@@ -11,6 +11,7 @@ import SearchableMultiSelectModal, {
   SearchableMultiSelectOption,
 } from '@/src/components/ui/SearchableMultiSelectModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchPropertyData } from '@/src/api/legacyFunctions';
 import { useBusinessContext } from '@/src/core/business';
 import { usePermission } from '@/src/core/permissions';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
@@ -161,7 +162,9 @@ const isNetworkLikeError = (error: any) => {
 };
 
 export default function GreyPackingScannerScreen() {
-  const { yearNo, prpCode, strCode, isReady } = useBusinessContext();
+  const { yearNo, prpCode: contextPrpCode,
+    // strCode,
+    isReady } = useBusinessContext();
   const user = useAppSessionStore((s) => s.user);
   const { canDo } = usePermission();
 
@@ -180,7 +183,20 @@ export default function GreyPackingScannerScreen() {
   const lastQrRef = useRef('');
   const lastQrAtRef = useRef(0);
 
-  const [mode, setMode] = useState<'header' | 'scanner' | 'list'>('header');
+  const [mode, setMode] = useState<'header' | 'scanner' | 'list' | 'browseList'>('header');
+
+  // Property can be changed directly from the Grey Packing header.
+  const [propertyOptions, setPropertyOptions] = useState<SearchablePickerOption[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<SearchablePickerOption | null>(null);
+  const [propertyLoading, setPropertyLoading] = useState(false);
+  const selectedPrpCode = String(selectedProperty?.value || contextPrpCode || '');
+
+  // Financial year is selectable on the Grey Packing header, just like Sales Order.
+  // The API continues to receive the 2-digit closing year (e.g. 27 for 2026-2027).
+  const [yearOptions, setYearOptions] = useState<SearchablePickerOption[]>([]);
+  const [selectedYear, setSelectedYear] = useState('');
+  const selectedYearNo = selectedYear ? selectedYear.slice(-2) : String(yearNo || '');
+
   const [session, setSession] = useState<SessionData | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
@@ -197,18 +213,21 @@ export default function GreyPackingScannerScreen() {
   const [voucherSuffix, setVoucherSuffix] = useState('');
   const [voucherLoading, setVoucherLoading] = useState(false);
 
-  const [departmentCode, setDepartmentCode] = useState('');
-  const [packingType, setPackingType] = useState('');
-  const [checkedByCode, setCheckedByCode] = useState('');
+  // Default header values for Add.
+  // These remain editable through the existing pickers/controls.
+  const [departmentCode, setDepartmentCode] = useState('SL');
+  const [packingType, setPackingType] = useState('R');
+  const [checkedByCode, setCheckedByCode] = useState('2');
   const [stockType, setStockType] = useState<'I' | 'P'>('I');
+  const [cutting, setCutting] = useState(true);
   const [packBy, setPackBy] = useState(
     String(user?.first_name || user?.name || user?.username || ''),
   );
   const [remarks, setRemarks] = useState('');
 
-  const [departmentName, setDepartmentName] = useState('');
-  const [packingTypeName, setPackingTypeName] = useState('');
-  const [checkedByName, setCheckedByName] = useState('');
+  const [departmentName, setDepartmentName] = useState('Sales');
+  const [packingTypeName, setPackingTypeName] = useState('Roll Packing');
+  const [checkedByName, setCheckedByName] = useState('Mahesh bhai');
 
   const [departmentOptions, setDepartmentOptions] = useState<SearchablePickerOption[]>([]);
   const [packingTypeOptions, setPackingTypeOptions] = useState<SearchablePickerOption[]>([]);
@@ -218,16 +237,25 @@ export default function GreyPackingScannerScreen() {
   const [packingTypeLoading, setPackingTypeLoading] = useState(false);
   const [checkedByLoading, setCheckedByLoading] = useState(false);
 
-  const [picker, setPicker] = useState<'department' | 'packingType' | 'checkedBy' | null>(null);
+  const [picker, setPicker] = useState<
+    'property' | 'year' | 'department' | 'packingType' | 'checkedBy' | null
+  >(null);
 
   const [transactionTypeOptions, setTransactionTypeOptions] = useState<SearchableMultiSelectOption[]>([]);
-  const [selectedTransactionTypes, setSelectedTransactionTypes] = useState<string[]>([]);
+  const [selectedTransactionTypes, setSelectedTransactionTypes] = useState<string[]>(['64']);
   const [transactionTypeLoading, setTransactionTypeLoading] = useState(false);
   const [transactionTypePickerOpen, setTransactionTypePickerOpen] = useState(false);
   const [transactionFilterRestored, setTransactionFilterRestored] = useState(false);
 
+  const [AllPackingDataList, setPackingDataList] = useState<any[]>([]);
+  const [browseListLoading, setBrowseListLoading] = useState(false);
+  const [browseSearch, setBrowseSearch] = useState('');
+
   const [lastScan, setLastScan] = useState<ScanRow | null>(null);
   const [notice, setNotice] = useState<{ type: 'ok' | 'error' | 'info'; text: string } | null>(null);
+
+  const strCode = '012'
+  // console.log("stcode",strCode);
 
   const main = session?.main?.[0];
   const uid = n(main?.UId);
@@ -264,10 +292,111 @@ export default function GreyPackingScannerScreen() {
     return selectedTransactionTypes.map((code) => map.get(String(code)) || String(code));
   }, [transactionTypeOptions, selectedTransactionTypes]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProperties = async () => {
+      setPropertyLoading(true);
+      try {
+        const storedCode = await AsyncStorage.getItem('selected_prpcode');
+        // The app stores the login token in AsyncStorage as `access_token`.
+        // AppSessionStore.user does not reliably contain the token, so use the
+        // same token source used by the other mobile routes.
+        const authToken = String(
+          (await AsyncStorage.getItem('access_token')) ||
+          (user as any)?.token ||
+          (user as any)?.access_token ||
+          (user as any)?.authToken ||
+          '',
+        );
+
+        if (!authToken) {
+          throw new Error('Login token not found. Please login again.');
+        }
+
+        const data = await fetchPropertyData(authToken);
+        const options: SearchablePickerOption[] = Array.isArray(data)
+          ? data
+            .map((row: any) => ({
+              value: String(row?.PrpCode ?? ''),
+              label: String(row?.LngName ?? row?.PrpCode ?? ''),
+              searchText: `${row?.LngName ?? ''} ${row?.PrpCode ?? ''}`,
+            }))
+            .filter((row: SearchablePickerOption) => row.value !== '')
+          : [];
+
+        if (cancelled) return;
+        setPropertyOptions(options);
+
+        const preferredCode = String(storedCode || contextPrpCode || '');
+        const selected = options.find((x) => x.value === preferredCode);
+        if (selected) {
+          setSelectedProperty(selected);
+        } else if (!selectedProperty && contextPrpCode) {
+          setSelectedProperty({
+            value: String(contextPrpCode),
+            label: String(contextPrpCode),
+            searchText: String(contextPrpCode),
+          });
+        }
+      } catch {
+        if (!cancelled && !selectedProperty && contextPrpCode) {
+          setSelectedProperty({
+            value: String(contextPrpCode),
+            label: String(contextPrpCode),
+            searchText: String(contextPrpCode),
+          });
+        }
+      } finally {
+        if (!cancelled) setPropertyLoading(false);
+      }
+    };
+
+    void loadProperties();
+    return () => { cancelled = true; };
+  }, [isReady, contextPrpCode, user]);
+
+  // Build the same 5 financial-year options used by Sales Order.
+  // Example: 2026-2027 -> API YearNo 27.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadYearOptions = async () => {
+      const currentYear = new Date().getFullYear();
+      const options: SearchablePickerOption[] = Array.from({ length: 5 }, (_, index) => {
+        const start = currentYear - index;
+        const end = start + 1;
+        const label = `${start}-${end}`;
+        return {
+          value: String(end).slice(-2),
+          label,
+          searchText: label,
+        };
+      });
+
+      if (cancelled) return;
+      setYearOptions(options);
+
+      const savedYear = await AsyncStorage.getItem('selectedyear');
+      const contextYear = String(yearNo || '');
+      const matched =
+        options.find((option) => option.label === savedYear) ||
+        options.find((option) => option.value === contextYear) ||
+        options[0];
+
+      if (!cancelled) setSelectedYear(matched?.label || '');
+    };
+
+    void loadYearOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [yearNo]);
+
   const transactionFilterKey = useCallback(
     (targetUid: number) =>
-      `${TXN_FILTER_KEY_PREFIX}:${String(prpCode)}:${String(yearNo)}:${String(targetUid)}`,
-    [prpCode, yearNo],
+      `${TXN_FILTER_KEY_PREFIX}:${String(selectedPrpCode)}:${String(selectedYearNo)}:${String(targetUid)}`,
+    [selectedPrpCode, selectedYearNo],
   );
 
   const persistTransactionTypes = useCallback(
@@ -303,44 +432,57 @@ export default function GreyPackingScannerScreen() {
     [transactionFilterKey],
   );
 
-  const webResponseData = (response: any) => response?.data?.response?.data ?? [];
+  const webResponseData = (response: any) => {
+    const raw = response?.data;
+
+    // PackingList API can return either:
+    // 1) { data: [...] }
+    // 2) { data: { response: { data: [...] } } }
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.data)) return raw.data;
+    if (Array.isArray(raw?.response?.data)) return raw.response.data;
+    if (Array.isArray(response?.response?.data)) return response.response.data;
+
+    return [];
+  };
 
   const loadDepartments = useCallback(async () => {
     if (!isReady) return;
     setDepartmentLoading(true);
     try {
       const response = await GreyPackingAPI.departments({
-        prpcode: prpCode,
-        yearno: yearNo,
+        prpcode: selectedPrpCode,
+        yearno: selectedYearNo,
         strcode: strCode,
         txntype: TXN_TYPE,
       });
       const data = webResponseData(response);
       const options: SearchablePickerOption[] = Array.isArray(data)
         ? data.map((row: any) => ({
-            value: String(row?.DptCode ?? ''),
-            label: String(row?.LngName ?? row?.DptCode ?? ''),
-            searchText: String(row?.DptCode ?? ''),
-          }))
+          value: String(row?.DptCode ?? ''),
+          label: String(row?.LngName ?? row?.DptCode ?? ''),
+          searchText: String(row?.DptCode ?? ''),
+        }))
         : [];
       setDepartmentOptions(options);
-      if (departmentCode && !departmentName) {
-        setDepartmentName(options.find((x) => x.value === String(departmentCode))?.label ?? '');
+      if (departmentCode) {
+        const selected = options.find((x) => x.value === String(departmentCode));
+        if (selected) setDepartmentName(selected.label);
       }
     } catch (error) {
       Alert.alert('Department', apiError(error));
     } finally {
       setDepartmentLoading(false);
     }
-  }, [isReady, prpCode, yearNo, strCode, departmentCode, departmentName]);
+  }, [isReady, selectedPrpCode, selectedYearNo, strCode, departmentCode, departmentName]);
 
   const loadPackingTypes = useCallback(async () => {
     if (!isReady) return;
     setPackingTypeLoading(true);
     try {
       const response = await GreyPackingAPI.packingTypes({
-        prpcode: prpCode,
-        yearno: yearNo,
+        prpcode: selectedPrpCode,
+        yearno: selectedYearNo,
         strcode: strCode,
         search: '',
         txntype: TXN_TYPE,
@@ -348,73 +490,54 @@ export default function GreyPackingScannerScreen() {
       const data = webResponseData(response);
       const options: SearchablePickerOption[] = Array.isArray(data)
         ? data.map((row: any) => ({
-            value: String(row?.PackType ?? ''),
-            label: String(row?.PackTypeName ?? row?.PackType ?? ''),
-            searchText: String(row?.PackType ?? ''),
-          }))
+          value: String(row?.PackType ?? ''),
+          label: String(row?.PackTypeName ?? row?.PackType ?? ''),
+          searchText: String(row?.PackType ?? ''),
+        }))
         : [];
       setPackingTypeOptions(options);
-      if (packingType && !packingTypeName) {
-        setPackingTypeName(options.find((x) => x.value === String(packingType))?.label ?? '');
+      if (packingType) {
+        const selected = options.find((x) => x.value === String(packingType));
+        if (selected) setPackingTypeName(selected.label);
       }
     } catch (error) {
       Alert.alert('Packing Type', apiError(error));
     } finally {
       setPackingTypeLoading(false);
     }
-  }, [isReady, prpCode, yearNo, strCode, packingType, packingTypeName]);
+  }, [isReady, selectedPrpCode, selectedYearNo, strCode, packingType, packingTypeName]);
 
   const loadCheckedBy = useCallback(async () => {
     if (!isReady) return;
     setCheckedByLoading(true);
     try {
       const response = await GreyPackingAPI.checkedBy({
-        prpcode: prpCode,
-        yearno: yearNo,
+        prpcode: selectedPrpCode,
+        yearno: selectedYearNo,
         employeecode: '',
         txntype: TXN_TYPE,
       });
       const data = webResponseData(response);
       const options: SearchablePickerOption[] = Array.isArray(data)
         ? data.map((row: any) => ({
-            value: String(row?.ChkCode ?? ''),
-            label: String(row?.ChkName ?? row?.ChkCode ?? ''),
-            searchText: `${row?.ChkCode ?? ''} ${row?.ChkName ?? ''}`,
-          }))
+          value: String(row?.ChkCode ?? ''),
+          label: String(row?.ChkName ?? row?.ChkCode ?? ''),
+          searchText: `${row?.ChkCode ?? ''} ${row?.ChkName ?? ''}`,
+        }))
         : [];
       setCheckedByOptions(options);
 
-      // Preserve Web behavior: on add, default Checked By to the logged-in user
-      // when ChkName exactly matches the current username/name (case-insensitive).
-      if (!checkedByCode) {
-        const currentName = String(
-          user?.username || user?.name || user?.first_name || '',
-        )
-          .trim()
-          .toUpperCase();
-
-        const matched = options.find(
-          (option) => option.label.trim().toUpperCase() === currentName,
-        );
-
-        if (matched) {
-          // The Web component re-queries getcheckby with employeecode before
-          // assigning ChkCode. Do the same to preserve backend filtering.
-          const verify = await GreyPackingAPI.checkedBy({
-            prpcode: prpCode,
-            yearno: yearNo,
-            employeecode: matched.value,
-            txntype: TXN_TYPE,
-          });
-          const verifiedRows = webResponseData(verify);
-          const verified = Array.isArray(verifiedRows) ? verifiedRows[0] : null;
-          if (verified?.ChkCode != null) {
-            setCheckedByCode(String(verified.ChkCode));
-            setCheckedByName(String(verified.ChkName ?? matched.label));
-          }
+      // Add default: Checked By code 2.
+      // The user can still change it from the existing picker.
+      if (checkedByCode === '2') {
+        const selected = options.find((x) => x.value === '2');
+        if (selected) {
+          setCheckedByName(selected.label);
         }
-      } else if (!checkedByName) {
-        setCheckedByName(options.find((x) => x.value === String(checkedByCode))?.label ?? '');
+      } else if (checkedByCode && !checkedByName) {
+        setCheckedByName(
+          options.find((x) => x.value === String(checkedByCode))?.label ?? '',
+        );
       }
     } catch (error) {
       Alert.alert('Checked By', apiError(error));
@@ -423,8 +546,8 @@ export default function GreyPackingScannerScreen() {
     }
   }, [
     isReady,
-    prpCode,
-    yearNo,
+    selectedPrpCode,
+    selectedYearNo,
     checkedByCode,
     checkedByName,
     user?.username,
@@ -438,8 +561,8 @@ export default function GreyPackingScannerScreen() {
     setTransactionTypeLoading(true);
     try {
       const response = await GreyPackingAPI.transactionTypes({
-        prpcode: prpCode,
-        yearno: yearNo,
+        prpcode: selectedPrpCode,
+        yearno: selectedYearNo,
         strcode: strCode,
         fetch: 'rpttxntype',
         txntype: TXN_TYPE,
@@ -447,10 +570,10 @@ export default function GreyPackingScannerScreen() {
       const data = webResponseData(response);
       const options: SearchableMultiSelectOption[] = Array.isArray(data)
         ? data.map((row: any) => ({
-            value: String(row?.code ?? ''),
-            label: String(row?.name ?? row?.code ?? ''),
-            searchText: `${row?.name ?? ''} ${row?.code ?? ''}`,
-          })).filter((row: SearchableMultiSelectOption) => row.value !== '')
+          value: String(row?.code ?? ''),
+          label: String(row?.name ?? row?.code ?? ''),
+          searchText: `${row?.name ?? ''} ${row?.code ?? ''}`,
+        })).filter((row: SearchableMultiSelectOption) => row.value !== '')
         : [];
       setTransactionTypeOptions(options);
     } catch (error) {
@@ -458,7 +581,7 @@ export default function GreyPackingScannerScreen() {
     } finally {
       setTransactionTypeLoading(false);
     }
-  }, [isReady, prpCode, yearNo, strCode]);
+  }, [isReady, selectedPrpCode, selectedYearNo, strCode]);
 
   const loadHeaderMasters = useCallback(async () => {
     await Promise.all([loadDepartments(), loadPackingTypes(), loadCheckedBy(), loadTransactionTypes()]);
@@ -486,6 +609,11 @@ export default function GreyPackingScannerScreen() {
       setPackingTypeName(packingTypeOptions.find((x) => x.value === loadedPackType)?.label ?? '');
       setCheckedByName(checkedByOptions.find((x) => x.value === loadedChkCode)?.label ?? '');
       setStockType(String(loadedMain.StkType ?? '') === 'P' ? 'P' : 'I');
+      setCutting(
+        String((loadedMain as any).Cutting ?? '').toLowerCase() === 'true' ||
+        String((loadedMain as any).Cutting ?? '') === '1' ||
+        String((loadedMain as any).Cutting ?? '').toUpperCase() === 'Y'
+      );
       setPackBy(String(loadedMain.PackBy ?? ''));
       setRemarks(String(loadedMain.Remarks ?? ''));
       setMode('scanner');
@@ -498,8 +626,8 @@ export default function GreyPackingScannerScreen() {
       if (!silent) setBusy(true);
       try {
         const response = await GreyPackingAPI.getSession({
-          prpcode: prpCode,
-          yearno: yearNo,
+          prpcode: selectedPrpCode,
+          yearno: selectedYearNo,
           uid: targetUid,
         });
         const result = unwrap(response);
@@ -524,7 +652,7 @@ export default function GreyPackingScannerScreen() {
         if (!silent) setBusy(false);
       }
     },
-    [applySession, isReady, prpCode, yearNo, restoreTransactionTypes],
+    [applySession, isReady, selectedPrpCode, selectedYearNo, restoreTransactionTypes],
   );
 
   const loadVoucherNo = useCallback(async () => {
@@ -532,8 +660,8 @@ export default function GreyPackingScannerScreen() {
     setVoucherLoading(true);
     try {
       const response = await GreyPackingAPI.voucherNo({
-        prpcode: prpCode,
-        yearno: yearNo,
+        prpcode: selectedPrpCode,
+        yearno: selectedYearNo,
         strcode: '',
         acccode: '',
         vouno: voucherNo || 0,
@@ -562,7 +690,7 @@ export default function GreyPackingScannerScreen() {
     } finally {
       setVoucherLoading(false);
     }
-  }, [isReady, prpCode, yearNo, uid, voucherNo, voucherSuffix, voucherMonth]);
+  }, [isReady, selectedPrpCode, selectedYearNo, uid, voucherNo, voucherSuffix, voucherMonth]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -673,8 +801,8 @@ export default function GreyPackingScannerScreen() {
       const response = await GreyPackingAPI.startSession({
         main: [
           {
-            PrpCode: prpCode,
-            YearNo: yearNo,
+            PrpCode: selectedPrpCode,
+            YearNo: selectedYearNo,
             StrCode: strCode,
             VouNo: voucherNo,
             VouDate: displayDate(todayRef.current),
@@ -683,13 +811,14 @@ export default function GreyPackingScannerScreen() {
             DptCode: departmentCode.trim(),
             PackType: packingType.trim(),
             ChkCode: checkedByCode.trim(),
+            Cutting: cutting,
             StkType: stockType,
             PackBy: packBy.trim(),
             Remarks: remarks.trim(),
           },
         ],
       });
-
+      console.log("strCode", strCode);
       const result = unwrap(response);
       if (!result.success) throw new Error(result.message);
 
@@ -755,6 +884,7 @@ export default function GreyPackingScannerScreen() {
 
   const handleScan = async (result: BarcodeScanningResult) => {
     const qr = String(result?.data ?? '').trim();
+    console.log("qr", qr);
     if (
       !qr ||
       !canScan ||
@@ -780,8 +910,8 @@ export default function GreyPackingScannerScreen() {
 
     try {
       const response = await GreyPackingAPI.scanSave({
-        prpcode: prpCode,
-        yearno: yearNo,
+        prpcode: selectedPrpCode,
+        yearno: selectedYearNo,
         strcode: strCode,
         uid,
         qrcode: qr,
@@ -864,8 +994,8 @@ export default function GreyPackingScannerScreen() {
             setBusy(true);
             try {
               const response = await GreyPackingAPI.removeScan({
-                prpcode: prpCode,
-                yearno: yearNo,
+                prpcode: selectedPrpCode,
+                yearno: selectedYearNo,
                 uid,
                 srno: n(row.SrNo),
                 subsr: n(row.SubSr),
@@ -906,8 +1036,8 @@ export default function GreyPackingScannerScreen() {
 
             try {
               const response = await GreyPackingAPI.cancelSession({
-                prpcode: prpCode,
-                yearno: yearNo,
+                prpcode: selectedPrpCode,
+                yearno: selectedYearNo,
                 uid,
               });
 
@@ -972,8 +1102,8 @@ export default function GreyPackingScannerScreen() {
             setBusy(true);
             try {
               const response = await GreyPackingAPI.completeSession({
-                prpcode: prpCode,
-                yearno: yearNo,
+                prpcode: selectedPrpCode,
+                yearno: selectedYearNo,
                 uid,
               });
               const result = unwrap(response);
@@ -1031,12 +1161,23 @@ export default function GreyPackingScannerScreen() {
     </View>
   );
 
+  const headerScrollRef = useRef<ScrollView>(null);
+  const headerScrollY = useRef(0);
+
   const HeaderForm = () => (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={headerScrollRef}
+        contentContainerStyle={styles.formContent}
+        keyboardShouldPersistTaps="handled"
+        onScroll={(event) => {
+          headerScrollY.current = event.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+      >
         <View style={styles.tip}>
           <View style={styles.tipIcon}>
             <Icon name="inventory-2" size={24} color={T.copper} />
@@ -1062,18 +1203,56 @@ export default function GreyPackingScannerScreen() {
           <Text style={styles.cardEyebrow}>PACKING HEADER</Text>
           <Text style={styles.cardTitle}>Main Details</Text>
 
-          <View style={styles.contextRow}>
-            <View style={styles.contextCell}>
-              <Text style={styles.label}>Property</Text>
-              <Text style={styles.contextValue}>{prpCode || '—'}</Text>
+          <Text style={styles.label}>Property</Text>
+          <TouchableOpacity
+            style={[styles.pickerField, styles.propertyPickerField]}
+            onPress={() => setPicker('property')}>
+            <View style={styles.pickerLeading}>
+              <Icon name="business" size={19} color={T.copper} />
             </View>
-            <View style={styles.contextCell}>
-              <Text style={styles.label}>Store</Text>
-              <Text style={styles.contextValue}>{strCode || '—'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.pickerValue, !selectedPrpCode && styles.pickerPlaceholder]}>
+                {selectedProperty?.label || (selectedPrpCode ? selectedPrpCode : 'Search Property')}
+              </Text>
+              {!!selectedPrpCode && <Text style={styles.pickerCode}>{selectedPrpCode}</Text>}
             </View>
-            <View style={styles.contextCell}>
-              <Text style={styles.label}>FY</Text>
-              <Text style={styles.contextValue}>{yearNo || '—'}</Text>
+            {propertyLoading ? (
+              <ActivityIndicator size="small" color={T.copper} />
+            ) : (
+              <Icon name="keyboard-arrow-down" size={23} color={T.muted} />
+            )}
+          </TouchableOpacity>
+
+          {/* Store stays below the Property + Financial Year pickers. */}
+          <Text style={styles.label}>Financial Year *</Text>
+          <TouchableOpacity
+            style={[styles.pickerField, styles.propertyPickerField]}
+            activeOpacity={0.8}
+            onPress={() => setPicker('year')}
+          >
+            <View style={styles.pickerLeading}>
+              <Icon name="calendar-today" size={19} color={T.copper} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.pickerValue, !selectedYear && styles.pickerPlaceholder]}>
+                {selectedYear || 'Select Financial Year'}
+              </Text>
+              {!!selectedYearNo && (
+                <Text style={styles.pickerCode}>Year No: {selectedYearNo}</Text>
+              )}
+            </View>
+            <Icon name="keyboard-arrow-down" size={23} color={T.muted} />
+          </TouchableOpacity>
+
+          <Text style={styles.label}>Grey Store</Text>
+          <View style={[styles.pickerField, styles.propertyPickerField]}>
+            <View style={styles.pickerLeading}>
+              <Icon name="store" size={19} color={T.copper} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pickerValue}>
+                {strCode || '—'}
+              </Text>
             </View>
           </View>
 
@@ -1159,6 +1338,22 @@ export default function GreyPackingScannerScreen() {
             </TouchableOpacity>
           </View>
 
+          <Text style={styles.label}>Cutting</Text>
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            activeOpacity={0.8}
+            onPress={() => {
+              setCutting((value) => !value);
+            }}
+          >
+            <View style={[styles.checkbox, cutting && styles.checkboxChecked]}>
+              {cutting && <Icon name="check" size={16} color="#FFF" />}
+            </View>
+            <Text style={styles.checkboxText}>Cutting</Text>
+          </TouchableOpacity>
+
+
+
           <Text style={styles.label}>Transaction Type *</Text>
           <TouchableOpacity
             style={styles.pickerField}
@@ -1222,6 +1417,21 @@ export default function GreyPackingScannerScreen() {
         >
           <Icon name="qr-code-scanner" size={22} color="#FFF" />
           <Text style={styles.primaryText}>Start Scanning</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.browseListButton}
+          onPress={loadPackingbrowselist}
+          disabled={browseListLoading}
+        >
+          {browseListLoading ? (
+            <ActivityIndicator size="small" color={T.nav} />
+          ) : (
+            <Icon name="format-list-bulleted" size={21} color={T.nav} />
+          )}
+          <Text style={styles.browseListText}>
+            {browseListLoading ? 'Loading...' : 'Browse List'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1358,6 +1568,136 @@ export default function GreyPackingScannerScreen() {
     );
   };
 
+  const filteredPackingDataList = useMemo(() => {
+    const query = browseSearch.trim().toLowerCase();
+    if (!query) return AllPackingDataList;
+
+    return AllPackingDataList.filter((item: any) => {
+      const searchableText = [
+        item?.VouNo,
+        item?.VouDate,
+        item?.DptName,
+        item?.DptCode,
+        item?.PackTypeName,
+        item?.PackType,
+        item?.Remarks,
+      ]
+        .map((value) => String(value ?? ''))
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [AllPackingDataList, browseSearch]);
+
+  const BrowseList = useMemo(() => (
+    <View style={styles.browseScreen}>
+      <View style={styles.browseHeader}>
+        <TouchableOpacity
+          style={styles.squareButton}
+          onPress={() => setMode('header')}
+        >
+          <Icon name="arrow-back-ios-new" size={18} color={T.nav} />
+        </TouchableOpacity>
+
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardEyebrow}>GREY PACKING</Text>
+          <Text style={styles.browseTitle}>Browse List</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.squareButton}
+          onPress={loadPackingbrowselist}
+          disabled={browseListLoading}
+        >
+          {browseListLoading ? (
+            <ActivityIndicator size="small" color={T.nav} />
+          ) : (
+            <Icon name="refresh" size={21} color={T.nav} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.browseSummary}>
+        <View style={styles.browseCountWrap}>
+          <Text style={styles.browseSummaryText}>
+            {filteredPackingDataList.length} / {AllPackingDataList.length} record{AllPackingDataList.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+
+        <View style={styles.browseSearchBox}>
+          <Icon name="search" size={19} color={T.muted} />
+          <TextInput
+            value={browseSearch}
+            onChangeText={setBrowseSearch}
+            placeholder="Search..."
+            placeholderTextColor={T.muted}
+            style={styles.browseSearchInput}
+            returnKeyType="search"
+          />
+          {!!browseSearch && (
+            <TouchableOpacity onPress={() => setBrowseSearch('')} hitSlop={8}>
+              <Icon name="close" size={18} color={T.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <FlatList
+        data={filteredPackingDataList}
+        keyExtractor={(item, index) => String(item?.UrowId ?? item?.UId ?? index)}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.browseListContent}
+        renderItem={({ item }) => {
+          const vouNo = String(item?.VouNo ?? '—').trim() || '—';
+          const vouDate = String(item?.VouDate ?? '—').trim() || '—';
+          const department = String(item?.DptName ?? item?.DptCode ?? '—').trim() || '—';
+          const packingType = String(item?.PackTypeName ?? item?.PackType ?? '—').trim() || '—';
+          const remarks = String(item?.Remarks ?? '').trim();
+          return (
+            <View style={styles.browseCard}>
+              <View style={styles.browseCardTop}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.browseVoucher}>{vouNo}</Text>
+                </View>
+                <Text style={styles.browseDate}>{vouDate}</Text>
+              </View>
+
+              <View style={styles.browseCardDivider} />
+
+              <View style={styles.browseCardInfo}>
+                <View style={styles.browseCardCell}>
+                  <Text style={styles.browseLabel}>DEPARTMENT</Text>
+                  <Text style={styles.browseValue} numberOfLines={1}>{department}</Text>
+                </View>
+
+                <View style={styles.browseCardCell}>
+                  <Text style={styles.browseLabel}>PACKING TYPE</Text>
+                  <Text style={styles.browseValue} numberOfLines={1}>{packingType}</Text>
+                </View>
+              </View>
+
+              <View style={styles.browseCardBottom}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.browseLabel}>REMARKS</Text>
+                  <Text style={styles.browseRemarks} numberOfLines={2}>
+                    {remarks || '—'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={styles.browseEmpty}>
+            <Icon name="format-list-bulleted" size={38} color={T.border} />
+            <Text style={styles.emptyText}>No packing records found.</Text>
+          </View>
+        }
+      />
+    </View>
+  ), [AllPackingDataList.length, browseListLoading, browseSearch, filteredPackingDataList, loadPackingbrowselist]);
+
   const List = () => (
     <View style={styles.listScreen}>
       <View style={styles.listHeader}>
@@ -1491,11 +1831,161 @@ export default function GreyPackingScannerScreen() {
     );
   }
 
+
+  const loadPackingbrowselist = useCallback(async () => {
+    if (!isReady) return;
+
+    const payload = {
+      prpcode: selectedPrpCode,
+      yearno: selectedYearNo,
+      employeecode: '',
+      txntype: TXN_TYPE,
+    };
+
+    console.log('[GreyPacking] PackingList payload:', payload);
+    setBrowseListLoading(true);
+
+    // Keep the current Header ScrollView position when the loading state updates.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        headerScrollRef.current?.scrollTo({
+          y: headerScrollY.current,
+          animated: false,
+        });
+      });
+    });
+
+    try {
+      const response = await GreyPackingAPI.PackingList(payload);
+
+      console.log('[GreyPacking] PackingList response:', response);
+
+      const data = webResponseData(response);
+      console.log('[GreyPacking] PackingList response data:', data);
+
+      const list = Array.isArray(data) ? data : [];
+
+      setPackingDataList(list);
+      setBrowseSearch('');
+      setMode('browseList');
+    } catch (error) {
+      console.log('[GreyPacking] PackingList error:', error);
+      Alert.alert('Browse List', apiError(error));
+    } finally {
+      setBrowseListLoading(false);
+    }
+  }, [isReady, selectedPrpCode, selectedYearNo]);
+
   return (
     <View style={styles.root}>
       {mode === 'header' && <HeaderForm />}
       {mode === 'scanner' && <Scanner />}
       {mode === 'list' && <List />}
+      {mode === 'browseList' && BrowseList}
+
+      <SearchablePickerModal
+        visible={picker === 'property'}
+        title="Property"
+        placeholder="Search property name or code..."
+        options={propertyOptions}
+        selectedValue={selectedPrpCode}
+        loading={propertyLoading}
+        onRefresh={async () => {
+          setPropertyLoading(true);
+          try {
+            const authToken = String(
+              (await AsyncStorage.getItem('access_token')) ||
+              (user as any)?.token ||
+              (user as any)?.access_token ||
+              (user as any)?.authToken ||
+              '',
+            );
+
+            if (!authToken) {
+              throw new Error('Login token not found. Please login again.');
+            }
+
+            const data = await fetchPropertyData(authToken);
+            const options: SearchablePickerOption[] = Array.isArray(data)
+              ? data
+                .map((row: any) => ({
+                  value: String(row?.PrpCode ?? ''),
+                  label: String(row?.LngName ?? row?.PrpCode ?? ''),
+                  searchText: `${row?.LngName ?? ''} ${row?.PrpCode ?? ''}`,
+                }))
+                .filter((row: SearchablePickerOption) => row.value !== '')
+              : [];
+            setPropertyOptions(options);
+          } catch (error) {
+            Alert.alert('Property', apiError(error));
+          } finally {
+            setPropertyLoading(false);
+          }
+        }}
+        onClose={() => setPicker(null)}
+        onSelect={async (option) => {
+          if (selectedPrpCode === String(option.value)) {
+            setPicker(null);
+            return;
+          }
+
+          setSelectedProperty(option);
+          await AsyncStorage.setItem('selected_prpcode', String(option.value));
+
+          // Changing property starts a fresh packing header for that property.
+          setSession(null);
+          setLastScan(null);
+          setNotice(null);
+          setSelectedTransactionTypes([]);
+          setTransactionFilterRestored(true);
+          setConnectionBlocked(false);
+          setMode('header');
+          setVoucherNo('');
+          setVoucherSuffix('');
+          setVoucherMonth(monthCode(todayRef.current));
+          setPicker(null);
+        }}
+      />
+      <SearchablePickerModal
+        visible={picker === 'year'}
+        title="Financial Year"
+        placeholder="Search financial year..."
+        options={yearOptions}
+        selectedValue={selectedYearNo}
+        onClose={() => setPicker(null)}
+        onSelect={async (option) => {
+          const nextYear = String(option.label || '');
+          if (!nextYear || nextYear === selectedYear) {
+            setPicker(null);
+            return;
+          }
+
+          // Do not switch FY while an open packing session is active.
+          if (uid > 0 && isOpen) {
+            Alert.alert(
+              'Packing in progress',
+              'Finish or leave the current packing before changing the financial year.',
+            );
+            setPicker(null);
+            return;
+          }
+
+          setSelectedYear(nextYear);
+          await AsyncStorage.setItem('selectedyear', nextYear);
+
+          setSession(null);
+          setLastScan(null);
+          setNotice(null);
+          setSelectedTransactionTypes([]);
+          setTransactionFilterRestored(true);
+          setConnectionBlocked(false);
+          setMode('header');
+          setVoucherNo('');
+          setVoucherSuffix('');
+          setVoucherMonth(monthCode(todayRef.current));
+          setPicker(null);
+        }}
+      />
 
       <SearchablePickerModal
         visible={picker === 'department'}
@@ -1552,7 +2042,7 @@ export default function GreyPackingScannerScreen() {
         onRefresh={loadTransactionTypes}
         onClose={() => setTransactionTypePickerOpen(false)}
         onApply={async (values) => {
-          const safeValues = values.map(String);
+          const safeValues = Array.from(new Set(values.map(String)));
           setSelectedTransactionTypes(safeValues);
           if (uid > 0) {
             await persistTransactionTypes(uid, safeValues);
@@ -1591,32 +2081,18 @@ const styles = StyleSheet.create({
   card: { backgroundColor: T.surface, borderRadius: 20, borderWidth: 1, borderColor: T.border, padding: 16, ...S.card },
   cardEyebrow: { color: T.copper, fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
   cardTitle: { color: T.ink, fontSize: 21, fontWeight: '900', marginTop: 4, marginBottom: 16 },
-  contextRow: { flexDirection: 'row', backgroundColor: T.sub, borderRadius: 13, marginBottom: 15, overflow: 'hidden' },
-  contextCell: { flex: 1, paddingHorizontal: 10, paddingVertical: 10, borderRightWidth: 1, borderRightColor: T.border },
+  contextRow: { flexDirection: 'row', backgroundColor: T.sub, borderRadius: 13, marginTop: 9, marginBottom: 15, overflow: 'hidden' },
+  contextCell: { flex: 1, paddingHorizontal: 14, paddingVertical: 11, borderRightWidth: 1, borderRightColor: T.border },
+  contextLabel: { color: '#716D68', fontSize: 11, fontWeight: '800', marginTop: 0, marginBottom: 4 },
   contextValue: { color: T.nav, fontWeight: '900', marginTop: 2 },
+  propertyValueRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 },
   label: { color: '#716D68', fontSize: 11, fontWeight: '800', marginTop: 11, marginBottom: 7 },
   input: { height: 48, borderWidth: 1, borderColor: T.border, borderRadius: 13, backgroundColor: '#FCFBF9', color: T.ink, paddingHorizontal: 13, fontWeight: '700' },
   multiline: { height: 78, paddingTop: 12, textAlignVertical: 'top' },
   twoCol: { flexDirection: 'row', gap: 10 },
-  pickerField: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderRadius: 14,
-    backgroundColor: '#FCFBF9',
-    paddingHorizontal: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  pickerLeading: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    backgroundColor: '#F3E3D3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  propertyPickerField: { minHeight: 70, marginBottom: 0, },
+  pickerField: { minHeight: 52, borderWidth: 1, borderColor: T.border, borderRadius: 14, backgroundColor: '#FCFBF9', paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 10, },
+  pickerLeading: { width: 36, height: 36, borderRadius: 11, backgroundColor: '#F3E3D3', alignItems: 'center', justifyContent: 'center' },
   pickerValue: { color: T.ink, fontSize: 13, fontWeight: '800' },
   pickerPlaceholder: { color: T.muted, fontWeight: '700' },
   pickerCode: { color: T.muted, fontSize: 9, fontWeight: '800', marginTop: 2 },
@@ -1641,23 +2117,44 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: T.nav },
   segmentText: { color: '#77716C', fontSize: 12, fontWeight: '800' },
   segmentTextActive: { color: '#FFF' },
+  checkboxRow: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 14,
+    backgroundColor: '#FCFBF9',
+    paddingHorizontal: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: T.border,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: T.nav,
+    borderColor: T.nav,
+  },
+  checkboxText: {
+    color: T.ink,
+    fontSize: 13,
+    fontWeight: '800',
+  },
 
   primary: { height: 54, marginTop: 14, borderRadius: 16, backgroundColor: T.nav, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   primaryText: { color: '#FFF', fontWeight: '900', fontSize: 14 },
   disabled: { opacity: .45 },
 
-  scannerContent: { flex: 1, padding: 14 },
-  cameraWrap: {
-    height: 330,
-    borderRadius: 22,
-    overflow: 'hidden',
-    backgroundColor: '#111',
-    position: 'relative',
-  },
-  camera: {
-    width: '100%',
-    height: '100%',
-  },
+  // scannerContent: { flex: 1, padding: 14 },
+  cameraWrap: { height: 330, borderRadius: 22, overflow: 'hidden', backgroundColor: '#111', position: 'relative' },
+  camera: { width: '100%', height: '100%' },
   scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   scanFrame: { width: '74%', aspectRatio: 1.28, position: 'relative' },
   corner: { position: 'absolute', width: 38, height: 38, borderColor: T.copper },
@@ -1671,86 +2168,18 @@ const styles = StyleSheet.create({
   torchButton: { position: 'absolute', top: 14, right: 14, width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(8,18,27,.74)', alignItems: 'center', justifyContent: 'center' },
   scanBusy: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,27,.6)', alignItems: 'center', justifyContent: 'center', gap: 8 },
   scanBusyText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
-  cameraPaused: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: T.nav,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  cameraPaused: { width: '100%', height: '100%', backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center', },
   cameraPausedText: { color: '#FFF', fontWeight: '800', marginTop: 8 },
-  cameraStartingLight: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 74,
-    backgroundColor: 'rgba(7,17,26,0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraStartingTitle: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '900',
-    marginTop: 5,
-  },
-
+  cameraStartingLight: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 74, backgroundColor: 'rgba(7,17,26,0.72)', alignItems: 'center', justifyContent: 'center', },
+  cameraStartingTitle: { color: '#FFF', fontSize: 11, fontWeight: '900', marginTop: 5, },
   scannerScroll: { flex: 1 },
   scannerContent: { padding: 14, paddingBottom: 118 },
-
-  scanLauncherCard: {
-    minHeight: 238,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: T.border,
-    backgroundColor: '#FFF',
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanLauncherIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
-    backgroundColor: '#F3E3D3',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  scanLauncherEyebrow: {
-    color: T.copper,
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 1.4,
-  },
-  scanLauncherTitle: {
-    color: T.nav,
-    fontSize: 22,
-    fontWeight: '900',
-    marginTop: 3,
-  },
-  scanLauncherText: {
-    color: T.muted,
-    fontSize: 11,
-    lineHeight: 17,
-    textAlign: 'center',
-    marginTop: 7,
-    marginBottom: 17,
-    maxWidth: 320,
-  },
-  startScanButton: {
-    minWidth: 205,
-    height: 50,
-    borderRadius: 15,
-    backgroundColor: T.nav,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 18,
-  },
+  scanLauncherCard: { minHeight: 238, borderRadius: 22, borderWidth: 1, borderColor: T.border, backgroundColor: '#FFF', paddingHorizontal: 24, paddingVertical: 22, alignItems: 'center', justifyContent: 'center', },
+  scanLauncherIcon: { width: 76, height: 76, borderRadius: 24, backgroundColor: '#F3E3D3', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  scanLauncherEyebrow: { color: T.copper, fontSize: 8, fontWeight: '900', letterSpacing: 1.4 },
+  scanLauncherTitle: { color: T.nav, fontSize: 22, fontWeight: '900', marginTop: 3 },
+  scanLauncherText: { color: T.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 7, marginBottom: 17, maxWidth: 320 },
+  startScanButton: { minWidth: 205, height: 50, borderRadius: 15, backgroundColor: T.nav, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18 },
   startScanButtonText: {
     color: '#FFF',
     fontSize: 13,
@@ -1876,74 +2305,34 @@ const styles = StyleSheet.create({
   summaryDivider: { width: 1, backgroundColor: T.border },
   summaryValue: { color: T.nav, fontSize: 16, fontWeight: '900' },
   summaryLabel: { color: T.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, marginTop: 4 },
-
-  transactionFilterCard: {
-    minHeight: 56,
-    marginTop: 10,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: T.border,
-    backgroundColor: '#FFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  transactionFilterCard: { minHeight: 56, marginTop: 10, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 15, borderWidth: 1, borderColor: T.border, backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', gap: 10 },
   transactionFilterMissing: { borderColor: '#F0B9B3', backgroundColor: '#FFF8F7' },
-  transactionFilterIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    backgroundColor: '#F3E3D3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  transactionFilterIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: '#F3E3D3', alignItems: 'center', justifyContent: 'center', },
   transactionFilterLabel: { color: T.copper, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   transactionFilterValue: { color: T.nav, fontSize: 11, fontWeight: '800', marginTop: 2 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginTop: 10 },
   noticeText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '800' },
   retryButton: { minHeight: 46, marginTop: 10, borderRadius: 14, backgroundColor: T.red, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   retryText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
-
   lastScan: { marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: '#B9DFC8', backgroundColor: '#FFF', padding: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
   lastScanCheck: { width: 34, height: 34, borderRadius: 11, backgroundColor: T.green, alignItems: 'center', justifyContent: 'center' },
   lastLabel: { color: T.green, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   lastTaka: { color: T.ink, fontSize: 14, fontWeight: '900', marginTop: 2 },
   lastMeta: { color: T.muted, fontSize: 10, marginTop: 2 },
   committed: { color: T.green, fontSize: 8, fontWeight: '900', letterSpacing: .6 },
-
   actions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   secondary: { flex: 1, height: 49, borderRadius: 15, borderWidth: 1, borderColor: T.border, backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   secondaryText: { color: T.nav, fontSize: 12, fontWeight: '900' },
   finish: { flex: 1.3, height: 49, borderRadius: 15, backgroundColor: T.nav, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   finishText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
-  cancelPackingButton: {
-    flex: 1,
-    width: '100%',
-    height: 54,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#E5AAA5',
-    backgroundColor: '#FFF7F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-  },
-  cancelPackingText: {
-    color: T.red,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-
+  cancelPackingButton: { flex: 1, width: '100%', height: 54, borderRadius: 16, borderWidth: 1.5, borderColor: '#E5AAA5', backgroundColor: '#FFF7F6', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  cancelPackingText: { color: T.red, fontSize: 13, fontWeight: '900' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
   cameraPermissionIcon: { width: 66, height: 66, borderRadius: 22, backgroundColor: '#F3E3D3', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   permissionTitle: { color: T.nav, fontSize: 18, fontWeight: '900' },
   permissionText: { color: T.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: 16 },
   permissionButton: { height: 47, borderRadius: 14, backgroundColor: T.nav, paddingHorizontal: 22, alignItems: 'center', justifyContent: 'center' },
   permissionButtonText: { color: '#FFF', fontWeight: '900' },
-
   listScreen: { flex: 1, padding: 14 },
   listHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   listTitle: { color: T.ink, fontSize: 20, fontWeight: '900', marginTop: 2 },
@@ -1959,14 +2348,46 @@ const styles = StyleSheet.create({
   removeButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FCECEA', alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingTop: 55 },
   emptyText: { color: T.muted, fontWeight: '700', marginTop: 8 },
-
   bottomBar: { position: 'absolute', left: 14, right: 14, bottom: 12, paddingTop: 8, backgroundColor: T.bg, flexDirection: 'row', gap: 9 },
   completedBar: { position: 'absolute', left: 14, right: 14, bottom: 12, padding: 12, borderRadius: 16, backgroundColor: '#E8F5ED', borderWidth: 1, borderColor: '#B9DFC8', flexDirection: 'row', alignItems: 'center', gap: 10 },
   completedIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: T.green, alignItems: 'center', justifyContent: 'center' },
   completedTitle: { color: T.green, fontSize: 12, fontWeight: '900' },
   completedText: { color: '#557A66', fontSize: 10, marginTop: 2 },
-
   loaderOverlay: { flex: 1, backgroundColor: 'rgba(8,18,27,.35)', alignItems: 'center', justifyContent: 'center' },
   loaderCard: { width: 132, height: 110, borderRadius: 20, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', gap: 10 },
   loaderText: { color: T.nav, fontSize: 11, fontWeight: '800' },
+  browseScreen: { flex: 1, backgroundColor: T.bg, padding: 14 },
+  browseHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  browseTitle: { color: T.ink, fontSize: 20, fontWeight: '900', marginTop: 3 },
+  browseSummary: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', borderWidth: 1, borderColor: T.border, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10, minHeight: 56 },
+  browseSummaryText: { color: T.muted, fontSize: 10, fontWeight: '800' },
+  browseListContent: { paddingBottom: 24 },
+  browseCard: { backgroundColor: '#FFF', borderWidth: 1, borderColor: T.border, borderRadius: 16, padding: 13, marginBottom: 10 },
+  browseCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  browseVoucher: { color: T.copper, fontSize: 15, fontWeight: '900' },
+  browseDate: { color: T.ink, fontSize: 11, fontWeight: '800' },
+  browseCardDivider: { height: 1, backgroundColor: T.border, marginVertical: 10 },
+  browseCardInfo: { flexDirection: 'row', gap: 12 },
+  browseCardCell: { flex: 1, minWidth: 0 },
+  browseLabel: { color: T.muted, fontSize: 8, fontWeight: '900', marginBottom: 3 },
+  browseValue: { color: T.ink, fontSize: 11, fontWeight: '800' },
+  browseCardBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 11 },
+  browseRemarks: { color: T.ink, fontSize: 10.5, fontWeight: '700', lineHeight: 15 },
+  browseRow: { backgroundColor: '#FFF', borderWidth: 1, borderColor: T.border, borderRadius: 15, padding: 13, marginBottom: 9 },
+  browseRowMain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  browseRowInfo: { flexDirection: 'row', gap: 12, marginTop: 11 },
+  browseCell: { flex: 1 },
+  browseRowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 11 },
+  browseMeta: { color: T.muted, fontSize: 9, fontWeight: '700' },
+  browseStatus: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, backgroundColor: '#E8F5ED' },
+  browseTransferMessage: { color: T.muted, fontSize: 9, fontWeight: '600', marginTop: 8, lineHeight: 13 },
+  browseLoader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  browseLoaderText: { color: T.muted, fontSize: 11, fontWeight: '700' },
+  browseEmpty: { alignItems: 'center', justifyContent: 'center', paddingTop: 70 },
+  browseListButton: { height: 50, marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: T.border, backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, },
+  browseListText: { color: T.nav, fontSize: 13, fontWeight: '900', minWidth: 72, textAlign: 'center' },
+  browseCountWrap: { minWidth: 92, marginRight: 8 },
+  browseSearchBox: { flex: 1, height: 38, borderRadius: 11, borderWidth: 1, borderColor: T.border, backgroundColor: T.bg, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9, gap: 6 },
+  browseSearchInput: { flex: 1, minWidth: 0, paddingVertical: 0, paddingHorizontal: 0, color: T.ink, fontSize: 11, fontWeight: '700' },
+
 });

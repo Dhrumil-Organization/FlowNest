@@ -153,38 +153,54 @@ export function parseXlsxBase64(b64) {
     const ws = wb.Sheets['Sheet1'];
     if (!ws) return null;
 
+    // Sheet1 remains the validated costing/report source.
+    // Sheet2 is the live daily-entry coverage source because it can contain
+    // electricity/production dates beyond the common costing cut-off.
+    // Fall back to Sheet1 for older exports that do not contain Sheet2.
+    const coverageWs = wb.Sheets['Sheet2'] || ws;
+
     // Safe numeric cell reader
     const n = (cell) => {
       const v = ws[cell]?.v;
       return typeof v === 'number' ? v : 0;
     };
+    const coverageN = (cell) => {
+      const v = coverageWs[cell]?.v;
+      return typeof v === 'number' ? v : 0;
+    };
 
-    // ── Read daily rows (row 4 onwards) ──
-    const daily = [];
-    for (let r = 4; r < 300; r++) {
-      const dateVal = ws[`A${r}`]?.v;
-      if (!dateVal || typeof dateVal !== 'string') break;
-      // Only include rows that look like actual dates (e.g. "01-Jan", "15-May")
-      if (!/^\d{2}-[A-Za-z]{3}$/.test(dateVal)) break;
-      daily.push({
-        date: dateVal,
-        mw_looms: n(`B${r}`),
-        mw_luwa: n(`C${r}`),
-        sd_looms: n(`D${r}`),
-        sd_luwa: n(`E${r}`),
-        wj_looms: n(`F${r}`),
-        warping: n(`G${r}`),
-        misc: n(`H${r}`),
-        total_kwh: n(`I${r}`),
-        sal_r: n(`L${r}`),
-        sal_w: n(`M${r}`),
-        sal_t: n(`N${r}`),
-        prod_mw: n(`O${r}`),
-        prod_sud: n(`P${r}`),
-        prod_wj: n(`Q${r}`),
-        prod_tot: n(`R${r}`),
-      });
-    }
+    const readDailyRows = (sheet, numberAt) => {
+      const rows = [];
+      for (let r = 4; r < 300; r++) {
+        const dateVal = sheet[`A${r}`]?.v;
+        if (!dateVal || typeof dateVal !== 'string') break;
+        if (!/^\d{2}-[A-Za-z]{3}$/.test(dateVal)) break;
+        rows.push({
+          date: dateVal,
+          mw_looms: numberAt(`B${r}`),
+          mw_luwa: numberAt(`C${r}`),
+          sd_looms: numberAt(`D${r}`),
+          sd_luwa: numberAt(`E${r}`),
+          wj_looms: numberAt(`F${r}`),
+          warping: numberAt(`G${r}`),
+          misc: numberAt(`H${r}`),
+          total_kwh: numberAt(`I${r}`),
+          sal_r: numberAt(`L${r}`),
+          sal_w: numberAt(`M${r}`),
+          sal_t: numberAt(`N${r}`),
+          prod_mw: numberAt(`O${r}`),
+          prod_sud: numberAt(`P${r}`),
+          prod_wj: numberAt(`Q${r}`),
+          prod_tot: numberAt(`R${r}`),
+        });
+      }
+      return rows;
+    };
+
+    // Existing report/drill-down data stays on Sheet1.
+    const daily = readDailyRows(ws, n);
+    // Coverage only uses Sheet2 so a zero placeholder is not mistaken for an entry.
+    const coverageDaily = readDailyRows(coverageWs, coverageN);
 
     // ── Electricity costs per sub-meter ──
     const elecWarping = n('G41');
@@ -384,6 +400,8 @@ export function parseXlsxBase64(b64) {
 
       // Daily rows
       daily,
+      // Live coverage rows from Sheet2 (Sheet1 fallback for legacy exports).
+      coverage_daily: coverageDaily,
     };
   } catch (err) {
     console.error('[parseXlsxBase64] parse error:', err);

@@ -1778,6 +1778,271 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
     };
 
+    const handleRemoveLastTaka = (row: any) => {
+        if (!row) return;
+
+        Alert.alert(
+            'Remove Last Taka',
+            `Are you sure you want to remove Last Taka from Taka No ${row?.TakaNo || ''}?`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Yes, Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsDeleteLoading(true);
+
+                            const yno =
+                                row?.yearno ||
+                                row?.YearNo ||
+                                (await AsyncStorage.getItem('yno')) ||
+                                getCurrentFinancialYear();
+
+                            let chkDate = row?.ChkDate || '';
+
+                            if (chkDate) {
+                                const dateObj = new Date(chkDate);
+
+                                if (!isNaN(dateObj.getTime())) {
+                                    const dd = String(dateObj.getDate()).padStart(2, '0');
+                                    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                    const yyyy = dateObj.getFullYear();
+
+                                    chkDate = `${dd}-${mm}-${yyyy}`;
+                                }
+                            } else {
+                                const now = new Date();
+
+                                const dd = String(now.getDate()).padStart(2, '0');
+                                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                                const yyyy = now.getFullYear();
+
+                                chkDate = `${dd}-${mm}-${yyyy}`;
+                            }
+
+                            // ==========================================
+                            // FIND MATCHING RECORD
+                            // SrNo + UId
+                            // ==========================================
+
+                            let isalldata = '0';
+                            let rlasttaka = '0';
+
+                            const currentSrNo = String(row?.SrNo ?? '');
+                            const currentUId = String(row?.UId ?? '');
+
+                            const matchingData =
+                                scannerCardData?.length > 0
+                                    ? scannerCardData.find((item: any) => {
+                                        return (
+                                            String(item?.SrNo ?? '') === currentSrNo &&
+                                            String(item?.UId ?? '') === currentUId
+                                        );
+                                    })
+                                    : null;
+
+                            if (matchingData) {
+                                const currentIsLastTaka = String(
+                                    row?.islasttaka ?? '0'
+                                );
+
+                                const matchingIsLastTaka = String(
+                                    matchingData?.islasttaka ?? '0'
+                                );
+
+                                if (currentIsLastTaka === matchingIsLastTaka) {
+                                    isalldata = '0';
+                                    rlasttaka = '0';
+                                } else {
+                                    isalldata = '1';
+                                    rlasttaka = '1';
+                                }
+                            } else {
+                                isalldata = '0';
+                                rlasttaka = '0';
+                            }
+
+                            console.log('REMOVE LAST TAKA MATCH:', {
+                                currentSrNo,
+                                currentUId,
+                                currentIsLastTaka: row?.islasttaka,
+                                matchingIsLastTaka: matchingData?.islasttaka,
+                                isalldata,
+                                rlasttaka,
+                            });
+
+                            const payload = {
+                                ShfCode: row?.ShfCode || '',
+                                ChkDate: chkDate,
+                                MacGrp: row?.MacGrp || '',
+                                PrpCode: row?.PrpCode || '',
+                                yearno: yno,
+                                txntype: 'chekingScanner',
+
+                                d1: [
+                                    {
+                                        font: row?.font || '0',
+
+                                        MacCode: row?.MacCode || '',
+                                        MacName: row?.MacName ?? null,
+
+                                        TakaNo: row?.TakaNo || '',
+                                        BeamNo: row?.BeamNo || '',
+
+                                        DsnCode: row?.DsnCode || '',
+                                        DsnName: row?.DsnName || '',
+
+                                        WarpLen: row?.WarpLen || '0',
+                                        BalLen: row?.BalLen || '0',
+                                        CutLen: row?.CutLen || '.000',
+
+                                        UId: row?.UId || '',
+                                        SrNo: row?.SrNo || '',
+                                        BeamUId: row?.BeamUId || '',
+
+                                        PlanUId: row?.PlanUId || '0',
+                                        PlanSrNo: row?.PlanSrNo || '0',
+
+                                        Status: row?.Status ?? '0',
+
+                                        Qty: row?.Qty || '0',
+                                        Wt: row?.Wt || '0',
+                                        AvgWt: row?.AvgWt || '0',
+
+                                        GrdCode: row?.GrdCode || '',
+                                        GrdName: row?.GrdName || '',
+
+                                        Remarks: row?.Remarks || '',
+
+                                        ChkCode: row?.ChkCode || '',
+                                        ChkName: row?.ChkName || '',
+
+                                        SupCode: row?.SupCode || '',
+                                        SupName: row?.SupName ?? null,
+
+                                        TechSup: row?.TechSup || '',
+                                        TechSupName: row?.TechSupName ?? null,
+
+                                        QltWt: row?.QltWt || '0',
+
+                                        RecType: row?.RecType || 'O',
+                                        OQty: row?.OQty || row?.Qty || '0',
+
+                                        GStatus: row?.GStatus || '0',
+
+                                        WvrCode: row?.WvrCode || '',
+                                        WvrName: row?.WvrName ?? null,
+
+                                        ismending: row?.ismending || '0',
+
+                                        // REMOVE LAST TAKA
+                                        islasttaka: '0',
+                                        islasttakatrack: '1',
+
+                                        EMode: row?.EMode || '',
+
+                                        PrpCode: row?.PrpCode || '',
+
+                                        trantype: row?.trantype || '',
+
+                                        shdcode: row?.shdcode || '',
+                                        shdname: '.',
+
+                                        kgQty: row?.kgQty || '0',
+
+                                        subsr: row?.subsr || '0',
+
+                                        LinkedOrderUId:
+                                            row?.LinkedOrderUId || '0',
+
+                                        LinkedOrderNo:
+                                            row?.LinkedOrderNo || '0',
+
+                                        OprCode: row?.OprCode || '',
+                                        OprName: row?.OprName || ' ',
+
+                                        // DYNAMIC
+                                        isalldata: isalldata,
+                                        rlasttaka: rlasttaka,
+                                    },
+                                ],
+                                d2: []
+                            };
+
+                            console.log(
+                                'REMOVE LAST TAKA PAYLOAD:',
+                                JSON.stringify(payload, null, 2)
+                            );
+
+                            const headers = {
+                                Authorization: `Bearer ${getToken()}`,
+                                'Content-Type': 'application/json',
+                                'X-Requested-with': 'XMLHttpRequest',
+                            };
+
+                            const response = await axios.post(
+                                `${API}/api/add_checking_detail`,
+                                payload,
+                                { headers }
+                            );
+
+                            console.log(
+                                'REMOVE LAST TAKA RESPONSE:',
+                                response
+                            );
+
+                            if (response?.data?.success === true) {
+                                showSuccess(
+                                    response?.data?.message ||
+                                    'Last Taka removed successfully',
+                                    {
+                                        text: 'OK',
+                                        onPress: () => { },
+                                    }
+                                );
+
+                                await handleScannerList('S');
+                            } else {
+                                showError(
+                                    response?.data?.message ||
+                                    'Unable to remove Last Taka',
+                                    {
+                                        text: 'OK',
+                                        onPress: () => { },
+                                    }
+                                );
+                            }
+                        } catch (error: any) {
+                            console.log(
+                                'REMOVE LAST TAKA ERROR:',
+                                error?.response?.data || error
+                            );
+
+                            showError(
+                                error?.response?.data?.message ||
+                                error?.message ||
+                                'Something went wrong while removing Last Taka',
+                                {
+                                    text: 'OK',
+                                    onPress: () => { },
+                                }
+                            );
+                        } finally {
+                            setIsDeleteLoading(false);
+                        }
+                    },
+                },
+            ],
+            {
+                cancelable: false,
+            }
+        );
+    };
+
     return (
         <>
             {/* <SafeAreaView
@@ -2976,6 +3241,74 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                                 <Text style={checkingScannerStyles.subText}>
                                                     Linked Order No : {item.LinkedOrderNo}
                                                 </Text>
+
+                                                {/* {Number(item.islasttaka) === 1 && (
+                                                    <Text
+                                                        style={[
+                                                            checkingScannerStyles.subText,
+                                                            { color: 'red', fontWeight: '700' },
+                                                        ]}
+                                                    >
+                                                        Last Taka Already Set
+                                                    </Text>
+
+
+                                                )} */}
+
+                                                {Number(item.islasttaka) === 1 && (
+                                                    <View style={{ marginTop: 8 }}>
+                                                        <Text
+                                                            style={[
+                                                                checkingScannerStyles.subText,
+                                                                {
+                                                                    color: 'red',
+                                                                    fontWeight: '700',
+                                                                    marginBottom: 8,
+                                                                },
+                                                            ]}
+                                                        >
+                                                            Last Taka Already Set
+                                                        </Text>
+
+                                                        <TouchableOpacity
+                                                            style={{
+                                                                backgroundColor: '#DC2626',
+                                                                paddingVertical: 10,
+                                                                paddingHorizontal: 14,
+                                                                borderRadius: 8,
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                opacity: isDeleteLoading ? 0.6 : 1,
+                                                            }}
+                                                            disabled={isDeleteLoading}
+                                                            onPress={() => handleRemoveLastTaka(item)}
+                                                        >
+                                                            {isDeleteLoading ? (
+                                                                <ActivityIndicator size="small" color="#fff" />
+                                                            ) : (
+                                                                <>
+                                                                    <Icon
+                                                                        name="lock-open"
+                                                                        size={18}
+                                                                        color="#fff"
+                                                                    />
+
+                                                                    <Text
+                                                                        style={{
+                                                                            color: '#fff',
+                                                                            fontWeight: '700',
+                                                                            marginLeft: 6,
+                                                                            fontSize: 13,
+                                                                        }}
+                                                                    >
+                                                                        Remove Last Taka
+                                                                    </Text>
+                                                                </>
+                                                            )}
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                )}
                                             </View>
 
                                             <View>

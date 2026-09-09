@@ -1261,7 +1261,7 @@ function ChartList({
                   <View style={s.chartInfoRow}>
                     <View style={s.chartIdentity}>
                       <Text style={s.chartNo} numberOfLines={1}>
-                        {chart.ChartNo || '—'}
+                        {chart.DesignName || '—'}
                       </Text>
                       {!!chart.PartyName && (
                         <Text style={s.partyName} numberOfLines={1}>
@@ -1287,7 +1287,7 @@ function ChartList({
                   <View style={s.secondaryRow}>
                     {!!chart.DesignName && (
                       <Text style={s.designName} numberOfLines={1}>
-                        {chart.DesignName}
+                        {chart.ChartNo}
                       </Text>
                     )}
                     {!!chart.ApcChartName && (

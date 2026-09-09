@@ -8,7 +8,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 import { Switch } from 'react-native';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
 

@@ -20,7 +20,7 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 // import SearchableDropdown from '../Shared/SearchableDropdown';
 import axios from 'axios';
 import { API } from '@/common/API/dynamicAPI';
-// import Snackbar from 'react-native-snackbar';
+// import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 // import FullScreenLoader from '../Loader/Loader';
 // import { values } from 'lodash';

@@ -321,6 +321,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   costing: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Costing' },
   monthlysalestarget: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Sales Target' },
   orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
+  priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Chart Priority' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
@@ -342,6 +343,14 @@ export default function TabsLayout() {
   const { canAccess, canDo } = usePermission();
   const hydrated = useAppSessionStore((state) => state.hydrated);
   const appSession = useAppSessionStore((state) => state.appSession);
+  // Bumped by setLoggedIn() on every login AND every in-app property
+  // switch (see AppHeader.switchProperty -> performLogin()). Keying the
+  // <Tabs> tree on it forces every tab screen to fully unmount/remount on
+  // switch, so per-screen state fetched only once on mount (token,
+  // dashboard cards, list data, etc.) is thrown away and re-fetched
+  // against the newly-selected property's API — exactly what happens the
+  // very first time /new/(tabs) mounts after a fresh RoleLoginScreen login.
+  const sessionEpoch = useAppSessionStore((state) => state.sessionEpoch);
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -442,6 +451,7 @@ export default function TabsLayout() {
       ) : null}
       <View style={{ flex: 1, backgroundColor: T.bg }}>
         <Tabs
+          key={sessionEpoch}
           screenOptions={{
             headerShown: false,
             sceneStyle: {

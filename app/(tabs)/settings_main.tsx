@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // import { clearAllAppDatabases, clearAllChatDatabases, clearAllMasterDatabases } from '@/common/utils/dbCleaner';
 // import { theme } from '@/components/theme';
 // import Icon from '@expo/vector-icons/MaterialIcons';
@@ -16,7 +17,7 @@
 //     const router = useRouter();
 
 //     const confirmAction = (title: string, action: () => Promise<boolean>) => {
-//         Alert.alert(
+//         AppAlert.alert(
 //             title,
 //             "Are you sure?",
 //             [
@@ -27,7 +28,7 @@
 //                     onPress: async () => {
 //                         const res = await action();
 //                         if (res) {
-//                             Alert.alert(
+//                             AppAlert.alert(
 //                                 "Success",
 //                                 `${title} completed successfully`,
 //                                 [
@@ -38,7 +39,7 @@
 //                                 ]
 //                             );
 //                         } else {
-//                             Alert.alert(
+//                             AppAlert.alert(
 //                                 "Error",
 //                                 `Something went wrong `,
 //                                 [
@@ -198,7 +199,7 @@ import {
 } from '@/common/utils/dbCleaner';
 import { theme } from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -243,7 +244,7 @@ export default function SettingsScreen() {
     // 📋 Copy notification token
     const copyNotificationToken = async () => {
         if (!notificationToken) {
-            Alert.alert(
+            AppAlert.alert(
                 'Notification Token',
                 'No notification token found.'
             );
@@ -253,7 +254,7 @@ export default function SettingsScreen() {
         try {
             await Clipboard.setStringAsync(notificationToken);
 
-            Alert.alert(
+            AppAlert.alert(
                 'Copied',
                 'Notification token copied to clipboard.'
             );
@@ -269,7 +270,7 @@ export default function SettingsScreen() {
         title: string,
         action: () => Promise<boolean>
     ) => {
-        Alert.alert(
+        AppAlert.alert(
             title,
             'Are you sure?',
             [
@@ -284,7 +285,7 @@ export default function SettingsScreen() {
                         const res = await action();
 
                         if (res) {
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Success',
                                 `${title} completed successfully`,
                                 [
@@ -295,7 +296,7 @@ export default function SettingsScreen() {
                                 ]
                             );
                         } else {
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Error',
                                 'Something went wrong',
                                 [

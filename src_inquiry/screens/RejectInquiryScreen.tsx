@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 
 import HeaderBarwithBack from '@/components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -57,17 +58,17 @@ const RejectInquiryScreen: React.FC<Props> = ({ route, navigation, username }) =
 
   const submit = async () => {
     if (!reason) {
-      Alert.alert('Reason required', 'Please select a rejection reason');
+      AppAlert.alert('Reason required', 'Please select a rejection reason');
       return;
     }
     setSaving(true);
     try {
       await inquiryApi.reject(id, { reason, remarks, prptype: getUserPrptype, yearno: '27' });
-      Alert.alert('Rejected', 'Inquiry has been marked as rejected', [
+      AppAlert.alert('Rejected', 'Inquiry has been marked as rejected', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to reject');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to reject');
     } finally {
       setSaving(false);
     }

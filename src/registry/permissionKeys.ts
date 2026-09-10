@@ -36,6 +36,7 @@ export const PermissionKeys = {
     orderAuthorization: 'orders.authorization',
     orderTracking: 'orders.tracking',
     priority: 'priority',
+    datalog: 'datalog',
   },
   administration: {
     accessControl: 'access_control',

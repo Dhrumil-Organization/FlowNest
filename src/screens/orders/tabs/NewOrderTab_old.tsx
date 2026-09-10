@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/orders/tabs/NewOrderTab.tsx
 // Migrated from SalesOrderNew/index.tsx's NewOrderTab (~915 lines).
 // Business logic (step-by-step reveal, validation, payload shape) is
@@ -9,7 +10,7 @@ import { fetchPropertyData } from '@/src/api/legacyFunctions';
 import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
 import { usePermission } from '@/src/core/permissions';
 import { T } from '@/src/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -300,7 +301,7 @@ export function NewOrderTab({ token, userid }: Props) {
     const addColourway = () => {
         if (!selectedShade || !qty) return;
         if (colourways.find((c) => c.shade.ShdCode === selectedShade.ShdCode)) {
-            Alert.alert('Already added', `${selectedShade.ShdName} is already in the list.`);
+            AppAlert.alert('Already added', `${selectedShade.ShdName} is already in the list.`);
             return;
         }
         const amount = Number(qty) * Number(pricePerM || 0);
@@ -322,14 +323,14 @@ export function NewOrderTab({ token, userid }: Props) {
     const marginPct = costDiff !== null && latestCost > 0 ? (costDiff / latestCost) * 100 : null;
 
     const submitOrder = async () => {
-        if (!canSubmitOrder) return Alert.alert('Not permitted', 'You do not have permission to submit a new order.');
-        if (!selectedProp?.PrpCode) return Alert.alert('Required', 'Select a property first');
-        if (!selectedParty) return Alert.alert('Required', 'Select a customer');
-        if (!selectedDesign) return Alert.alert('Required', 'Select a design');
-        if (!selectedItem) return Alert.alert('Required', 'Select a fabric type');
-        if (!pricePerM) return Alert.alert('Required', 'Enter price per metre');
-        if (!deliveryDate) return Alert.alert('Required', 'Select expected delivery date');
-        if (colourways.length === 0) return Alert.alert('Required', 'Add at least one shade');
+        if (!canSubmitOrder) return AppAlert.alert('Not permitted', 'You do not have permission to submit a new order.');
+        if (!selectedProp?.PrpCode) return AppAlert.alert('Required', 'Select a property first');
+        if (!selectedParty) return AppAlert.alert('Required', 'Select a customer');
+        if (!selectedDesign) return AppAlert.alert('Required', 'Select a design');
+        if (!selectedItem) return AppAlert.alert('Required', 'Select a fabric type');
+        if (!pricePerM) return AppAlert.alert('Required', 'Enter price per metre');
+        if (!deliveryDate) return AppAlert.alert('Required', 'Select expected delivery date');
+        if (colourways.length === 0) return AppAlert.alert('Required', 'Add at least one shade');
 
         try {
             setSubmitting(true);
@@ -400,10 +401,10 @@ export function NewOrderTab({ token, userid }: Props) {
             if (res.data?.success === true) {
                 setSuccessSO(res.data?.response?.sono || res.data?.response?.SONo || 'SO-' + Date.now());
             } else {
-                Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
+                AppAlert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
         } catch (e: any) {
-            Alert.alert('Error', e?.response?.data?.message || 'Something went wrong');
+            AppAlert.alert('Error', e?.response?.data?.message || 'Something went wrong');
         } finally {
             setSubmitting(false);
         }

@@ -10,7 +10,7 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 // import Snackbar from 'react-native-snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 // import PartyDropdown from '../Shared/PartyDropdown';

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/orders/NewOrderTab.tsx
 // Extracted New Order tab — uses SearchableDropdown for all lookups.
 // Drop-in replacement for the NewOrderTab function inside OrdersScreen.tsx
@@ -189,7 +190,7 @@ export function NewOrderTab() {
             })),
         });
         autoSave();
-        Alert.alert('Submitted', 'Order sent for authorization.');
+        AppAlert.alert('Submitted', 'Order sent for authorization.');
         // Reset
         setStep(1);
         setCustId(''); setMdId(''); setPrice('');

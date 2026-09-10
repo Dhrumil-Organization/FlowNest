@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -7,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import { fetchPropertyData } from '../../common/API/Functions';
@@ -507,7 +508,7 @@ function NewOrderTab({ token, userid }) {
     const addColourway = () => {
         if (!selectedShade || !qty) return;
         if (colourways.find(c => c.shade.ShdCode === selectedShade.ShdCode)) {
-            Alert.alert('Already added', `${selectedShade.ShdName} is already in the list.`);
+            AppAlert.alert('Already added', `${selectedShade.ShdName} is already in the list.`);
             return;
         }
         const amount = Number(qty) * Number(pricePerM || 0);
@@ -548,13 +549,13 @@ function NewOrderTab({ token, userid }) {
         : null;
 
     const submitOrder = async () => {
-        if (!selectedProp?.PrpCode) { Alert.alert('Required', 'Select a property first'); return; }
-        if (!selectedParty) { Alert.alert('Required', 'Select a customer'); return; }
-        if (!selectedDesign) { Alert.alert('Required', 'Select a design'); return; }
-        if (!selectedItem) { Alert.alert('Required', 'Select a fabric type'); return; }
-        if (!pricePerM) { Alert.alert('Required', 'Enter price per metre'); return; }
-        if (!deliveryDate) { Alert.alert('Required', 'Select expected delivery date'); return; }
-        if (colourways.length === 0) { Alert.alert('Required', 'Add at least one shade'); return; }
+        if (!selectedProp?.PrpCode) { AppAlert.alert('Required', 'Select a property first'); return; }
+        if (!selectedParty) { AppAlert.alert('Required', 'Select a customer'); return; }
+        if (!selectedDesign) { AppAlert.alert('Required', 'Select a design'); return; }
+        if (!selectedItem) { AppAlert.alert('Required', 'Select a fabric type'); return; }
+        if (!pricePerM) { AppAlert.alert('Required', 'Enter price per metre'); return; }
+        if (!deliveryDate) { AppAlert.alert('Required', 'Select expected delivery date'); return; }
+        if (colourways.length === 0) { AppAlert.alert('Required', 'Add at least one shade'); return; }
 
         try {
             setSubmitting(true);
@@ -633,10 +634,10 @@ function NewOrderTab({ token, userid }) {
             if (res.data?.success === true) {
                 setSuccessSO(res.data?.response?.sono || res.data?.response?.SONo || 'SO-' + Date.now());
             } else {
-                Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
+                AppAlert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
         } catch (e) {
-            Alert.alert('Error', e?.response?.data?.message || 'Something went wrong');
+            AppAlert.alert('Error', e?.response?.data?.message || 'Something went wrong');
         } finally {
             setSubmitting(false);
         }
@@ -703,7 +704,7 @@ function NewOrderTab({ token, userid }) {
                         <Text style={N.stepTitle}>Customer</Text>
                     </View>
                     <TouchableOpacity style={N.dropdownBox}
-                        onPress={() => { if (prpcode) setShowPartyPicker(true); else Alert.alert('Required', 'Select a property first'); }}
+                        onPress={() => { if (prpcode) setShowPartyPicker(true); else AppAlert.alert('Required', 'Select a property first'); }}
                         activeOpacity={0.8}>
                         <Text style={[N.dropdownText, !selectedParty && N.placeholder]}>
                             {selectedParty ? (selectedParty.accountname || selectedParty.ParName) : 'Select customer'}
@@ -1212,7 +1213,7 @@ function AuthOrderModal({
 
     const loadAddDesigns = async () => {
         if (!editPrpCode || !token) {
-            Alert.alert('Unable to add item', 'Property or login information is missing.');
+            AppAlert.alert('Unable to add item', 'Property or login information is missing.');
             return;
         }
 
@@ -1230,7 +1231,7 @@ function AuthOrderModal({
             setAddDesignList(Array.isArray(data) ? data : []);
         } catch (e) {
             setAddDesignList([]);
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load items',
                 e?.response?.data?.message || e?.message || 'Please try again.'
             );
@@ -1271,7 +1272,7 @@ function AuthOrderModal({
             setAddItemList(Array.isArray(data) ? data : []);
         } catch (e) {
             setAddItemList([]);
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load designs',
                 e?.response?.data?.message || e?.message || 'Please try again.'
             );
@@ -1304,7 +1305,7 @@ function AuthOrderModal({
             setAddShadeList(Array.isArray(data) ? data : []);
         } catch (e) {
             setAddShadeList([]);
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load shades',
                 e?.response?.data?.message || e?.message || 'Please try again.'
             );
@@ -1318,19 +1319,19 @@ function AuthOrderModal({
         const rate = parseNum(addRate);
 
         if (!addDesign) {
-            Alert.alert('Item required', 'Select an item.');
+            AppAlert.alert('Item required', 'Select an item.');
             return;
         }
         if (!addItem) {
-            Alert.alert('Design required', 'Select a design.');
+            AppAlert.alert('Design required', 'Select a design.');
             return;
         }
         if (!addShade) {
-            Alert.alert('Shade required', 'Select a shade.');
+            AppAlert.alert('Shade required', 'Select a shade.');
             return;
         }
         if (qty <= 0 || rate <= 0) {
-            Alert.alert('Quantity and rate required', 'Enter quantity and rate greater than zero.');
+            AppAlert.alert('Quantity and rate required', 'Enter quantity and rate greater than zero.');
             return;
         }
 
@@ -1341,7 +1342,7 @@ function AuthOrderModal({
         ));
 
         if (duplicate) {
-            Alert.alert(
+            AppAlert.alert(
                 'Combination already exists',
                 'This item, design and shade combination is already present in the order.'
             );
@@ -1424,7 +1425,7 @@ function AuthOrderModal({
             return;
         }
 
-        Alert.alert(
+        AppAlert.alert(
             'Remove item row?',
             `${row.ItmName || 'This item'} · ${row.DsnName || 'Design'} · ${row.ShdName || 'Shade'}\n\nThe row will be deleted only after Update Order succeeds.`,
             [
@@ -1483,12 +1484,12 @@ function AuthOrderModal({
         );
 
         if (rows.length === 0) {
-            Alert.alert('Cannot update', 'This sales order does not contain any item rows.');
+            AppAlert.alert('Cannot update', 'This sales order does not contain any item rows.');
             return;
         }
 
         if (invalidIndex >= 0) {
-            Alert.alert(
+            AppAlert.alert(
                 'Invalid quantity or rate',
                 `Enter a quantity and rate greater than zero in item ${invalidIndex + 1}.`
             );
@@ -1510,7 +1511,7 @@ function AuthOrderModal({
             if (addedCount > 0) {
                 changeParts.push(`${addedCount} new row${addedCount === 1 ? '' : 's'} will be added`);
             }
-            Alert.alert(
+            AppAlert.alert(
                 'Update sales order?',
                 `${changeParts.join(' and ')}.`,
                 [
@@ -2082,7 +2083,7 @@ function AuthTab({ token }) {
             setPending(pRes.data?.response?.data || []);
             setAuthorised(aRes.data?.response?.data || []);
         } catch (e) {
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load orders',
                 e?.response?.data?.message || e?.message || 'Please pull down to try again.'
             );
@@ -2157,14 +2158,14 @@ function AuthTab({ token }) {
             if (res.data?.success) {
                 await load();
                 setExpandedId(null);
-                Alert.alert('Done', action === 'approve'
+                AppAlert.alert('Done', action === 'approve'
                     ? 'Order approved successfully.'
                     : 'Order rejected successfully.');
             } else {
-                Alert.alert('Failed', res.data?.message || 'Action failed');
+                AppAlert.alert('Failed', res.data?.message || 'Action failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setApproving(null);
         }
@@ -2198,7 +2199,7 @@ function AuthTab({ token }) {
 
     const openOrder = (item, mode) => {
         if (mode === 'edit' && Number(item.IsAuth || 0) !== 0) {
-            Alert.alert('Cannot edit', 'An authorized sales order cannot be modified.');
+            AppAlert.alert('Cannot edit', 'An authorized sales order cannot be modified.');
             return;
         }
         setOrderModal({ visible: true, mode, record: item });
@@ -2295,14 +2296,14 @@ function AuthTab({ token }) {
                 changeParts.push(`${addedCount} row${addedCount === 1 ? '' : 's'} added`);
             }
 
-            Alert.alert(
+            AppAlert.alert(
                 'Updated',
                 changeParts.length > 0
                     ? `Sales order updated successfully: ${changeParts.join(' and ')}.`
                     : 'Sales order updated successfully.'
             );
         } catch (e) {
-            Alert.alert(
+            AppAlert.alert(
                 'Update failed',
                 e?.response?.data?.message || e?.message || 'Unable to update the sales order.'
             );
@@ -2339,9 +2340,9 @@ function AuthTab({ token }) {
             setPending(previous => previous.filter(row => String(row.UId) !== String(item.UId)));
             setAuthorised(previous => previous.filter(row => String(row.UId) !== String(item.UId)));
             setExpandedId(previous => String(previous) === String(item.UId) ? null : previous);
-            Alert.alert('Deleted', 'Sales order removed successfully.');
+            AppAlert.alert('Deleted', 'Sales order removed successfully.');
         } catch (e) {
-            Alert.alert(
+            AppAlert.alert(
                 'Cannot delete order',
                 e?.response?.data?.response?.message ||
                 e?.response?.data?.message ||
@@ -2356,7 +2357,7 @@ function AuthTab({ token }) {
     const confirmDelete = (item) => {
         if (deletingId || savingEdit || approving) return;
 
-        Alert.alert(
+        AppAlert.alert(
             'Delete sales order?',
             `${getSoId(item)} will be permanently removed. This is allowed only when the order is not in use.`,
             [
@@ -2985,7 +2986,7 @@ function TrackingTab({ token }) {
         const enteredQty = Number(totalDispatchQty || 0);
 
         if (enteredQty > pendingQty) {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation',
                 `Dispatch Qty cannot exceed Pending Qty (${pendingQty.toFixed(3)} m)`
             );
@@ -2996,7 +2997,7 @@ function TrackingTab({ token }) {
             .filter((sh) => dispChecked[sh.ShdCode] && num(dispQtys[sh.ShdCode]) > 0)
             .map((sh) => ({ ShdCode: sh.ShdCode, Qty: num(dispQtys[sh.ShdCode]) }));
         if (items.length === 0) {
-            Alert.alert('Required', 'Enter at least one dispatch quantity');
+            AppAlert.alert('Required', 'Enter at least one dispatch quantity');
             return;
         }
         try {
@@ -3010,12 +3011,12 @@ function TrackingTab({ token }) {
             if (res.data?.success) {
                 setDispItem(null);
                 load();
-                Alert.alert('Done', 'Dispatched successfully');
+                AppAlert.alert('Done', 'Dispatched successfully');
             } else {
-                Alert.alert('Failed', res.data?.message || 'Dispatch failed');
+                AppAlert.alert('Failed', res.data?.message || 'Dispatch failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setDispatching(false);
         }
@@ -3070,12 +3071,12 @@ function TrackingTab({ token }) {
                 setConfirmItem(null);
                 setConfirmShadeRow(null);
                 load();
-                Alert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
+                AppAlert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Could not confirm shade');
+                AppAlert.alert('Failed', res.data?.message || 'Could not confirm shade');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setConfirmSaving(false);
         }
@@ -3105,9 +3106,9 @@ function TrackingTab({ token }) {
     const copyJobChart = () => {
         try {
             Clipboard.setString(buildJobChartText(jobItem));
-            Alert.alert('Copied', 'Job chart copied to clipboard');
+            AppAlert.alert('Copied', 'Job chart copied to clipboard');
         } catch (e) {
-            Alert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
+            AppAlert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
         }
     };
 

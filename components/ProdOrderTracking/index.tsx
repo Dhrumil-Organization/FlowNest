@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { crlimtreq_styles } from '@/common/Style';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
@@ -112,7 +113,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -163,7 +164,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -225,7 +226,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -292,7 +293,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
             console.log('🔵 design details response 123:', response, payload);
             if (response.data.success === true && response.data.data.length === 0) {
                 setIsLoading(false);
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
                 setPOTData([]);
                 // setresponsemessage(response.data.message || 'Success');
                 // setTimeout(() => {
@@ -313,11 +314,11 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
                 // setProcessedCards(prev => new Set(prev).add(selectedItem.uid));
             } else if (response.data.success === false) {
                 setIsLoading(false);
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setPOTData([]);
             } else {
                 setIsLoading(false);
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setPOTData([]);
             }
 
@@ -328,7 +329,7 @@ const ProdOrderTracking: React.FC<Props> = ({ token, username }) => {
 
         } catch (error) {
             setIsLoading(false);
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
             setPOTData([]);
             // setTimeout(() => {
             //     setSuccess(false);

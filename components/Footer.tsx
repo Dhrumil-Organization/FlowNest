@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { useRouter } from 'expo-router';
 // import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // import { theme } from './theme';
@@ -86,7 +87,7 @@
 import { theme } from './theme'; // 👈 apne actual theme path ke hisaab se adjust karo
 
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 // 👇 Expo SDK 54+ me expo-file-system ka naya API aaya hai jisme EncodingType,
@@ -144,7 +145,7 @@ const Footer: React.FC<FooterProps> = ({
   const [reportsModalVisible, setReportsModalVisible] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert(
+    AppAlert.alert(
       'Confirm Logout',
       'Are you sure you want to sign out?',
       [
@@ -186,7 +187,7 @@ const Footer: React.FC<FooterProps> = ({
     try {
       const available = await Sharing.isAvailableAsync();
       if (!available) {
-        Alert.alert('Not available', 'Sharing is not available on this device.');
+        AppAlert.alert('Not available', 'Sharing is not available on this device.');
         return;
       }
       await Sharing.shareAsync(localFileUri, {
@@ -195,7 +196,7 @@ const Footer: React.FC<FooterProps> = ({
         UTI: 'com.adobe.pdf',
       });
     } catch (err: any) {
-      Alert.alert('Share failed', err?.message || String(err));
+      AppAlert.alert('Share failed', err?.message || String(err));
     }
   };
 
@@ -236,13 +237,13 @@ const Footer: React.FC<FooterProps> = ({
 
       const pdfUrlFromApi = resp?.data?.data?.filename;
       if (!pdfUrlFromApi) {
-        Alert.alert('Error', 'PDF URL not found in server response');
+        AppAlert.alert('Error', 'PDF URL not found in server response');
         return;
       }
 
       const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
       if (!pdfResp || !pdfResp.data) {
-        Alert.alert('Error', 'Failed to download PDF bytes');
+        AppAlert.alert('Error', 'Failed to download PDF bytes');
         return;
       }
 
@@ -266,7 +267,7 @@ const Footer: React.FC<FooterProps> = ({
         console.log('fetchCollectionPdf cancelled');
       } else {
         console.error('fetchCollectionPdf error', err);
-        Alert.alert('Error', err?.message || 'Failed to fetch PDF');
+        AppAlert.alert('Error', err?.message || 'Failed to fetch PDF');
       }
     } finally {
       setFetchingSummary(false);
@@ -280,7 +281,7 @@ const Footer: React.FC<FooterProps> = ({
 
     const handleDownload = async () => {
       if (!pdfLocalUri) {
-        Alert.alert('No file', 'No PDF available to save');
+        AppAlert.alert('No file', 'No PDF available to save');
         return;
       }
 
@@ -299,7 +300,7 @@ const Footer: React.FC<FooterProps> = ({
           await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
 
         if (!permissions.granted) {
-          Alert.alert(
+          AppAlert.alert(
             'Permission needed',
             'Please allow folder access to save the PDF, or share it instead.',
             [
@@ -329,11 +330,11 @@ const Footer: React.FC<FooterProps> = ({
         if (ToastAndroid) {
           ToastAndroid.show(`Saved: ${fileName}`, ToastAndroid.LONG);
         } else {
-          Alert.alert('Saved', `Saved: ${fileName}`);
+          AppAlert.alert('Saved', `Saved: ${fileName}`);
         }
       } catch (copyErr: any) {
         console.error('SAF save failed', copyErr);
-        Alert.alert(
+        AppAlert.alert(
           'Save failed',
           'Could not save the file. You can share it instead.',
           [
@@ -404,7 +405,7 @@ const Footer: React.FC<FooterProps> = ({
                 )}
                 onError={(e) => {
                   console.error('WebView PDF error', e.nativeEvent);
-                  Alert.alert('Error', 'Failed to render PDF');
+                  AppAlert.alert('Error', 'Failed to render PDF');
                 }}
                 onHttpError={(e) => {
                   console.error('WebView PDF HTTP error', e.nativeEvent);

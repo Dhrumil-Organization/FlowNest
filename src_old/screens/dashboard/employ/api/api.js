@@ -4,7 +4,7 @@
 // (see @/src/api/client.ts) instead of the old '../../../../common/API/dynamicAPI'
 // path, which does not exist inside this project.
 import { API_BASE_URL as API } from '@/src/api/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 const BASE_URL = `${API}/api`; // ← change here if the Employ Dashboard endpoints live elsewhere
 

@@ -1,5 +1,5 @@
 // // screens/SalesExecDashboardScreen.js
-// import AsyncStorage from "@react-native-async-storage/async-storage";
+// import AsyncStorage from "@/common/utils/compatibleStorage";
 // import { useLocalSearchParams, useRouter } from "expo-router";
 // import React, { useCallback, useEffect, useState } from "react";
 // import {
@@ -654,7 +654,7 @@
 // });
 
 // screens/SalesExecDashboardScreen.js
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -106,7 +107,7 @@ const CreditLimit: React.FC<Props> = ({ token, username }) => {
             setAllHistoryData([]);
 
         } catch {
-            Alert.alert("Error", "Server error");
+            AppAlert.alert("Error", "Server error");
         } finally {
             setIsLoading(false);
         }
@@ -163,7 +164,7 @@ const CreditLimit: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoading(false);
@@ -203,7 +204,7 @@ const CreditLimit: React.FC<Props> = ({ token, username }) => {
     //         }
     //     } catch (error) {
     //         if (!axios.isCancel(error)) {
-    //             Alert.alert('Error', 'Server error');
+    //             AppAlert.alert('Error', 'Server error');
     //         }
     //     } finally {
     //         setIsLoading(false);
@@ -286,7 +287,7 @@ const CreditLimit: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPartyLoading(false);
@@ -392,25 +393,25 @@ const CreditLimit: React.FC<Props> = ({ token, username }) => {
                 parseFloat(numericNewLimit2).toFixed(2) ===
                 parseFloat(numericLimit1).toFixed(2)
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (parseFloat(updatedItem.limit2) < 0) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
                 )

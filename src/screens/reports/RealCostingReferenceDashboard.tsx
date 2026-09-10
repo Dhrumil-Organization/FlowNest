@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -482,7 +483,7 @@ export default function RealCostingReferenceDashboard({ route }: any) {
             const first = response?.designs?.[0];
             setExpandedKey(first ? designKey(first) : null);
         } catch (error: any) {
-            Alert.alert(
+            AppAlert.alert(
                 'Real Costing Error',
                 error?.response?.data?.message || error?.message || 'Unable to load real costing chain'
             );

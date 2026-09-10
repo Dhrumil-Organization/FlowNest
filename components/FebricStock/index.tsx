@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Modal, TextInput } from 'react-native';
 import { useWindowDimensions } from 'react-native';
@@ -225,7 +226,7 @@ const FebricStock: React.FC<{ token: string, username: string }> = ({ token, use
 
             } else {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setGreyStockData([]);
                 setFinishStockData([]);
                 setsalesdata([]);
@@ -234,7 +235,7 @@ const FebricStock: React.FC<{ token: string, username: string }> = ({ token, use
 
         } catch (error) {
 
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
             setsalesdata([]);
             setsalessumdata([]);
 

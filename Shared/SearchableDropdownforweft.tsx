@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // components/Shared/SearchableDropdown.tsx
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import {
@@ -173,7 +174,7 @@ const SearchableDropdownforweft = forwardRef<any, Props>(({
         //         isReturnDone === "0"
         //     ) {
 
-        //         Alert.alert(
+        //         AppAlert.alert(
         //             "Validation",
         //             "Issue Return Is Pending"
         //         );

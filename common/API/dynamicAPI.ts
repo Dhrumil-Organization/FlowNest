@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 // Shared live ERP API base. All legacy modules import this value so the
 // common property switch changes the host for every subsequent call.

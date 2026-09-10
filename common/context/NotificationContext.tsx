@@ -11,7 +11,7 @@
 // Iske baad kisi bhi screen/component me useNotificationCenter() hook use karke
 // notifications, unreadCount, removeNotification, clearAll access kar sakte ho.
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import * as Notifications from 'expo-notifications';
 import React, {
     createContext,

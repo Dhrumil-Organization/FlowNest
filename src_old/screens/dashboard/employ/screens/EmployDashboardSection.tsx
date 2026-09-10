@@ -15,7 +15,7 @@
 //
 // Everything else — the AsyncStorage prptype lookup and the API-backed child
 // screens (Owner / My View) — is unchanged.
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';

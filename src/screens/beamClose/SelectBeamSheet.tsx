@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/beamClose/SelectBeamSheet.tsx
 // Migrated from BeamClose/SelectBeam.tsx. Business logic (payload shape,
 // validation, save behavior) preserved exactly — only structural changes:
@@ -98,7 +99,7 @@ export function SelectBeamSheet({ visible, onClose, FormState, setFormState, tok
             const response = await BeamCloseAPI.addBeamOpen(payload);
 
             if (response.data.success === true) {
-                Alert.alert('Success', 'Saved successfully.');
+                AppAlert.alert('Success', 'Saved successfully.');
                 setFormState((prev) => ({
                     ...prev,
                     values: {
@@ -112,11 +113,11 @@ export function SelectBeamSheet({ visible, onClose, FormState, setFormState, tok
                 }));
                 onClose();
             } else {
-                Alert.alert('Warning', response.data.message);
+                AppAlert.alert('Warning', response.data.message);
             }
         } catch (error) {
             console.log('SAVE ERROR:', error);
-            Alert.alert('Error', 'Something went wrong');
+            AppAlert.alert('Error', 'Something went wrong');
         } finally {
             setLoading(false);
         }
@@ -124,7 +125,7 @@ export function SelectBeamSheet({ visible, onClose, FormState, setFormState, tok
 
     const handleDemo = (rowData: any) => {
         if (!rowData) return;
-        Alert.alert(
+        AppAlert.alert(
             'Confirm',
             `Do you want to open this Beam entry ${rowData.BeamNo}?`,
             [

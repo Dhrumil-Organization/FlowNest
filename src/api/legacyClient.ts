@@ -1,4 +1,4 @@
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import axios from 'axios';
 // import { API } from '../../common/API/dynamicAPI';
 // import { resolveNewErpApiBaseUrl } from './client';
@@ -346,7 +346,7 @@
 
 
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import { resolveNewErpApiBaseUrl } from './client';

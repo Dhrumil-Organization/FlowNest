@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -17,7 +18,7 @@ import { getCurrentFinancialYear } from '@/common/commonfunction';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useRouter } from 'expo-router';
 import EmptyState from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
@@ -131,7 +132,7 @@ const DashboardScreen: React.FC<Props> = ({ username, getUserId }) => {
       console.log("Rights res:", data?.response?.module_rights);
       setUserRights(data?.response?.module_rights);
     } catch (e: any) {
-      Alert.alert('Error', e || 'Unable to fetch Rights');
+      AppAlert.alert('Error', e || 'Unable to fetch Rights');
     } finally {
       setLoading(false);
     }
@@ -190,7 +191,7 @@ const DashboardScreen: React.FC<Props> = ({ username, getUserId }) => {
   };
 
   const handleDelete = (item: Inquiry) => {
-    Alert.alert(
+    AppAlert.alert(
       'Delete Inquiry?',
       `Are you sure you want to delete ${item.inquiry_no}? This cannot be undone.`,
       [
@@ -203,7 +204,7 @@ const DashboardScreen: React.FC<Props> = ({ username, getUserId }) => {
               await inquiryApi.delete({ item: item.id, prptype: getUserPrptype, yearno: getCurrentFinancialYear() });
               load(false, getUserPrptype, getUserRights);
             } catch (e: any) {
-              Alert.alert(
+              AppAlert.alert(
                 'Error',
                 e?.response?.data?.message || 'Failed to delete inquiry',
               );

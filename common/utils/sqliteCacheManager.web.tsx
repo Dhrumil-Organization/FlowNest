@@ -1,71 +1,35 @@
 import axios from 'axios';
 import { API } from '../API/dynamicAPI';
+import { createWebKVStore } from './webIndexedDB';
 
-const DB = 'FlowNestWebCache';
-const STORE = 'kv';
+const store = createWebKVStore('FlowNestGlobalCache');
 
-function openStore(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function setValue(key: string, value: any) {
-  const db = await openStore();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
-}
-
-async function getValue<T = any>(key: string): Promise<T | null> {
-  const db = await openStore();
-  const value = await new Promise<T | null>((resolve, reject) => {
-    const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result ?? null);
-    req.onerror = () => reject(req.error);
-  });
-  db.close();
-  return value;
-}
-
-async function deleteValue(key: string) {
-  const db = await openStore();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
-}
+const tableKey = (table: string) => `table:${table}`;
 
 export const initGlobalCacheDB = async (): Promise<void> => {
-  await openStore().then(db => db.close());
+  // Browser fallback: IndexedDB replaces native SQLite.
 };
 
 export const getCachedGlobalData = async (table: string): Promise<any[]> => {
   try {
-    return (await getValue<any[]>(`global:${table}`)) || [];
-  } catch (e) {
-    console.error(`❌ Error fetching ${table}:`, e);
+    return (await store.get<any[]>(tableKey(table))) || [];
+  } catch {
     return [];
   }
 };
 
 export const clearAllGlobalCacheData = async (): Promise<void> => {
-  await Promise.all(['party', 'item', 'shade'].map(t => deleteValue(`global:${t}`)));
+  await Promise.all([
+    store.remove(tableKey('party')),
+    store.remove(tableKey('item')),
+    store.remove(tableKey('shade')),
+  ]);
 };
 
-export const fetchAndCacheGlobalData = async (token: string, forceRefresh = false): Promise<void> => {
+export const fetchAndCacheGlobalData = async (
+  token: string,
+  forceRefresh = false,
+): Promise<void> => {
   const [party, item, shade] = await Promise.all([
     getCachedGlobalData('party'),
     getCachedGlobalData('item'),
@@ -83,18 +47,24 @@ export const fetchAndCacheGlobalData = async (token: string, forceRefresh = fals
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-    }
+    },
   );
 
-  const data = response?.data?.response || {};
+  const nextParty = response?.data?.response?.party || [];
+  const nextItem = response?.data?.response?.item || [];
+  const nextShade = response?.data?.response?.shade || [];
+
   await Promise.all([
-    setValue('global:party', data.party || []),
-    setValue('global:item', data.item || []),
-    setValue('global:shade', data.shade || []),
+    store.set(tableKey('party'), nextParty),
+    store.set(tableKey('item'), nextItem),
+    store.set(tableKey('shade'), nextShade),
   ]);
 };
 
 export const updateGlobalCacheInBackground = async (token: string): Promise<void> => {
-  try { await fetchAndCacheGlobalData(token, true); }
-  catch (e) { console.error('❌ Background global cache update failed:', e); }
+  try {
+    await fetchAndCacheGlobalData(token, true);
+  } catch (error) {
+    console.error('❌ Browser global cache update failed:', error);
+  }
 };

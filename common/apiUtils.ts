@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as MailComposer from 'expo-mail-composer';
 import * as Print from 'expo-print';
@@ -141,7 +142,7 @@ export const apiCall = async <T>(
   try {
     const response: AxiosResponse<T> = await axios(config);
     if (response.data.success === false) {
-      Alert.alert('Bug Report Sent', 'A bug report has been sent to the support team.');
+      AppAlert.alert('Bug Report Sent', 'A bug report has been sent to the support team.');
       const bugReport = generateBugReport(filename, username, endpoint, method, payload, new Error('API returned success=false'), response.data);
       await saveBugReport(bugReport);
       const pdfUri = await generateBugReportPDF(bugReport);

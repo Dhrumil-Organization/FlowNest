@@ -1,6 +1,6 @@
 import { PermissionRouteGuard } from '@/src/core/navigation';
 import { DashboardScreen as DashboardScreen1 } from '@/src/screens/dashboard/DashboardScreen';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 export default function DashboardRoute() {

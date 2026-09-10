@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -98,7 +99,7 @@ export function CostingHistoryScreen() {
             const response = await CostingAPI.history();
             setGroups(normaliseGroups(response.data.data));
         } catch (error: any) {
-            Alert.alert('Costing history', error?.response?.data?.message || error?.message || 'Unable to load costing history.');
+            AppAlert.alert('Costing history', error?.response?.data?.message || error?.message || 'Unable to load costing history.');
         } finally {
             setLoading(false);
             setRefreshing(false);

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useRef, useState } from "react";
 import {
     Alert,
@@ -78,7 +79,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     //     Voice.onSpeechError = (e) => {
     //         console.log("Speech error:", e);
     //         setIsListening(false);
-    //         // Alert.alert("Error", "Voice recognition failed. Please try again.");
+    //         // AppAlert.alert("Error", "Voice recognition failed. Please try again.");
     //     };
     //     return () => {
     //         Voice.destroy().then(Voice.removeAllListeners);
@@ -220,7 +221,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                 if (retryCount < MAX_RETRIES) {
                     // Show retry message
                     if (retryCount === 0) {
-                        Alert.alert(
+                        AppAlert.alert(
                             "Retrying Update",
                             "Cache update encountered an issue. Retrying...",
                             [{ text: "OK" }]
@@ -235,7 +236,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                     return updateCache(getUserPrptype, retryCount + 1);
                 } else {
                     // Max retries reached
-                    Alert.alert(
+                    AppAlert.alert(
                         "Update Failed",
                         "Unable to update cache after multiple attempts. Please try again later or contact support.",
                         [{ text: "OK" }]
@@ -250,7 +251,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
                 // Show success message if it was a retry
                 if (retryCount > 0) {
-                    Alert.alert(
+                    AppAlert.alert(
                         "Success",
                         `Cache updated successfully after ${retryCount} retry/retries.`,
                         [{ text: "OK" }]
@@ -267,7 +268,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
                     return updateCache(getUserPrptype, retryCount + 1);
                 } else {
                     setUpdatedDate('Invalid response');
-                    Alert.alert(
+                    AppAlert.alert(
                         "Update Warning",
                         "Received unexpected response from server. Please try again later.",
                         [{ text: "OK" }]
@@ -284,7 +285,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
                 // Show network error message on first failure
                 if (retryCount === 0) {
-                    Alert.alert(
+                    AppAlert.alert(
                         "Network Issue",
                         "Connection problem detected. Retrying...",
                         [{ text: "OK" }]
@@ -297,7 +298,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
                 return updateCache(getUserPrptype, retryCount + 1);
             } else {
-                Alert.alert(
+                AppAlert.alert(
                     "Update Failed",
                     "Network error persists. Please check your internet connection and try again.",
                     [{ text: "OK" }]
@@ -357,7 +358,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     // const startListening = async () => {
     //     const ok = await requestPermission();
     //     if (!ok) {
-    //         Alert.alert(
+    //         AppAlert.alert(
     //             "Permission Required",
     //             "Please enable microphone permission in settings to use voice input.",
     //             [{ text: "OK" }]
@@ -369,7 +370,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     //         await Voice.start("en-IN");
     //     } catch (e) {
     //         console.log("Voice start error:", e);
-    //         Alert.alert("Error", "Could not start voice recognition. Please try again.");
+    //         AppAlert.alert("Error", "Could not start voice recognition. Please try again.");
     //         setIsListening(false);
     //     }
     // };
@@ -378,7 +379,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     //         const permission = await Audio.requestPermissionsAsync();
 
     //         if (!permission.granted) {
-    //             Alert.alert("Permission denied", "Microphone access required");
+    //             AppAlert.alert("Permission denied", "Microphone access required");
     //             return;
     //         }
 
@@ -427,7 +428,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
     //     } catch (err) {
     //         console.log("Speech error:", err);
-    //         Alert.alert("Error", "Voice failed");
+    //         AppAlert.alert("Error", "Voice failed");
     //     }
     // };
 
@@ -645,7 +646,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
     };
 
     const handleClearChat = () => {
-        Alert.alert(
+        AppAlert.alert(
             'Clear Chat',
             'Are you sure you want to delete all conversations?',
             [
@@ -683,7 +684,7 @@ const SalesAnalysis = ({ token, username, getUserPrptype }) => {
 
     const copyMessage = async (text) => {
         await Clipboard.setStringAsync(text);
-        Alert.alert("Success", "Message copied to clipboard");
+        AppAlert.alert("Success", "Message copied to clipboard");
     };
 
     const startEdit = index => {

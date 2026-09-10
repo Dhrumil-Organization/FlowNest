@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 /* eslint-disable react/no-unstable-nested-components */
 import React, { useState, useEffect } from 'react';
 import {
@@ -111,11 +112,11 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
             } else {
                 setStageLoading(false);
                 console.error('Unexpected response structure:', response.data);
-                Alert.alert(`${response.data}`);
+                AppAlert.alert(`${response.data}`);
             }
         } catch (error) {
             setStageLoading(false);
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
         }
     };
 

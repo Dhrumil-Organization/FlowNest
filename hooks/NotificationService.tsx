@@ -1,6 +1,6 @@
 
 // import * as Notifications from 'expo-notifications';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { Platform } from 'react-native';
 
 // // Request permissions
@@ -31,7 +31,7 @@
 //     return null;
 //   }
 // };
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';

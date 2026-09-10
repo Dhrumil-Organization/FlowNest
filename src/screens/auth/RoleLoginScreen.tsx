@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // // ─────────────────────────────────────────────────────────────
 // // FILE: src/screens/auth/RoleLoginScreen.tsx
 // //
@@ -116,7 +117,7 @@
 //       );
 
 //       if (!outcome.success) {
-//         Alert.alert(
+//         AppAlert.alert(
 //           'Login failed',
 //           outcome.message || 'Unable to login.'
 //         );
@@ -129,7 +130,7 @@
 //       // If "Remember me" could not be saved, login itself is still
 //       // valid. Show the note, then enter the New ERP dashboard.
 //       if (outcome.message) {
-//         Alert.alert(
+//         AppAlert.alert(
 //           'Note',
 //           outcome.message,
 //           [
@@ -149,7 +150,7 @@
 //       // New ERP only and never points at the Legacy dashboard.
 //       openNewErpDashboard();
 //     } catch (error: any) {
-//       Alert.alert(
+//       AppAlert.alert(
 //         'Login failed',
 //         error?.message || 'Unable to login.'
 //       );
@@ -633,7 +634,7 @@ export function RoleLoginScreen() {
 
     // Extra safety check
     if (!isPasswordValid(validation)) {
-      Alert.alert('Error', 'Password does not meet security requirements');
+      AppAlert.alert('Error', 'Password does not meet security requirements');
       return;
     }
 
@@ -654,7 +655,7 @@ export function RoleLoginScreen() {
       );
 
       if (!outcome.success) {
-        Alert.alert(
+        AppAlert.alert(
           'Login failed',
           outcome.message || 'Unable to login.'
         );
@@ -662,7 +663,7 @@ export function RoleLoginScreen() {
       }
 
       if (outcome.message) {
-        Alert.alert(
+        AppAlert.alert(
           'Note',
           outcome.message,
           [
@@ -680,7 +681,7 @@ export function RoleLoginScreen() {
 
       openNewErpDashboard();
     } catch (error: any) {
-      Alert.alert(
+      AppAlert.alert(
         'Login failed',
         error?.message || 'Unable to login.'
       );

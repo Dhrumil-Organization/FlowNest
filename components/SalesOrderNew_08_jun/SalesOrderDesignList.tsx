@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
@@ -63,7 +64,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     console.log("selectedItem", selectedItem);
     //   const loadDesigns = async () => {
     //     if (!selectedItem?.ItmCode) {
-    //       Alert.alert('Required', 'Item is missing.');
+    //       AppAlert.alert('Required', 'Item is missing.');
     //       return;
     //     }
 
@@ -98,7 +99,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     //       setDesigns(Array.isArray(data) ? data : []);
     //     } catch (error) {
     //       console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
-    //       Alert.alert('Error', 'Unable to load design list');
+    //       AppAlert.alert('Error', 'Unable to load design list');
     //       setDesigns([]);
     //     } finally {
     //       setLoading(false);
@@ -109,7 +110,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
     const loadDesigns = async () => {
         const yrno = yearno ? yearno.slice(-2) : '';
         if (!selectedItem?.ItmCode) {
-            Alert.alert('Required', 'Item is missing.');
+            AppAlert.alert('Required', 'Item is missing.');
             return;
         }
         try {
@@ -139,7 +140,7 @@ const SalesOrderDesignList = ({ navigation, route }) => {
             setDesigns(Array.isArray(data) ? data : []);
         } catch (error) {
             console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load design list');
+            AppAlert.alert('Error', 'Unable to load design list');
             setDesigns([]);
         } finally {
             setLoading(false);

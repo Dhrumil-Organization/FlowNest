@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -85,7 +86,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
     console.log("selectedItem", parsedSelectedItem);
     //   const loadDesigns = async () => {
     //     if (!selectedItem?.ItmCode) {
-    //       Alert.alert('Required', 'Item is missing.');
+    //       AppAlert.alert('Required', 'Item is missing.');
     //       return;
     //     }
 
@@ -120,7 +121,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
     //       setDesigns(Array.isArray(data) ? data : []);
     //     } catch (error) {
     //       console.log('DESIGN LIST ERROR:', error?.response?.data || error.message);
-    //       Alert.alert('Error', 'Unable to load design list');
+    //       AppAlert.alert('Error', 'Unable to load design list');
     //       setDesigns([]);
     //     } finally {
     //       setLoading(false);
@@ -131,7 +132,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
     const loadDesigns = async () => {
         const yrno = yearno ? yearno.slice(-2) : '';
         if (!parsedSelectedItem?.ItmCode) {
-            Alert.alert('Required', 'Item is missing.');
+            AppAlert.alert('Required', 'Item is missing.');
             return;
         }
         try {
@@ -155,7 +156,7 @@ const SalesOrderGradeList = ({ navigation, route }) => {
             setDesigns(Array.isArray(data) ? data : []);
         } catch (error) {
             console.log('getgrade ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load grades');
+            AppAlert.alert('Error', 'Unable to load grades');
             setDesigns([]);
         } finally {
             setLoading(false);

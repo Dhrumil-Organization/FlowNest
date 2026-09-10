@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -48,10 +49,10 @@ const FabricQrScannerModal: React.FC<Props> = ({
         try {
             const result = permission?.granted ? permission : await requestPermission();
             if (!result?.granted) {
-                Alert.alert('Camera Permission Required', 'Allow camera access to scan fabric QR codes.');
+                AppAlert.alert('Camera Permission Required', 'Allow camera access to scan fabric QR codes.');
             }
         } catch (error) {
-            Alert.alert('Camera Error', 'Unable to request camera permission.');
+            AppAlert.alert('Camera Error', 'Unable to request camera permission.');
         }
     };
 

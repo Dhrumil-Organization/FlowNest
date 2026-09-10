@@ -13,7 +13,7 @@ import { RootStackParamList, TatAnalytics } from '../types';
 import { tatApi } from '../services/tatApi';
 import EmptyState from '../components/EmptyState';
 import HeaderBarwithBack from '../../components/HeaderBarwithBack/HeaderBarwithBack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { getCurrentFinancialYear } from '../../common/commonfunction';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TatAnalytics'>;

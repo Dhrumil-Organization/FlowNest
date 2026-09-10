@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useRef } from 'react';
 
 import { Text, View, TouchableOpacity, Alert, Modal } from 'react-native';
@@ -7,7 +8,7 @@ import PCAcard from './PCAcard';
 // import Icon from 'react-native-vector-icons/MaterialIcons';
 import CriteriaForm from './CriteriaForm';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
 import FullScreenLoader from '@/components/FullScreenLoader';
@@ -110,7 +111,7 @@ const ProcessCompleteAuth = (props) => {
 
             if (response.data.success === true && response.data.data.length === 0) {
 
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
 
                 setAllData([]);
 
@@ -120,13 +121,13 @@ const ProcessCompleteAuth = (props) => {
 
             } else if (response.data.success === false) {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
 
                 setAllData([]);
 
             } else {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
 
                 setAllData([]);
 
@@ -136,7 +137,7 @@ const ProcessCompleteAuth = (props) => {
 
             setIsLoading(false);
             setAllData([]);
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
 
         } finally {
 
@@ -211,22 +212,22 @@ const ProcessCompleteAuth = (props) => {
 
             if (response.data.success === true) {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
 
                 setAllData([]);
 
             } else if (response.data.success === false) {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
 
             } else {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
             }
 
         } catch (error) {
 
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
 
         } finally {
 

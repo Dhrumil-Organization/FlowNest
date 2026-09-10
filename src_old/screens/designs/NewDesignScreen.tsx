@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
@@ -43,7 +44,7 @@ export function NewDesignScreen() {
         };
         addMain(design);
         autoSave();
-        Alert.alert('Saved', `${code.trim()} added to the catalog.`, [
+        AppAlert.alert('Saved', `${code.trim()} added to the catalog.`, [
             { text: 'OK', onPress: () => router.back() },
         ]);
     };

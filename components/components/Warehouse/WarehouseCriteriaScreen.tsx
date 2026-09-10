@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
 import { fetchAllStoredata, fetchPropertyData } from '@/common/API/Functions';
 import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
 import Icon from "@expo/vector-icons/MaterialIcons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 import React, { useEffect, useState } from "react";
@@ -236,7 +237,7 @@ export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
 
     // const handlePreview = () => {
     //     if (!form.prpgroup) {
-    //         Alert.alert("Validation", "Property group is required");
+    //         AppAlert.alert("Validation", "Property group is required");
     //         return;
     //     }
 
@@ -250,15 +251,15 @@ export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
     const handlePreview = async () => {
 
         // if (!form.prpgroup) {
-        //     Alert.alert("Validation", "Property group is required");
+        //     AppAlert.alert("Validation", "Property group is required");
         //     return;
         // }
         if (!form.prpcode) {
-            Alert.alert("Validation", "Property is required");
+            AppAlert.alert("Validation", "Property is required");
             return;
         }
         if (!form.strcode) {
-            Alert.alert("Validation", "Store is required");
+            AppAlert.alert("Validation", "Store is required");
             return;
         }
         const userPtype = await AsyncStorage.getItem('user_prptype');
@@ -314,7 +315,7 @@ export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
 
             if (
                 !responseData || !Array.isArray(responseData) || responseData.length === 0) {
-                Alert.alert(
+                AppAlert.alert(
                     "No Data Found",
                     "No warehouse data available"
                 );
@@ -332,7 +333,7 @@ export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
                 e?.response?.data || e.message
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 "Error",
                 e?.response?.data?.message ||
                 "Failed to load dashboard"
@@ -384,7 +385,7 @@ export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
 
         if (!form.prpcode || !form.strcode) {
 
-            Alert.alert(
+            AppAlert.alert(
                 "Validation",
                 "Please select Property and Store"
             );
@@ -445,7 +446,7 @@ export default function WarehouseCriteriaScreen({ token, navigation, userid }) {
                 e?.response?.data || e.message
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 "Error",
                 e?.response?.data?.message || "Something went wrong"
             );

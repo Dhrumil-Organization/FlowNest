@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
 import SearchableDropdown from "@/Shared/SearchableDropdown";
@@ -237,7 +238,7 @@ const BeamClose: React.FC<Props> = ({
         } else {
             // ❌ mismatch case
             if (FormState.values.YearNo !== matchedYear.YearNo) {
-                Alert.alert(
+                AppAlert.alert(
                     "Error",
                     "Selected date does not match selected financial year"
                 );
@@ -334,7 +335,7 @@ const BeamClose: React.FC<Props> = ({
         const selectedYearName = selectedYearObj?.YearName || "N/A";
 
         if (!matchedYear || FormState.values.YearNo !== matchedYear.YearNo) {
-            Alert.alert(
+            AppAlert.alert(
                 "Warning",
                 `Checking Date (${formatDate(FormState.values.CheckingDate)}) belongs to FY (${calculatedFY}) but selected year is (${selectedYearName})`
             );
@@ -351,12 +352,12 @@ const BeamClose: React.FC<Props> = ({
 
             // ✅ VALIDATION
             if (!FormState.values.MacCode) {
-                Alert.alert("Warning", "Please select Machine");
+                AppAlert.alert("Warning", "Please select Machine");
                 return;
             }
 
             if (!FormState.values.DsnCode) {
-                Alert.alert("Warning", "Please select Design");
+                AppAlert.alert("Warning", "Please select Design");
                 return;
             }
 
@@ -430,15 +431,15 @@ const BeamClose: React.FC<Props> = ({
 
             // ✅ RESPONSE HANDLE
             if (response?.data?.success === false) {
-                Alert.alert("Warning", `${response?.data?.message}`);
+                AppAlert.alert("Warning", `${response?.data?.message}`);
             } else {
-                Alert.alert("Success", `${response?.data?.message}` || 'Saved successfully.');
+                AppAlert.alert("Success", `${response?.data?.message}` || 'Saved successfully.');
                 resetForm(); // form clear
             }
 
         } catch (error) {
             console.log("SAVE ERROR:", error);
-            Alert.alert("Error", "API Failed");
+            AppAlert.alert("Error", "API Failed");
         }
     };
 

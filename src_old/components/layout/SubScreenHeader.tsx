@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // SubScreenHeader — used by sub-screens (push screens) that need
 // a back button + sign out. Renders entirely in React, zero native
 // header involvement, so iOS can't add the capsule wrapper.
@@ -25,7 +26,7 @@ export function SubScreenHeader({ backLabel, title }: Props) {
     const logout = useAppSessionStore(s => s.logout);
 
     const signOut = () =>
-        Alert.alert('Sign out', 'Are you sure?', [
+        AppAlert.alert('Sign out', 'Are you sure?', [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
         ]);

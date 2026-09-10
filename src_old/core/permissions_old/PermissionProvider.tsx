@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { flattenPermissionRegistry } from '../../registry';
@@ -135,7 +136,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const requireAccess = useCallback(
     (resourcePath: string, message?: string) => {
       const allowed = canAccess(resourcePath);
-      if (!allowed) Alert.alert('Access denied', message || 'You do not have permission to open this section.');
+      if (!allowed) AppAlert.alert('Access denied', message || 'You do not have permission to open this section.');
       return allowed;
     },
     [canAccess],
@@ -144,7 +145,7 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const requireAction = useCallback(
     (resourcePath: string, actionKey: string, message?: string) => {
       const allowed = canDo(resourcePath, actionKey);
-      if (!allowed) Alert.alert('Permission required', message || 'You do not have permission for this action.');
+      if (!allowed) AppAlert.alert('Permission required', message || 'You do not have permission for this action.');
       return allowed;
     },
     [canDo],

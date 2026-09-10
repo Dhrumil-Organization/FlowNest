@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/beamClose/BeamCloseScreen.tsx
 // Migrated from BeamClose/index.tsx to the app's standard architecture.
 // Business logic (financial-year matching, validation, payload shape)
@@ -70,7 +71,7 @@ export function BeamCloseScreen({ token, isConnected = true }: Props) {
                     url: error?.config?.url,
                     baseURL: error?.config?.baseURL,
                 });
-                Alert.alert(
+                AppAlert.alert(
                     'Unable to load financial years',
                     serverMessage || (status ? `Server returned HTTP ${status}.` : 'Please check the API connection and try again.'),
                 );
@@ -196,7 +197,7 @@ export function BeamCloseScreen({ token, isConnected = true }: Props) {
         if (isFromPicker) {
             setFormState((prev) => ({ ...prev, values: { ...prev.values, YearNo: matchedYear.YearNo } }));
         } else if (FormState.values.YearNo !== matchedYear.YearNo) {
-            Alert.alert('Error', 'Selected date does not match selected financial year');
+            AppAlert.alert('Error', 'Selected date does not match selected financial year');
         }
     };
 
@@ -257,7 +258,7 @@ export function BeamCloseScreen({ token, isConnected = true }: Props) {
         const selectedYearName = selectedYearObj?.YearName || 'N/A';
 
         if (!matchedYear || FormState.values.YearNo !== matchedYear.YearNo) {
-            Alert.alert(
+            AppAlert.alert(
                 'Warning',
                 `Checking Date (${formatDate(FormState.values.CheckingDate)}) belongs to FY (${calculatedFY}) but selected year is (${selectedYearName})`,
             );
@@ -267,11 +268,11 @@ export function BeamCloseScreen({ token, isConnected = true }: Props) {
     };
 
     const handleSaveData = async () => {
-        if (!canSave) return Alert.alert('Not permitted', 'You do not have permission to add a beam close entry.');
+        if (!canSave) return AppAlert.alert('Not permitted', 'You do not have permission to add a beam close entry.');
         try {
             if (!validateFinancialYear()) return;
-            if (!FormState.values.MacCode) return Alert.alert('Warning', 'Please select Machine');
-            if (!FormState.values.DsnCode) return Alert.alert('Warning', 'Please select Design');
+            if (!FormState.values.MacCode) return AppAlert.alert('Warning', 'Please select Machine');
+            if (!FormState.values.DsnCode) return AppAlert.alert('Warning', 'Please select Design');
 
             const d1Obj = {
                 AvgWt: FormState.values.AvgWt || 0,
@@ -328,14 +329,14 @@ export function BeamCloseScreen({ token, isConnected = true }: Props) {
             const response = await BeamCloseAPI.addBeamClose(payload);
 
             if (response?.data?.success === false) {
-                Alert.alert('Warning', `${response?.data?.message}`);
+                AppAlert.alert('Warning', `${response?.data?.message}`);
             } else {
-                Alert.alert('Success', `${response?.data?.message}` || 'Saved successfully.');
+                AppAlert.alert('Success', `${response?.data?.message}` || 'Saved successfully.');
                 resetForm();
             }
         } catch (error) {
             console.log('SAVE ERROR:', error);
-            Alert.alert('Error', 'API Failed');
+            AppAlert.alert('Error', 'API Failed');
         }
     };
 

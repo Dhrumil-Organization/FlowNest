@@ -1,6 +1,6 @@
 import Footer from '@/components/Footer';
 import Receivables from '@/components/Receivables/index';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 

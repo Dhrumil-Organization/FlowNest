@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
     StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
@@ -234,7 +235,7 @@ function CostSheetPreviewModal({
         try {
             await Share.share({ message: shareText });
         } catch (e: any) {
-            Alert.alert('Share Error', e?.message || 'Unable to share costing');
+            AppAlert.alert('Share Error', e?.message || 'Unable to share costing');
         }
     };
 
@@ -553,7 +554,7 @@ function CostingTab({
                 await applyLatestSavedInputs(full);
             }
         } catch (e: any) {
-            Alert.alert('Error', e?.response?.data?.message || e.message || 'Unable to load design');
+            AppAlert.alert('Error', e?.response?.data?.message || e.message || 'Unable to load design');
         } finally {
             setDesignLoading(false);
         }
@@ -731,7 +732,7 @@ function CostingTab({
                         'REOPEN COSTING ERROR:',
                         e?.response?.data || e
                     );
-                    Alert.alert(
+                    AppAlert.alert(
                         'Unable to reopen costing',
                         e?.response?.data?.message ||
                         e?.message ||
@@ -769,7 +770,7 @@ function CostingTab({
             });
             setResult(res.data.data);
         } catch (e: any) {
-            Alert.alert('Compute Error', e.message);
+            AppAlert.alert('Compute Error', e.message);
         } finally {
             setComputing(false);
         }
@@ -783,14 +784,14 @@ function CostingTab({
     }, [mdId, priceMap, dyeMap, ydTiers, subTiers, params, adjust]);
 
     // const save = async () => {
-    //     if (!result) { Alert.alert('Compute first'); return; }
+    //     if (!result) { AppAlert.alert('Compute first'); return; }
     //     setSaving(true);
     //     try {
     //         await CostingAPI.save({ md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params });
-    //         Alert.alert('Saved ✓', 'Costing record saved to history');
+    //         AppAlert.alert('Saved ✓', 'Costing record saved to history');
     //         onSaved();
     //     } catch (e: any) {
-    //         Alert.alert('Error', e.message);
+    //         AppAlert.alert('Error', e.message);
     //     } finally {
     //         setSaving(false);
     //     }
@@ -798,7 +799,7 @@ function CostingTab({
 
     const save = async () => {
         if (!result) {
-            Alert.alert('Compute first');
+            AppAlert.alert('Compute first');
             return;
         }
         setSaving(true);
@@ -817,14 +818,14 @@ function CostingTab({
             const response = await CostingAPI.save(payload);
             console.log("SAVE RESPONSE:", response?.data);
             if (response?.data?.success) {
-                Alert.alert("Success", response.data.message);
+                AppAlert.alert("Success", response.data.message);
                 onSaved();
             } else {
-                Alert.alert("Error", response?.data?.message);
+                AppAlert.alert("Error", response?.data?.message);
             }
         } catch (e: any) {
             console.log("SAVE ERROR:", e?.response?.data || e);
-            Alert.alert("Error", e?.response?.data?.message || e?.message);
+            AppAlert.alert("Error", e?.response?.data?.message || e?.message);
         } finally {
             setSaving(false);
         }
@@ -2407,7 +2408,7 @@ function TempCostingTab() {
         try {
             await AsyncStorage.setItem(TEMP_STORAGE_KEY, JSON.stringify(rows.slice(0, 50)));
         } catch (e: any) {
-            Alert.alert('Temporary costing', e?.message || 'Unable to save temporary costing locally.');
+            AppAlert.alert('Temporary costing', e?.message || 'Unable to save temporary costing locally.');
         }
     }, []);
 
@@ -2468,7 +2469,7 @@ function TempCostingTab() {
 
     const saveTemp = async () => {
         if (!result) {
-            Alert.alert(
+            AppAlert.alert(
                 'Temporary costing',
                 'Enter Reed Space and at least one valid Warp and Weft yarn before saving.'
             );
@@ -2485,7 +2486,7 @@ function TempCostingTab() {
                 result: JSON.parse(JSON.stringify(result)),
             };
             await persistSaved([rec, ...saved]);
-            Alert.alert('Temporary costing', 'Temporary costing saved on this device.');
+            AppAlert.alert('Temporary costing', 'Temporary costing saved on this device.');
         } finally {
             setSavingTemp(false);
         }
@@ -2512,7 +2513,7 @@ function TempCostingTab() {
         try {
             await Share.share({ message: lines.join('\n') });
         } catch (e: any) {
-            Alert.alert('Share Error', e?.message || 'Unable to share temporary costing.');
+            AppAlert.alert('Share Error', e?.message || 'Unable to share temporary costing.');
         }
     };
 
@@ -3116,7 +3117,7 @@ function HistoryTab({
         } catch (e: any) {
             console.log('history error', e?.response?.data || e);
 
-            Alert.alert(
+            AppAlert.alert(
                 'History Error',
                 e?.response?.data?.message ||
                 e?.message ||
@@ -3949,7 +3950,7 @@ function VarianceTab() {
                 e?.response?.data || e
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 e?.response?.data?.message ||
                 e?.message ||

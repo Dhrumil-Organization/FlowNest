@@ -7,7 +7,7 @@ import {
   TextInput, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useExpenseData } from '../useExpenseData';
 
 const { width: SCREEN_W } = Dimensions.get('window');

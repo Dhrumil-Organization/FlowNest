@@ -10,7 +10,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 // import { API } from '../../common/API/dynamicAPI';
 // import Snackbar from '@/common/utils/snackbarCompat';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 const { height } = Dimensions.get('window');

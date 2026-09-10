@@ -1,6 +1,6 @@
 // // common/API/Functions.ts
 
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import axios from 'axios';
 // // import RNFS from 'react-native-fs';
 // import * as FileSystem from 'expo-file-system';
@@ -1468,7 +1468,7 @@
 
 // common/API/Functions.ts
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 // import RNFS from 'react-native-fs';
 // import * as FileSystem from 'expo-file-system';

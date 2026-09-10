@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
@@ -11,7 +12,7 @@ import { yarnmanagementsystemstyle } from '@/common/Style';
 import { API, PRINTSTICKER, PRINTERSLISTAPI } from '@/common/API/dynamicAPI';
 import HeaderBarwithBack from '@/components/Header';
 // import { ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import CustomDrawer from './CustomDrawer';
 import AddWeftIssueDetail from './AddWeftIssueDetail';
 import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
@@ -310,7 +311,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     //             setIsEditMode(true);
     //             setMainUId(item.UId);
     //         } else {
-    //             Alert.alert("Error", "No data found");
+    //             AppAlert.alert("Error", "No data found");
     //         }
 
     //     } catch (err) {
@@ -483,7 +484,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
                 setMainUId(item.UId);
                 // setIsDetailVisible(true);
             } else {
-                Alert.alert("Error", "No data found");
+                AppAlert.alert("Error", "No data found");
             }
 
         } catch (err) {
@@ -639,7 +640,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     }
 
     const confirmDelete = (item) => {
-        Alert.alert(
+        AppAlert.alert(
             "Delete Creel",
             `Are you sure you want to delete this ${item.BeamNo}?`,
             [

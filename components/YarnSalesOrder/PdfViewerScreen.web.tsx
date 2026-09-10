@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState } from 'react';
 import {
   View,
@@ -32,7 +33,7 @@ export default function PdfViewerScreen() {
 
   const downloadPdf = () => {
     if (!pdfUrl) {
-      Alert.alert('Error', 'PDF URL not found');
+      AppAlert.alert('Error', 'PDF URL not found');
       return;
     }
 
@@ -53,7 +54,7 @@ export default function PdfViewerScreen() {
       document.body.removeChild(link);
     } catch (error) {
       console.error('WEB PDF DOWNLOAD ERROR:', error);
-      Alert.alert('Error', 'Unable to download PDF');
+      AppAlert.alert('Error', 'Unable to download PDF');
     } finally {
       setDownloading(false);
     }
@@ -61,7 +62,7 @@ export default function PdfViewerScreen() {
 
   const sharePdf = async () => {
     if (!pdfUrl) {
-      Alert.alert('Error', 'PDF URL not found');
+      AppAlert.alert('Error', 'PDF URL not found');
       return;
     }
 
@@ -80,7 +81,7 @@ export default function PdfViewerScreen() {
 
       try {
         await navigator.clipboard?.writeText(pdfUrl);
-        Alert.alert(
+        AppAlert.alert(
           'PDF Link Copied',
           'PDF link has been copied to clipboard.'
         );

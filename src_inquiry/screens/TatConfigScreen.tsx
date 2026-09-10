@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -12,7 +13,7 @@ import {
 } from 'react-native';
 
 import HeaderBarwithBack from '@/components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import Button from '../components/Button';
 import { tatApi } from '../services/tatApi';
 import { RootStackParamList, TatConfiguration } from '../types';
@@ -70,7 +71,7 @@ const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
           })),
         );
       } catch {
-        Alert.alert('Error', 'Failed to load TAT configurations');
+        AppAlert.alert('Error', 'Failed to load TAT configurations');
       } finally {
         setLoading(false);
       }
@@ -86,11 +87,11 @@ const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
       const hrs = parseInt(r._expectedHours, 10);
       const pct = parseInt(r._warningPct, 10);
       if (isNaN(hrs) || hrs < 1) {
-        Alert.alert('Invalid', `Enter valid hours for "${r.step_name}"`);
+        AppAlert.alert('Invalid', `Enter valid hours for "${r.step_name}"`);
         return;
       }
       if (isNaN(pct) || pct < 1 || pct > 100) {
-        Alert.alert('Invalid', `Warning % must be 1–100 for "${r.step_name}"`);
+        AppAlert.alert('Invalid', `Warning % must be 1–100 for "${r.step_name}"`);
         return;
       }
     }
@@ -105,11 +106,11 @@ const TatConfigScreen: React.FC<Props> = ({ navigation, username }) => {
         getUserPrptype,
         "27"
       );
-      Alert.alert('Saved', 'TAT configurations updated successfully', [
+      AppAlert.alert('Saved', 'TAT configurations updated successfully', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }

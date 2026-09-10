@@ -1,4 +1,4 @@
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import * as SQLite from 'expo-sqlite';
 // import { API } from '../../common/API/dynamicAPI';
 // import { getCurrentFinancialYear } from '../../common/commonfunction';
@@ -706,7 +706,7 @@
 
 // export default getDb;
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import * as SQLite from "expo-sqlite";
 import { API } from "../../common/API/dynamicAPI";
 import { getCurrentFinancialYear } from "../../common/commonfunction";

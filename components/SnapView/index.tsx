@@ -1,7 +1,8 @@
+import AppAlert from '@/common/utils/appAlert';
 // MonthlyExpenseReport.tsx
 import { API } from '@/common/API/dynamicAPI';
 import HeaderBarwithBackWebUI from '@/components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -116,7 +117,7 @@ const SnapView: React.FC<Props> = ({ token, deviceId, username }) => {
     setError(nativeEvent.description || 'Failed to load page');
     // optional alert
     if (__DEV__) {
-      Alert.alert('WebView error', nativeEvent.description || 'Failed to load page');
+      AppAlert.alert('WebView error', nativeEvent.description || 'Failed to load page');
     }
   };
 

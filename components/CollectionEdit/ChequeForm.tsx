@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // ChequeForm.tsx (updated with initial blocking modal)
 import React, { useMemo, useState, useEffect } from 'react';
 import {
@@ -23,7 +24,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownType from '@/Shared/PartyDropdownType';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import PartyDropdownAdj from '@/Shared/PartyDropdownAdj';
 
 interface PropertyData {
@@ -353,7 +354,7 @@ const ChequeForm: React.FC<Props> = ({
 
     // gallery pick -> set form.attachment
     // const pickFromGallery = async () => {
-    //     // if (!isConnected) return Alert.alert('Offline', 'You are offline.');
+    //     // if (!isConnected) return AppAlert.alert('Offline', 'You are offline.');
     //     try {
     //         const res = await launchImageLibrary({
     //             mediaType: 'photo',
@@ -379,13 +380,13 @@ const ChequeForm: React.FC<Props> = ({
     //     }
     // };
     const pickFromGallery = async () => {
-        // if (!isConnected) return Alert.alert('Offline', 'You are offline.');
+        // if (!isConnected) return AppAlert.alert('Offline', 'You are offline.');
 
         try {
             // Request media library permissions
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Please allow access to the gallery to select an image.');
+                AppAlert.alert('Permission Required', 'Please allow access to the gallery to select an image.');
                 return;
             }
 
@@ -413,7 +414,7 @@ const ChequeForm: React.FC<Props> = ({
             }
         } catch (err) {
             console.log("Gallery error:", err);
-            Alert.alert('Error', 'Failed to pick image.');
+            AppAlert.alert('Error', 'Failed to pick image.');
         }
     };
 
@@ -442,28 +443,28 @@ const ChequeForm: React.FC<Props> = ({
             const numericAmount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
 
             if (!payType || String(payType).trim() === '') {
-                Alert.alert('Validation', 'Please select Payment Type.');
+                AppAlert.alert('Validation', 'Please select Payment Type.');
                 return;
             }
             if ((!accCode || String(accCode).trim() === '') && !isPLN) {
-                Alert.alert('Validation', 'Please select Party.');
+                AppAlert.alert('Validation', 'Please select Party.');
                 return;
             }
             if ((!accName || String(accName).trim() === '') && isPLN) {
-                Alert.alert('Validation', 'Please Enter Party.');
+                AppAlert.alert('Validation', 'Please Enter Party.');
                 return;
             }
             if (!amountRaw || numericAmount <= 0) {
-                Alert.alert('Validation', 'Please enter a valid Amount greater than 0.');
+                AppAlert.alert('Validation', 'Please enter a valid Amount greater than 0.');
                 return;
             }
             if (!bankName || String(bankName).trim() === '') {
                 console.log('Payment::', form.PayType);
                 if (form.PayType == 'NEFT' || form.PayType == 'RTGS') {
-                    // Alert.alert('Validation', 'Please select Bank.');
+                    // AppAlert.alert('Validation', 'Please select Bank.');
                     // return;
                 } else {
-                    Alert.alert('Validation', 'Please select Bank.');
+                    AppAlert.alert('Validation', 'Please select Bank.');
                     return;
                 }
             }
@@ -527,9 +528,9 @@ const ChequeForm: React.FC<Props> = ({
                 ...form,
                 AdjType,
             });
-            // Alert.alert("Saved", "Part 1 saved");
+            // AppAlert.alert("Saved", "Part 1 saved");
         } catch (err) {
-            Alert.alert("Error", `${err.response?.data?.message || err.message || err || 'Save failed'}`);
+            AppAlert.alert("Error", `${err.response?.data?.message || err.message || err || 'Save failed'}`);
         }
     };
 
@@ -537,10 +538,10 @@ const ChequeForm: React.FC<Props> = ({
         // example behavior preserved
         try {
             await onSavePart2?.({ ...form, AdjType });
-            // Alert.alert('Saved', 'Form saved');
+            // AppAlert.alert('Saved', 'Form saved');
         } catch (err) {
             // console.error(err);
-            Alert.alert("Error", `${err.response?.data?.message || err.message || err || 'Save failed'}`);
+            AppAlert.alert("Error", `${err.response?.data?.message || err.message || err || 'Save failed'}`);
         }
     };
 
@@ -564,11 +565,11 @@ const ChequeForm: React.FC<Props> = ({
     const handleInitialOk = async () => {
         // client-side validation
         if (!form.PrpCode) {
-            Alert.alert('Validation', 'Please select a Property.');
+            AppAlert.alert('Validation', 'Please select a Property.');
             return;
         }
         if (!form.EDate) {
-            Alert.alert('Validation', 'Please select collection date.');
+            AppAlert.alert('Validation', 'Please select collection date.');
             return;
         }
 
@@ -580,7 +581,7 @@ const ChequeForm: React.FC<Props> = ({
             // after await, parent should setInitialModalVisible(false) and clear initialLoading
         } catch (err) {
             console.error('[ChequeForm] ShowChequeData error', err);
-            Alert.alert('Error', 'Could not fetch cheque data.');
+            AppAlert.alert('Error', 'Could not fetch cheque data.');
         }
     };
 
@@ -1002,7 +1003,7 @@ const ChequeForm: React.FC<Props> = ({
 
                                         // Check if TDS Amount exceeds Amount or is negative
                                         if (tdsValue > amountValue || tdsValue < 0) {
-                                            Alert.alert('Validation', 'TDS Amount cannot exceed Amount or be negative.');
+                                            AppAlert.alert('Validation', 'TDS Amount cannot exceed Amount or be negative.');
                                             setForm(prev => ({ ...prev, TDSAmt: '0' }));
                                         } else {
                                             setForm(prev => ({ ...prev, TDSAmt: validatedValue }));
@@ -1059,7 +1060,7 @@ const ChequeForm: React.FC<Props> = ({
 
                                         // Check if Discount Amount exceeds Amount or is negative
                                         if (disValue > amountValue || disValue < 0) {
-                                            Alert.alert('Validation', 'Discount Amount cannot exceed Amount or be negative.');
+                                            AppAlert.alert('Validation', 'Discount Amount cannot exceed Amount or be negative.');
                                             setForm(prev => ({ ...prev, DisAmt: '0' }));
                                         } else {
                                             setForm(prev => ({ ...prev, DisAmt: validatedValue }));

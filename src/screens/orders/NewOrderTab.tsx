@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { T } from '../../theme';
@@ -9,7 +10,7 @@ import { CUSTOMERS } from '../../data/seeds';
 import type { SalesOrder, FabricType } from '../../types';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, FlatList, StatusBar } from 'react-native';
 import { SalesOrderAPI } from '@/src/api/legacyClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useMobileUserPreference } from '@/hooks/useMobileUserPreference';
 import { fetchAllPropertyData, fetchPropertyData } from '@/src/api/legacyFunctions';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -377,7 +378,7 @@ export function NewOrderTab({ token, userid }: Props) {
         );
 
         if (alreadyAdded) {
-            Alert.alert(
+            AppAlert.alert(
                 'Already added',
                 `${selectedShade?.ShdName ?? selectedShade?.label ?? 'This shade'} is already in the list.`
             );
@@ -795,52 +796,52 @@ export function NewOrderTab({ token, userid }: Props) {
         // Final validation
         // -----------------------------
         if (!prpcode) {
-            Alert.alert('Required', 'Select a property first');
+            AppAlert.alert('Required', 'Select a property first');
             return;
         }
 
         if (!yearno) {
-            Alert.alert('Required', 'Select a year');
+            AppAlert.alert('Required', 'Select a year');
             return;
         }
 
         if (!custId) {
-            Alert.alert('Required', 'Select a customer');
+            AppAlert.alert('Required', 'Select a customer');
             return;
         }
 
         if (!salesExecId) {
-            Alert.alert('Required', 'Select a sales executive');
+            AppAlert.alert('Required', 'Select a sales executive');
             return;
         }
 
         if (!selectedDesign) {
-            Alert.alert('Required', 'Select an item');
+            AppAlert.alert('Required', 'Select an item');
             return;
         }
 
         if (!selectedItem) {
-            Alert.alert('Required', 'Select a design');
+            AppAlert.alert('Required', 'Select a design');
             return;
         }
 
         if (!mdId) {
-            Alert.alert('Required', 'Select a design');
+            AppAlert.alert('Required', 'Select a design');
             return;
         }
 
         if (!price || Number(price) <= 0) {
-            Alert.alert('Required', 'Enter price per metre');
+            AppAlert.alert('Required', 'Enter price per metre');
             return;
         }
 
         if (!delivDate) {
-            Alert.alert('Required', 'Select expected delivery date');
+            AppAlert.alert('Required', 'Select expected delivery date');
             return;
         }
 
         if (validColourways.length === 0) {
-            Alert.alert('Required', 'Add at least one shade');
+            AppAlert.alert('Required', 'Add at least one shade');
             return;
         }
 
@@ -872,7 +873,7 @@ export function NewOrderTab({ token, userid }: Props) {
                     ).trim() === duplicateShade
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 'Duplicate Shade',
                 `${duplicateRow?.shade?.ShdName ?? duplicateRow?.shade?.label ?? duplicateShade} is already added. Please select another shade.`
             );
@@ -1131,7 +1132,7 @@ export function NewOrderTab({ token, userid }: Props) {
                 // Success screen must remain visible until user taps New Order.
                 setSuccessSO(String(savedSO));
             } else {
-                Alert.alert(
+                AppAlert.alert(
                     'Save Failed',
                     res?.data?.message ||
                     res?.data?.response?.message ||
@@ -1144,7 +1145,7 @@ export function NewOrderTab({ token, userid }: Props) {
                 e?.response?.data ?? e
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 e?.response?.data?.message ||
                 e?.response?.data?.response?.message ||

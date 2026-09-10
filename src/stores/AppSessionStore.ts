@@ -3,7 +3,7 @@
 // Session + permission store for Sudamo mobile platform.
 // ─────────────────────────────────────────────────────────────
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { router } from 'expo-router';
 import { create } from 'zustand';
 import type { AppPermissionScreen, AppSession } from '../api/client';

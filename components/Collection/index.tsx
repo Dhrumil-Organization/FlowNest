@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -10,7 +11,7 @@ import {
     Modal,
 } from 'react-native';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import HeaderBarwithBack from '@/components/Header';
 import ChequeForm from './ChequeForm';
 import { useRouter } from 'expo-router';
@@ -532,11 +533,11 @@ const Collection: React.FC<Props> = ({
                     d1: d1
                 }));
             } else if (response.data.success == false) {
-                Alert.alert('Error', `${response.data.success}`);
+                AppAlert.alert('Error', `${response.data.success}`);
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `${error.response?.data?.message || error.message || 'Server error'}`);
+                AppAlert.alert('Error', `${error.response?.data?.message || error.message || 'Server error'}`);
             }
         } finally {
             setInitialLoading(false);
@@ -589,7 +590,7 @@ const Collection: React.FC<Props> = ({
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setInitialLoading(false);
@@ -688,7 +689,7 @@ const Collection: React.FC<Props> = ({
             setAdjLoading(false);
             setAdjData([]);
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         }
     };
@@ -742,7 +743,7 @@ const Collection: React.FC<Props> = ({
         } catch (error) {
             if (!axios.isCancel(error)) {
                 setPaymentLoading(false);
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         }
     };
@@ -807,7 +808,7 @@ const Collection: React.FC<Props> = ({
 
                 if (setAmtSum > amount) {
                     setSaveLoading(false);
-                    Alert.alert(
+                    AppAlert.alert(
                         "Validation Error",
                         "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
                         [{ text: "OK" }]
@@ -902,7 +903,7 @@ const Collection: React.FC<Props> = ({
                 // Check if sum > Amount
                 if (setAmtSum > amount) {
                     setSaveLoading(false);
-                    Alert.alert(
+                    AppAlert.alert(
                         "Validation Error",
                         "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
                         [{ text: "OK" }]

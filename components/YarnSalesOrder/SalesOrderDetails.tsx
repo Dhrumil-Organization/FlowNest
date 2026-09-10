@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -125,32 +126,32 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
   // const onSave = () => {
   //   if (!selectedItem?.ItmCode) {
-  //     Alert.alert('Required', 'Item missing');
+  //     AppAlert.alert('Required', 'Item missing');
   //     return;
   //   }
 
   //   if (!selectedGrade?.GrdCode) {
-  //     Alert.alert('Required', 'Grade missing');
+  //     AppAlert.alert('Required', 'Grade missing');
   //     return;
   //   }
 
   //   // if (!selectedShade?.ShdCode) {
-  //   //   Alert.alert('Required', 'Shade missing');
+  //   //   AppAlert.alert('Required', 'Shade missing');
   //   //   return;
   //   // }
 
   //   if (!selectedShade || selectedShade.length === 0) {
-  //     Alert.alert('Required', 'Please select shade');
+  //     AppAlert.alert('Required', 'Please select shade');
   //     return;
   //   }
 
   //   if (num(qty) <= 0) {
-  //     Alert.alert('Required', 'Enter valid qty');
+  //     AppAlert.alert('Required', 'Enter valid qty');
   //     return;
   //   }
 
   //   if (num(rate) <= 0) {
-  //     Alert.alert('Required', 'Enter valid rate');
+  //     AppAlert.alert('Required', 'Enter valid rate');
   //     return;
   //   }
 
@@ -215,7 +216,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
   //     );
 
   //     if (existsIndex >= 0) {
-  //       Alert.alert(
+  //       AppAlert.alert(
   //         'Duplicate Shade',
   //         'This shade is already added for same item and design.',
   //       );
@@ -252,28 +253,28 @@ const SalesOrderDetails = ({ navigation, route }) => {
   // const onSave = () => {
 
   //   if (!selectedItem?.ItmCode) {
-  //     Alert.alert('Required', 'Item missing');
+  //     AppAlert.alert('Required', 'Item missing');
   //     return;
   //   }
 
   //   if (!selectedGrade?.GrdCode) {
-  //     Alert.alert('Required', 'Grade missing');
+  //     AppAlert.alert('Required', 'Grade missing');
   //     return;
   //   }
 
   //   // MULTIPLE SHADE VALIDATION
   //   if (!selectedShade || selectedShade.length === 0) {
-  //     Alert.alert('Required', 'Please select shade');
+  //     AppAlert.alert('Required', 'Please select shade');
   //     return;
   //   }
 
   //   if (num(qty) <= 0) {
-  //     Alert.alert('Required', 'Enter valid qty');
+  //     AppAlert.alert('Required', 'Enter valid qty');
   //     return;
   //   }
 
   //   if (num(rate) <= 0) {
-  //     Alert.alert('Required', 'Enter valid rate');
+  //     AppAlert.alert('Required', 'Enter valid rate');
   //     return;
   //   }
 
@@ -472,28 +473,28 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
   const onSave = () => {
     if (!parsedSelectedItem?.ItmCode) {
-      Alert.alert('Required', 'Item missing');
+      AppAlert.alert('Required', 'Item missing');
       return;
     }
 
     if (!parsedSelectedGrade?.GrdCode) {
-      Alert.alert('Required', 'Grade missing');
+      AppAlert.alert('Required', 'Grade missing');
       return;
     }
 
     // Use parsedSelectedShade
     if (!parsedSelectedShade || parsedSelectedShade.length === 0) {
-      Alert.alert('Required', 'Please select shade');
+      AppAlert.alert('Required', 'Please select shade');
       return;
     }
 
     if (num(qty) <= 0) {
-      Alert.alert('Required', 'Enter valid qty');
+      AppAlert.alert('Required', 'Enter valid qty');
       return;
     }
 
     if (num(rate) <= 0) {
-      Alert.alert('Required', 'Enter valid rate');
+      AppAlert.alert('Required', 'Enter valid rate');
       return;
     }
 
@@ -693,7 +694,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
   //     console.log('get stock ERROR:', error?.response?.data || error.message);
 
-  //     Alert.alert('Error', 'Unable to get stock');
+  //     AppAlert.alert('Error', 'Unable to get stock');
 
   //   } finally {
 
@@ -774,7 +775,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
       setIsDyeing(totalQty > 0 ? 1 : 0);
     } catch (error) {
       console.log('get stock ERROR:', error?.response?.data || error.message);
-      Alert.alert(
+      AppAlert.alert(
         'Error',
         `Unable to get stock. Error: ${error?.response?.data?.message || error.message}`
       );

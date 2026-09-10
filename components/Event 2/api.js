@@ -7,7 +7,7 @@
 //   npm install axios
 
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { API } from '../../common/API/dynamicAPI';
 
 // Your Laravel API base URL

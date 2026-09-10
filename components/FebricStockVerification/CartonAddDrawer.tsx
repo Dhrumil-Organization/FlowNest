@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
@@ -292,7 +293,7 @@ const CartonAddDrawer = (props) => {
 
             if (response.data.success === true && response.data.response.data.length === 0) {
 
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
             } else if (response.data.success === true && response.data.response.data.length > 0) {
                 if (newdata && newdata.length > 0) {
 
@@ -328,13 +329,13 @@ const CartonAddDrawer = (props) => {
 
             } else if (response.data.success === false) {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
             } else {
 
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
             }
         } catch (error) {
-            Alert.alert('Server Error :' + error)
+            AppAlert.alert('Server Error :' + error)
         } finally {
             setLoading(false)
             onClose()
@@ -491,19 +492,19 @@ const CartonAddDrawer = (props) => {
             try {
                 const response = await axios.post(`${API}/api/insert_verify_manual_fabric_stock`, payload, { headers });
                 if (response.data.success === true && response.data.data.length === 0) {
-                    Alert.alert('No Data Found');
+                    AppAlert.alert('No Data Found');
                 } else if (response.data.success === true && response.data.data.length > 0) {
                     setAllStockDataInserted(getAllStockDataInserted => [...getAllStockDataInserted, response.data.data[0]])
                     const mergedata = response.data.data.concat(getAllStockDataInserted);
                     handleStockData(mergedata)
                     //onClose()
                 } else if (response.data.success === false) {
-                    Alert.alert(`${response.data.message}`);
+                    AppAlert.alert(`${response.data.message}`);
                 } else {
-                    Alert.alert(`${response.data.message}`);
+                    AppAlert.alert(`${response.data.message}`);
                 }
             } catch (error) {
-                Alert.alert('Server Error :' + error)
+                AppAlert.alert('Server Error :' + error)
             } finally {
                 setLoading(false)
             }

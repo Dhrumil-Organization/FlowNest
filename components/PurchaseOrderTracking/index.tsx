@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Dimensions, ActivityIndicator, Alert, ScrollView, Modal, TextInput } from 'react-native';
@@ -10,7 +11,7 @@ import { API } from '../../common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import { LinearGradient } from 'expo-linear-gradient';
 // import data from './data.json';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { crlimtreq_styles } from '../../common/Styles/Style';
 import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
@@ -185,7 +186,7 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
         }
@@ -329,12 +330,12 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
                 }
 
             } else {
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setsalesdata([]);
                 setsalessumdata([]);
             }
         } catch (error) {
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
             setsalesdata([]);
             setsalessumdata([]);
         } finally {
@@ -401,12 +402,12 @@ const PurchaseOrderTracking: React.FC<{ token: string, username: string }> = ({ 
                 }
 
             } else {
-                Alert.alert(`${response12.data.message}`);
+                AppAlert.alert(`${response12.data.message}`);
                 // setsalesdata([]);
                 // setsalessumdata([]);
             }
         } catch (error) {
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
             // setsalesdata([]);
             // setsalessumdata([]);
         } finally {

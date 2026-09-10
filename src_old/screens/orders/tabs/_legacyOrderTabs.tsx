@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/orders/tabs/_legacyOrderTabs.tsx
 // ─────────────────────────────────────────────────────────────────────────
 // TEMPORARY — NOT YET MIGRATED. This file is AuthTab, TrackingTab, and
@@ -12,7 +13,7 @@
 // the root screen are fully converted; these three are next. Delete this
 // file once all three are migrated into their own proper files.
 // ─────────────────────────────────────────────────────────────────────────
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -268,12 +269,12 @@ function AuthTab({ token }) {
 
             if (res.data?.success) {
                 load();
-                Alert.alert('Done', `Order ${action}d successfully`);
+                AppAlert.alert('Done', `Order ${action}d successfully`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Action failed');
+                AppAlert.alert('Failed', res.data?.message || 'Action failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setApproving(null);
         }
@@ -838,7 +839,7 @@ function TrackingTab({ token }) {
         const enteredQty = Number(totalDispatchQty || 0);
 
         if (enteredQty > pendingQty) {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation',
                 `Dispatch Qty cannot exceed Pending Qty (${pendingQty.toFixed(3)} m)`
             );
@@ -849,7 +850,7 @@ function TrackingTab({ token }) {
             .filter((sh) => dispChecked[sh.ShdCode] && num(dispQtys[sh.ShdCode]) > 0)
             .map((sh) => ({ ShdCode: sh.ShdCode, Qty: num(dispQtys[sh.ShdCode]) }));
         if (items.length === 0) {
-            Alert.alert('Required', 'Enter at least one dispatch quantity');
+            AppAlert.alert('Required', 'Enter at least one dispatch quantity');
             return;
         }
         try {
@@ -863,12 +864,12 @@ function TrackingTab({ token }) {
             if (res.data?.success) {
                 setDispItem(null);
                 load();
-                Alert.alert('Done', 'Dispatched successfully');
+                AppAlert.alert('Done', 'Dispatched successfully');
             } else {
-                Alert.alert('Failed', res.data?.message || 'Dispatch failed');
+                AppAlert.alert('Failed', res.data?.message || 'Dispatch failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setDispatching(false);
         }
@@ -923,12 +924,12 @@ function TrackingTab({ token }) {
                 setConfirmItem(null);
                 setConfirmShadeRow(null);
                 load();
-                Alert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
+                AppAlert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Could not confirm shade');
+                AppAlert.alert('Failed', res.data?.message || 'Could not confirm shade');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setConfirmSaving(false);
         }
@@ -958,9 +959,9 @@ function TrackingTab({ token }) {
     const copyJobChart = () => {
         try {
             Clipboard.setString(buildJobChartText(jobItem));
-            Alert.alert('Copied', 'Job chart copied to clipboard');
+            AppAlert.alert('Copied', 'Job chart copied to clipboard');
         } catch (e) {
-            Alert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
+            AppAlert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
         }
     };
 

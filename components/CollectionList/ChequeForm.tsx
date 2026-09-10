@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // ChequeForm.tsx (updated with initial blocking modal)
 import React, { useMemo, useState, useEffect } from 'react';
 import {
@@ -220,7 +221,7 @@ const ChequeForm: React.FC<Props> = ({
 
     // gallery pick -> set form.attachment
     // const pickFromGallery = async () => {
-    //     if (!isConnected) return Alert.alert('Offline', 'You are offline.');
+    //     if (!isConnected) return AppAlert.alert('Offline', 'You are offline.');
     //     try {
     //         const res = await launchImageLibrary({
     //             mediaType: 'photo',
@@ -246,13 +247,13 @@ const ChequeForm: React.FC<Props> = ({
     //     }
     // };
     const pickFromGallery = async () => {
-        // if (!isConnected) return Alert.alert('Offline', 'You are offline.');
+        // if (!isConnected) return AppAlert.alert('Offline', 'You are offline.');
 
         try {
             // Request media library permissions
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Please allow access to the gallery to select an image.');
+                AppAlert.alert('Permission Required', 'Please allow access to the gallery to select an image.');
                 return;
             }
 
@@ -280,7 +281,7 @@ const ChequeForm: React.FC<Props> = ({
             }
         } catch (err) {
             console.log("Gallery error:", err);
-            Alert.alert('Error', 'Failed to pick image.');
+            AppAlert.alert('Error', 'Failed to pick image.');
         }
     };
 
@@ -313,9 +314,9 @@ const ChequeForm: React.FC<Props> = ({
                 ...form,
                 AdjType,
             });
-            Alert.alert("Saved", "Part 1 saved");
+            AppAlert.alert("Saved", "Part 1 saved");
         } catch (err) {
-            Alert.alert("Error", "Could not save part1");
+            AppAlert.alert("Error", "Could not save part1");
         }
     };
 
@@ -323,10 +324,10 @@ const ChequeForm: React.FC<Props> = ({
         // example behavior preserved
         try {
             await onSavePart2?.({ ...form, AdjType });
-            Alert.alert('Saved', 'Form saved');
+            AppAlert.alert('Saved', 'Form saved');
         } catch (err) {
             console.error(err);
-            Alert.alert('Error', 'Could not save part 2');
+            AppAlert.alert('Error', 'Could not save part 2');
         }
     };
 
@@ -350,11 +351,11 @@ const ChequeForm: React.FC<Props> = ({
     const handleInitialOk = async () => {
         // client-side validation
         if (!form.PrpCode) {
-            Alert.alert('Validation', 'Please select a Property.');
+            AppAlert.alert('Validation', 'Please select a Property.');
             return;
         }
         if (!form.EDate) {
-            Alert.alert('Validation', 'Please select collection date.');
+            AppAlert.alert('Validation', 'Please select collection date.');
             return;
         }
 
@@ -366,7 +367,7 @@ const ChequeForm: React.FC<Props> = ({
             // after await, parent should setInitialModalVisible(false) and clear initialLoading
         } catch (err) {
             console.error('[ChequeForm] ShowChequeData error', err);
-            Alert.alert('Error', 'Could not fetch cheque data.');
+            AppAlert.alert('Error', 'Could not fetch cheque data.');
         }
     };
 

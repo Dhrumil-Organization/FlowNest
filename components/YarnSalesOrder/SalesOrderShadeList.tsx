@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -104,12 +105,12 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
     // const loadShades = async () => {
     //     if (!selectedItem?.ItmCode) {
-    //         Alert.alert('Required', 'Item is missing.');
+    //         AppAlert.alert('Required', 'Item is missing.');
     //         return;
     //     }
 
     //     if (!selectedGrade?.DsnCode) {
-    //         Alert.alert('Required', 'Design is missing.');
+    //         AppAlert.alert('Required', 'Design is missing.');
     //         return;
     //     }
 
@@ -159,7 +160,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
     //         }
     //     } catch (error) {
     //         console.log('SHADE LIST ERROR:', error?.response?.data || error.message);
-    //         Alert.alert('Error', 'Unable to load shade list');
+    //         AppAlert.alert('Error', 'Unable to load shade list');
     //         setShades([]);
     //     } finally {
     //         setLoading(false);
@@ -171,7 +172,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
         const yrno = yearno ? yearno.slice(-2) : '';
 
         if (!parsedSelectedItem?.ItmCode) {          // instead of selectedItem?.ItmCode
-            Alert.alert('Required', 'Item is missing.');
+            AppAlert.alert('Required', 'Item is missing.');
             return;
         }
 
@@ -202,7 +203,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
             setShades(Array.isArray(data) ? data : []);
         } catch (error) {
             console.log('getmobshade LIST ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load shade list');
+            AppAlert.alert('Error', 'Unable to load shade list');
             setShades([]);
         } finally {
             setLoading(false);
@@ -287,7 +288,7 @@ const SalesOrderShadeList = ({ navigation, route }) => {
 
     // const onNext = () => {
     //     // if (!selectedShade?.ShdCode) {
-    //     //     Alert.alert('Required', 'Please select shade.');
+    //     //     AppAlert.alert('Required', 'Please select shade.');
     //     //     return;
     //     // }
 

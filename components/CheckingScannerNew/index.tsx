@@ -1,10 +1,11 @@
+import AppAlert from '@/common/utils/appAlert';
 import CustomPicker from '@/common/CustomPicker';
 import { checkingScannerStyles } from '@/common/Style';
 import { showError, showSuccess } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
@@ -196,7 +197,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
             sendScannedValue(value);
         } catch {
             resetScanFields();
-            Alert.alert('Invalid QR', 'QR format not valid');
+            AppAlert.alert('Invalid QR', 'QR format not valid');
         }
         setIsScanning(false);
     };
@@ -384,7 +385,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
             if (response.data.success && response.data.response.design) {
                 setData(response.data.response.design);
             } else {
-                Alert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
+                AppAlert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
             }
         } catch (error) {
             console.log('API sendScannedValue error:', error);
@@ -427,10 +428,10 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                 } else {
                     setDesigndata([]);
                     setWarpLen('0');
-                    Alert.alert('No Data Found');
+                    AppAlert.alert('No Data Found');
                 }
             } else {
-                Alert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
+                AppAlert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
             }
         } catch (error) {
             console.log('API sendScannedValue1 error:', error);
@@ -470,18 +471,18 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleSubmitScan = async () => {
-        if (!beamNo) return Alert.alert('Beam no can not be blank');
-        if (!takaNo) return Alert.alert('Taka no can not be blank');
-        if (!design) return Alert.alert('Design can not be blank.');
-        if (!meter || parseFloat(meter) <= 0) return Alert.alert('Meter can not be blank or 0.');
+        if (!beamNo) return AppAlert.alert('Beam no can not be blank');
+        if (!takaNo) return AppAlert.alert('Taka no can not be blank');
+        if (!design) return AppAlert.alert('Design can not be blank.');
+        if (!meter || parseFloat(meter) <= 0) return AppAlert.alert('Meter can not be blank or 0.');
         if (parseFloat(meter) > parseFloat(getWarpLen))
-            return Alert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
-        if (!kgs || parseFloat(kgs) <= 0) return Alert.alert('Kgs can not be blank or 0.');
-        if (!grade) return Alert.alert('Grade can not be blank.');
-        if (!checker) return Alert.alert('Checker can not be blank.');
-        if (!shift) return Alert.alert('Shift can not be blank.');
-        if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
-        // if (!operator) return Alert.alert('Operator can not be blank.');
+            return AppAlert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
+        if (!kgs || parseFloat(kgs) <= 0) return AppAlert.alert('Kgs can not be blank or 0.');
+        if (!grade) return AppAlert.alert('Grade can not be blank.');
+        if (!checker) return AppAlert.alert('Checker can not be blank.');
+        if (!shift) return AppAlert.alert('Shift can not be blank.');
+        if (!Designdata.length) return AppAlert.alert('Design data missing. Select design again.');
+        // if (!operator) return AppAlert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -626,9 +627,9 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
 
     const printStickerForData = async (rowData: any) => {
         const printerName = printer || '';
-        if (!printerName) return Alert.alert('Printer Required', 'Please select printer first.');
+        if (!printerName) return AppAlert.alert('Printer Required', 'Please select printer first.');
         if (!rowData || Object.keys(rowData).length === 0)
-            return Alert.alert('Print Error', 'Sticker data is empty.');
+            return AppAlert.alert('Print Error', 'Sticker data is empty.');
         console.log("rowdata", rowData, printerName);
         setIsLoading(true);
         try {
@@ -680,7 +681,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                 err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Printer service not reachable';
             setPrinterError(message);
             setPrinters([]);
-            Alert.alert('Printer Error', String(message));
+            AppAlert.alert('Printer Error', String(message));
         } finally {
             setPrinterLoading(false);
         }
@@ -716,7 +717,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
             if (response.data.success && response.data.response.design) {
                 setdesigndata(response.data.response.design);
             } else {
-                Alert.alert('No Design Data Found');
+                AppAlert.alert('No Design Data Found');
             }
         } catch (error) {
             console.log('API error:', error);
@@ -1055,7 +1056,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
                 fetchdesign();
                 fetchManualGradeCheckerOperatorShift();
             } else {
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
             }
         } catch (error) {
             console.log('API error:', error);
@@ -1066,7 +1067,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
 
     const showAlert = (message: string) =>
         new Promise<void>((resolve) => {
-            Alert.alert('Validation Error', message, [{ text: 'OK', onPress: () => resolve() }], {
+            AppAlert.alert('Validation Error', message, [{ text: 'OK', onPress: () => resolve() }], {
                 cancelable: false,
             });
         });
@@ -1160,7 +1161,7 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
             console.log('handlesave response:', response);
 
             if (response.data.success === true) {
-                Alert.alert('Success', 'Data Saved Successfully ✅', [
+                AppAlert.alert('Success', 'Data Saved Successfully ✅', [
                     {
                         text: 'OK',
                         onPress: async () => {
@@ -1268,13 +1269,13 @@ const CheckingScannerNew: React.FC<Props> = ({ token, username }) => {
             console.log('handledelete response:', response);
 
             if (response.data.success) {
-                Alert.alert('Success', response.data.message || 'Record deleted successfully');
+                AppAlert.alert('Success', response.data.message || 'Record deleted successfully');
                 await handleScannerList();
             } else {
-                Alert.alert('Warning', response.data.message);
+                AppAlert.alert('Warning', response.data.message);
             }
         } catch (error) {
-            Alert.alert('Error', 'Something went wrong');
+            AppAlert.alert('Error', 'Something went wrong');
         } finally {
             setIsDeleteLoading(false);
         }

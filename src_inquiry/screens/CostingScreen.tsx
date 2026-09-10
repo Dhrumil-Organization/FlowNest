@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -13,7 +14,7 @@ import {
 
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import Button from '../components/Button';
 import TourOverlay, { COSTING_TOUR } from '../components/TourOverlay';
 import { inquiryApi } from '../services/inquiryApi';
@@ -92,7 +93,7 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const save = async () => {
     for (const r of rows) {
       if (!r.cost_per_mtr || parseFloat(r.cost_per_mtr) <= 0) {
-        Alert.alert('Cost required', `Enter cost for "${r.design_name}"`);
+        AppAlert.alert('Cost required', `Enter cost for "${r.design_name}"`);
         return;
       }
     }
@@ -107,11 +108,11 @@ const CostingScreen: React.FC<Props> = ({ route, navigation, username }) => {
         prptype: getUserPrptype,
         yearno: "27"
       });
-      Alert.alert('Success', 'Costing saved', [
+      AppAlert.alert('Success', 'Costing saved', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save costing');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to save costing');
     } finally {
       setSaving(false);
     }

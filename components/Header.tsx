@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { LinearGradient } from 'expo-linear-gradient';
 // import { useRouter } from 'expo-router';
 // import React, { useEffect, useRef, useState } from 'react';
@@ -69,7 +70,7 @@
 
 //     const handleLogout = () => {
 //         closeMenu();
-//         Alert.alert('Logout', 'Are you sure you want to logout?', [
+//         AppAlert.alert('Logout', 'Are you sure you want to logout?', [
 //             { text: 'Cancel', style: 'cancel' },
 //             {
 //                 text: 'Logout',
@@ -354,7 +355,7 @@
 // });
 
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -432,7 +433,7 @@ export default function Header({
 
     const handleLogout = () => {
         closeMenu();
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
+        AppAlert.alert('Logout', 'Are you sure you want to logout?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Logout',

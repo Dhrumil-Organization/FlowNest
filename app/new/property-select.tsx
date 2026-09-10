@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -71,7 +72,7 @@ export default function NewErpPropertySelectScreen() {
 
   const handleContinue = async () => {
     if (!selected) {
-      Alert.alert('Property Required', 'Please select a property to continue.');
+      AppAlert.alert('Property Required', 'Please select a property to continue.');
       return;
     }
 
@@ -81,7 +82,7 @@ export default function NewErpPropertySelectScreen() {
       router.replace('/new/role-login?manual=1');
     } catch (error) {
       console.error('Unable to save New ERP property:', error);
-      Alert.alert('Error', 'Unable to save the selected property. Please try again.');
+      AppAlert.alert('Error', 'Unable to save the selected property. Please try again.');
     } finally {
       setLoading(false);
     }

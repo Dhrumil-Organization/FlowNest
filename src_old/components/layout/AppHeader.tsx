@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -55,7 +56,7 @@ export function AppHeader({ eyebrow='SUDAMO TEXTILE ERP', title, subtitle, right
 
     fetchAppVersion();
 }, []);
- const signOut=()=>Alert.alert('Sign out?','This will clear the mobile session on this device.',[
+ const signOut=()=>AppAlert.alert('Sign out?','This will clear the mobile session on this device.',[
   {text:'Cancel',style:'cancel'},{text:'Sign out',style:'destructive',onPress:logout}
  ]);
  return <View style={s.safe}>

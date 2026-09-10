@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
 import FullScreenLoader from '@/components/FullScreenLoader';
@@ -229,7 +230,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingSPO(false);
@@ -269,7 +270,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingSPO(false);
@@ -344,7 +345,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingSPO(false);
@@ -414,7 +415,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingSPO(false);
@@ -473,7 +474,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingSPO(false);
@@ -578,25 +579,25 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
@@ -608,7 +609,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
             if (
                 updatedItem.aremark === '' || updatedItem.aremark === null || updatedItem.aremark === undefined || !updatedItem.aremark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.vouno
                 )

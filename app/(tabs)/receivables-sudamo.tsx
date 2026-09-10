@@ -1,6 +1,6 @@
 import Footer from '@/components/Footer';
 import ReceivablesSudamo from '@/components/ReceivablesSudamo/index';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 export default function Receivables_Container() {

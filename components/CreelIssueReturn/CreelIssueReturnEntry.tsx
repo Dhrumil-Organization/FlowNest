@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import CustomSearchableDropdown from '@/Shared/CustomSearchableDropdown';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from "axios";
@@ -6,7 +7,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
 import { Snackbar } from '@/common/utils/snackbarCompat';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -572,7 +573,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
 
     const printSticker = () => {
         if (typeof printer == 'undefined' || printer == null || printer == '') {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
         else {
@@ -681,7 +682,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                                 backgroundColor: 'green',
                                 action: { text: 'OK', textColor: 'white' },
                             });
-                            Alert.alert('✅ ${res.printed} label(s) sent to printer.');
+                            AppAlert.alert('✅ ${res.printed} label(s) sent to printer.');
                         } else {
                             Snackbar.show({
                                 text: res.message || 'Operation failed',
@@ -689,7 +690,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                                 backgroundColor: 'red',
                                 action: { text: 'OK', textColor: 'white' },
                             });
-                            Alert.alert(res.message || 'Operation failed');
+                            AppAlert.alert(res.message || 'Operation failed');
                         }
                     }).catch(error => {
                         setIsLoading(false);
@@ -699,7 +700,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                             backgroundColor: 'red',
                             action: { text: 'OK', textColor: 'white' },
                         });
-                        Alert.alert(error?.response?.data?.error || error.message || 'Print failed');
+                        AppAlert.alert(error?.response?.data?.error || error.message || 'Print failed');
                     });
             } else {
                 setIsLoading(false);
@@ -710,7 +711,7 @@ const CreelIssueReturnEntry = ({ token, navigation, route }) => {
                     textColor: '#fff',
                     action: { text: 'OK', textColor: '#fff' },
                 });
-                Alert.alert('printing sticker data is empty');
+                AppAlert.alert('printing sticker data is empty');
             }
         }
     }

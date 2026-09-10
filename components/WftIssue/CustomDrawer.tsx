@@ -8,7 +8,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 // import { Switch } from 'react-native';
 // import axios from 'axios';
 // import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from '@/common/utils/snackbarCompat';
+// import Snackbar from 'react-native-snackbar';
 // import FullScreenLoader from '../Loader/Loader';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';

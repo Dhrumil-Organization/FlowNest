@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
@@ -210,7 +211,7 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
     if (!permission.granted) {
       requestPermission().then(res => {
         if (!res?.granted) {
-          Alert.alert("Camera Permission Required", "Please allow camera permission.", [
+          AppAlert.alert("Camera Permission Required", "Please allow camera permission.", [
             { text: "OK", onPress: () => navigation.goBack() },
           ]);
         }

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // NewAccountRequest.tsx (updated)
 // NOTE: Replace APP_PACKAGE_NAME with your real package name before building
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -104,7 +105,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoading(false);
@@ -162,7 +163,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPartyLoading(false);
@@ -285,7 +286,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
 
     const openManageAllFilesPermission = async () => {
         if (Platform.OS !== 'android') {
-            Alert.alert('Only Android', 'This action is only for Android devices.');
+            AppAlert.alert('Only Android', 'This action is only for Android devices.');
             return;
         }
 
@@ -320,7 +321,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
             try {
                 await Linking.openURL(`app-settings:package:${pkg}`); // not always supported
             } catch (ee) {
-                Alert.alert('Unable to open settings', 'Please open app settings manually and grant "All files access".');
+                AppAlert.alert('Unable to open settings', 'Please open app settings manually and grant "All files access".');
             }
         }
     };
@@ -343,7 +344,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
                 return true;
             }
             if (status === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-                Alert.alert(
+                AppAlert.alert(
                     'Permission required',
                     'Storage permission was permanently denied. Please open settings and enable storage permission to save the PDF.',
                     [
@@ -353,7 +354,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
                 );
                 return false;
             }
-            Alert.alert('Permission denied', 'Cannot save PDF without storage permission.');
+            AppAlert.alert('Permission denied', 'Cannot save PDF without storage permission.');
             return false;
         } catch (err) {
             console.warn('requestStoragePermission error', err);
@@ -366,7 +367,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
         const already = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE);
         if (already) return true;
         return new Promise(async (resolve) => {
-            Alert.alert(
+            AppAlert.alert(
                 'Storage permission required',
                 'App needs permission to save the PDF to your Downloads. Do you want to allow?',
                 [
@@ -388,7 +389,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
                                     return;
                                 }
                                 if (status === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-                                    Alert.alert(
+                                    AppAlert.alert(
                                         'Permission required',
                                         'Storage permission was permanently denied. Open settings to enable storage permission or grant manually.',
                                         [
@@ -404,7 +405,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
                                     );
                                     return;
                                 }
-                                Alert.alert('Permission denied', 'Cannot save PDF without storage permission.');
+                                AppAlert.alert('Permission denied', 'Cannot save PDF without storage permission.');
                                 resolve(false);
                             } catch (err) {
                                 console.warn('permission request error', err);
@@ -448,12 +449,12 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
             });
             // console.log('pdfUrlFromApi', pdfUrlFromApi);
             // if (!pdfUrlFromApi) {
-            //     Alert.alert('Error', 'PDF URL not found in server response');
+            //     AppAlert.alert('Error', 'PDF URL not found in server response');
             //     return;
             // }
             // const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
             // if (!pdfResp || !pdfResp.data) {
-            //     Alert.alert('Error', 'Failed to download PDF bytes');
+            //     AppAlert.alert('Error', 'Failed to download PDF bytes');
             //     return;
             // }
             // const buffer = Buffer.from(new Uint8Array(pdfResp.data));
@@ -466,7 +467,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
             // setShowPdfModal(true);
         } catch (err: any) {
             console.error('handleCallURL error:', err);
-            Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
+            AppAlert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
         } finally {
             setLocationLoading(false);
             setPdfLoading(false);
@@ -488,7 +489,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
             await Share.share({ url: urlToShare } as any);
         } catch (err) {
             console.warn('shareLocalFile error', err);
-            Alert.alert('Share failed', err?.message || String(err));
+            AppAlert.alert('Share failed', err?.message || String(err));
         }
     };
 
@@ -504,7 +505,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
 
     //     const handleDownload = async () => {
     //         try {
-    //             if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //             if (!pdfUrl) { AppAlert.alert('No file', 'No PDF available to download'); return; }
 
     //             // iOS: open share sheet (no Downloads folder concept for RNFS copy)
     //             if (Platform.OS === 'ios') {
@@ -516,7 +517,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
     //             // const ok = await askAndRequestStoragePermission();
     //             // if (!ok) {
     //             //     // user denied; offer share fallback
-    //             //     Alert.alert(
+    //             //     AppAlert.alert(
     //             //         'Cannot save',
     //             //         'Storage permission not granted. You can share the file to save it elsewhere.',
     //             //         [
@@ -537,12 +538,12 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
     //                 if (ToastAndroid) {
     //                     ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
     //                 } else {
-    //                     Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //                     AppAlert.alert('Saved', `Saved to Downloads:\n${destPath}`);
     //                 }
     //             } catch (copyErr: any) {
     //                 console.error('copyFile failed', copyErr);
     //                 // If copy fails due to Android 11+ restrictions, ask user to give All files access
-    //                 Alert.alert(
+    //                 AppAlert.alert(
     //                     'Save failed',
     //                     'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
     //                     [
@@ -554,7 +555,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
     //             }
     //         } catch (err) {
     //             console.error('handleDownload error', err);
-    //             Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //             AppAlert.alert('Error', `Could not save PDF: ${err?.message || err}`);
     //         }
     //     };
 
@@ -585,7 +586,7 @@ const NewAccountRequest: React.FC<Props> = ({ token, isConnected = true, usernam
     //                             style={{ flex: 1 }}
     //                             onError={(e) => {
     //                                 console.error('react-native-pdf error', e);
-    //                                 Alert.alert('Error', 'Failed to render PDF');
+    //                                 AppAlert.alert('Error', 'Failed to render PDF');
     //                             }}
     //                         />
     //                     ) : (

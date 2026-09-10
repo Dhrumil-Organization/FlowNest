@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
@@ -819,7 +820,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
             // Validate date range
             if (isBefore(endDate, startDate)) {
                 // Show error or swap dates
-                alert('End date cannot be before start date');
+                AppAlert.alert('End date cannot be before start date');
                 return;
             }
 
@@ -830,11 +831,11 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
             onToDateChange(endDate);
             setShowDateRangePicker(false);
         } else if (startDate && !endDate) {
-            alert('Please select both start and end dates');
+            AppAlert.alert('Please select both start and end dates');
         } else if (!startDate && endDate) {
-            alert('Please select both start and end dates');
+            AppAlert.alert('Please select both start and end dates');
         } else {
-            alert('Please select a date range');
+            AppAlert.alert('Please select a date range');
         }
     };
 

@@ -1,9 +1,10 @@
+import AppAlert from '@/common/utils/appAlert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import HeaderBarwithBack from '@/components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -50,13 +51,13 @@ const ConfirmInquiryScreen: React.FC<Props> = ({ route, navigation, username }) 
         yearno: '27',
       });
       const soNo = res?.sales_order?.so_no;
-      Alert.alert(
+      AppAlert.alert(
         'Confirmed!',
         `Sales Order ${soNo} has been created successfully.`,
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to confirm');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to confirm');
     } finally {
       setSaving(false);
     }

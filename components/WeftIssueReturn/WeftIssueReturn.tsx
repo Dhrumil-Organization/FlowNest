@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
@@ -12,7 +13,7 @@ import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { Snackbar } from '@/common/utils/snackbarCompat';
 
 const WeftIssueReturn = ({ token, navigation }) => {
@@ -703,7 +704,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
 
     const printBrowseSticker = async (item, selectedPrinterName = printer) => {
         if (!item) {
-            Alert.alert('Printing sticker data is empty');
+            AppAlert.alert('Printing sticker data is empty');
             return false;
         }
         const printerToUse = selectedPrinterName || printer;
@@ -739,7 +740,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
             printerToUse == null ||
             printerToUse === ''
         ) {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
 
@@ -832,7 +833,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
                                 textColor: 'white'
                             },
                         });
-                        Alert.alert('Print Successful', `✅ ${res.printed ?? 1} label(s) sent to printer.`);
+                        AppAlert.alert('Print Successful', `✅ ${res.printed ?? 1} label(s) sent to printer.`);
                     } else {
                         Snackbar.show({
                             text: res.message || 'Operation failed',
@@ -843,7 +844,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
                                 textColor: 'white'
                             },
                         });
-                        Alert.alert(res.message || 'Operation failed');
+                        AppAlert.alert(res.message || 'Operation failed');
                     }
                 })
                 .catch(error => {
@@ -866,7 +867,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
                         },
                     });
 
-                    Alert.alert(
+                    AppAlert.alert(
                         errorMessage
                     );
                 });
@@ -882,7 +883,7 @@ const WeftIssueReturn = ({ token, navigation }) => {
                     textColor: '#fff'
                 },
             });
-            Alert.alert(
+            AppAlert.alert(
                 'printing sticker data is empty'
             );
         }
@@ -1574,12 +1575,12 @@ const WeftIssueReturn = ({ token, navigation }) => {
                                     disabled={!printer || !pendingPrintItem || isLoading}
                                     onPress={async () => {
                                         if (!pendingPrintItem) {
-                                            Alert.alert("Printing sticker data is empty");
+                                            AppAlert.alert("Printing sticker data is empty");
                                             return;
                                         }
 
                                         if (!printer) {
-                                            Alert.alert("Please select printer first.");
+                                            AppAlert.alert("Please select printer first.");
                                             return;
                                         }
 

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect } from "react";
 import {
     View,
@@ -18,7 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Snackbar } from '@/common/utils/snackbarCompat';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 // import CustomSearchableDropdown from "../Shared/CustomSearchableDropdown";
 
 const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
@@ -661,7 +662,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
 
             // }
             // else if (resData?.success === true) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         "Success",
             //         resData?.response?.message,
             //         [
@@ -837,7 +838,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
 
             if (resData?.success === true) {
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     resData?.response?.message || "Delete Successfully.",
                     [
@@ -899,7 +900,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
 
     // const printSticker = () => {
     //     if (typeof printer == 'undefined' || printer == null || printer == '') {
-    //         Alert.alert('Please select printer first.');
+    //         AppAlert.alert('Please select printer first.');
     //         return false;
     //     }
     //     else {
@@ -1014,7 +1015,7 @@ const WeftIssueReturnModifyEntry = ({ navigation, route }) => {
 
     const printSticker = () => {
         if (typeof printer == 'undefined' || printer == null || printer == '') {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
         else {

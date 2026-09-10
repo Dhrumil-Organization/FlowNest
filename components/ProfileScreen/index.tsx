@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // screens/ProfileScreen.tsx
 import { API } from '@/common/API/dynamicAPI';
 import {
@@ -128,7 +129,7 @@ export default function ProfileScreen({ token }) {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                Alert.alert('✅ Success', 'Profile photo updated!');
+                AppAlert.alert('✅ Success', 'Profile photo updated!');
             }
         }
     };
@@ -143,14 +144,14 @@ export default function ProfileScreen({ token }) {
                 if (Platform.OS !== 'web') {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 }
-                Alert.alert('✅ Success', 'Profile photo updated!');
+                AppAlert.alert('✅ Success', 'Profile photo updated!');
             }
         }
     };
 
     const handleRemoveImage = async () => {
         setImageModalVisible(false);
-        Alert.alert(
+        AppAlert.alert(
             'Remove Photo?',
             'Are you sure you want to remove your profile photo?',
             [
@@ -184,7 +185,7 @@ export default function ProfileScreen({ token }) {
         await updateUserProfile(updates);
         await loadProfile();
         setEditModalVisible(false);
-        Alert.alert('✅ Updated', 'Profile updated successfully!');
+        AppAlert.alert('✅ Updated', 'Profile updated successfully!');
     };
 
     const togglePreference = async (key: 'notifications' | 'darkMode' | 'biometric') => {
@@ -197,7 +198,7 @@ export default function ProfileScreen({ token }) {
     };
 
     const handleLogout = () => {
-        Alert.alert(
+        AppAlert.alert(
             'Logout?',
             'Are you sure you want to logout? Your profile data will be preserved.',
             [
@@ -219,7 +220,7 @@ export default function ProfileScreen({ token }) {
     };
 
     const handleDeleteAccount = () => {
-        Alert.alert(
+        AppAlert.alert(
             'Delete Account',
             'This will permanently delete your FlowNest account and remove your personal data associated with this account. This action cannot be undone.',
             [
@@ -232,7 +233,7 @@ export default function ProfileScreen({ token }) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Final Confirmation',
                                 'Are you absolutely sure you want to permanently delete your account? Once deleted, you will lose access to your account, profile information, and app data.',
                                 [
@@ -261,7 +262,7 @@ export default function ProfileScreen({ token }) {
                                                 if (response.data.success === true) {
                                                     setdelloading(false);
 
-                                                    // Alert.alert('No Data Found');
+                                                    // AppAlert.alert('No Data Found');
                                                     console.log('🔵 Delete acoount Response:', response);
                                                     // const maindata = response.data.data.data;
 
@@ -269,7 +270,7 @@ export default function ProfileScreen({ token }) {
 
                                                     console.log('DELETE ACCOUNT API RESPONSE =>', response);
 
-                                                    Alert.alert(
+                                                    AppAlert.alert(
                                                         'Account Deleted',
                                                         'Your account has been permanently deleted.'
                                                     );
@@ -282,7 +283,7 @@ export default function ProfileScreen({ token }) {
                                                 setdelloading(false);
                                                 console.log('DELETE ACCOUNT ERROR =>', error);
 
-                                                Alert.alert(
+                                                AppAlert.alert(
                                                     'Deletion Failed',
                                                     'Unable to delete your account at this time. Please try again later.'
                                                 );
@@ -483,7 +484,7 @@ export default function ProfileScreen({ token }) {
                         <ActionButton icon="rate-review" label="Send Feedback" onPress={() => router.push('/feedback')} />
                         {/* <ActionButton icon="help" label="Help Center" onPress={() => router.push('/help')} /> */}
                         {/* <ActionButton icon="lock" label="Privacy" onPress={() => router.push('/privacy')} /> */}
-                        {/* <ActionButton icon="share" label="Share App" onPress={() => Alert.alert('Share', 'Share functionality coming soon!')} /> */}
+                        {/* <ActionButton icon="share" label="Share App" onPress={() => AppAlert.alert('Share', 'Share functionality coming soon!')} /> */}
                         <DeleteActionButton icon="delete" label="Delete Account" onPress={handleDeleteAccount} />
                     </View>
                 </View>

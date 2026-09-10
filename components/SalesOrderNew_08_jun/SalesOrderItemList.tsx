@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
@@ -89,7 +90,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
     //         setItems(Array.isArray(data) ? data : []);
     //     } catch (error) {
     //         console.log('ITEM LIST ERROR:', error?.response?.data || error.message);
-    //         Alert.alert('Error', 'Unable to load item list');
+    //         AppAlert.alert('Error', 'Unable to load item list');
     //         setItems([]);
     //     } finally {
     //         setLoading(false);
@@ -123,7 +124,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
             setItems(Array.isArray(data) ? data : []);
         } catch (error) {
             console.log('ITEM LIST ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load item list');
+            AppAlert.alert('Error', 'Unable to load item list');
             setItems([]);
         } finally {
             setLoading(false);

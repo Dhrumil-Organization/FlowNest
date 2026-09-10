@@ -1,6 +1,7 @@
+import AppAlert from '@/common/utils/appAlert';
 
 // export default SettingsScreen;
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -61,11 +62,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const addId = () => {
     const id = parseInt(newId, 10);
     if (!id || isNaN(id)) {
-      Alert.alert('Invalid', 'Enter a valid user ID');
+      AppAlert.alert('Invalid', 'Enter a valid user ID');
       return;
     }
     if (userIds.includes(id)) {
-      Alert.alert('Already added', 'This user is already an authorizer');
+      AppAlert.alert('Already added', 'This user is already an authorizer');
       return;
     }
     setUserIds([...userIds, id]);
@@ -80,11 +81,11 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     setSaving(true);
     try {
       await settingsApi.updateAuthorizers(userIds, getUserPrptype, getCurrentFinancialYear());
-      Alert.alert('Saved', 'Authorizer list updated', [
+      AppAlert.alert('Saved', 'Authorizer list updated', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed');
     } finally {
       setSaving(false);
     }

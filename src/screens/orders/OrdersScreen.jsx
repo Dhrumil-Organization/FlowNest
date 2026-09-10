@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -7,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { API } from '../../api/dynamicAPI';
@@ -455,7 +456,7 @@ function NewOrderTab({ token, userid }) {
     const addColourway = () => {
         if (!selectedShade || !qty) return;
         if (colourways.find(c => c.shade.ShdCode === selectedShade.ShdCode)) {
-            Alert.alert('Already added', `${selectedShade.ShdName} is already in the list.`);
+            AppAlert.alert('Already added', `${selectedShade.ShdName} is already in the list.`);
             return;
         }
         const amount = Number(qty) * Number(pricePerM || 0);
@@ -496,13 +497,13 @@ function NewOrderTab({ token, userid }) {
         : null;
 
     const submitOrder = async () => {
-        if (!selectedProp?.PrpCode) { Alert.alert('Required', 'Select a property first'); return; }
-        if (!selectedParty) { Alert.alert('Required', 'Select a customer'); return; }
-        if (!selectedDesign) { Alert.alert('Required', 'Select a design'); return; }
-        if (!selectedItem) { Alert.alert('Required', 'Select a fabric type'); return; }
-        if (!pricePerM) { Alert.alert('Required', 'Enter price per metre'); return; }
-        if (!deliveryDate) { Alert.alert('Required', 'Select expected delivery date'); return; }
-        if (colourways.length === 0) { Alert.alert('Required', 'Add at least one shade'); return; }
+        if (!selectedProp?.PrpCode) { AppAlert.alert('Required', 'Select a property first'); return; }
+        if (!selectedParty) { AppAlert.alert('Required', 'Select a customer'); return; }
+        if (!selectedDesign) { AppAlert.alert('Required', 'Select a design'); return; }
+        if (!selectedItem) { AppAlert.alert('Required', 'Select a fabric type'); return; }
+        if (!pricePerM) { AppAlert.alert('Required', 'Enter price per metre'); return; }
+        if (!deliveryDate) { AppAlert.alert('Required', 'Select expected delivery date'); return; }
+        if (colourways.length === 0) { AppAlert.alert('Required', 'Add at least one shade'); return; }
 
         try {
             setSubmitting(true);
@@ -580,10 +581,10 @@ function NewOrderTab({ token, userid }) {
             if (res.data?.success === true) {
                 setSuccessSO(res.data?.response?.sono || res.data?.response?.SONo || 'SO-' + Date.now());
             } else {
-                Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
+                AppAlert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
         } catch (e) {
-            Alert.alert('Error', e?.response?.data?.message || 'Something went wrong');
+            AppAlert.alert('Error', e?.response?.data?.message || 'Something went wrong');
         } finally {
             setSubmitting(false);
         }
@@ -650,7 +651,7 @@ function NewOrderTab({ token, userid }) {
                         <Text style={N.stepTitle}>Customer</Text>
                     </View>
                     <TouchableOpacity style={N.dropdownBox}
-                        onPress={() => { if (prpcode) setShowPartyPicker(true); else Alert.alert('Required', 'Select a property first'); }}
+                        onPress={() => { if (prpcode) setShowPartyPicker(true); else AppAlert.alert('Required', 'Select a property first'); }}
                         activeOpacity={0.8}>
                         <Text style={[N.dropdownText, !selectedParty && N.placeholder]}>
                             {selectedParty ? (selectedParty.accountname || selectedParty.ParName) : 'Select customer'}
@@ -1167,12 +1168,12 @@ function AuthTab({ token }) {
 
             if (res.data?.success) {
                 load();
-                Alert.alert('Done', `Order ${action}d successfully`);
+                AppAlert.alert('Done', `Order ${action}d successfully`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Action failed');
+                AppAlert.alert('Failed', res.data?.message || 'Action failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setApproving(null);
         }
@@ -1734,7 +1735,7 @@ function TrackingTab({ token }) {
         const enteredQty = Number(totalDispatchQty || 0);
 
         if (enteredQty > pendingQty) {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation',
                 `Dispatch Qty cannot exceed Pending Qty (${pendingQty.toFixed(3)} m)`
             );
@@ -1745,7 +1746,7 @@ function TrackingTab({ token }) {
             .filter((sh) => dispChecked[sh.ShdCode] && num(dispQtys[sh.ShdCode]) > 0)
             .map((sh) => ({ ShdCode: sh.ShdCode, Qty: num(dispQtys[sh.ShdCode]) }));
         if (items.length === 0) {
-            Alert.alert('Required', 'Enter at least one dispatch quantity');
+            AppAlert.alert('Required', 'Enter at least one dispatch quantity');
             return;
         }
         try {
@@ -1759,12 +1760,12 @@ function TrackingTab({ token }) {
             if (res.data?.success) {
                 setDispItem(null);
                 load();
-                Alert.alert('Done', 'Dispatched successfully');
+                AppAlert.alert('Done', 'Dispatched successfully');
             } else {
-                Alert.alert('Failed', res.data?.message || 'Dispatch failed');
+                AppAlert.alert('Failed', res.data?.message || 'Dispatch failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setDispatching(false);
         }
@@ -1819,12 +1820,12 @@ function TrackingTab({ token }) {
                 setConfirmItem(null);
                 setConfirmShadeRow(null);
                 load();
-                Alert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
+                AppAlert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Could not confirm shade');
+                AppAlert.alert('Failed', res.data?.message || 'Could not confirm shade');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setConfirmSaving(false);
         }
@@ -1854,9 +1855,9 @@ function TrackingTab({ token }) {
     const copyJobChart = () => {
         try {
             Clipboard.setString(buildJobChartText(jobItem));
-            Alert.alert('Copied', 'Job chart copied to clipboard');
+            AppAlert.alert('Copied', 'Job chart copied to clipboard');
         } catch (e) {
-            Alert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
+            AppAlert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
         }
     };
 

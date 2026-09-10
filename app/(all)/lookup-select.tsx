@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { useRouter } from 'expo-router';
 // import React, { useState } from 'react';
 // import {
@@ -37,7 +38,7 @@
 
 //     const saveSelection = async () => {
 //         if (!selected) {
-//             Alert.alert('Selection Required', 'Please select a system to continue.');
+//             AppAlert.alert('Selection Required', 'Please select a system to continue.');
 //             return;
 //         }
 
@@ -46,7 +47,7 @@
 
 //             await AsyncStorage.setItem(STORAGE_KEY, selected);
 
-//             // Alert.alert(
+//             // AppAlert.alert(
 //             //     'Done',
 //             //     `Selected Platform : ${selected === 'NEW' ? 'New ERP System' : 'Legacy ERP System'
 //             //     }`,
@@ -66,7 +67,7 @@
 
 
 //         } catch (e) {
-//             Alert.alert('Error', 'Unable to save selection.');
+//             AppAlert.alert('Error', 'Unable to save selection.');
 //         } finally {
 //             setLoading(false);
 //         }
@@ -483,7 +484,7 @@
 // });
 
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { useRouter } from 'expo-router';
 // import React, { useState } from 'react';
 // import {
@@ -521,7 +522,7 @@
 
 //     const saveSelection = async () => {
 //         if (!selected) {
-//             Alert.alert('Selection Required', 'Please select a system to continue.');
+//             AppAlert.alert('Selection Required', 'Please select a system to continue.');
 //             return;
 //         }
 
@@ -530,7 +531,7 @@
 
 //             await AsyncStorage.setItem(STORAGE_KEY, selected);
 
-//             // Alert.alert(
+//             // AppAlert.alert(
 //             //     'Done',
 //             //     `Selected Platform : ${selected === 'NEW' ? 'New ERP System' : 'Legacy ERP System'
 //             //     }`,
@@ -550,7 +551,7 @@
 
 
 //         } catch (e) {
-//             Alert.alert('Error', 'Unable to save selection.');
+//             AppAlert.alert('Error', 'Unable to save selection.');
 //         } finally {
 //             setLoading(false);
 //         }
@@ -967,7 +968,7 @@
 // });
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -1006,7 +1007,7 @@ const LookupSelectionScreen = () => {
 
     const saveSelection = async () => {
         if (!selected) {
-            Alert.alert('Selection Required', 'Please select a system to continue.');
+            AppAlert.alert('Selection Required', 'Please select a system to continue.');
             return;
         }
 
@@ -1046,7 +1047,7 @@ const LookupSelectionScreen = () => {
                 router.replace('/(auth)/login');
             }
         } catch (e) {
-            Alert.alert('Error', 'Unable to save selection.');
+            AppAlert.alert('Error', 'Unable to save selection.');
         } finally {
             setLoading(false);
         }

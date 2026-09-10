@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 // // index.tsx - S: design fields always visible, placeholder design if none exists
 // import FullScreenLoader from '@/components/FullScreenLoader';
 // import HeaderBarwithBack from '@/components/Header';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import * as ImagePicker from 'expo-image-picker';
 // import { useLocalSearchParams, useRouter } from 'expo-router';
 // import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -728,7 +729,7 @@
 //   const openDesignModalForItem = (itemIndex) => {
 //     const currentItem = selectedItems[itemIndex];
 //     if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
-//       Alert.alert('Select item first', 'Please select an item before choosing a design.');
+//       AppAlert.alert('Select item first', 'Please select an item before choosing a design.');
 //       return;
 //     }
 //     setEditingDesignItemIndex(itemIndex);
@@ -810,7 +811,7 @@
 //       setDebugData(all);
 //       setDebugModalVisible(true);
 //     } catch (err) {
-//       Alert.alert('Error', 'Failed to load local data');
+//       AppAlert.alert('Error', 'Failed to load local data');
 //       console.log(err);
 //     }
 //   };
@@ -820,7 +821,7 @@
 //       const all = await deleteAllEnquiriesFromDB();
 //       setDebugData(all);
 //     } catch (err) {
-//       Alert.alert('Error', 'Failed to load local data');
+//       AppAlert.alert('Error', 'Failed to load local data');
 //       console.log(err);
 //     }
 //   };
@@ -833,7 +834,7 @@
 //     await checkConnectivity();
 //     const currentlyOnline = await isOnline();
 //     if (!currentlyOnline) {
-//       Alert.alert(
+//       AppAlert.alert(
 //         'No internet',
 //         "Card scan needs internet. You're offline right now — please fill the details manually."
 //       );
@@ -847,9 +848,9 @@
 //       setCardCaptureStage('front_preview');
 //     } catch (err) {
 //       if (err.message === 'CAMERA_PERMISSION_DENIED') {
-//         Alert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
+//         AppAlert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
 //       } else {
-//         Alert.alert('Scan failed', "Couldn't open the camera. Please try again.");
+//         AppAlert.alert('Scan failed', "Couldn't open the camera. Please try again.");
 //       }
 //     }
 //   }
@@ -865,9 +866,9 @@
 //       setCardCaptureStage('both_preview');
 //     } catch (err) {
 //       if (err.message === 'CAMERA_PERMISSION_DENIED') {
-//         Alert.alert('Camera permission needed', 'Please allow camera access to scan the back side.');
+//         AppAlert.alert('Camera permission needed', 'Please allow camera access to scan the back side.');
 //       } else {
-//         Alert.alert('Scan failed', "Couldn't capture the back side. Please try again.");
+//         AppAlert.alert('Scan failed', "Couldn't capture the back side. Please try again.");
 //       }
 //     } finally {
 //       setCapturingBack(false);
@@ -942,7 +943,7 @@
 //       setCardCaptureStage(null);
 //       setPendingFrontUri(null);
 //       setPendingBackUri(null);
-//       Alert.alert('Card scanned', 'Details filled in below — please check them before saving.');
+//       AppAlert.alert('Card scanned', 'Details filled in below — please check them before saving.');
 //     } catch (err) {
 //       console.log('err', err);
 //       setCardFrontUri(null);
@@ -950,11 +951,11 @@
 //       setFrontPath('');
 //       setScannedFromCard(false);
 //       if (err.message === 'OFFLINE') {
-//         Alert.alert('No internet', 'Lost connection during scan. Please fill details manually.');
+//         AppAlert.alert('No internet', 'Lost connection during scan. Please fill details manually.');
 //       } else if (err.message === 'CAMERA_PERMISSION_DENIED') {
-//         Alert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
+//         AppAlert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
 //       } else {
-//         Alert.alert('Scan failed', "Couldn't read the card clearly. Please try again.");
+//         AppAlert.alert('Scan failed', "Couldn't read the card clearly. Please try again.");
 //       }
 //     } finally {
 //       setScanning(false);
@@ -966,14 +967,14 @@
 //     await checkConnectivity();
 //     const currentlyOnline = await isOnline();
 //     if (!currentlyOnline) {
-//       Alert.alert('No internet', 'Card scan needs internet.');
+//       AppAlert.alert('No internet', 'Card scan needs internet.');
 //       return;
 //     }
 
 //     try {
 //       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 //       if (!permission.granted) {
-//         Alert.alert('Permission required', 'Please allow gallery permission.');
+//         AppAlert.alert('Permission required', 'Please allow gallery permission.');
 //         return;
 //       }
 
@@ -991,7 +992,7 @@
 //       setUploadStage('front_preview');
 //     } catch (err) {
 //       console.error('Upload front error', err);
-//       Alert.alert('Error', 'Failed to pick front image.');
+//       AppAlert.alert('Error', 'Failed to pick front image.');
 //     }
 //   }
 
@@ -1016,7 +1017,7 @@
 //       setUploadStage('both_preview');
 //     } catch (err) {
 //       console.error('Upload back error', err);
-//       Alert.alert('Error', 'Failed to pick back image.');
+//       AppAlert.alert('Error', 'Failed to pick back image.');
 //     }
 //   }
 
@@ -1036,7 +1037,7 @@
 //     try {
 //       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 //       if (!permission.granted) {
-//         Alert.alert("Permission required", "Please allow gallery permission.");
+//         AppAlert.alert("Permission required", "Please allow gallery permission.");
 //         return;
 //       }
 //       const result = await ImagePicker.launchImageLibraryAsync({
@@ -1199,36 +1200,36 @@
 //   // --- Save function ---
 //   async function handleSave(mode) {
 //     if (!partyName.trim()) {
-//       Alert.alert('Party name required', 'Please enter the company / party name.');
+//       AppAlert.alert('Party name required', 'Please enter the company / party name.');
 //       return;
 //     }
 //     if (!email) {
-//       Alert.alert('Email required', 'Please enter the email.');
+//       AppAlert.alert('Email required', 'Please enter the email.');
 //       return;
 //     }
 //     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 //     if (!emailRegex.test(email)) {
-//       Alert.alert('Invalid Email', 'Please enter a valid email address.');
+//       AppAlert.alert('Invalid Email', 'Please enter a valid email address.');
 //       return;
 //     }
 //     if (!mobile) {
-//       Alert.alert('Mobile number required', 'Please enter the mobile number.');
+//       AppAlert.alert('Mobile number required', 'Please enter the mobile number.');
 //       return;
 //     }
 //     if (selectedItems.length === 0) {
-//       Alert.alert('Items required', 'Please add at least one item.');
+//       AppAlert.alert('Items required', 'Please add at least one item.');
 //       return;
 //     }
 //     // Check for empty item names if any new items (non-S)
 //     const emptyName = selectedItems.some(i => i.is_new_item && !i.item_name.trim());
 //     if (emptyName) {
-//       Alert.alert('Item name required', 'Please enter a name for all new items.');
+//       AppAlert.alert('Item name required', 'Please enter a name for all new items.');
 //       return;
 //     }
 //     if (getUserPrptype !== 'S') {
 //       const missingQty = selectedItems.some(i => !i.item_qty || !i.item_qty.trim());
 //       if (missingQty) {
-//         Alert.alert('Quantity required', 'Please enter quantity for all items.');
+//         AppAlert.alert('Quantity required', 'Please enter quantity for all items.');
 //         return;
 //       }
 //     } else {
@@ -1238,15 +1239,15 @@
 //           const design = item.designs[0];
 //           // If design is New, name must be filled
 //           if (design.is_new && !design.dsn_name.trim()) {
-//             Alert.alert('Design name required', 'Please enter a name for new designs.');
+//             AppAlert.alert('Design name required', 'Please enter a name for new designs.');
 //             return;
 //           }
 //           if (!design.dsn_qty || !design.dsn_qty.trim()) {
-//             Alert.alert('Quantity required', 'Please enter quantity for all designs.');
+//             AppAlert.alert('Quantity required', 'Please enter quantity for all designs.');
 //             return;
 //           }
 //         } else {
-//           Alert.alert('Design required', 'Each item must have a design.');
+//           AppAlert.alert('Design required', 'Each item must have a design.');
 //           return;
 //         }
 //       }
@@ -1257,7 +1258,7 @@
 //       const userJson = await AsyncStorage.getItem('user_id');
 //       const user = userJson ? JSON.parse(userJson) : null;
 //       if (!user) {
-//         Alert.alert('Not logged in', 'Please log in again before saving.');
+//         AppAlert.alert('Not logged in', 'Please log in again before saving.');
 //         setSaving(false);
 //         return;
 //       }
@@ -1296,14 +1297,14 @@
 //       }
 
 //       if (!saveSuccess) {
-//         Alert.alert('Save failed', 'Could not save locally. Please try again.');
+//         AppAlert.alert('Save failed', 'Could not save locally. Please try again.');
 //         setSaving(false);
 //         return;
 //       }
 
 //       const currentlyOnline = await isOnline();
 //       if (!currentlyOnline) {
-//         Alert.alert('Enquiry saved', "Saved on this device. It'll sync automatically once you're back online.");
+//         AppAlert.alert('Enquiry saved', "Saved on this device. It'll sync automatically once you're back online.");
 //         setSaving(false);
 //         resetFormFields();
 //         return;
@@ -1322,18 +1323,18 @@
 
 //       if (syncResult.type === 'all_done' || syncResult.type === 'validation_error') {
 //         if (syncResult.failedCount === 0) {
-//           Alert.alert('Enquiry saved', 'Saved and synced to server successfully.');
+//           AppAlert.alert('Enquiry saved', 'Saved and synced to server successfully.');
 //           router.push('/event');
 //         } else {
-//           Alert.alert('Enquiry saved locally', `Sync completed with ${syncResult.failedCount} error(s). Check the sync banner.`);
+//           AppAlert.alert('Enquiry saved locally', `Sync completed with ${syncResult.failedCount} error(s). Check the sync banner.`);
 //         }
 //       } else {
-//         Alert.alert('Sync error', `An error occurred during sync: ${syncResult.message}`);
+//         AppAlert.alert('Sync error', `An error occurred during sync: ${syncResult.message}`);
 //       }
 //       setSaving(false);
 //     } catch (err) {
 //       console.log('Save error', err);
-//       Alert.alert('Save failed', 'Something went wrong saving this enquiry. Please try again.');
+//       AppAlert.alert('Save failed', 'Something went wrong saving this enquiry. Please try again.');
 //       setSaving(false);
 //     }
 //   }
@@ -1343,7 +1344,7 @@
 //       setFailedItemsList(syncStatus.failedItems);
 //       setFailedItemsModalVisible(true);
 //     } else {
-//       Alert.alert('No failed items', 'All enquiries synced successfully!');
+//       AppAlert.alert('No failed items', 'All enquiries synced successfully!');
 //     }
 //   };
 
@@ -1545,7 +1546,7 @@
 //                           // Design selection must only open once an item is selected for this row.
 //                           const currentItem = selectedItems[itemIndex];
 //                           if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
-//                             Alert.alert('Select item first', 'Please select an item before choosing a design.');
+//                             AppAlert.alert('Select item first', 'Please select an item before choosing a design.');
 //                             return;
 //                           }
 //                           setEditingDesignItemIndex(itemIndex);
@@ -2426,7 +2427,7 @@
 //                     onPress={() => {
 //                       if (editingItemIndex === null) return;
 //                       // if (alreadyAdded) {
-//                       //   Alert.alert('Already added', `${item.name} is already in the list.`);
+//                       //   AppAlert.alert('Already added', `${item.name} is already in the list.`);
 //                       //   return;
 //                       // }
 //                       addItemToCard(item, editingItemIndex);
@@ -2510,7 +2511,7 @@
 //                     style={[styles.modalDesignItem, alreadyAdded && styles.modalDesignItemSelected]}
 //                     onPress={() => {
 //                       if (alreadyAdded) {
-//                         Alert.alert('Already added', `${item.name} is already selected.`);
+//                         AppAlert.alert('Already added', `${item.name} is already selected.`);
 //                         return;
 //                       }
 //                       const success = addDesignToItem(item);
@@ -3140,7 +3141,7 @@
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBarwithBack from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -4198,11 +4199,11 @@ export default function NewEnquiryScreen({ token, username }) {
     console.log("currentItem: ", currentItem);
     // if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
     // if (!currentItem || currentItem.is_new_item !== "0" || !currentItem.item_code || String(currentItem.item_code) === '0') {
-    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    //   AppAlert.alert('Select item first', 'Please select an item before choosing a design.');
     //   return;
     // } 
     // else if (!id && !currentItem || currentItem.is_new_item !== false || !currentItem.item_code || String(currentItem.item_code) === '0') {
-    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    //   AppAlert.alert('Select item first', 'Please select an item before choosing a design.');
     // }
     setEditingDesignItemIndex(itemIndex);
     setEditingDesignIndex(designIndex);
@@ -4221,11 +4222,11 @@ export default function NewEnquiryScreen({ token, username }) {
     console.log("currentItem: ", currentItem);
     // if (!currentItem || currentItem.is_new_item || !currentItem.item_code || String(currentItem.item_code) === '0') {
     // if (!currentItem || currentItem.is_new_item !== false || !currentItem.item_code || String(currentItem.item_code) === '0') {
-    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    //   AppAlert.alert('Select item first', 'Please select an item before choosing a design.');
     //   return;
     // } 
     // else if (!id && !currentItem || currentItem.is_new_item !== false || !currentItem.item_code || String(currentItem.item_code) === '0') {
-    //   Alert.alert('Select item first', 'Please select an item before choosing a design.');
+    //   AppAlert.alert('Select item first', 'Please select an item before choosing a design.');
     // }
     setEditingDesignItemIndex(itemIndex);
     setEditingDesignIndex(designIndex);
@@ -4308,7 +4309,7 @@ export default function NewEnquiryScreen({ token, username }) {
       setDebugData(all);
       setDebugModalVisible(true);
     } catch (err) {
-      Alert.alert('Error', 'Failed to load local data');
+      AppAlert.alert('Error', 'Failed to load local data');
       console.log(err);
     }
   };
@@ -4318,7 +4319,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const all = await deleteAllEnquiriesFromDB();
       setDebugData(all);
     } catch (err) {
-      Alert.alert('Error', 'Failed to load local data');
+      AppAlert.alert('Error', 'Failed to load local data');
       console.log(err);
     }
   };
@@ -4329,7 +4330,7 @@ export default function NewEnquiryScreen({ token, username }) {
     await checkConnectivity();
     const currentlyOnline = await isOnline();
     if (!currentlyOnline) {
-      Alert.alert(
+      AppAlert.alert(
         'No internet',
         "Card scan needs internet. You're offline right now — please fill the details manually."
       );
@@ -4343,9 +4344,9 @@ export default function NewEnquiryScreen({ token, username }) {
       setCardCaptureStage('front_preview');
     } catch (err) {
       if (err.message === 'CAMERA_PERMISSION_DENIED') {
-        Alert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
+        AppAlert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
       } else {
-        Alert.alert('Scan failed', "Couldn't open the camera. Please try again.");
+        AppAlert.alert('Scan failed', "Couldn't open the camera. Please try again.");
       }
     }
   }
@@ -4359,9 +4360,9 @@ export default function NewEnquiryScreen({ token, username }) {
       setCardCaptureStage('both_preview');
     } catch (err) {
       if (err.message === 'CAMERA_PERMISSION_DENIED') {
-        Alert.alert('Camera permission needed', 'Please allow camera access to scan the back side.');
+        AppAlert.alert('Camera permission needed', 'Please allow camera access to scan the back side.');
       } else {
-        Alert.alert('Scan failed', "Couldn't capture the back side. Please try again.");
+        AppAlert.alert('Scan failed', "Couldn't capture the back side. Please try again.");
       }
     } finally {
       setCapturingBack(false);
@@ -4427,7 +4428,7 @@ export default function NewEnquiryScreen({ token, username }) {
       setCardCaptureStage(null);
       setPendingFrontUri(null);
       setPendingBackUri(null);
-      Alert.alert('Card scanned', 'Details filled in below — please check them before saving.');
+      AppAlert.alert('Card scanned', 'Details filled in below — please check them before saving.');
     } catch (err) {
       console.log('err', err);
       setCardFrontUri(null);
@@ -4435,11 +4436,11 @@ export default function NewEnquiryScreen({ token, username }) {
       setFrontPath('');
       setScannedFromCard(false);
       if (err.message === 'OFFLINE') {
-        Alert.alert('No internet', 'Lost connection during scan. Please fill details manually.');
+        AppAlert.alert('No internet', 'Lost connection during scan. Please fill details manually.');
       } else if (err.message === 'CAMERA_PERMISSION_DENIED') {
-        Alert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
+        AppAlert.alert('Camera permission needed', 'Please allow camera access to scan a card.');
       } else {
-        Alert.alert('Scan failed', "Couldn't read the card clearly. Please try again.");
+        AppAlert.alert('Scan failed', "Couldn't read the card clearly. Please try again.");
       }
     } finally {
       setScanning(false);
@@ -4451,14 +4452,14 @@ export default function NewEnquiryScreen({ token, username }) {
     await checkConnectivity();
     const currentlyOnline = await isOnline();
     if (!currentlyOnline) {
-      Alert.alert('No internet', 'Card scan needs internet.');
+      AppAlert.alert('No internet', 'Card scan needs internet.');
       return;
     }
 
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission required', 'Please allow gallery permission.');
+        AppAlert.alert('Permission required', 'Please allow gallery permission.');
         return;
       }
 
@@ -4475,7 +4476,7 @@ export default function NewEnquiryScreen({ token, username }) {
       setUploadStage('front_preview');
     } catch (err) {
       console.error('Upload front error', err);
-      Alert.alert('Error', 'Failed to pick front image.');
+      AppAlert.alert('Error', 'Failed to pick front image.');
     }
   }
 
@@ -4498,7 +4499,7 @@ export default function NewEnquiryScreen({ token, username }) {
       setUploadStage('both_preview');
     } catch (err) {
       console.error('Upload back error', err);
-      Alert.alert('Error', 'Failed to pick back image.');
+      AppAlert.alert('Error', 'Failed to pick back image.');
     }
   }
 
@@ -4517,7 +4518,7 @@ export default function NewEnquiryScreen({ token, username }) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permission required", "Please allow gallery permission.");
+        AppAlert.alert("Permission required", "Please allow gallery permission.");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -4682,25 +4683,25 @@ export default function NewEnquiryScreen({ token, username }) {
   // --- Save function ---
   async function handleSave(mode) {
     if (!partyName.trim()) {
-      Alert.alert('Party name required', 'Please enter the company / party name.');
+      AppAlert.alert('Party name required', 'Please enter the company / party name.');
       return;
     }
     if (!email) {
-      Alert.alert('Email required', 'Please enter the email.');
+      AppAlert.alert('Email required', 'Please enter the email.');
       return;
     }
     // const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     // if (!emailRegex.test(email)) {
-    //   Alert.alert('Invalid Email', 'Please enter a valid email address.');
+    //   AppAlert.alert('Invalid Email', 'Please enter a valid email address.');
     //   return;
     // }
     if (!mobile) {
-      Alert.alert('Mobile number required', 'Please enter the mobile number.');
+      AppAlert.alert('Mobile number required', 'Please enter the mobile number.');
       return;
     }
     const cleanedMobile = mobile.replace(/\D/g, '');
     if (cleanedMobile.length < 7) {
-      Alert.alert(
+      AppAlert.alert(
         'Invalid Mobile Number',
         'Mobile number must contain at least 7 digits.'
       );
@@ -4708,20 +4709,20 @@ export default function NewEnquiryScreen({ token, username }) {
     }
 
     if (selectedItems.length === 0) {
-      Alert.alert('Items required', 'Please add at least one item.');
+      AppAlert.alert('Items required', 'Please add at least one item.');
       return;
     }
 
     // Check for empty item names if any new items (non-S)
     const emptyName = selectedItems.some(i => i.is_new_item && !i.item_name.trim());
     if (emptyName) {
-      Alert.alert('Item name required', 'Please enter a name for all new items.');
+      AppAlert.alert('Item name required', 'Please enter a name for all new items.');
       return;
     }
     if (getUserPrptype !== 'S') {
       const missingQty = selectedItems.some(i => !i.item_qty || !i.item_qty.trim());
       if (missingQty) {
-        Alert.alert('Quantity required', 'Please enter quantity for all items.');
+        AppAlert.alert('Quantity required', 'Please enter quantity for all items.');
         return;
       }
     } else {
@@ -4731,16 +4732,16 @@ export default function NewEnquiryScreen({ token, username }) {
           for (const design of item.designs) {
             // If design is New, name must be filled
             if (design.is_new && !design.dsn_name.trim()) {
-              Alert.alert('Design name required', 'Please enter a name for new designs.');
+              AppAlert.alert('Design name required', 'Please enter a name for new designs.');
               return;
             }
             if (!design.dsn_qty || !design.dsn_qty.trim()) {
-              Alert.alert('Quantity required', 'Please enter quantity for all designs.');
+              AppAlert.alert('Quantity required', 'Please enter quantity for all designs.');
               return;
             }
           }
         } else {
-          Alert.alert('Design required', 'Each item must have a design.');
+          AppAlert.alert('Design required', 'Each item must have a design.');
           return;
         }
       }
@@ -4751,7 +4752,7 @@ export default function NewEnquiryScreen({ token, username }) {
       const userJson = await AsyncStorage.getItem('user_id');
       const user = userJson ? JSON.parse(userJson) : null;
       if (!user) {
-        Alert.alert('Not logged in', 'Please log in again before saving.');
+        AppAlert.alert('Not logged in', 'Please log in again before saving.');
         setSaving(false);
         return;
       }
@@ -4789,14 +4790,14 @@ export default function NewEnquiryScreen({ token, username }) {
       }
 
       if (!saveSuccess) {
-        Alert.alert('Save failed', 'Could not save locally. Please try again.');
+        AppAlert.alert('Save failed', 'Could not save locally. Please try again.');
         setSaving(false);
         return;
       }
 
       const currentlyOnline = await isOnline();
       if (!currentlyOnline) {
-        Alert.alert('Enquiry saved', "Saved on this device. It'll sync automatically once you're back online.");
+        AppAlert.alert('Enquiry saved', "Saved on this device. It'll sync automatically once you're back online.");
         setSaving(false);
         resetFormFields();
         return;
@@ -4814,18 +4815,18 @@ export default function NewEnquiryScreen({ token, username }) {
 
       if (syncResult.type === 'all_done' || syncResult.type === 'validation_error') {
         if (syncResult.failedCount === 0) {
-          Alert.alert('Enquiry saved', 'Saved and synced to server successfully.');
+          AppAlert.alert('Enquiry saved', 'Saved and synced to server successfully.');
           router.push('/event');
         } else {
-          Alert.alert('Enquiry saved locally', `Sync completed with ${syncResult.failedCount} error(s). Check the sync banner.`);
+          AppAlert.alert('Enquiry saved locally', `Sync completed with ${syncResult.failedCount} error(s). Check the sync banner.`);
         }
       } else {
-        Alert.alert('Sync error', `An error occurred during sync: ${syncResult.message}`);
+        AppAlert.alert('Sync error', `An error occurred during sync: ${syncResult.message}`);
       }
       setSaving(false);
     } catch (err) {
       console.log('Save error', err);
-      Alert.alert('Save failed', 'Something went wrong saving this enquiry. Please try again.');
+      AppAlert.alert('Save failed', 'Something went wrong saving this enquiry. Please try again.');
       setSaving(false);
     }
   }
@@ -4835,7 +4836,7 @@ export default function NewEnquiryScreen({ token, username }) {
       setFailedItemsList(syncStatus.failedItems);
       setFailedItemsModalVisible(true);
     } else {
-      Alert.alert('No failed items', 'All enquiries synced successfully!');
+      AppAlert.alert('No failed items', 'All enquiries synced successfully!');
     }
   };
 
@@ -5873,7 +5874,7 @@ export default function NewEnquiryScreen({ token, username }) {
                     style={[styles.modalDesignItem, alreadyAdded && styles.modalDesignItemSelected]}
                     onPress={() => {
                       // if (alreadyAdded) {
-                      //   Alert.alert('Already added', `${item.name} is already selected.`);
+                      //   AppAlert.alert('Already added', `${item.name} is already selected.`);
                       //   return;
                       // }
                       const success = addDesignToItem(item);

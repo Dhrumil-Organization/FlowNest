@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // screens/FeedbackScreen.tsx
 import {
     deleteFeedback,
@@ -136,15 +137,15 @@ export default function FeedbackScreen() {
 
     const validateForm = (): boolean => {
         if (rating === 0) {
-            Alert.alert('Rating Required', 'Please select a star rating before submitting.');
+            AppAlert.alert('Rating Required', 'Please select a star rating before submitting.');
             return false;
         }
         if (title.trim().length < 5) {
-            Alert.alert('Title Too Short', 'Please enter at least 5 characters in the title.');
+            AppAlert.alert('Title Too Short', 'Please enter at least 5 characters in the title.');
             return false;
         }
         if (message.trim().length < 10) {
-            Alert.alert('Message Too Short', 'Please enter at least 10 characters in your feedback.');
+            AppAlert.alert('Message Too Short', 'Please enter at least 10 characters in your feedback.');
             return false;
         }
         return true;
@@ -175,7 +176,7 @@ export default function FeedbackScreen() {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
 
-            Alert.alert(
+            AppAlert.alert(
                 '✅ Feedback Submitted',
                 `Thank you for your valuable feedback!\n\nReference ID: ${newFeedback.id}\n\nWe'll review it and get back to you soon.`,
                 [
@@ -194,7 +195,7 @@ export default function FeedbackScreen() {
                 ]
             );
         } catch (error) {
-            Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+            AppAlert.alert('Error', 'Failed to submit feedback. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -211,7 +212,7 @@ export default function FeedbackScreen() {
     };
 
     const handleDelete = (id: string) => {
-        Alert.alert(
+        AppAlert.alert(
             'Delete Feedback?',
             'Are you sure you want to delete this feedback? This action cannot be undone.',
             [

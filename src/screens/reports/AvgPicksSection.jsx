@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // AvgPicksSection.js — React Native
 // Ports the web "Avg Picks" module (Salary.js + AvgPicksCalendar.jsx) into a
 // thin accordion that drops straight into ExpenseScreen.jsx, right below the
@@ -478,7 +479,7 @@ export default function AvgPicksSection({
       setLoaded(true);
     } catch (err) {
       console.error("[AvgPicks] fetch error:", err?.message || err);
-      Alert.alert("Error", "Could not load Avg Picks data for this month.");
+      AppAlert.alert("Error", "Could not load Avg Picks data for this month.");
     } finally {
       setLoading(false);
     }
@@ -537,7 +538,7 @@ export default function AvgPicksSection({
   }, []);
 
   const handleClearRow = useCallback((date) => {
-    Alert.alert(`Clear ${date}?`, "This will wipe all values for this date.", [
+    AppAlert.alert(`Clear ${date}?`, "This will wipe all values for this date.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Clear",
@@ -634,14 +635,14 @@ export default function AvgPicksSection({
           }
         );
         if (res.data?.success === true) {
-          Alert.alert("Saved", res.data?.message || "Avg picks saved.");
+          AppAlert.alert("Saved", res.data?.message || "Avg picks saved.");
           fetchMonthData();
         } else {
-          Alert.alert("Error", res.data?.message || "Could not save.");
+          AppAlert.alert("Error", res.data?.message || "Could not save.");
         }
       } catch (err) {
         console.error("[AvgPicks] save error:", err?.message || err);
-        Alert.alert("Error", "Could not save Avg Picks data.");
+        AppAlert.alert("Error", "Could not save Avg Picks data.");
       } finally {
         setLoading(false);
       }
@@ -710,7 +711,7 @@ export default function AvgPicksSection({
       const lines = errors.map(
         (e) => `${e.Date}: ${e.missing.map(prettyLabel).join(", ")}`
       );
-      Alert.alert(
+      AppAlert.alert(
         "Validation errors",
         `The following edited rows have missing fields:\n\n${lines.join(
           "\n"

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, Alert, TextInput as RNTextInput, Modal, ActivityIndicator, LayoutAnimation, ScrollView, ToastAndroid, Share, StyleSheet
@@ -14,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import theme from '@/components/theme';
 import { API } from '@/common/API/dynamicAPI';
 import { fetchAllStoredata } from '@/common/API/Functions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 interface CardData {
     [key: string]: string;
@@ -391,7 +392,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -449,7 +450,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
         }
         catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -502,7 +503,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -540,7 +541,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -589,7 +590,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -693,7 +694,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
         }
         if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
             if (!remark) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Item.: ' + updatedItem.ItmCode
                 )
@@ -834,7 +835,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
     //         await Share.share({ url: urlToShare } as any);
     //     } catch (err) {
     //         console.warn('shareLocalFile error', err);
-    //         Alert.alert('Share failed', err?.message || String(err));
+    //         AppAlert.alert('Share failed', err?.message || String(err));
     //     }
     // };
 
@@ -850,7 +851,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
 
     //     const handleDownload = async () => {
     //         try {
-    //             if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //             if (!pdfUrl) { AppAlert.alert('No file', 'No PDF available to download'); return; }
     //             if (Platform.OS === 'ios') {
     //                 await shareLocalFile(pdfUrl);
     //                 return;
@@ -864,11 +865,11 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
     //                 if (ToastAndroid) {
     //                     ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
     //                 } else {
-    //                     Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //                     AppAlert.alert('Saved', `Saved to Downloads:\n${destPath}`);
     //                 }
     //             } catch (copyErr: any) {
     //                 console.error('copyFile failed', copyErr);
-    //                 Alert.alert(
+    //                 AppAlert.alert(
     //                     'Save failed',
     //                     'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
     //                     [
@@ -880,7 +881,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
     //             }
     //         } catch (err) {
     //             console.error('handleDownload error', err);
-    //             Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //             AppAlert.alert('Error', `Could not save PDF: ${err?.message || err}`);
     //         }
     //     };
 
@@ -912,7 +913,7 @@ const DesignAuthorization: React.FC<Props> = ({ token, isConnected = true, usern
     //                                     style={{ flex: 1 }}
     //                                     onError={(e) => {
     //                                         console.error('react-native-pdf error', e);
-    //                                         Alert.alert('Error', 'Failed to render PDF');
+    //                                         AppAlert.alert('Error', 'Failed to render PDF');
     //                                     }}
     //                                 />
     //                             )

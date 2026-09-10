@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -11,7 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import HeaderBarwithBack from '@/components/Header';
 import ChequeForm from './ChequeForm';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -605,7 +606,7 @@ const CollectionEdit: React.FC<Props> = ({
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setInitialLoading(false);
@@ -725,7 +726,7 @@ const CollectionEdit: React.FC<Props> = ({
         } catch (error) {
             if (!axios.isCancel(error)) {
                 console.error('ShowChequeDataEdit error', error);
-                if (!background) Alert.alert('Error', 'Server error');
+                if (!background) AppAlert.alert('Error', 'Server error');
             }
         } finally {
             if (!background) {
@@ -827,7 +828,7 @@ const CollectionEdit: React.FC<Props> = ({
             setAdjLoading(false);
             setAdjData([]);
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         }
     };
@@ -862,7 +863,7 @@ const CollectionEdit: React.FC<Props> = ({
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setPaymentLoading(false);
@@ -1132,7 +1133,7 @@ const CollectionEdit: React.FC<Props> = ({
                 // Check if sum > Amount
                 if (setAmtSum > amount) {
                     setSaveLoading(false);
-                    Alert.alert(
+                    AppAlert.alert(
                         "Validation Error",
                         "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
                         [{ text: "OK" }]
@@ -1242,7 +1243,7 @@ const CollectionEdit: React.FC<Props> = ({
                 // Check if sum > Amount
                 if (setAmtSum > amount) {
                     setSaveLoading(false);
-                    Alert.alert(
+                    AppAlert.alert(
                         "Validation Error",
                         "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
                         [{ text: "OK" }]

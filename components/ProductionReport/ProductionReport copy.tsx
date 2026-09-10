@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -505,7 +506,7 @@ const ProductionReport = ({ navigation, token }) => {
         );
 
         if (response.data.success === true && response.data.data.length === 0) {
-          Alert.alert('No Data Found');
+          AppAlert.alert('No Data Found');
 
           setAllData([]);
         } else if (
@@ -514,18 +515,18 @@ const ProductionReport = ({ navigation, token }) => {
         ) {
           setAllData(response.data.data);
         } else if (response.data.success === false) {
-          Alert.alert(`${response.data.message}`);
+          AppAlert.alert(`${response.data.message}`);
 
           setAllData([]);
         } else {
-          Alert.alert(`${response.data.message}`);
+          AppAlert.alert(`${response.data.message}`);
 
           setAllData([]);
         }
       } catch (error) {
         setLoading(false);
         setAllData([]);
-        Alert.alert('Server Error');
+        AppAlert.alert('Server Error');
       } finally {
         setLoading(false);
         // handleCriteriaFormClose()

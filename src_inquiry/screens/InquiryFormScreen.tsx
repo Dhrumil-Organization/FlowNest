@@ -1,7 +1,8 @@
+import AppAlert from '@/common/utils/appAlert';
 import { registerCallback } from '@/common/utils/callbackRegistry';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -91,7 +92,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
 
         // Guard: if it's no longer editable, bounce back
         if (existing.status !== 'pending_costing') {
-          Alert.alert(
+          AppAlert.alert(
             'Cannot Edit',
             'This inquiry can no longer be edited because it has been costed.',
             [{ text: 'OK', onPress: () => router.back() }],
@@ -125,7 +126,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
           })),
         );
       } catch (e: any) {
-        // Alert.alert('Error', 'Failed to load inquiry');
+        // AppAlert.alert('Error', 'Failed to load inquiry');
         console.error('Failed to load inquiry', e);
         // navigation.goBack();
       } finally {
@@ -144,7 +145,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
 
 
       } catch (e: any) {
-        // Alert.alert('Error', 'Failed to load inquiry');
+        // AppAlert.alert('Error', 'Failed to load inquiry');
         console.error('Failed to load shades List', e);
         // navigation.goBack();
       } finally {
@@ -189,7 +190,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
 
   const removeRow = (id: string) => {
     if (designs.length === 1) {
-      Alert.alert('At least one design required');
+      AppAlert.alert('At least one design required');
       return;
     }
     setDesigns(prev => prev.filter(d => d._id !== id));
@@ -236,7 +237,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
 
   const save = async () => {
     if (!party) {
-      Alert.alert('Select Party', 'Please select a party first');
+      AppAlert.alert('Select Party', 'Please select a party first');
       return;
     }
 
@@ -244,26 +245,26 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
     for (let idx = 0; idx < designs.length; idx++) {
       const d = designs[idx];
       if (!d.design_name_snapshot.trim()) {
-        Alert.alert(getUserPrptype === 'S' ? 'Design name required, Please add a design' : 'Item name required, Please add an item');
+        AppAlert.alert(getUserPrptype === 'S' ? 'Design name required, Please add a design' : 'Item name required, Please add an item');
         return;
       }
       if (d.is_new_design && !d.construction_remarks.trim()) {
-        Alert.alert(
+        AppAlert.alert(
           'Construction details required',
           `Please add construction details for new ${getUserPrptype === 'S' ? 'designs' : 'items'}`,
         );
         return;
       }
       if (!d.shades || d.shades.length <= 0) {
-        Alert.alert('At least one shade required', `Select at least one shade for each ${getUserPrptype === 'S' ? 'design' : 'item'}`);
+        AppAlert.alert('At least one shade required', `Select at least one shade for each ${getUserPrptype === 'S' ? 'design' : 'item'}`);
         return;
       }
       if (!d.quantity || d.quantity <= 0) {
-        Alert.alert('Quantity required', `Enter a valid quantity for each ${getUserPrptype === 'S' ? 'design' : 'item'} from selected shades`);
+        AppAlert.alert('Quantity required', `Enter a valid quantity for each ${getUserPrptype === 'S' ? 'design' : 'item'} from selected shades`);
         return;
       }
       if (!d.expected_delivery_date) {
-        Alert.alert('Missing Date', `Delivery date required for ${getUserPrptype === 'S' ? 'design' : 'item'} #${idx + 1}`);
+        AppAlert.alert('Missing Date', `Delivery date required for ${getUserPrptype === 'S' ? 'design' : 'item'} #${idx + 1}`);
         return;
       }
     }
@@ -284,7 +285,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
 
       if (isEditMode) {
         const updated = await inquiryApi.update(inquiryId!, payload);
-        Alert.alert('Success', `Inquiry ${updated.inquiry_no} updated`, [
+        AppAlert.alert('Success', `Inquiry ${updated.inquiry_no} updated`, [
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
@@ -308,7 +309,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
             }
           }
         }
-        Alert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
+        AppAlert.alert('Success', `Inquiry ${created.inquiry_no} created`, [
           {
             text: 'OK', onPress: () =>
               // navigation.replace('InquiryDetail', { id: created.id }) 
@@ -320,7 +321,7 @@ const InquiryFormScreen: React.FC<Props> = ({ route, navigation, username }) => 
         ]);
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save inquiry');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to save inquiry');
     } finally {
       setSaving(false);
     }

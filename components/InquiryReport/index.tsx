@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import {
@@ -199,7 +200,7 @@ const InquiryReport: React.FC<{
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         }
     };
@@ -281,7 +282,7 @@ const InquiryReport: React.FC<{
                 closeDrawer();
             }
         } catch (error) {
-            Alert.alert('Error', `Server error: ${error?.message}`);
+            AppAlert.alert('Error', `Server error: ${error?.message}`);
             setsalesdata([]);
             setsalessumdata([]);
         } finally {
@@ -294,7 +295,7 @@ const InquiryReport: React.FC<{
         console.log(`🔹 Category Clicked: Status="${status}", Category="${category}", Value=${value}, Palyload=${paylaod}`);
         // Here you can call an API or show a detailed modal
         // For demonstration, we show an alert with the info
-        // Alert.alert(
+        // AppAlert.alert(
         //     'Category Detail',
         //     `Status: ${status}\nCategory: ${category}\nCount: ${value}`
         // );
@@ -328,7 +329,7 @@ const InquiryReport: React.FC<{
                 setFilteredCategoryData(response.data.data); // Initialize filtered data
             }
         } catch (error) {
-            Alert.alert('Error', `Server error: ${error?.message}`);
+            AppAlert.alert('Error', `Server error: ${error?.message}`);
         } finally {
             setCategoryLoading(false);
         }
@@ -372,7 +373,7 @@ const InquiryReport: React.FC<{
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error.message}`);
+                AppAlert.alert('Error', `Server error: ${error.message}`);
             }
         }
     };
@@ -817,7 +818,7 @@ const InquiryReport: React.FC<{
                                     onPress={() => {
                                         closeDetailModal();
                                         // You can navigate to a detailed list view here
-                                        Alert.alert(
+                                        AppAlert.alert(
                                             'View Details',
                                             `Showing full list of ${selectedConversion.ConversionStatus} clients`,
                                         );

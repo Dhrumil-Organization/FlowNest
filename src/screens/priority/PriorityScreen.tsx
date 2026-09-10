@@ -88,11 +88,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Modal,
   PanResponder,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -400,6 +402,17 @@ export function PriorityScreen() {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusModalKey, setStatusModalKey] = useState<string | null>(null);
+  // Status legend now doubles as a filter: 'ALL' (default) shows every chart;
+  // picking a status shows ONLY charts that have at least one shade currently
+  // in that status. This is a pure view-level filter — `charts` (the real,
+  // full order) is never touched by it, so Self priority numbers and the
+  // save payload stay correct regardless of what's filtered on screen.
+  const [statusFilter, setStatusFilter] = useState<ShadeStatus | 'ALL'>('ALL');
+  // Free-text search across chart no / party / design / APC name / shade
+  // names & codes. While the box has text, drag-reorder is disabled (see
+  // where `dragEnabled` is computed below) — reordering only makes sense
+  // against the real, unfiltered order.
+  const [searchText, setSearchText] = useState('');
 
   // `silent` = true for the manual "Refresh" button: keeps the current list
   // on screen (no full-screen spinner) while re-fetching in the background.
@@ -474,15 +487,37 @@ export function PriorityScreen() {
     }, [dirty, setHeaderExtras, clearHeaderExtras]),
   );
 
-  // Reorder happens ONLY through the drag handle.  We do not persist anything
-  // locally: the browse API remains the source of truth after a successful save.
-  const reorderCharts = useCallback((fromIndex: number, toIndex: number) => {
+  // Reorder happens ONLY through the drag handle. We do not persist anything
+  // locally: the browse API remains the source of truth after a successful
+  // save.
+  //
+  // `visibleList` is whatever ChartList was actually given to render — the
+  // FULL `charts` array when the status filter is 'ALL', or the FILTERED
+  // subset when a status is selected. `fromIndex`/`toIndex` are positions
+  // within THAT list, not necessarily within the full `charts` array.
+  //
+  // To keep this accurate under a filter: work out the new relative order of
+  // just the visible charts (a normal splice), then rebuild the full array by
+  // walking it once and, at every slot that belongs to a visible chart,
+  // pulling the next chart off that new relative order. Charts NOT in the
+  // visible list are never touched and keep their exact original position —
+  // this is what lets you reorder inside a filtered view without disturbing
+  // every other chart's Self priority.
+  const reorderCharts = useCallback((fromIndex: number, toIndex: number, visibleList: PriorityChart[]) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+      fromIndex >= visibleList.length || toIndex >= visibleList.length) return;
+
     setCharts((current) => {
-      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
-        fromIndex >= current.length || toIndex >= current.length) return current;
-      const next = current.slice();
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      const reorderedVisible = visibleList.slice();
+      const [moved] = reorderedVisible.splice(fromIndex, 1);
+      reorderedVisible.splice(toIndex, 0, moved);
+
+      const visibleKeys = new Set(visibleList.map((chart) => chart.key));
+      let cursor = 0;
+      const next = current.map((chart) =>
+        visibleKeys.has(chart.key) ? reorderedVisible[cursor++] : chart,
+      );
+
       next.forEach((chart, idx) => { chart.displayPriority = idx + 1; });
       return next;
     });
@@ -606,6 +641,40 @@ export function PriorityScreen() {
     [charts, statusModalKey],
   );
 
+  // Pure view filter — see the note above `reorderCharts`. `charts` itself
+  // (the real, saved order) is never filtered or mutated by this.
+  const visibleCharts = useMemo(() => {
+    let list = statusFilter === 'ALL'
+      ? charts
+      : charts.filter((chart) => chart.shades.some((shade) => shade.Status === statusFilter));
+
+    const query = searchText.trim().toLowerCase();
+    if (query) {
+      list = list.filter((chart) => {
+        const haystack = [
+          chart.ChartNo,
+          chart.PartyName,
+          chart.DesignName,
+          chart.DesignCode,
+          chart.ApcChartName,
+          ...chart.shades.map((shade) => shade.ShdName),
+          ...chart.shades.map((shade) => shade.ShdCode),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(query);
+      });
+    }
+
+    return list;
+  }, [charts, statusFilter, searchText]);
+
+  // Reordering only makes sense against the real order — while the person is
+  // actively searching, dragging is switched off (the drag handle simply
+  // doesn't render; see ChartCard's `canEdit` gate). Clearing the box brings
+  // it straight back.
+  const dragEnabled = canEdit && searchText.trim() === '';
+
   if (loading) {
     return (
       <View style={[s.center, { backgroundColor: T.bg }]}>
@@ -655,14 +724,50 @@ export function PriorityScreen() {
         saving={saving}
         dirty={dirty}
         onSave={() => onSave(prpGroup, yearNo)}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
       />
 
-      <ChartList
-        charts={charts}
-        canEdit={canEdit}
-        onReorder={reorderCharts}
-        onOpenStatus={setStatusModalKey}
-      />
+      <View style={s.searchBar}>
+        <Icon name="search" size={16} color={T.muted} />
+        <TextInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Search chart no, party, design, shade…"
+          placeholderTextColor={T.muted}
+          style={s.searchInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {!!searchText && (
+          <TouchableOpacity
+            onPress={() => setSearchText('')}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <Icon name="close" size={16} color={T.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {visibleCharts.length ? (
+        <ChartList
+          charts={visibleCharts}
+          canEdit={dragEnabled}
+          onReorder={reorderCharts}
+          onOpenStatus={setStatusModalKey}
+        />
+      ) : (
+        <View style={s.center}>
+          <Icon name="filter-list" size={26} color={T.muted} />
+          <Text style={s.emptyTitle}>No matching charts</Text>
+          <Text style={s.emptyText}>
+            {searchText.trim()
+              ? `Nothing matches "${searchText.trim()}"${statusFilter !== 'ALL' ? ` with status "${statusFilter}"` : ''}.`
+              : `Nothing currently has a shade marked "${statusFilter}". Try a different status or tap All.`}
+          </Text>
+        </View>
+      )}
 
       <ShadeStatusModal
         visible={!!statusModalKey}
@@ -687,6 +792,8 @@ function StatusLegend({
   saving,
   dirty,
   onSave,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   refreshing: boolean;
   onRefresh: () => void;
@@ -694,16 +801,43 @@ function StatusLegend({
   saving: boolean;
   dirty: boolean;
   onSave: () => void;
+  statusFilter: ShadeStatus | 'ALL';
+  onStatusFilterChange: (value: ShadeStatus | 'ALL') => void;
 }) {
   return (
     <View style={s.legendBar}>
-      <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-        {STATUS_OPTIONS.map((option) => (
-          <View key={option} style={s.legendItem}>
-            <View style={[s.legendDot, { backgroundColor: STATUS_COLORS[option] }]} />
-            <Text style={s.legendText}>{option}</Text>
-          </View>
-        ))}
+      <View style={s.legendRow}>
+        <TouchableOpacity
+          onPress={() => onStatusFilterChange('ALL')}
+          style={[
+            s.legendPill,
+            statusFilter === 'ALL' && { borderColor: T.ink, backgroundColor: `${T.ink}12` },
+          ]}
+          hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+        >
+          <Text style={[s.legendText, statusFilter === 'ALL' && { color: T.ink, fontWeight: '900' }]}>
+            All
+          </Text>
+        </TouchableOpacity>
+
+        {STATUS_OPTIONS.map((option) => {
+          const active = statusFilter === option;
+          const color = STATUS_COLORS[option];
+          return (
+            <TouchableOpacity
+              key={option}
+              onPress={() => onStatusFilterChange(active ? 'ALL' : option)}
+              style={[
+                s.legendPill,
+                active && { borderColor: color, backgroundColor: `${color}18` },
+              ]}
+              hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+            >
+              <View style={[s.legendDot, { backgroundColor: color }]} />
+              <Text style={[s.legendText, active && { color, fontWeight: '900' }]}>{option}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={s.legendActions}>
@@ -924,18 +1058,258 @@ function ShadeStatusModal({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Chart list — precise handle-only drag reorder.                            */
+/*  Chart list — precise handle-only drag reorder, virtualized AND accurate   */
+/*  at scale (thousands to 1,00,000+ charts).                                */
 /*                                                                            */
-/*  UX rule: the dragged card NEVER gets moved away from its original slot.   */
-/*  The user drags only the handle; a strong insertion line moves between     */
-/*  cards and shows exactly where the card will land. The actual array is     */
-/*  changed only on release. While the handle is held near the top/bottom     */
-/*  edge, the list auto-scrolls continuously so long lists remain draggable. */
+/*  Two separate problems had to be solved together here:                    */
+/*   1. RENDERING: a plain ScrollView mounts every card's full JSX tree up-   */
+/*      front, which is what freezes the app once there are a few thousand   */
+/*      charts. Fixed with FlatList, which only mounts cards near the        */
+/*      viewport (LIST_* tuning below) and recycles the rest.                */
+/*   2. DRAG ACCURACY: once rendering is virtualized, a card that isn't      */
+/*      currently mounted has no real on-screen position to measure — so any */
+/*      drop-target math that depends on *measuring* card layouts (onLayout) */
+/*      only ever knows about the small mounted window, and guesses wrong    */
+/*      for anything further away. That's what made reordering land in the   */
+/*      wrong place with large datasets.                                    */
+/*                                                                            */
+/*  The fix for (2): every card is given a FIXED height (CARD_BOX_HEIGHT).   */
+/*  With a fixed, uniform row height, the on-screen position of ANY chart —  */
+/*  mounted or not — is pure arithmetic: `LIST_PADDING_TOP + index *         */
+/*  ITEM_HEIGHT`. So the drop-target index is computed with plain division,  */
+/*  never by measuring or scanning cards. This is O(1) per pointer-move      */
+/*  event and gives an EXACT index regardless of how many charts there are   */
+/*  or how many of them are actually mounted right now — the same accuracy  */
+/*  as the original (unvirtualized) implementation, but it scales.          */
+/*                                                                            */
+/*  Trade-off: to keep every card exactly CARD_BOX_HEIGHT tall regardless of */
+/*  content, the shade-chip row is a single horizontally-scrollable line —   */
+/*  no shade is ever hidden or truncated; you swipe sideways to see the rest.*/
+/*                                                                            */
+/*  Two more things keep this scaling on the render side:                   */
+/*   - Each card is its own React.memo'd component (ChartCard) so moving     */
+/*     the drop-line only re-renders the (at most two) cards whose line/     */
+/*     dragging flags actually changed.                                     */
+/*   - The drag handle's PanResponder is created once per MOUNTED card via   */
+/*     useMemo inside ChartCard, not once per chart up-front.                */
+/*                                                                            */
+/*  UX rule (unchanged): the dragged card NEVER gets moved away from its     */
+/*  original slot. The user drags only the handle; a strong insertion line   */
+/*  moves between cards and shows exactly where the card will land. The      */
+/*  actual array is changed only on release. While the handle is held near   */
+/*  the top/bottom edge, the list auto-scrolls continuously so long lists    */
+/*  remain draggable.                                                       */
 /* -------------------------------------------------------------------------- */
 
 const AUTO_SCROLL_EDGE = 72;
 const AUTO_SCROLL_MAX_STEP = 16;
 const AUTO_SCROLL_INTERVAL = 16;
+
+// FlatList tuning for very large chart lists — see RENDERING note above.
+const LIST_INITIAL_RENDER = 12;
+const LIST_WINDOW_SIZE = 10;
+const LIST_MAX_PER_BATCH = 10;
+const LIST_UPDATE_BATCH_PERIOD = 50;
+
+// --- Fixed row geometry — see DRAG ACCURACY note above. Every card is this ---
+// --- exact height; this is what makes drop-target index math exact & O(1). --
+const CARD_BOX_HEIGHT = 138; // the card's own box height (its `s.card` style)
+const ROW_GAP = 6;           // matches `s.card.marginBottom` below
+const ITEM_HEIGHT = CARD_BOX_HEIGHT + ROW_GAP; // total vertical space one row consumes
+const LIST_PADDING_TOP = 8;  // matches `s.listContent.padding` below
+
+/* ---------------------------------------------------------------------- */
+/*  ChartCard — one row, fixed height. Memoized so unaffected rows never   */
+/*  re-render while dragging; only the card being dragged and the (at      */
+/*  most two) cards around the current drop-line change props on any       */
+/*  given frame.                                                           */
+/* ---------------------------------------------------------------------- */
+
+type ChartCardProps = {
+  chart: PriorityChart;
+  index: number;
+  canEdit: boolean;
+  isDragging: boolean;
+  showTopLine: boolean;
+  showBottomLine: boolean;
+  onOpenStatus: (chartKey: string) => void;
+  onDragStart: (chartKey: string, index: number, pageY: number) => void;
+  onDragMove: (pageY: number) => void;
+  onDragEnd: () => void;
+};
+
+const ChartCard = React.memo(function ChartCard({
+  chart,
+  index,
+  canEdit,
+  isDragging,
+  showTopLine,
+  showBottomLine,
+  onOpenStatus,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: ChartCardProps) {
+  // Created once per MOUNTED card — never once per chart in the whole
+  // dataset, since only visible cards ever mount.
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => canEdit,
+        onMoveShouldSetPanResponder: () => canEdit,
+        onPanResponderGrant: (event) => onDragStart(chart.key, index, event.nativeEvent.pageY),
+        onPanResponderMove: (event) => onDragMove(event.nativeEvent.pageY),
+        onPanResponderRelease: onDragEnd,
+        onPanResponderTerminate: onDragEnd,
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [canEdit, chart.key, index, onDragStart, onDragMove, onDragEnd],
+  );
+
+  return (
+    <React.Fragment>
+      {showTopLine && <View style={s.dropLineTop} />}
+
+      <View
+        style={[
+          s.card,
+          { borderColor: T.border },
+          isDragging && s.draggingCard,
+        ]}
+      >
+        <View style={s.cardInner}>
+          {canEdit ? (
+            <View style={s.dragHandle} {...panResponder.panHandlers}>
+              <Icon name="drag-handle" size={22} color={T.muted} />
+            </View>
+          ) : null}
+
+          <View style={s.cardBody}>
+            <View style={s.topRow}>
+              <View style={s.priorityInline}>
+                <View style={s.priorityItem}>
+                  <View style={[s.numBadge, { borderColor: T.green }]}>
+                    <Text style={s.numText}>{chart.displayPriority}</Text>
+                  </View>
+                  <Text style={[s.priorityLabel, { color: T.green }]}>Self</Text>
+                </View>
+
+                <View style={s.priorityItem}>
+                  <View style={s.numBadgeSmall}>
+                    <Text style={s.numTextSmall}>{chart.savedClientPriority ?? '—'}</Text>
+                  </View>
+                  <Text style={s.priorityLabel}>Client</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => onOpenStatus(chart.key)}
+                style={s.statusOpenBtn}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                <Icon name="assignment" size={12} color={T.copper} />
+                <Text style={s.statusOpenBtnText}>Status</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={s.chartInfoRow}>
+              <View style={s.chartIdentity}>
+                <Text style={s.chartNo} numberOfLines={1}>
+                  {chart.DesignName || '—'}
+                </Text>
+                {!!chart.PartyName && (
+                  <Text style={s.partyName} numberOfLines={1}>
+                    {chart.PartyName}
+                  </Text>
+                )}
+              </View>
+
+              <View style={s.metaRow}>
+                <View style={s.metaItem}>
+                  <Icon name="local-offer" size={11} color={T.muted} />
+                  <Text style={s.metaText}>
+                    {chart.qty ? `${qtyLabel(chart.qty)} m` : '—'}
+                  </Text>
+                </View>
+                <View style={s.metaItem}>
+                  <Icon name="event" size={11} color={T.muted} />
+                  <Text style={s.metaText}>{formatDate(chart.LastDate)}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={s.secondaryRow}>
+              {!!chart.DesignName && (
+                <Text style={s.designName} numberOfLines={1}>
+                  {chart.ChartNo}
+                </Text>
+              )}
+              {!!chart.ApcChartName && (
+                <View style={s.apcBadge}>
+                  <Icon name="palette" size={10} color={T.amber} />
+                  <Text style={s.apcBadgeText} numberOfLines={1}>
+                    {chart.ApcChartName}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={s.chipScroll}
+              contentContainerStyle={s.chipScrollContent}
+            >
+              {chart.shades.map((shade, si) => {
+                const statusColor = shade.Status ? STATUS_COLORS[shade.Status] : null;
+                return (
+                  <View
+                    key={`${shade.ShdCode || shade.ShdName}-${si}`}
+                    style={[
+                      s.chip,
+                      statusColor
+                        ? {
+                          borderColor: statusColor,
+                          backgroundColor: `${statusColor}18`,
+                        }
+                        : null,
+                    ]}
+                  >
+                    {!!statusColor && (
+                      <View style={[s.chipDot, { backgroundColor: statusColor }]} />
+                    )}
+                    <Text style={s.chipText} numberOfLines={1}>
+                      {shade.ShdName}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </View>
+
+      {showBottomLine && <View style={s.dropLine} />}
+    </React.Fragment>
+  );
+}, (prev, next) =>
+  prev.chart === next.chart &&
+  prev.index === next.index &&
+  prev.canEdit === next.canEdit &&
+  prev.isDragging === next.isDragging &&
+  prev.showTopLine === next.showTopLine &&
+  prev.showBottomLine === next.showBottomLine &&
+  prev.onOpenStatus === next.onOpenStatus &&
+  prev.onDragStart === next.onDragStart &&
+  prev.onDragMove === next.onDragMove &&
+  prev.onDragEnd === next.onDragEnd,
+);
+
+/* ---------------------------------------------------------------------- */
+/*  ChartList — the FlatList shell + all drag/auto-scroll bookkeeping.     */
+/*  See the big comment above: drop-target detection is pure index math,   */
+/*  not layout measurement, so it is exact for any chart count.            */
+/* ---------------------------------------------------------------------- */
 
 function ChartList({
   charts,
@@ -945,14 +1319,20 @@ function ChartList({
 }: {
   charts: PriorityChart[];
   canEdit: boolean;
-  onReorder: (fromIndex: number, toIndex: number) => void;
+  onReorder: (fromIndex: number, toIndex: number, list: PriorityChart[]) => void;
   onOpenStatus: (chartKey: string) => void;
 }) {
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<PriorityChart>>(null);
   const scrollOffsetRef = useRef(0);
   const viewportHeightRef = useRef(0);
   const viewportTopRef = useRef(0);
-  const cardLayouts = useRef<Map<string, { y: number; height: number }>>(new Map());
+
+  // Drag callbacks below are created ONCE (stable useCallback identities) so
+  // ChartCard's per-card PanResponder memoization isn't invalidated on every
+  // render. They read the live chart list through this ref instead of
+  // closing over the `charts` prop directly.
+  const chartsRef = useRef(charts);
+  useEffect(() => { chartsRef.current = charts; }, [charts]);
 
   const dragRef = useRef<{
     key: string;
@@ -970,8 +1350,15 @@ function ChartList({
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
 
   // `dropAfterIndex` means: show the insertion line immediately BELOW this
-  // card. `-1` means the line is at the very top (before the first card).
-  const [dropAfterIndex, setDropAfterIndex] = useState<number | null>(null);
+  // index. `-1` means the line is at the very top (before the first card).
+  // Mirrored into a ref so `handleDragEnd` (a stable callback) always reads
+  // the latest value without needing to be recreated on every change.
+  const [dropAfterIndex, setDropAfterIndexState] = useState<number | null>(null);
+  const dropAfterIndexRef = useRef<number | null>(null);
+  const setDropAfterIndex = useCallback((value: number | null) => {
+    dropAfterIndexRef.current = value;
+    setDropAfterIndexState(value);
+  }, []);
 
   const stopAutoScroll = useCallback(() => {
     if (autoScrollTimerRef.current != null) {
@@ -980,16 +1367,21 @@ function ChartList({
     }
   }, []);
 
+  // Exact content-space top-of-card for any index — pure arithmetic, valid
+  // for a card whether it's currently mounted or not (see the big comment
+  // above). This is what removes any dependency on measuring layouts.
+  const centerContentYForIndex = useCallback(
+    (index: number) => LIST_PADDING_TOP + index * ITEM_HEIGHT + CARD_BOX_HEIGHT / 2,
+    [],
+  );
+
   // Store the absolute initial finger Y separately. This avoids accumulating
-  // floating-point/scroll errors when auto-scroll changes the ScrollView offset.
-  const updateDropTarget = useCallback((key: string, moveY: number) => {
+  // floating-point/scroll errors when auto-scroll changes the list's offset.
+  const updateDropTarget = useCallback((moveY: number) => {
     const drag = dragRef.current;
     if (!drag) return;
 
-    const currentIndex = charts.findIndex((chart) => chart.key === key);
-    const layout = cardLayouts.current.get(key);
-    if (currentIndex < 0 || !layout) return;
-
+    const list = chartsRef.current;
     const viewport = viewportHeightRef.current;
     const offset = scrollOffsetRef.current;
 
@@ -1020,39 +1412,25 @@ function ChartList({
     }
 
     // Finger position -> content position. The dragged card's original centre
-    // is adjusted by the finger movement plus whatever the ScrollView has
+    // is adjusted by the finger movement plus whatever the list has
     // auto-scrolled since the drag began.
     const movingCenter =
       drag.centerContentY +
       (moveY - drag.startMoveY) +
       (offset - drag.startScrollOffset);
 
-    const otherCenters = charts
-      .map((item, index) => {
-        if (index === currentIndex) return null;
-        const measured = cardLayouts.current.get(item.key);
-        if (!measured) return null;
-        return {
-          index,
-          center: measured.y + measured.height / 2,
-        };
-      })
-      .filter((item): item is { index: number; center: number } => item != null);
+    // Pure index math — O(1), exact for any chart count, and independent of
+    // which cards happen to be mounted. This is what makes drag-to-position
+    // land exactly where the finger is, even with lakhs of charts. Every
+    // card's centre sits at `LIST_PADDING_TOP + i*ITEM_HEIGHT +
+    // CARD_BOX_HEIGHT/2`, evenly spaced by ITEM_HEIGHT — so the index of the
+    // last card whose centre is at/above `movingCenter` is a single division.
+    const relative = movingCenter - LIST_PADDING_TOP - CARD_BOX_HEIGHT / 2;
+    let afterIndex = Math.floor(relative / ITEM_HEIGHT);
+    afterIndex = Math.max(-1, Math.min(list.length - 1, afterIndex));
 
-    // Find the last card whose centre is above the dragged card centre.
-    // The insertion line is rendered BELOW that card. This directly matches
-    // what the user sees: "drop on this line".
-    let afterIndex = -1;
-    for (const item of otherCenters) {
-      if (movingCenter >= item.center) {
-        afterIndex = Math.max(afterIndex, item.index);
-      }
-    }
-
-    // If the dragged card is below the last card, the line belongs under the
-    // last card. If it is above the first card, show a top insertion line.
     setDropAfterIndex(afterIndex);
-  }, [charts]);
+  }, [setDropAfterIndex]);
 
   const startAutoScroll = useCallback(() => {
     stopAutoScroll();
@@ -1072,31 +1450,37 @@ function ChartList({
       if (nextOffset === currentOffset) return;
 
       scrollOffsetRef.current = nextOffset;
-      scrollRef.current?.scrollTo({ y: nextOffset, animated: false });
+      listRef.current?.scrollToOffset({ offset: nextOffset, animated: false });
 
       // Recalculate immediately after each auto-scroll tick so the highlighted
       // line follows the finger all the way through a long list.
-      updateDropTarget(drag.key, drag.lastMoveY);
+      updateDropTarget(drag.lastMoveY);
     }, AUTO_SCROLL_INTERVAL);
   }, [stopAutoScroll, updateDropTarget]);
 
-  const finishDrag = useCallback(() => {
+  const handleDragEnd = useCallback(() => {
     const drag = dragRef.current;
-    if (!drag) return;
-
-    const afterIndex = dropAfterIndex;
-    const fromIndex = drag.fromIndex;
 
     stopAutoScroll();
     dragRef.current = null;
     setDraggingKey(null);
+
+    if (!drag) {
+      setDropAfterIndex(null);
+      return;
+    }
+
+    const afterIndex = dropAfterIndexRef.current;
+    const fromIndex = drag.fromIndex;
+    const list = chartsRef.current;
+
     setDropAfterIndex(null);
 
     if (afterIndex == null) return;
 
-    // Convert "line below card X" into the final array index AFTER the dragged
-    // card is removed. This is the important part that prevents off-by-one
-    // reorder bugs when moving upward vs downward.
+    // Convert "line below index X" into the final array index AFTER the
+    // dragged card is removed. This is the important part that prevents
+    // off-by-one reorder bugs when moving upward vs downward.
     let targetIndex: number;
     if (afterIndex < 0) {
       targetIndex = 0;
@@ -1108,58 +1492,97 @@ function ChartList({
       targetIndex = fromIndex;
     }
 
-    targetIndex = Math.max(0, Math.min(charts.length - 1, targetIndex));
+    targetIndex = Math.max(0, Math.min(list.length - 1, targetIndex));
 
     if (targetIndex !== fromIndex) {
-      onReorder(fromIndex, targetIndex);
+      onReorder(fromIndex, targetIndex, list);
     }
-  }, [charts.length, dropAfterIndex, onReorder, stopAutoScroll]);
+  }, [onReorder, setDropAfterIndex, stopAutoScroll]);
 
-  const makeHandlePanResponder = useCallback((chartKey: string, index: number) => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => canEdit,
-      onMoveShouldSetPanResponder: () => canEdit,
-      onPanResponderGrant: (event) => {
-        const layout = cardLayouts.current.get(chartKey);
-        if (!layout) return;
+  const handleDragStart = useCallback((chartKey: string, index: number, pageY: number) => {
+    dragRef.current = {
+      key: chartKey,
+      fromIndex: index,
+      centerContentY: centerContentYForIndex(index),
+      startMoveY: pageY,
+      lastMoveY: pageY,
+      startScrollOffset: scrollOffsetRef.current,
+      viewportTop: viewportTopRef.current,
+      autoScrollDirection: 0,
+      autoScrollSpeed: 0,
+    };
 
-        dragRef.current = {
-          key: chartKey,
-          fromIndex: index,
-          centerContentY: layout.y + layout.height / 2,
-          startMoveY: event.nativeEvent.pageY,
-          lastMoveY: event.nativeEvent.pageY,
-          startScrollOffset: scrollOffsetRef.current,
-          viewportTop: viewportTopRef.current,
-          autoScrollDirection: 0,
-          autoScrollSpeed: 0,
-        };
+    setDraggingKey(chartKey);
+    setDropAfterIndex(index > 0 ? index - 1 : -1);
+    startAutoScroll();
+  }, [centerContentYForIndex, setDropAfterIndex, startAutoScroll]);
 
-        setDraggingKey(chartKey);
-        setDropAfterIndex(index > 0 ? index - 1 : -1);
-        startAutoScroll();
-      },
-      onPanResponderMove: (event) => {
-        const drag = dragRef.current;
-        if (!drag) return;
+  const handleDragMove = useCallback((pageY: number) => {
+    const drag = dragRef.current;
+    if (!drag) return;
 
-        drag.lastMoveY = event.nativeEvent.pageY;
-        updateDropTarget(chartKey, event.nativeEvent.pageY);
-      },
-      onPanResponderRelease: finishDrag,
-      onPanResponderTerminate: finishDrag,
-      onPanResponderTerminationRequest: () => false,
-    });
-  }, [canEdit, finishDrag, startAutoScroll, updateDropTarget]);
+    drag.lastMoveY = pageY;
+    updateDropTarget(pageY);
+  }, [updateDropTarget]);
 
   useEffect(() => {
     return () => stopAutoScroll();
   }, [stopAutoScroll]);
 
+  const keyExtractor = useCallback((item: PriorityChart) => item.key, []);
+
+  // Fixed row height means FlatList never has to measure anything to know
+  // where an item sits — this also makes scrolling/virtualization itself
+  // cheaper and more accurate for very large lists.
+  const getItemLayout = useCallback(
+    (_data: ArrayLike<PriorityChart> | null | undefined, index: number) => ({
+      length: ITEM_HEIGHT,
+      offset: LIST_PADDING_TOP + index * ITEM_HEIGHT,
+      index,
+    }),
+    [],
+  );
+
+  const renderItem = useCallback(({ item, index }: { item: PriorityChart; index: number }) => {
+    const isDragging = draggingKey === item.key;
+
+    // The line is intentionally BELOW the selected card, never floating
+    // over the card. For the first insertion position it is shown above
+    // the first card.
+    const showTopLine =
+      draggingKey != null &&
+      dropAfterIndex === -1 &&
+      index === 0 &&
+      !isDragging;
+
+    const showBottomLine =
+      draggingKey != null &&
+      dropAfterIndex === index &&
+      !isDragging;
+
+    return (
+      <ChartCard
+        chart={item}
+        index={index}
+        canEdit={canEdit}
+        isDragging={isDragging}
+        showTopLine={showTopLine}
+        showBottomLine={showBottomLine}
+        onOpenStatus={onOpenStatus}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+      />
+    );
+  }, [draggingKey, dropAfterIndex, canEdit, onOpenStatus, handleDragStart, handleDragMove, handleDragEnd]);
+
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={{ flex: 1 }}
+    <FlatList
+      ref={listRef}
+      data={charts}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      getItemLayout={getItemLayout}
       contentContainerStyle={s.listContent}
       showsVerticalScrollIndicator
       keyboardShouldPersistTaps="handled"
@@ -1168,174 +1591,32 @@ function ChartList({
         scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
         const drag = dragRef.current;
         if (drag) {
-          // Keep the line correct even when ScrollView emits a native scroll
+          // Keep the line correct even when the list emits a native scroll
           // event during an edge-scroll tick.
-          updateDropTarget(drag.key, drag.lastMoveY);
+          updateDropTarget(drag.lastMoveY);
         }
       }}
       onLayout={(event) => {
         viewportHeightRef.current = event.nativeEvent.layout.height;
-        // ScrollView's onLayout gives us height but not an absolute screen Y.
-        // Measure it once so edge auto-scroll uses the real finger position.
+        // onLayout gives us height but not an absolute screen Y. Measure it
+        // once so edge auto-scroll uses the real finger position.
         requestAnimationFrame(() => {
-          scrollRef.current?.measureInWindow((_x, y, _width, height) => {
+          const node: any = (listRef.current as any)?.getNativeScrollRef?.() ?? listRef.current;
+          node?.measureInWindow?.((_x: number, y: number, _width: number, height: number) => {
             viewportTopRef.current = y;
             viewportHeightRef.current = height;
           });
         });
       }}
       scrollEnabled={!draggingKey}
-    >
-      {charts.map((chart, index) => {
-        const isDragging = draggingKey === chart.key;
-
-        // The line is intentionally BELOW the selected card, never floating
-        // over the card. For the first insertion position it is shown above
-        // the first card.
-        const showTopLine =
-          draggingKey != null &&
-          dropAfterIndex === -1 &&
-          index === 0 &&
-          !isDragging;
-
-        const showBottomLine =
-          draggingKey != null &&
-          dropAfterIndex === index &&
-          !isDragging;
-
-        return (
-          <React.Fragment key={chart.key}>
-            {showTopLine && <View style={s.dropLineTop} />}
-
-            <View
-              onLayout={(event) => {
-                cardLayouts.current.set(chart.key, {
-                  y: event.nativeEvent.layout.y,
-                  height: event.nativeEvent.layout.height,
-                });
-              }}
-              style={[
-                s.card,
-                { borderColor: T.border },
-                isDragging && s.draggingCard,
-              ]}
-            >
-              <View style={s.cardInner}>
-                {canEdit ? (
-                  <View
-                    style={s.dragHandle}
-                    {...makeHandlePanResponder(chart.key, index).panHandlers}
-                  >
-                    <Icon name="drag-handle" size={22} color={T.muted} />
-                  </View>
-                ) : null}
-
-                <View style={s.cardBody}>
-                  <View style={s.topRow}>
-                    <View style={s.priorityInline}>
-                      <View style={s.priorityItem}>
-                        <View style={[s.numBadge, { borderColor: T.green }]}>
-                          <Text style={s.numText}>{chart.displayPriority}</Text>
-                        </View>
-                        <Text style={[s.priorityLabel, { color: T.green }]}>Self</Text>
-                      </View>
-
-                      <View style={s.priorityItem}>
-                        <View style={s.numBadgeSmall}>
-                          <Text style={s.numTextSmall}>{chart.savedClientPriority ?? '—'}</Text>
-                        </View>
-                        <Text style={s.priorityLabel}>Client</Text>
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      onPress={() => onOpenStatus(chart.key)}
-                      style={s.statusOpenBtn}
-                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-                    >
-                      <Icon name="assignment" size={12} color={T.copper} />
-                      <Text style={s.statusOpenBtnText}>Status</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={s.chartInfoRow}>
-                    <View style={s.chartIdentity}>
-                      <Text style={s.chartNo} numberOfLines={1}>
-                        {chart.ChartNo || '—'}
-                      </Text>
-                      {!!chart.PartyName && (
-                        <Text style={s.partyName} numberOfLines={1}>
-                          {chart.PartyName}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={s.metaRow}>
-                      <View style={s.metaItem}>
-                        <Icon name="local-offer" size={11} color={T.muted} />
-                        <Text style={s.metaText}>
-                          {chart.qty ? `${qtyLabel(chart.qty)} m` : '—'}
-                        </Text>
-                      </View>
-                      <View style={s.metaItem}>
-                        <Icon name="event" size={11} color={T.muted} />
-                        <Text style={s.metaText}>{formatDate(chart.LastDate)}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={s.secondaryRow}>
-                    {!!chart.DesignName && (
-                      <Text style={s.designName} numberOfLines={1}>
-                        {chart.DesignName}
-                      </Text>
-                    )}
-                    {!!chart.ApcChartName && (
-                      <View style={s.apcBadge}>
-                        <Icon name="palette" size={10} color={T.amber} />
-                        <Text style={s.apcBadgeText} numberOfLines={1}>
-                          {chart.ApcChartName}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={s.chipWrap}>
-                    {chart.shades.map((shade, si) => {
-                      const statusColor = shade.Status ? STATUS_COLORS[shade.Status] : null;
-                      return (
-                        <View
-                          key={`${shade.ShdCode || shade.ShdName}-${si}`}
-                          style={[
-                            s.chip,
-                            statusColor
-                              ? {
-                                borderColor: statusColor,
-                                backgroundColor: `${statusColor}18`,
-                              }
-                              : null,
-                          ]}
-                        >
-                          {!!statusColor && (
-                            <View style={[s.chipDot, { backgroundColor: statusColor }]} />
-                          )}
-                          <Text style={s.chipText} numberOfLines={1}>
-                            {shade.ShdName}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {showBottomLine && <View style={s.dropLine} />}
-          </React.Fragment>
-        );
-      })}
-      <View style={{ height: 24 }} />
-    </ScrollView>
+      // --- large-dataset tuning (see RENDERING note above) -----------------
+      initialNumToRender={LIST_INITIAL_RENDER}
+      windowSize={LIST_WINDOW_SIZE}
+      maxToRenderPerBatch={LIST_MAX_PER_BATCH}
+      updateCellsBatchingPeriod={LIST_UPDATE_BATCH_PERIOD}
+      removeClippedSubviews
+      ListFooterComponent={<View style={{ height: 24 }} />}
+    />
   );
 }
 
@@ -1387,8 +1668,6 @@ const ms = StyleSheet.create({
   },
 });
 
-const ROW_GAP = 6;
-
 const s = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
@@ -1403,12 +1682,20 @@ const s = StyleSheet.create({
   errorText: { color: '#fff', fontSize: 12, fontWeight: '600', marginLeft: 6, flex: 1 },
 
   legendBar: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8,
     paddingHorizontal: 12, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: T.border,
     backgroundColor: T.surface,
   },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendRow: {
+    flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6,
+    minWidth: 0,
+  },
+  legendPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: 'transparent', borderRadius: 20,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 10, fontWeight: '700', color: T.muted },
 
@@ -1425,6 +1712,17 @@ const s = StyleSheet.create({
   },
   saveSmallBtnText: { color: '#fff', fontSize: 12, fontWeight: '900' },
 
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: T.border,
+    backgroundColor: T.surface,
+  },
+  searchInput: {
+    flex: 1, fontSize: 13, fontWeight: '600', color: T.ink,
+    padding: 0,
+  },
+
   listContent: { padding: 8, paddingBottom: 20 },
 
   card: {
@@ -1434,6 +1732,8 @@ const s = StyleSheet.create({
     padding: 8,
     marginBottom: ROW_GAP,
     minWidth: 0,
+    height: CARD_BOX_HEIGHT,
+    overflow: 'hidden',
   },
   cardInner: { flexDirection: 'row', alignItems: 'stretch', minWidth: 0 },
   dragHandle: {
@@ -1529,15 +1829,17 @@ const s = StyleSheet.create({
     fontSize: 9.5, fontWeight: '800', color: T.amber, marginLeft: 3, flexShrink: 1,
   },
 
-  chipWrap: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 4,
+  chipScroll: {
     marginTop: 5, width: '100%',
+  },
+  chipScrollContent: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 4,
   },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3,
     borderColor: T.border, backgroundColor: T.sub,
-    maxWidth: '100%',
+    maxWidth: 220,
   },
   chipDot: { width: 6, height: 6, borderRadius: 3 },
   chipText: { fontSize: 9.5, fontWeight: '600', color: T.ink, maxWidth: 180 },

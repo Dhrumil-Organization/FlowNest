@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View, Text, FlatList, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Modal, ActivityIndicator, Linking, LayoutAnimation, ScrollView, UIManager, Platform, useWindowDimensions, StyleSheet
@@ -407,7 +408,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -446,7 +447,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -489,7 +490,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -534,7 +535,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -587,7 +588,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -737,7 +738,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
         else if (action === 'InActive') {
             const remark = editableValuesYPO[item.UId]?.Remark || item.Remark || '';
             if (!remark.trim()) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Remark cannot be empty for Voucher No.: ' + (item.SONo || '')
                 );
@@ -751,7 +752,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
         else {
             const remark = editableValuesYPO[item.UId]?.Remark || item.Remark || '';
             if (!remark.trim()) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Remark cannot be empty for Voucher No.: ' + (item.SONo || '')
                 );
@@ -778,7 +779,7 @@ const SalesOrderInACtive: React.FC<Props> = ({ token, isConnected = true, userna
         if (selectedActionYPO?.toLowerCase() === 'inactive') {
             const remark = updatedItem?.Remark?.trim();
             if (!remark) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Remark cannot be empty for Voucher No.: ' + (updatedItem?.ParName || '')
                 );

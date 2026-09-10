@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // MonthlyExpenseReport.tsx
 import HeaderBarwithBackWebUI from '@/components/Header';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -65,7 +66,7 @@ const MonthlyExpenseReport: React.FC<Props> = ({ deviceId, username }) => {
     setError(nativeEvent.description || 'Failed to load page');
     // optional alert
     if (__DEV__) {
-      Alert.alert('WebView error', nativeEvent.description || 'Failed to load page');
+      AppAlert.alert('WebView error', nativeEvent.description || 'Failed to load page');
     }
   };
 

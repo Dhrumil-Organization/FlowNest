@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { initAPI } from '@/common/API/dynamicAPI';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -327,7 +328,7 @@ export default function Signup() {
           response.data?.message ||
           'Account created successfully!';
 
-        alert(`🎉 ${successMessage}`);
+        AppAlert.alert(`🎉 ${successMessage}`);
 
         // Navigate to login after success
         setTimeout(() => {

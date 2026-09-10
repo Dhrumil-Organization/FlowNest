@@ -8,7 +8,7 @@
 // Keeping this in one place means both paths always stay in sync.
 // ─────────────────────────────────────────────────────────────
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 import { AuthAPI } from '../api/client';
 import {

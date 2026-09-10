@@ -391,6 +391,228 @@ const yarnUi = StyleSheet.create({
     formIntroSub: { color: YARN_UI.muted, fontSize: 12.5, marginTop: 2 },
 });
 
+
+type YarnDeletePermissionModalProps = {
+    visible: boolean;
+    loading: boolean;
+    itemType: 'MAIN' | 'SUB';
+    item: any;
+    onCancel: () => void;
+    onConfirm: () => void;
+};
+
+const YarnDeletePermissionModal: React.FC<YarnDeletePermissionModalProps> = ({
+    visible,
+    loading,
+    itemType,
+    item,
+    onCancel,
+    onConfirm,
+}) => {
+    const isSubItem = itemType === 'SUB';
+
+    const itemName =
+        item?.WNameCode ||
+        item?.itmname ||
+        item?.ItmName ||
+        'Selected Item';
+
+    const itemCode =
+        item?.itmcode ||
+        (isSubItem ? '' : item?.mitmcode || item?.ItmCode) ||
+        '-';
+
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+                if (!loading) onCancel();
+            }}
+        >
+            <View
+                style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.45)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 24,
+                }}
+            >
+                <View
+                    style={{
+                        width: '100%',
+                        maxWidth: 380,
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 16,
+                        padding: 20,
+                        elevation: 8,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.18,
+                        shadowRadius: 8,
+                    }}
+                >
+                    <View style={{ alignItems: 'center' }}>
+                        <View
+                            style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: '#FEE2E2',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: 12,
+                            }}
+                        >
+                            <Icon name="delete-outline" size={25} color="#DC2626" />
+                        </View>
+
+                        <Text
+                            style={{
+                                fontSize: 19,
+                                fontWeight: '800',
+                                color: '#18212F',
+                                textAlign: 'center',
+                            }}
+                        >
+                            {isSubItem ? 'Delete Sub Item' : 'Delete Item'}
+                        </Text>
+
+                        <Text
+                            style={{
+                                marginTop: 8,
+                                fontSize: 14,
+                                lineHeight: 20,
+                                color: '#667085',
+                                textAlign: 'center',
+                            }}
+                        >
+                            {isSubItem
+                                ? 'Are you sure you want to delete this sub item?'
+                                : 'Are you sure you want to delete this item?'}
+                        </Text>
+                    </View>
+
+                    <View
+                        style={{
+                            marginTop: 18,
+                            padding: 12,
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: '#E4E7EC',
+                        }}
+                    >
+                        <Text
+                            numberOfLines={2}
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '700',
+                                color: '#18212F',
+                                lineHeight: 19,
+                            }}
+                        >
+                            {itemName}
+                        </Text>
+                        <Text
+                            style={{
+                                marginTop: 5,
+                                fontSize: 12,
+                                color: '#667085',
+                            }}
+                        >
+                            Item Code: {itemCode}
+                        </Text>
+                    </View>
+
+                    <Text
+                        style={{
+                            marginTop: 14,
+                            fontSize: 12,
+                            color: '#B42318',
+                            textAlign: 'center',
+                        }}
+                    >
+                        This action cannot be undone.
+                    </Text>
+
+                    <View style={{ marginTop: 18 }}>
+                        {/* Cancel button intentionally kept in code but commented out. */}
+                        {/*
+                        <TouchableOpacity
+                            disabled={loading}
+                            activeOpacity={0.8}
+                            onPress={onCancel}
+                            style={{
+                                height: 48,
+                                borderRadius: 10,
+                                backgroundColor: '#F2F4F7',
+                                borderWidth: 1,
+                                borderColor: '#D0D5DD',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: 10,
+                            }}
+                        >
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: '#344054' }}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
+                        */}
+
+                        <TouchableOpacity
+                            disabled={loading}
+                            activeOpacity={0.82}
+                            onPress={onConfirm}
+                            style={{
+                                height: 48,
+                                borderRadius: 10,
+                                backgroundColor: loading ? '#F87171' : '#DC2626',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                            }}
+                        >
+                            {loading ? (
+                                <>
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                    <Text
+                                        style={{
+                                            marginLeft: 8,
+                                            fontSize: 14,
+                                            fontWeight: '700',
+                                            color: '#FFFFFF',
+                                        }}
+                                    >
+                                        Deleting...
+                                    </Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Icon name="delete-outline" size={20} color="#FFFFFF" />
+                                    <Text
+                                        style={{
+                                            marginLeft: 7,
+                                            fontSize: 14,
+                                            fontWeight: '700',
+                                            color: '#FFFFFF',
+                                        }}
+                                    >
+                                        {isSubItem ? 'Delete Sub Item' : 'Delete Item'}
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
 interface Props {
     token: string;
     username: string;
@@ -2136,7 +2358,7 @@ const SubItemCreateTab: React.FC = () => {
         filteredData,
         CARD_COLORS,
         token,
-        username,        
+        username,
     } = ctx;
 
     // IMPORTANT: Back from Sub Item form must return to the Sub Item LIST,
@@ -2452,21 +2674,21 @@ const SubItemCreateTab: React.FC = () => {
                         style={{ marginTop: 0, backgroundColor: YARN_UI.canvas }}
                         contentContainerStyle={{ paddingBottom: 100 }}
                     >
-                    <View style={yarnUi.formIntro}>
-                        <View style={yarnUi.sectionIcon}>
-                            <Icon name="create-new-folder" size={22} color={YARN_UI.primary} />
+                        <View style={yarnUi.formIntro}>
+                            <View style={yarnUi.sectionIcon}>
+                                <Icon name="create-new-folder" size={22} color={YARN_UI.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={yarnUi.formIntroTitle}>{isModifyMode ? "Modify Sub Item" : "Create Sub Item"}</Text>
+                                <Text style={yarnUi.formIntroSub}>Complete the yarn details below. Required fields are marked with *.</Text>
+                            </View>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={yarnUi.formIntroTitle}>{isModifyMode ? "Modify Sub Item" : "Create Sub Item"}</Text>
-                            <Text style={yarnUi.formIntroSub}>Complete the yarn details below. Required fields are marked with *.</Text>
-                        </View>
-                    </View>
-                    <View style={yarnmanagementsystemstyle.formCard}>
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Yarn Main Code <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            {/* <PartyDropdown
+                        <View style={yarnmanagementsystemstyle.formCard}>
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Yarn Main Code <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                {/* <PartyDropdown
                                 data={mitemdata}
                                 placeholder={isLoading ? "Loading..." : "Choose master item..."}
                                 labelKey={["WNameCode", "itmcode"]}
@@ -2512,106 +2734,106 @@ const SubItemCreateTab: React.FC = () => {
                                 }}
                             /> */}
 
-                            <View style={yarnmanagementsystemstyle.inputBox}>
-                                <TextInput
-                                    style={{ color: 'black' }}
-                                    value={subitemform.WNameCode || ''}
-                                    placeholder="Yarn Main Code"
-                                    editable={false}   // 🔥 readonly
-                                />
+                                <View style={yarnmanagementsystemstyle.inputBox}>
+                                    <TextInput
+                                        style={{ color: 'black' }}
+                                        value={subitemform.WNameCode || ''}
+                                        placeholder="Yarn Main Code"
+                                        editable={false}   // 🔥 readonly
+                                    />
+                                </View>
+
                             </View>
 
-                        </View>
-
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Blend <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            {blendList.length === 0 ? (
-                                <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <View style={[yarnmanagementsystemstyle.inputBox, { flex: 2 }]}>
-                                        <TextInput style={{ color: 'black' }} placeholder="Blend..." editable={false} />
-                                    </View>
-
-                                    <View style={[yarnmanagementsystemstyle.inputBox, { flex: 1 }]}>
-                                        <TextInput style={{ color: 'black' }} placeholder="%" keyboardType="numeric" />
-                                    </View>
-                                </View>
-                            ) : (
-                                blendList.map((item, index) => (
-                                    <View key={index} style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-
-                                        {/* Blend Name */}
-                                        <View style={[yarnmanagementsystemstyle.inputBox, { flex: 2 }]}>
-                                            <TextInput
-                                                style={{ color: 'black' }}
-                                                placeholder="Blend..."
-                                                value={item.name}
-                                                editable={false}
-                                            />
-                                        </View>
-
-                                        {/* Percentage */}
-                                        <View style={[yarnmanagementsystemstyle.inputBox, { flex: 1 }]}>
-                                            <TextInput
-                                                style={{ color: 'black' }}
-                                                placeholder="%"
-                                                value={item.per}
-                                                keyboardType="numeric"
-                                                onChangeText={(text) => {
-                                                    const updated = [...blendList];
-                                                    updated[index].per = text;
-                                                    setBlendList(updated);
-
-                                                    setsubitemform(prev => ({
-                                                        ...prev,
-                                                        linkitmcode: buildSubItem(prev, updated)
-                                                    }));
-                                                }}
-                                            // onChangeText={(text) => {
-                                            //     const value = text.replace(/[^0-9]/g, '');
-
-                                            //     const updated = [...blendList];
-                                            //     updated[index].per = value;
-
-                                            //     setBlendList(updated);
-
-                                            //     setsubitemform(prev => ({
-                                            //         ...prev,
-                                            //         linkitmcode: buildSubItem(prev, updated)
-                                            //     }));
-
-                                            //     // 🔥 validation only when all fields filled
-                                            //     if (isAllFilled(updated)) {
-                                            //         const total = getTotalPercentage(updated);
-
-                                            //         if (total !== 100) {
-                                            //             Alert.alert(
-                                            //                 "Validation",
-                                            //                 `Total percentage must be 100. Current: ${total}`
-                                            //             );
-                                            //         }
-                                            //     }
-                                            // }}
-                                            />
-                                        </View>
-
-                                    </View>
-                                ))
-                            )}
-                            {blendList.length > 0 && total !== 100 && (
-                                <Text style={{ color: 'red', marginTop: 5 }}>
-                                    Total must be 100% (Current: {total}%)
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Blend <Text style={{ color: 'red' }}>*</Text>
                                 </Text>
-                            )}
+                                {blendList.length === 0 ? (
+                                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                                        <View style={[yarnmanagementsystemstyle.inputBox, { flex: 2 }]}>
+                                            <TextInput style={{ color: 'black' }} placeholder="Blend..." editable={false} />
+                                        </View>
 
-                        </View>
+                                        <View style={[yarnmanagementsystemstyle.inputBox, { flex: 1 }]}>
+                                            <TextInput style={{ color: 'black' }} placeholder="%" keyboardType="numeric" />
+                                        </View>
+                                    </View>
+                                ) : (
+                                    blendList.map((item, index) => (
+                                        <View key={index} style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
 
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Count <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            {/* <PartyDropdown
+                                            {/* Blend Name */}
+                                            <View style={[yarnmanagementsystemstyle.inputBox, { flex: 2 }]}>
+                                                <TextInput
+                                                    style={{ color: 'black' }}
+                                                    placeholder="Blend..."
+                                                    value={item.name}
+                                                    editable={false}
+                                                />
+                                            </View>
+
+                                            {/* Percentage */}
+                                            <View style={[yarnmanagementsystemstyle.inputBox, { flex: 1 }]}>
+                                                <TextInput
+                                                    style={{ color: 'black' }}
+                                                    placeholder="%"
+                                                    value={item.per}
+                                                    keyboardType="numeric"
+                                                    onChangeText={(text) => {
+                                                        const updated = [...blendList];
+                                                        updated[index].per = text;
+                                                        setBlendList(updated);
+
+                                                        setsubitemform(prev => ({
+                                                            ...prev,
+                                                            linkitmcode: buildSubItem(prev, updated)
+                                                        }));
+                                                    }}
+                                                // onChangeText={(text) => {
+                                                //     const value = text.replace(/[^0-9]/g, '');
+
+                                                //     const updated = [...blendList];
+                                                //     updated[index].per = value;
+
+                                                //     setBlendList(updated);
+
+                                                //     setsubitemform(prev => ({
+                                                //         ...prev,
+                                                //         linkitmcode: buildSubItem(prev, updated)
+                                                //     }));
+
+                                                //     // 🔥 validation only when all fields filled
+                                                //     if (isAllFilled(updated)) {
+                                                //         const total = getTotalPercentage(updated);
+
+                                                //         if (total !== 100) {
+                                                //             Alert.alert(
+                                                //                 "Validation",
+                                                //                 `Total percentage must be 100. Current: ${total}`
+                                                //             );
+                                                //         }
+                                                //     }
+                                                // }}
+                                                />
+                                            </View>
+
+                                        </View>
+                                    ))
+                                )}
+                                {blendList.length > 0 && total !== 100 && (
+                                    <Text style={{ color: 'red', marginTop: 5 }}>
+                                        Total must be 100% (Current: {total}%)
+                                    </Text>
+                                )}
+
+                            </View>
+
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Count <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                {/* <PartyDropdown
                                 data={countdata}
                                 placeholder="Choose blend..."
                                 labelKey={["count", "id"]}
@@ -2636,118 +2858,118 @@ const SubItemCreateTab: React.FC = () => {
                                     });
                                 }}
                             /> */}
-                            <View style={yarnmanagementsystemstyle.inputBox}>
-                                <TextInput
-                                    style={{ color: 'black' }}
-                                    placeholder="Count..."
-                                    value={subitemform.count_no || ''}
-                                    editable={true}
-                                    // onChangeText={(text) => {
-                                    //     setSpunForm(prev => ({
-                                    //         ...prev,
-                                    //         count: text
-                                    //     }));
-                                    // }}
-                                    onChangeText={(text) => {
-                                        const regex = /^[0-9]*$/;
+                                <View style={yarnmanagementsystemstyle.inputBox}>
+                                    <TextInput
+                                        style={{ color: 'black' }}
+                                        placeholder="Count..."
+                                        value={subitemform.count_no || ''}
+                                        editable={true}
+                                        // onChangeText={(text) => {
+                                        //     setSpunForm(prev => ({
+                                        //         ...prev,
+                                        //         count: text
+                                        //     }));
+                                        // }}
+                                        onChangeText={(text) => {
+                                            const regex = /^[0-9]*$/;
 
-                                        if (!regex.test(text)) return;
+                                            if (!regex.test(text)) return;
 
-                                        // if (text !== '' && parseInt(text, 10) > 100) return;
+                                            // if (text !== '' && parseInt(text, 10) > 100) return;
 
+                                            setsubitemform(prev => {
+                                                const updated = {
+                                                    ...prev,
+                                                    count_no: text
+                                                };
+
+                                                // 👇 calculation sirf textbox value se
+                                                return {
+                                                    ...updated,
+                                                    denier: calculateSubitemDenier(updated),
+                                                    linkitmcode: buildSubItem(updated, blendList),
+                                                };
+                                            });
+
+                                        }}
+                                        style={{
+                                            color: '#000',
+                                            opacity: 1,
+                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                        }}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Ply */}
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Ply <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                <PartyDropdown
+                                    data={plydata}
+                                    placeholder="Choose Ply..."
+                                    labelKey={["ply", "id"]}
+                                    valueKey="id"
+                                    pageSize={12}
+                                    initialValue={selectedsubply ?? null}
+                                    selected={selectedsubply ?? null}
+                                    type="ply"
+                                    onSelect={(item) => {
+                                        setselectedsubply(item);
                                         setsubitemform(prev => {
                                             const updated = {
                                                 ...prev,
-                                                count_no: text
+                                                ply_id: item?.id || '',
+                                                ply: item?.ply || ''
                                             };
-
-                                            // 👇 calculation sirf textbox value se
                                             return {
                                                 ...updated,
-                                                denier: calculateSubitemDenier(updated),
                                                 linkitmcode: buildSubItem(updated, blendList),
+                                                denier: calculateSubitemDenier(updated)
                                             };
                                         });
-
-                                    }}
-                                    style={{
-                                        color: '#000',
-                                        opacity: 1,
-                                        height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
                                     }}
                                 />
                             </View>
-                        </View>
 
-                        {/* Ply */}
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Ply <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            <PartyDropdown
-                                data={plydata}
-                                placeholder="Choose Ply..."
-                                labelKey={["ply", "id"]}
-                                valueKey="id"
-                                pageSize={12}
-                                initialValue={selectedsubply ?? null}
-                                selected={selectedsubply ?? null}
-                                type="ply"
-                                onSelect={(item) => {
-                                    setselectedsubply(item);
-                                    setsubitemform(prev => {
-                                        const updated = {
-                                            ...prev,
-                                            ply_id: item?.id || '',
-                                            ply: item?.ply || ''
-                                        };
-                                        return {
-                                            ...updated,
-                                            linkitmcode: buildSubItem(updated, blendList),
-                                            denier: calculateSubitemDenier(updated)
-                                        };
-                                    });
-                                }}
-                            />
-                        </View>
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Yarn Type <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                <PartyDropdown
+                                    data={subitemtypedata}
+                                    placeholder="Choose yarn type..."
+                                    labelKey={["name", "id"]}
+                                    valueKey="id"
+                                    pageSize={12}
+                                    initialValue={selectedsubitemtypedata ?? null}
+                                    selected={selectedsubitemtypedata ?? null}
+                                    type="blend"
+                                    onSelect={(item) => {
+                                        setselectedsubitem(item);
+                                        setsubitemform(prev => {
+                                            const updated = {
+                                                ...prev,
+                                                subtype_id: item?.id || '',
+                                                subtype_name: item?.name || ''
+                                            };
+                                            return {
+                                                ...updated,
+                                                // linkitmcode: buildSubItem(updated, blendList),
+                                                // denier: calculateSubitemDenier(updated)
+                                            };
+                                        });
+                                    }}
+                                />
+                            </View>
 
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Yarn Type <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            <PartyDropdown
-                                data={subitemtypedata}
-                                placeholder="Choose yarn type..."
-                                labelKey={["name", "id"]}
-                                valueKey="id"
-                                pageSize={12}
-                                initialValue={selectedsubitemtypedata ?? null}
-                                selected={selectedsubitemtypedata ?? null}
-                                type="blend"
-                                onSelect={(item) => {
-                                    setselectedsubitem(item);
-                                    setsubitemform(prev => {
-                                        const updated = {
-                                            ...prev,
-                                            subtype_id: item?.id || '',
-                                            subtype_name: item?.name || ''
-                                        };
-                                        return {
-                                            ...updated,
-                                            // linkitmcode: buildSubItem(updated, blendList),
-                                            // denier: calculateSubitemDenier(updated)
-                                        };
-                                    });
-                                }}
-                            />
-                        </View>
-
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Other
-                                {/* <Text style={{ color: 'red' }}>*</Text> */}
-                            </Text>
-                            {/* <PartyDropdown
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Other
+                                    {/* <Text style={{ color: 'red' }}>*</Text> */}
+                                </Text>
+                                {/* <PartyDropdown
                                 data={othersdata}
                                 placeholder="Choose Others..."
                                 labelKey={["name", "id"]}
@@ -2771,79 +2993,79 @@ const SubItemCreateTab: React.FC = () => {
                                     });
                                 }}
                             /> */}
-                            <View style={yarnmanagementsystemstyle.inputBox}>
-                                <TextInput
-                                    style={{ color: 'black' }}
-                                    placeholder="Others..."
-                                    value={subitemform.others || ''}
-                                    editable={true}
-                                    // onChangeText={(text) => {
-                                    //     setsubitemform(prev => ({
-                                    //         ...prev,
-                                    //         others: text
-                                    //     }));
-                                    // }}
+                                <View style={yarnmanagementsystemstyle.inputBox}>
+                                    <TextInput
+                                        style={{ color: 'black' }}
+                                        placeholder="Others..."
+                                        value={subitemform.others || ''}
+                                        editable={true}
+                                        // onChangeText={(text) => {
+                                        //     setsubitemform(prev => ({
+                                        //         ...prev,
+                                        //         others: text
+                                        //     }));
+                                        // }}
 
-                                    onChangeText={(text) => {
-                                        setsubitemform(prev => {
-                                            const updated = {
+                                        onChangeText={(text) => {
+                                            setsubitemform(prev => {
+                                                const updated = {
+                                                    ...prev,
+                                                    others: text
+                                                };
+
+                                                return {
+                                                    ...updated,
+                                                    linkitmcode: buildSubItem(updated, blendList) // 🔥 auto update
+                                                };
+                                            });
+                                        }}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Sub Item Name <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                <View style={yarnmanagementsystemstyle.inputBox}>
+                                    <TextInput
+                                        placeholder="Main Item..."
+                                        value={subitemform.linkitmcode || ''}
+                                        editable={true}
+                                        onChangeText={(text) => {
+                                            setsubitemform(prev => ({
                                                 ...prev,
-                                                others: text
-                                            };
-
-                                            return {
-                                                ...updated,
-                                                linkitmcode: buildSubItem(updated, blendList) // 🔥 auto update
-                                            };
-                                        });
-                                    }}
-                                />
+                                                linkitmcode: text
+                                            }));
+                                        }}
+                                        style={{
+                                            color: '#000',
+                                            opacity: 1,
+                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                        }}
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Sub Item Name <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            <View style={yarnmanagementsystemstyle.inputBox}>
-                                <TextInput
-                                    placeholder="Main Item..."
-                                    value={subitemform.linkitmcode || ''}
-                                    editable={true}
-                                    onChangeText={(text) => {
-                                        setsubitemform(prev => ({
-                                            ...prev,
-                                            linkitmcode: text
-                                        }));
-                                    }}
-                                    style={{
-                                        color: '#000',
-                                        opacity: 1,
-                                        height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                    }}
-                                />
+                            <View style={yarnmanagementsystemstyle.inputGroup}>
+                                <Text style={yarnmanagementsystemstyle.label}>
+                                    Denier <Text style={{ color: 'red' }}>*</Text>
+                                </Text>
+                                <View style={yarnmanagementsystemstyle.inputBox}>
+                                    <TextInput
+                                        placeholder="Denier..."
+                                        value={subitemform.denier}
+                                        editable={false}
+                                        style={{
+                                            color: '#000',
+                                            opacity: 1,
+                                            height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
+                                        }}
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        <View style={yarnmanagementsystemstyle.inputGroup}>
-                            <Text style={yarnmanagementsystemstyle.label}>
-                                Denier <Text style={{ color: 'red' }}>*</Text>
-                            </Text>
-                            <View style={yarnmanagementsystemstyle.inputBox}>
-                                <TextInput
-                                    placeholder="Denier..."
-                                    value={subitemform.denier}
-                                    editable={false}
-                                    style={{
-                                        color: '#000',
-                                        opacity: 1,
-                                        height: '100%'   // 👈 IMPORTANT (parent View ko fill kare)
-                                    }}
-                                />
-                            </View>
-                        </View>
-
-                        {/* <View style={yarnmanagementsystemstyle.inputGroup}>
+                            {/* <View style={yarnmanagementsystemstyle.inputGroup}>
                             <Text style={yarnmanagementsystemstyle.label}>
                                 Link Item
                             </Text>
@@ -2868,8 +3090,8 @@ const SubItemCreateTab: React.FC = () => {
                             />
                         </View> */}
 
-                    </View>
-                </ScrollView>
+                        </View>
+                    </ScrollView>
                 )}
 
                 <View style={{
@@ -3448,32 +3670,32 @@ const PartyTab: React.FC = () => {
                             paddingHorizontal: 10
                         }
                     ]}>
-                    <TouchableOpacity
-                        onPress={goBackFromParty}
-                        style={{
-                            width: 40,
-                            height: 40,
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                        }}
-                    >
-                        <Icon name="arrow-back" size={22} color="#fff" />
-                    </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={goBackFromParty}
+                            style={{
+                                width: 40,
+                                height: 40,
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}
+                        >
+                            <Icon name="arrow-back" size={22} color="#fff" />
+                        </TouchableOpacity>
 
-                    {/* 📝 TITLE */}
-                    <Text
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                        style={[
-                            yarnmanagementsystemstyle.topHeaderTitle,
-                            {
-                                flex: 1,
-                                marginRight: 10
-                            }
-                        ]}
-                    >
-                        Sub Item: {browseParentItem?.WNameCode || '-'}
-                    </Text>
+                        {/* 📝 TITLE */}
+                        <Text
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                            style={[
+                                yarnmanagementsystemstyle.topHeaderTitle,
+                                {
+                                    flex: 1,
+                                    marginRight: 10
+                                }
+                            ]}
+                        >
+                            Sub Item: {browseParentItem?.WNameCode || '-'}
+                        </Text>
 
                     </View>
                 </SafeAreaView>
@@ -3670,6 +3892,13 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     const [deletePermissionVisible, setDeletePermissionVisible] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
     const [deleteTargetType, setDeleteTargetType] = useState<'MAIN' | 'SUB'>('MAIN');
+
+    // Delete API result modal. This is separate from the confirmation modal so
+    // the API response is shown immediately and refresh happens only after OK.
+    const [deleteResultVisible, setDeleteResultVisible] = useState(false);
+    const [deleteResultType, setDeleteResultType] = useState<'SUCCESS' | 'PERMISSION' | 'ERROR'>('ERROR');
+    const [deleteResultMessage, setDeleteResultMessage] = useState('');
+    const [deleteResultTargetType, setDeleteResultTargetType] = useState<'MAIN' | 'SUB'>('MAIN');
     const [getDataSaved, setDataSaved] = useState(false);
     const [setupDate, setSetupDate] = useState(new Date());
     const [showPicker, setShowPicker] = useState(false);
@@ -5177,23 +5406,58 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         setDeletePermissionVisible(true);
     };
 
+    const handleDeleteResultOk = async () => {
+        if (deleteLoading) return;
+
+        const resultType = deleteResultType;
+        const resultTargetType = deleteResultTargetType;
+        const parentForRefresh = subItemParent;
+
+        setDeleteResultVisible(false);
+        setDeleteResultMessage('');
+        setDeleteTarget(null);
+
+        // IMPORTANT:
+        // Never refresh the list for permission/error responses.
+        // Refresh only after the user presses OK on a genuine successful delete.
+        if (resultType !== 'SUCCESS') {
+            return;
+        }
+
+        setDeleteLoading(true);
+        try {
+            if (resultTargetType === 'MAIN') {
+                await fetchbrowse(activeTab);
+            } else if (parentForRefresh?.itmcode) {
+                await fetchSubItemList(parentForRefresh);
+            }
+        } catch (error) {
+            console.log('Delete result refresh error:', error);
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
+
     const confirmDeleteItem = async () => {
         if (!deleteTarget || deleteLoading) return;
 
-        // The selected row's own item code is always used.
+        // For SUB delete, ALWAYS use the selected sub row's own itmcode.
+        // Never fall back to the parent/main item's mitmcode.
         const itemCode =
-            deleteTarget?.itmcode ||
-            deleteTarget?.mitmcode ||
-            deleteTarget?.ItmCode ||
-            '';
+            deleteTargetType === 'SUB'
+                ? deleteTarget?.itmcode || ''
+                : deleteTarget?.itmcode ||
+                deleteTarget?.mitmcode ||
+                deleteTarget?.ItmCode ||
+                '';
 
         if (!itemCode) {
             setDeletePermissionVisible(false);
             setDeleteTarget(null);
-            Alert.alert(
-                'Delete Item',
-                'Item code not found. Unable to delete this item.'
-            );
+            setDeleteResultType('ERROR');
+            setDeleteResultMessage('Item code not found. Unable to delete this item.');
+            setDeleteResultTargetType(deleteTargetType);
+            setDeleteResultVisible(true);
             return;
         }
 
@@ -5222,42 +5486,68 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         try {
             const response = await axios.post(
                 `${API}/api/yarnitemdelete`,
-                getRequestConfig({ params: payload })
+                payload,
+                getRequestConfig({})
             );
 
             console.log('yarnitemdelete Response:', response?.data);
 
+            const responseData = response?.data || {};
+            const responseObject = responseData?.response || responseData?.data?.response || {};
             const message =
-                response?.data?.response?.message ||
-                response?.data?.data?.response?.message ||
-                response?.data?.message ||
-                'Delete completed successfully.';
+                responseObject?.message ||
+                responseData?.message ||
+                responseData?.data?.message ||
+                'Delete response received.';
 
-            if (response?.data?.success === true) {
-                // Close permission after successful delete.
-                setDeletePermissionVisible(false);
-                setDeleteTarget(null);
+            const normalizedMessage = String(message).trim().toLowerCase();
+            const responseStatus = String(responseObject?.status ?? '').trim().toUpperCase();
 
-                // Refresh only the list from which the delete was performed.
-                if (deleteTargetType === 'MAIN') {
-                    await fetchbrowse(activeTab);
-                } else if (subItemParent?.itmcode) {
-                    await fetchSubItemList(subItemParent);
-                }
+            // IMPORTANT:
+            // This API can return success:true even when the record cannot be
+            // deleted (for example: "Record is in use."). Therefore success:true
+            // alone must NEVER be treated as a successful delete.
+            // A real success is identified by the API success status (P) or a
+            // clear successful-delete message. Everything else is permission/error.
+            const hasExplicitDeleteSuccessMessage =
+                normalizedMessage.includes('delete successful') ||
+                normalizedMessage.includes('deleted successfully') ||
+                normalizedMessage.includes('delete successfully') ||
+                normalizedMessage.includes('successfully deleted');
 
-                setDeleteLoading(false);
-                Alert.alert('Success', message);
+            const isDeleteSuccess =
+                responseData?.success === true &&
+                (responseStatus === 'P' || hasExplicitDeleteSuccessMessage);
+
+            setDeleteLoading(false);
+            setDeletePermissionVisible(false);
+            setDeleteResultTargetType(deleteTargetType);
+            setDeleteResultMessage(String(message));
+
+            if (isDeleteSuccess) {
+                // Do NOT refresh here. Refresh is intentionally performed only
+                // after the user presses OK in the result modal.
+                setDeleteResultType('SUCCESS');
             } else {
-                setDeleteLoading(false);
-                Alert.alert('Delete Failed', message);
+                // Any non-success response, including:
+                // { success:true, response:{error:false, message:'Record is in use.'} }
+                // is treated as a delete permission/error response.
+                setDeleteResultType('PERMISSION');
             }
-        } catch (error) {
+
+            setDeleteResultVisible(true);
+        } catch (error: any) {
             console.log('yarnitemdelete error:', error);
             setDeleteLoading(false);
-            Alert.alert(
-                'Delete Failed',
+            setDeletePermissionVisible(false);
+            setDeleteResultTargetType(deleteTargetType);
+            setDeleteResultType('ERROR');
+            setDeleteResultMessage(
+                error?.response?.data?.response?.message ||
+                error?.response?.data?.message ||
                 'Unable to delete item. Please try again.'
             );
+            setDeleteResultVisible(true);
         }
     };
 
@@ -6321,7 +6611,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         }
     };
 
-    
+
 
     const fetchbrowse = async (tabValue) => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
@@ -6334,7 +6624,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const historyPayload = {
                 prptype: userPtype,
                 // prptype: 'S',
-                strcode: FormState.values.yarnstrcode||'002',
+                strcode: FormState.values.yarnstrcode || '002',
                 txntype: 'yarn_creation_item_master',
                 yarntype: tabValue == 'Spun' ? '1' : '2',
             };
@@ -7030,326 +7320,6 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                 </Modal>
 
 
-                                {/* =========================================================
-                                    CUSTOM DELETE PERMISSION MODAL
-                                    - Shows the exact selected row
-                                    - Uses the selected row's own itmcode
-                                    - Own delete loading state
-                                    ========================================================= */}
-                                <Modal
-                                    visible={deletePermissionVisible}
-                                    transparent
-                                    animationType="fade"
-                                    statusBarTranslucent
-                                    onRequestClose={() => {
-                                        if (!deleteLoading) {
-                                            setDeletePermissionVisible(false);
-                                            setDeleteTarget(null);
-                                        }
-                                    }}
-                                >
-                                    <View
-                                        style={{
-                                            flex: 1,
-                                            backgroundColor: 'rgba(15, 23, 42, 0.58)',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            paddingHorizontal: 22,
-                                        }}
-                                    >
-                                        <View
-                                            style={{
-                                                width: '100%',
-                                                maxWidth: 430,
-                                                backgroundColor: '#FFFFFF',
-                                                borderRadius: 22,
-                                                overflow: 'hidden',
-                                                elevation: 16,
-                                                shadowColor: '#000',
-                                                shadowOffset: { width: 0, height: 7 },
-                                                shadowOpacity: 0.28,
-                                                shadowRadius: 14,
-                                            }}
-                                        >
-                                            {/* Header */}
-                                            <View
-                                                style={{
-                                                    backgroundColor: '#FFF1F2',
-                                                    paddingHorizontal: 20,
-                                                    paddingVertical: 18,
-                                                    flexDirection: 'row',
-                                                    alignItems: 'center',
-                                                }}
-                                            >
-                                                <View
-                                                    style={{
-                                                        width: 50,
-                                                        height: 20,
-                                                        borderRadius: 25,
-                                                        backgroundColor: '#FEE2E2',
-                                                        justifyContent: 'center',
-                                                        alignItems: 'center',
-                                                        marginRight: 14,
-                                                    }}
-                                                >
-                                                    <Icon
-                                                        name="delete-outline"
-                                                        size={20}
-                                                        color="#DC2626"
-                                                    />
-                                                </View>
-
-                                                <View style={{ flex: 1 }}>
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 16,
-                                                            fontWeight: '500',
-                                                            color: '#000',
-                                                        }}
-                                                    >
-                                                        Delete Item
-                                                    </Text>
-                                                    {/* <Text
-                                                        style={{
-                                                            marginTop: 3,
-                                                            fontSize: 13,
-                                                            fontWeight: '700',
-                                                            color: '#B91C1C',
-                                                        }}
-                                                    >
-                                                        Permanent action
-                                                    </Text> */}
-                                                </View>
-                                            </View>
-
-                                            {/* Body */}
-                                            <View
-                                                style={{
-                                                    paddingHorizontal: 20,
-                                                    paddingTop: 22,
-                                                    paddingBottom: 8,
-                                                }}
-                                            >
-                                                <Text
-                                                    style={{
-                                                        fontSize: 14,
-                                                        lineHeight: 18,
-                                                        fontWeight: '500',
-                                                        color: '#000',
-                                                        marginBottom: 18,
-                                                    }}
-                                                >
-                                                    Are you sure you want to delete this item?
-                                                </Text>
-
-                                                {/* Selected item information */}
-                                                <View
-                                                    style={{
-                                                        backgroundColor: '#F8FAFC',
-                                                        borderWidth: 1,
-                                                        borderColor: '#E2E8F0',
-                                                        borderRadius: 15,
-                                                        padding: 10,
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 12,
-                                                            fontWeight: '800',
-                                                            color: '#000',
-                                                            marginBottom: 7,
-                                                        }}
-                                                    >
-                                                        {deleteTargetType === 'SUB' ? 'SUB ITEM' : 'ITEM'}
-                                                    </Text>
-
-                                                    <Text
-                                                        numberOfLines={3}
-                                                        style={{
-                                                            fontSize: 14,
-                                                            lineHeight: 18,
-                                                            fontWeight: '500',
-                                                            color: '#0000',
-                                                        }}
-                                                    >
-                                                        {deleteTarget?.WNameCode ||
-                                                            deleteTarget?.itmname ||
-                                                            deleteTarget?.ItmName ||
-                                                            'Selected Item'}
-                                                    </Text>
-
-                                                    {/* <View
-                                                        style={{
-                                                            flexDirection: 'row',
-                                                            alignItems: 'center',
-                                                            marginTop: 13,
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                fontWeight: '700',
-                                                                color: '#64748B',
-                                                                marginRight: 9,
-                                                            }}
-                                                        >
-                                                            Item Code
-                                                        </Text>
-
-                                                        <View
-                                                            style={{
-                                                                backgroundColor: '#E0F2FE',
-                                                                borderRadius: 9,
-                                                                paddingHorizontal: 11,
-                                                                paddingVertical: 6,
-                                                            }}
-                                                        >
-                                                            <Text
-                                                                style={{
-                                                                    color: '#0369A1',
-                                                                    fontSize: 14,
-                                                                    fontWeight: '800',
-                                                                }}
-                                                            >
-                                                                {deleteTarget?.itmcode ||
-                                                                    deleteTarget?.mitmcode ||
-                                                                    deleteTarget?.ItmCode ||
-                                                                    '-'}
-                                                            </Text>
-                                                        </View>
-                                                    </View> */}
-                                                </View>
-
-                                                {/* Warning */}
-                                                <View
-                                                    style={{
-                                                        marginTop: 16,
-                                                        backgroundColor: '#FEF2F2',
-                                                        borderRadius: 13,
-                                                        paddingHorizontal: 14,
-                                                        paddingVertical: 12,
-                                                        flexDirection: 'row',
-                                                        alignItems: 'center',
-                                                    }}
-                                                >
-                                                    <View
-                                                        style={{
-                                                            width: 30,
-                                                            height: 30,
-                                                            borderRadius: 15,
-                                                            backgroundColor: '#FEE2E2',
-                                                            justifyContent: 'center',
-                                                            alignItems: 'center',
-                                                        }}
-                                                    >
-                                                        <Icon
-                                                            name="warning-amber"
-                                                            size={18}
-                                                            color="#DC2626"
-                                                        />
-                                                    </View>
-
-                                                    <View style={{ flex: 1, marginLeft: 10 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                fontWeight: '800',
-                                                                color: '#B91C1C',
-                                                            }}
-                                                        >
-                                                            This action cannot be undone.
-                                                        </Text>
-                                                        {/* <Text
-                                                            style={{
-                                                                marginTop: 3,
-                                                                fontSize: 12,
-                                                                color: '#7F1D1D',
-                                                            }}
-                                                        >
-                                                            The selected item will be permanently removed.
-                                                        </Text> */}
-                                                    </View>
-                                                </View>
-                                            </View>
-
-                                            {/* Delete button only. Cancel stays removed/commented as requested. */}
-                                            <View
-                                                style={{
-                                                    paddingHorizontal: 20,
-                                                    paddingVertical: 18,
-                                                }}
-                                            >
-                                                {/*
-                                                <TouchableOpacity
-                                                    disabled={deleteLoading}
-                                                    onPress={() => {
-                                                        if (deleteLoading) return;
-                                                        setDeletePermissionVisible(false);
-                                                        setDeleteTarget(null);
-                                                    }}
-                                                >
-                                                    <Text>CANCEL</Text>
-                                                </TouchableOpacity>
-                                                */}
-
-                                                <TouchableOpacity
-                                                    disabled={deleteLoading}
-                                                    activeOpacity={0.8}
-                                                    onPress={confirmDeleteItem}
-                                                    style={{
-                                                        width: '100%',
-                                                        height: 54,
-                                                        borderRadius: 14,
-                                                        backgroundColor: deleteLoading
-                                                            ? '#F87171'
-                                                            : '#DC2626',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        flexDirection: 'row',
-                                                    }}
-                                                >
-                                                    {deleteLoading ? (
-                                                        <>
-                                                            <ActivityIndicator
-                                                                size="small"
-                                                                color="#FFFFFF"
-                                                            />
-                                                            <Text
-                                                                style={{
-                                                                    marginLeft: 9,
-                                                                    fontSize: 14,
-                                                                    fontWeight: '500',
-                                                                    color: '#FFFFFF',
-                                                                }}
-                                                            >
-                                                                DELETING...
-                                                            </Text>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Icon
-                                                                name="delete-outline"
-                                                                size={20}
-                                                                color="#FFFFFF"
-                                                            />
-                                                            <Text
-                                                                style={{
-                                                                    marginLeft: 8,
-                                                                    fontSize: 14,
-                                                                    fontWeight: '500',
-                                                                    color: '#FFFFFF',
-                                                                }}
-                                                            >
-                                                                DELETE ITEM
-                                                            </Text>
-                                                        </>
-                                                    )}
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    </View>
-                                </Modal>
-
                                 {activeTab === 'Spun' && <SpunTab />}
                                 {activeTab === 'Filaments' && <FilamentTab />}
                             </View>
@@ -7374,6 +7344,193 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     />
                 </View>
             )}
+            {/* =========================================================
+                GLOBAL DELETE MODALS
+                - Mounted outside the currentScreen conditional.
+                - Therefore MAIN/SUB delete permission and API result modals
+                  stay over the exact screen from which Delete was pressed.
+                ========================================================= */}
+            {/* =========================================================
+                MAIN ITEM DELETE PERMISSION
+                - Main item has its own confirmation modal.
+                ========================================================= */}
+            <YarnDeletePermissionModal
+                visible={
+                    deletePermissionVisible &&
+                    deleteTargetType === 'MAIN'
+                }
+                loading={deleteLoading}
+                itemType="MAIN"
+                item={deleteTarget}
+                onCancel={() => {
+                    if (deleteLoading) return;
+                    setDeletePermissionVisible(false);
+                    setDeleteTarget(null);
+                }}
+                onConfirm={confirmDeleteItem}
+            />
+
+            {/* =========================================================
+                SUB ITEM DELETE PERMISSION
+                - Sub item has a completely separate confirmation modal.
+                - Uses the selected sub item's own itmcode.
+                ========================================================= */}
+            <YarnDeletePermissionModal
+                visible={
+                    deletePermissionVisible &&
+                    deleteTargetType === 'SUB'
+                }
+                loading={deleteLoading}
+                itemType="SUB"
+                item={deleteTarget}
+                onCancel={() => {
+                    if (deleteLoading) return;
+                    setDeletePermissionVisible(false);
+                    setDeleteTarget(null);
+                }}
+                onConfirm={confirmDeleteItem}
+            />
+
+            {/* Simple DELETE API result modal */}
+            <Modal
+                visible={deleteResultVisible}
+                transparent
+                animationType="fade"
+                statusBarTranslucent
+                onRequestClose={() => {
+                    if (!deleteLoading) {
+                        setDeleteResultVisible(false);
+                        setDeleteResultMessage('');
+                        setDeleteTarget(null);
+                    }
+                }}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.45)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        paddingHorizontal: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 380,
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: 16,
+                            padding: 20,
+                            elevation: 8,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.18,
+                            shadowRadius: 8,
+                        }}
+                    >
+                        <View style={{ alignItems: 'center' }}>
+                            <View
+                                style={{
+                                    width: 46,
+                                    height: 46,
+                                    borderRadius: 23,
+                                    backgroundColor:
+                                        deleteResultType === 'SUCCESS' ? '#DCFCE7' : '#FEE2E2',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: 10,
+                                }}
+                            >
+                                <Icon
+                                    name={
+                                        deleteResultType === 'SUCCESS'
+                                            ? 'check'
+                                            : 'error-outline'
+                                    }
+                                    size={25}
+                                    color={
+                                        deleteResultType === 'SUCCESS' ? '#16A34A' : '#DC2626'
+                                    }
+                                />
+                            </View>
+
+                            <Text
+                                style={{
+                                    fontSize: 18,
+                                    fontWeight: '800',
+                                    color: '#18212F',
+                                    textAlign: 'center',
+                                }}
+                            >
+                                {deleteResultType === 'SUCCESS'
+                                    ? (deleteResultTargetType === 'SUB'
+                                        ? 'Sub Item Deleted'
+                                        : 'Item Deleted')
+                                    : deleteResultType === 'PERMISSION'
+                                        ? 'Delete Permission'
+                                        : 'Delete Failed'}
+                            </Text>
+                        </View>
+
+                        <Text
+                            style={{
+                                marginTop: 14,
+                                fontSize: 14,
+                                lineHeight: 20,
+                                color: '#475467',
+                                textAlign: 'center',
+                            }}
+                        >
+                            {deleteResultMessage}
+                        </Text>
+
+                        {deleteResultType === 'PERMISSION' && (
+                            <Text
+                                style={{
+                                    marginTop: 10,
+                                    fontSize: 12.5,
+                                    lineHeight: 18,
+                                    color: '#B42318',
+                                    textAlign: 'center',
+                                }}
+                            >
+                                {deleteResultTargetType === 'SUB'
+                                    ? 'This sub item is currently in use or deletion is not permitted.'
+                                    : 'This item is currently in use or deletion is not permitted.'}
+                            </Text>
+                        )}
+
+                        <TouchableOpacity
+                            disabled={deleteLoading}
+                            activeOpacity={0.82}
+                            onPress={handleDeleteResultOk}
+                            style={{
+                                marginTop: 18,
+                                height: 46,
+                                borderRadius: 10,
+                                backgroundColor: YARN_UI.primary,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            {deleteLoading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '700',
+                                        color: '#FFFFFF',
+                                    }}
+                                >
+                                    OK
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
             {/* </SafeAreaView> */}
         </YarnManagementContext.Provider>
     );

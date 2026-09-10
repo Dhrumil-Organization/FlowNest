@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 type Args = { UserId: string | number; ModuleCode: string; ModuleName: string; ScreenCode: string; ScreenName: string; token?: string };
 export function useMobileUserPreference(args: Args) {

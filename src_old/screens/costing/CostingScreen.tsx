@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
@@ -177,7 +178,7 @@ function CostSheetPreviewModal({
         try {
             await Share.share({ message: shareText });
         } catch (e: any) {
-            Alert.alert('Share Error', e?.message || 'Unable to share costing');
+            AppAlert.alert('Share Error', e?.message || 'Unable to share costing');
         }
     };
 
@@ -354,7 +355,7 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
             setPriceMap(pm);
             setDyeMap(dm);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         }
     };
 
@@ -368,7 +369,7 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
             });
             setResult(res.data.data);
         } catch (e: any) {
-            Alert.alert('Compute Error', e.message);
+            AppAlert.alert('Compute Error', e.message);
         } finally {
             setComputing(false);
         }
@@ -382,14 +383,14 @@ function CostingTab({ onSaved }: { onSaved: () => void }) {
     }, [mdId, priceMap, dyeMap, params]);
 
     const save = async () => {
-        if (!result) { Alert.alert('Compute first'); return; }
+        if (!result) { AppAlert.alert('Compute first'); return; }
         setSaving(true);
         try {
             await CostingAPI.save({ md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params });
-            Alert.alert('Saved ✓', 'Costing record saved to history');
+            AppAlert.alert('Saved ✓', 'Costing record saved to history');
             onSaved();
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         } finally {
             setSaving(false);
         }
@@ -611,7 +612,7 @@ function HistoryTab({ refreshKey }: { refreshKey: number }) {
             const res = await CostingAPI.history();
             setGroups(res.data.data);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -695,7 +696,7 @@ function VarianceTab() {
             const res = await CostingAPI.variance(id);
             setData(res.data.data);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         } finally {
             setLoading(false);
         }

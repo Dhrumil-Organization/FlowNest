@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 // ── Financial Year Helper ────────────────────────────────────────
 // calMonth: 0-indexed JS Date month (0=Jan ... 11=Dec)
 // April (3) onwards belongs to the NEW financial year

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 const API_BASE_URL = `${API}/api`;
 

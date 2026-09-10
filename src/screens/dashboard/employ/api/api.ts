@@ -4,7 +4,7 @@
 // // (see @/src/api/client.ts) instead of the old '../../../../common/API/dynamicAPI'
 // // path, which does not exist inside this project.
 // // import { initNewErpAPI } from "@/src/api/client";
-// import AsyncStorage from "@react-native-async-storage/async-storage";
+// import AsyncStorage from "@/common/utils/compatibleStorage";
 
 // const NEW_ERP_API_URLS = {
 //   sudamo_knits: 'https://apig.tms-webapp.com',
@@ -158,7 +158,7 @@
 
 // screens/dashboard/employ/api/api.js
 // Central API service for the Employ Dashboard section.
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 
 const NEW_ERP_API_URLS = {
   sudamo_knits: 'https://apig.tms-webapp.com',

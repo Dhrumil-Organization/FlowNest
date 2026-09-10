@@ -15,6 +15,7 @@ import './modules/orders.permission';
 import './modules/administration.permission';
 import './modules/greyPacking.permission';
 import './modules/priority.permission';
+import './modules/datalog.permission';
 
 import { validatePermissionRegistry } from './permissionRegistry';
 

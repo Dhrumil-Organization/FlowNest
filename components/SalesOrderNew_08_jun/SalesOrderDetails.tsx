@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
@@ -76,27 +77,27 @@ const SalesOrderDetails = ({ navigation, route }) => {
 
   const onSave = () => {
     if (!selectedItem?.ItmCode) {
-      Alert.alert('Required', 'Item missing');
+      AppAlert.alert('Required', 'Item missing');
       return;
     }
 
     if (!selectedDesign?.DsnCode) {
-      Alert.alert('Required', 'Design missing');
+      AppAlert.alert('Required', 'Design missing');
       return;
     }
 
     if (!selectedShade?.ShdCode) {
-      Alert.alert('Required', 'Shade missing');
+      AppAlert.alert('Required', 'Shade missing');
       return;
     }
 
     if (num(qty) <= 0) {
-      Alert.alert('Required', 'Enter valid qty');
+      AppAlert.alert('Required', 'Enter valid qty');
       return;
     }
 
     if (num(rate) <= 0) {
-      Alert.alert('Required', 'Enter valid rate');
+      AppAlert.alert('Required', 'Enter valid rate');
       return;
     }
 
@@ -166,7 +167,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
       // );
 
       // if (existsIndex >= 0) {
-      //   Alert.alert(
+      //   AppAlert.alert(
       //     'Duplicate Shade',
       //     'This shade is already added for same item and design.',
       //   );
@@ -182,7 +183,7 @@ const SalesOrderDetails = ({ navigation, route }) => {
       if (existsIndex >= 0
         && shadeName !== 'apc'
       ) {
-        Alert.alert(
+        AppAlert.alert(
           'Duplicate Shade',
           'This shade is already added for same item and design.',
         );

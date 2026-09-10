@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     View,
@@ -33,7 +34,7 @@ import theme from '@/components/theme';
 import { API } from '../../common/API/dynamicAPI';
 // import CriteriaForm from './CriteriaForm';
 import { fetchAllStoredata } from '../../common/API/Functions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { useNavigation } from '@react-navigation/native';
 // import { navigate } from '../../android/app/src/navigation/NavigationService';
 import { useRouter } from 'expo-router';
@@ -592,7 +593,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             );
             console.log('🔵 fetchData request tab api response', response);
             if (response.data.success == false) {
-                Alert.alert(response.data.message)
+                AppAlert.alert(response.data.message)
             }
             if (response.data.success && response.data.response.data.length > 0) {
                 const updatedData = response.data.response.data.map(item => {
@@ -610,7 +611,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -679,7 +680,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -724,7 +725,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -770,7 +771,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -813,7 +814,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -865,7 +866,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -910,7 +911,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -962,7 +963,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -1019,7 +1020,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -1127,25 +1128,25 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
@@ -1157,7 +1158,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
                 )
@@ -1233,7 +1234,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -1384,12 +1385,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                 setMailLogData(response.data.data);
                 setMailLogModal(true);
             } else {
-                Alert.alert('Info', 'No Data Found');
+                AppAlert.alert('Info', 'No Data Found');
             }
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -1425,12 +1426,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
                 params: { pdfUrl, title: 'Purchase Order' },
             });
             // if (!pdfUrlFromApi) {
-            //     Alert.alert('Error', 'PDF URL not found in server response');
+            //     AppAlert.alert('Error', 'PDF URL not found in server response');
             //     return;
             // }
             // const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
             // if (!pdfResp || !pdfResp.data) {
-            //     Alert.alert('Error', 'Failed to download PDF bytes');
+            //     AppAlert.alert('Error', 'Failed to download PDF bytes');
             //     return;
             // }
             // const buffer = Buffer.from(new Uint8Array(pdfResp.data));
@@ -1443,7 +1444,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             // setShowPdfModal(true);
         } catch (err: any) {
             console.error('handleCallURL error:', err);
-            Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
+            AppAlert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
         } finally {
             setLocationLoading(false);
             setPdfLoading(false);
@@ -1456,7 +1457,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
             await Share.share({ url: urlToShare } as any);
         } catch (err) {
             console.warn('shareLocalFile error', err);
-            Alert.alert('Share failed', err?.message || String(err));
+            AppAlert.alert('Share failed', err?.message || String(err));
         }
     };
 
@@ -1472,7 +1473,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
 
     //     // const handleDownload = async () => {
     //     //     try {
-    //     //         if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+    //     //         if (!pdfUrl) { AppAlert.alert('No file', 'No PDF available to download'); return; }
     //     //         if (Platform.OS === 'ios') {
     //     //             await shareLocalFile(pdfUrl);
     //     //             return;
@@ -1486,11 +1487,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
     //     //             if (ToastAndroid) {
     //     //                 ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
     //     //             } else {
-    //     //                 Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+    //     //                 AppAlert.alert('Saved', `Saved to Downloads:\n${destPath}`);
     //     //             }
     //     //         } catch (copyErr: any) {
     //     //             console.error('copyFile failed', copyErr);
-    //     //             Alert.alert(
+    //     //             AppAlert.alert(
     //     //                 'Save failed',
     //     //                 'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
     //     //                 [
@@ -1502,7 +1503,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
     //     //         }
     //     //     } catch (err) {
     //     //         console.error('handleDownload error', err);
-    //     //         Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+    //     //         AppAlert.alert('Error', `Could not save PDF: ${err?.message || err}`);
     //     //     }
     //     // };
 
@@ -1538,7 +1539,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, isConnected = true, usernam
     //                                     style={{ flex: 1 }}
     //                                     onError={(e) => {
     //                                         console.error('react-native-pdf error', e);
-    //                                         Alert.alert('Error', 'Failed to render PDF');
+    //                                         AppAlert.alert('Error', 'Failed to render PDF');
     //                                     }}
     //                                 />
     //                             )

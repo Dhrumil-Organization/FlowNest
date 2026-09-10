@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, FlatList, Alert, ActivityIndicator } from "react-native";
 import axios from "axios";
@@ -6,7 +7,7 @@ import { API, PRINTSTICKER, PRINTERSLISTAPI } from "../../common/API/dynamicAPI"
 import CustomSearchableDropdown from '@/Shared/CustomSearchableDropdown';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import { Snackbar } from '@/common/utils/snackbarCompat';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -535,7 +536,7 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
             // else if (resData?.success === true) {
             //     setGetSavedData(payload);
 
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         "Success",
             //         resData?.response?.message,
             //         [
@@ -696,7 +697,7 @@ const WeftIssueReturnEntry = ({ navigation, route }) => {
 
     const printSticker = () => {
         if (typeof printer == 'undefined' || printer == null || printer == '') {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
         else {

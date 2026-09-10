@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView, ActivityIndicator, TextInput } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -17,7 +18,7 @@ import { showSnackbar, showSuccess, showError } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import FabricQrScannerModal from './FabricQrScannerModal';
 import { findFabricStockRow, parseFabricQr } from './fabricQr';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 interface Props {
     token: string;
@@ -227,7 +228,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             const response_details = await axios.post(`${API}/api/getparentdesign`, payload, { headers });
             if (response.data.success === true && response.data.data.length === 0) {
                 setIsLoading(false);
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
                 setPOTData([]);
             } else if (response.data.success === true && response.data.data.length > 0) {
                 setIsLoading(false);
@@ -235,11 +236,11 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
                 closeDrawer();
             } else if (response.data.success === false) {
                 setIsLoading(false);
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setPOTData([]);
             } else {
                 setIsLoading(false);
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setPOTData([]);
             }
             if (response_details.data.success === true && response_details.data.data.length > 0) {
@@ -247,7 +248,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             setIsLoading(false);
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
             setPOTData([]);
         }
     };
@@ -302,7 +303,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
 
     const openVerificationScanner = () => {
         if (!Array.isArray(getAllStockData) || getAllStockData.length === 0) {
-            Alert.alert('Load Stock First', 'Select property/year and load fabric stock before scanning a taka.');
+            AppAlert.alert('Load Stock First', 'Select property/year and load fabric stock before scanning a taka.');
             return;
         }
         setIsQrScannerVisible(true);
@@ -317,7 +318,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             if (matchedRow) {
                 const alreadyVerified = String(matchedRow?.Status ?? '') === '2' || Number(matchedRow?.Chk ?? 0) === 1 || getSavedCartons.includes(matchedRow?.UId);
                 if (alreadyVerified) {
-                    Alert.alert('Already Verified', `Taka ${matchedRow?.CartNo || qr.CartNo || ''} is already verified.`);
+                    AppAlert.alert('Already Verified', `Taka ${matchedRow?.CartNo || qr.CartNo || ''} is already verified.`);
                     return;
                 }
 
@@ -329,7 +330,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             // Do NOT copy the scanned QR payload into Manual Entry.
             // Manual Entry is a fresh operator-entry form. This is especially
             // important when the QR parser cannot identify a valid Taka No.
-            Alert.alert(
+            AppAlert.alert(
                 'Taka Not Found',
                 `Scanned Taka ${qr.CartNo || 'could not be identified'} is not found.`,
                 [
@@ -339,7 +340,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             );
         } catch (error) {
             setIsQrScannerVisible(false);
-            Alert.alert('Invalid QR', 'This QR could not be read as a fabric/taka QR code.');
+            AppAlert.alert('Invalid QR', 'This QR could not be read as a fabric/taka QR code.');
         }
     };
 
@@ -468,7 +469,7 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
             const response = await axios.post(`${API}/api/update_verify_manual_fabric_stock`, payload, { headers });
 
             if (response.data.success === true && response.data.data.length === 0) {
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
                 setIsLoading(false);
             } else if (response.data.success === true && response.data.data.length > 0) {
                 setSavedCartons(getSavedCartons => [...getSavedCartons, response.data.data[0].UId]);
@@ -479,15 +480,15 @@ const FabricStockVerification: React.FC<Props> = ({ token, username }) => {
                 });
                 setIsLoading(false);
             } else if (response.data.success === false) {
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setIsLoading(false);
             } else {
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setIsLoading(false);
             }
         } catch (error) {
             setIsLoading(false);
-            Alert.alert('Server Error :' + error);
+            AppAlert.alert('Server Error :' + error);
         }
         setModalOpen(false);
     };

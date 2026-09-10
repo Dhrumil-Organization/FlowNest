@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 // export default AuthReviewScreen;
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -72,7 +73,7 @@ const AuthReviewScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [inquiryId, designId, getUserPrptype]);
 
   const approve = (getUserPrptype) => {
-    Alert.alert(
+    AppAlert.alert(
       'Approve this cost sheet?',
       `GM: ${sheet?.gross_margin_pct}% (${formatCurrency(
         sheet?.gross_margin_amount || 0,
@@ -85,11 +86,11 @@ const AuthReviewScreen: React.FC<Props> = ({ route, navigation }) => {
             setProcessing(true);
             try {
               await costSheetApi.approve(inquiryId, designId, getUserPrptype, getCurrentFinancialYear());
-              Alert.alert('Approved', 'Cost sheet approved successfully', [
+              AppAlert.alert('Approved', 'Cost sheet approved successfully', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
             } catch (e: any) {
-              Alert.alert('Error', e?.response?.data?.message || 'Failed');
+              AppAlert.alert('Error', e?.response?.data?.message || 'Failed');
             } finally {
               setProcessing(false);
             }
@@ -101,7 +102,7 @@ const AuthReviewScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const reject = async (getUserPrptype) => {
     if (!rejectReason) {
-      Alert.alert('Select reason', 'Please select a rejection reason');
+      AppAlert.alert('Select reason', 'Please select a rejection reason');
       return;
     }
     setProcessing(true);
@@ -110,11 +111,11 @@ const AuthReviewScreen: React.FC<Props> = ({ route, navigation }) => {
         reason: rejectReason,
         remarks: rejectRemarks,
       });
-      Alert.alert('Rejected', 'Cost sheet rejected. Costing person notified.', [
+      AppAlert.alert('Rejected', 'Cost sheet rejected. Costing person notified.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed');
     } finally {
       setProcessing(false);
     }

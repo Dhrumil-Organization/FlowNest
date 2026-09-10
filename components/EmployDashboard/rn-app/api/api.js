@@ -1,7 +1,7 @@
 // api/api.js
 // Central API service - replace BASE_URL with your server
 // import { API } from '../../common/API/dynamicAPI';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { API } from '../../../../common/API/dynamicAPI';
 
 const BASE_URL = `${API}/api`; // ← CHANGE THIS

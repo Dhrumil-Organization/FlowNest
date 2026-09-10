@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -17,7 +18,7 @@ import { API } from '../../common/API/dynamicAPI';
 
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownYarn from '@/Shared/PartyDropdownYarn';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import CustomDrawer from './CustomDrawer';
 interface Props {
@@ -1107,7 +1108,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
         const errorMessage = validateSpunForm();
         if (errorMessage) {
-            Alert.alert("Validation", errorMessage);
+            AppAlert.alert("Validation", errorMessage);
             return;
         }
         try {
@@ -1152,7 +1153,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 const newItemCode = response?.data?.data?.data?.itmcode;
                 console.log("newItemCode", newItemCode);
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Item ${newItemCode} Saved successfully.`,
                     [
@@ -1186,7 +1187,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
             }
             else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -1243,7 +1244,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
         const errorMessage = validateFilamentForm();
         if (errorMessage) {
-            Alert.alert("Validation", errorMessage);
+            AppAlert.alert("Validation", errorMessage);
             return;
         }
 
@@ -1289,7 +1290,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                 const newItemCode = response?.data?.data?.data?.itmcode;
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Item ${newItemCode} saved successfully.`,
                     [
@@ -1332,7 +1333,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
 
             } else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -1344,7 +1345,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 console.log("Request cancelled:", error.message);
             } else {
                 console.log("API error:", error);
-                Alert.alert("Error", "Something went wrong");
+                AppAlert.alert("Error", "Something went wrong");
             }
         }
         finally {
@@ -1368,12 +1369,12 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const subitemvalidate = () => {
         if (!subitemform.WNameCode) {
-            Alert.alert("Validation", "Yarn Main Code required");
+            AppAlert.alert("Validation", "Yarn Main Code required");
             return false;
         }
 
         if (!blendList || blendList.length === 0) {
-            Alert.alert("Validation", "Please select blend");
+            AppAlert.alert("Validation", "Please select blend");
             return false;
         }
 
@@ -1383,7 +1384,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const per = Number(blendList[i].per);
 
             if (!per || per <= 0) {
-                Alert.alert("Validation", `Enter valid % for ${blendList[i].name}`);
+                AppAlert.alert("Validation", `Enter valid % for ${blendList[i].name}`);
                 return false;
             }
 
@@ -1391,41 +1392,41 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         }
 
         if (total !== 100) {
-            Alert.alert("Validation", `Total percentage must be 100. Current: ${total}`);
+            AppAlert.alert("Validation", `Total percentage must be 100. Current: ${total}`);
             return false;
         }
 
         // if (!subitemform.count_id) {
-        //     Alert.alert("Validation", "Please select Count");
+        //     AppAlert.alert("Validation", "Please select Count");
         //     return false;
         // }
 
         if (!subitemform.count_no) {
-            Alert.alert("Validation", "Please enter count value");
+            AppAlert.alert("Validation", "Please enter count value");
             return false;
         }
 
         if (!subitemform.ply_id) {
-            Alert.alert("Validation", "Please select Ply");
+            AppAlert.alert("Validation", "Please select Ply");
             return false;
         }
 
         if (!subitemform.subtype_id) {
-            Alert.alert("Validation", "Please enter yarn type");
+            AppAlert.alert("Validation", "Please enter yarn type");
             return false;
         }
 
         // if (!subitemform.others) {
-        //     Alert.alert("Validation", "Please enter others Value");
+        //     AppAlert.alert("Validation", "Please enter others Value");
         //     return false;
         // }
         if (!subitemform.linkitmcode) {
-            Alert.alert("Validation", "Please enter Sub Item Name");
+            AppAlert.alert("Validation", "Please enter Sub Item Name");
             return false;
         }
 
         // if (!subitemform.ItmCode) {
-        //     Alert.alert("Validation", "Please select Link Item");
+        //     AppAlert.alert("Validation", "Please select Link Item");
         //     return false;
         // }
 
@@ -1483,7 +1484,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             console.log("spun add response", response);
             if (response?.data?.success) {
                 const newItemCode = response?.data?.data?.data?.itmcode;
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Item ${newItemCode} Saved successfully.`,
                     [
@@ -1534,7 +1535,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
             }
             else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -1599,11 +1600,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const partyitemvalidation = () => {
         if (!partyForm.acccode) {
-            Alert.alert("Validation", "Party Can not be blank");
+            AppAlert.alert("Validation", "Party Can not be blank");
             return false;
         }
         if (!partyForm.ItemName) {
-            Alert.alert("Validation", "Please enter Item value");
+            AppAlert.alert("Validation", "Please enter Item value");
             return false;
         }
         return true;
@@ -1614,7 +1615,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         const isValid = partyitemvalidation();
         if (!isValid) return;
         if (!selectedBrowseItem?.itmcode) {
-            Alert.alert("Error", "Please select item from list");
+            AppAlert.alert("Error", "Please select item from list");
             return;
         }
         try {
@@ -1650,7 +1651,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             console.log("party add response", response);
             if (response?.data?.success) {
                 const newItemCode = response?.data?.data?.data?.itmcode;
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Item Saved successfully.`,
                     [
@@ -1688,7 +1689,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
             }
             else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -1986,7 +1987,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                             //         const total = getTotalPercentage(updated);
 
                                             //         if (total !== 100) {
-                                            //             Alert.alert(
+                                            //             AppAlert.alert(
                                             //                 "Validation",
                                             //                 `Total percentage must be 100. Current: ${total}`
                                             //             );
@@ -2310,7 +2311,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                         // }}
                         onPress={() => {
                             // if (!selectedsubitem || !selectedsubitem.ItmCode) {
-                            //     Alert.alert(
+                            //     AppAlert.alert(
                             //         "Confirmation",
                             //         "Link item is not selected. Do you want to create a new item?",
                             //         [
@@ -3493,7 +3494,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                             // }}
                                             onPress={() => {
                                                 // if (!selecteditem || !selecteditem.ItmCode) {
-                                                //     Alert.alert(
+                                                //     AppAlert.alert(
                                                 //         "Confirmation",
                                                 //         "Link item is not selected. Do you want to create a new item?",
                                                 //         [
@@ -4134,7 +4135,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                                             onPress={() => {
                                                 // if (!selectedfilamentitem || !selectedfilamentitem.ItmCode) {
-                                                //     Alert.alert(
+                                                //     AppAlert.alert(
                                                 //         "Confirmation",
                                                 //         "Link item is not selected. Do you want to create a new item?",
                                                 //         [

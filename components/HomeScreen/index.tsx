@@ -1,3 +1,5 @@
+import { getLoginSource } from '@/src/platform/runtime';
+import AppAlert from '@/common/utils/appAlert';
 /////// [3] /////////
 import { initDatabase } from '@/common/API/DatabaseManager';
 import { API, initAPI } from '@/common/API/dynamicAPI';
@@ -10,7 +12,7 @@ import { fetchAndCacheGlobalData, initGlobalCacheDB } from '@/common/utils/sqlit
 import Header from '@/components/Header';
 import { getCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import * as Device from 'expo-device';
 import { useRouter } from 'expo-router';
@@ -333,7 +335,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
             const loginResponse = response.data.response || {};
             const token = loginResponse.access_token;
             const user = loginResponse.user;
-            const userLoginFrom = user?.regsrc || 'web';
+            const userLoginFrom = getLoginSource();
             const userDetails = user?.first_name || 'user';
             const userAvailable = user?.is_deleted || 'user';
             const userMenuApps = loginResponse.usermenu || '';
@@ -475,7 +477,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
             }
 
             setPrp(previousProperty);
-            Alert.alert(
+            AppAlert.alert(
                 'Property switch failed',
                 error?.message || 'Unable to switch property.'
             );

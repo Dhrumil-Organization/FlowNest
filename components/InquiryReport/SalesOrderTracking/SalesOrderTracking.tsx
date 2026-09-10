@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -19,7 +20,7 @@ import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import data from './data.json';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { crlimtreq_styles } from '../../common/Styles/Style';
 import {
     ExeData,
@@ -345,7 +346,7 @@ const SalesOrderTracking: React.FC<{
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -409,7 +410,7 @@ const SalesOrderTracking: React.FC<{
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -460,7 +461,7 @@ const SalesOrderTracking: React.FC<{
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -524,7 +525,7 @@ const SalesOrderTracking: React.FC<{
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -881,11 +882,11 @@ const SalesOrderTracking: React.FC<{
                     setsalessumdata(response.data.data.salessumdata);
                     // await saveToCache(CACHE_KEY_CONFIRM_ACTION, { payload, response: response.data });
                 } else if (response.data.success === false) {
-                    Alert.alert(`${response.data.message}`);
+                    AppAlert.alert(`${response.data.message}`);
                     setsalesdata([]);
                     setsalessumdata([]);
                 } else {
-                    Alert.alert('No Data Found!');
+                    AppAlert.alert('No Data Found!');
                     setsalesdata([]);
                     setsalessumdata([]);
                 }
@@ -894,7 +895,7 @@ const SalesOrderTracking: React.FC<{
                 }
                 console.log('🔵 responsedsn hiii');
             } catch (error) {
-                Alert.alert('Error', `Server error: ${error?.message}`);
+                AppAlert.alert('Error', `Server error: ${error?.message}`);
                 setsalesdata([]);
                 setsalessumdata([]);
             } finally {
@@ -974,7 +975,7 @@ const SalesOrderTracking: React.FC<{
                     setDData(partyData);
                     openDesignModal(response.data.data, payload);
                 } else {
-                    Alert.alert('No Data Found!');
+                    AppAlert.alert('No Data Found!');
                 }
             }
             if (responsedes?.data?.data) {
@@ -991,7 +992,7 @@ const SalesOrderTracking: React.FC<{
             // }
         } catch (error) {
             console.error('Error in handleCardPress:', error);
-            Alert.alert('Error', 'Failed to process party details');
+            AppAlert.alert('Error', 'Failed to process party details');
         } finally {
             setTrackingLoader(false);
         }
@@ -1081,7 +1082,7 @@ const SalesOrderTracking: React.FC<{
             // }
         } catch (error) {
             console.error('Error in handleCardPress:', error);
-            Alert.alert('Error', 'Failed to process party details');
+            AppAlert.alert('Error', 'Failed to process party details');
         } finally {
             setIsLoading(false);
         }
@@ -1121,7 +1122,7 @@ const SalesOrderTracking: React.FC<{
     //         }
     //     } catch (error) {
     //         console.error("Error in handleCardPress:", error);
-    //         Alert.alert("Error", "Failed to process party details");
+    //         AppAlert.alert("Error", "Failed to process party details");
     //     } finally {
     //         setTrackingLoader(false);
     //     }
@@ -1218,7 +1219,7 @@ const SalesOrderTracking: React.FC<{
             }
         } catch (error) {
             console.error('Error in handleCardPress:', error);
-            Alert.alert('Error', 'Failed to process party details');
+            AppAlert.alert('Error', 'Failed to process party details');
         } finally {
             setTrackingLoader(false);
         }
@@ -1317,7 +1318,7 @@ const SalesOrderTracking: React.FC<{
             }
         } catch (error) {
             console.error('Error in handleCardPress:', error);
-            Alert.alert('Error', 'Failed to process party details');
+            AppAlert.alert('Error', 'Failed to process party details');
         } finally {
             setTrackingLoader(false);
         }
@@ -1455,7 +1456,7 @@ const SalesOrderTracking: React.FC<{
         } catch (error) {
             if (!axios.isCancel(error)) {
 
-                Alert.alert('Error', `Server error: ${error.message}`);
+                AppAlert.alert('Error', `Server error: ${error.message}`);
             }
         }
     };

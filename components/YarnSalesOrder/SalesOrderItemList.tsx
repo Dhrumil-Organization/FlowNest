@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -157,7 +158,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
     //         setItems(Array.isArray(data) ? data : []);
     //     } catch (error) {
     //         console.log('ITEM LIST ERROR:', error?.response?.data || error.message);
-    //         Alert.alert('Error', 'Unable to load item list');
+    //         AppAlert.alert('Error', 'Unable to load item list');
     //         setItems([]);
     //     } finally {
     //         setLoading(false);
@@ -192,7 +193,7 @@ const SalesOrderItemList = ({ navigation, route }) => {
             setItems(Array.isArray(data) ? data : []);
         } catch (error) {
             console.log('ITEM LIST ERROR:', error?.response?.data || error.message);
-            Alert.alert('Error', 'Unable to load item list');
+            AppAlert.alert('Error', 'Unable to load item list');
             setItems([]);
         } finally {
             setLoading(false);

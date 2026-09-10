@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -8,7 +9,7 @@ export function CommonLogoutButton() {
   const logout = useAppSessionStore((state) => state.logout);
 
   const confirmLogout = useCallback(() => {
-    Alert.alert('Sign out?', 'This will clear the mobile session on this device.', [
+    AppAlert.alert('Sign out?', 'This will clear the mobile session on this device.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
     ]);

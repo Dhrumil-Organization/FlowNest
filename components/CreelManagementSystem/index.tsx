@@ -1,7 +1,8 @@
+import AppAlert from '@/common/utils/appAlert';
 import { yarnmanagementsystemstyle } from '@/common/Style';
 import HeaderBarwithBack from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
@@ -1511,7 +1512,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const handleLoadPress = () => {
         const { PrpCode, YearNo, fromdate, todate } = FormState.values;
         if (!PrpCode || !YearNo) {
-            Alert.alert("Validation", "Please select Property and Year");
+            AppAlert.alert("Validation", "Please select Property and Year");
             return;
         }
         const yearNo = parseInt(YearNo);
@@ -1531,7 +1532,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         // console.log("fyEnd:", fyEnd);
 
         if (from < fyStart || to > fyEnd) {
-            Alert.alert(
+            AppAlert.alert(
                 "Validation",
                 `Date must be between ${fyStart.toLocaleDateString()} and ${fyEnd.toLocaleDateString()}`
             );
@@ -1539,7 +1540,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
 
         if (from > to) {
-            Alert.alert("Validation", "From Date cannot be greater than To Date");
+            AppAlert.alert("Validation", "From Date cannot be greater than To Date");
             return;
         }
         fetchBrowseData();
@@ -1635,7 +1636,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 } else {
                     setActiveCreels([]);
                     setFilteredData([]);
-                    Alert.alert("No Record Found", "No data available");
+                    AppAlert.alert("No Record Found", "No data available");
                 }
             }
         } catch (error) {
@@ -1644,7 +1645,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 // console.log("Request cancelled");
             } else {
                 console.log("API Error:", error);
-                // Alert.alert('Error while searching');
+                // AppAlert.alert('Error while searching');
             }
         } finally {
             setIsLoading(false);
@@ -1771,7 +1772,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 setIsScanModalVisible(true);
 
             } else {
-                Alert.alert("Error", "No data found");
+                AppAlert.alert("Error", "No data found");
             }
 
         } catch (error) {
@@ -1779,7 +1780,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 // console.log("Request cancelled");
             } else {
                 console.log("API Error:", error);
-                // Alert.alert("Error while processing");
+                // AppAlert.alert("Error while processing");
             }
         } finally {
             setIsLoading(false);
@@ -1867,7 +1868,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     //             sendScannedValue(value);
     //         } catch (err) {
-    //             Alert.alert("Invalid QR", "QR format not valid");
+    //             AppAlert.alert("Invalid QR", "QR format not valid");
     //         }
     //         setIsScanning(false);
     //     },
@@ -1947,7 +1948,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     //     } catch (err) {
     //         // resetScanFields();
-    //         Alert.alert("Invalid QR", "QR format not valid");
+    //         AppAlert.alert("Invalid QR", "QR format not valid");
     //     }
 
     //     setIsScanning(false);
@@ -2060,14 +2061,14 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
             sendScannedValue(value);
         } catch (err) {
-            Alert.alert("Invalid QR", "QR format not valid");
+            AppAlert.alert("Invalid QR", "QR format not valid");
         }
         setIsScanning(false);
     };
 
     const handleSearch = async () => {
         if (!searchText) {
-            Alert.alert('Enter carton number');
+            AppAlert.alert('Enter carton number');
             return;
         }
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -2100,7 +2101,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 setSearchResults(data);
             } else {
                 setSearchResults([]);
-                Alert.alert('No data found');
+                AppAlert.alert('No data found');
             }
 
         } catch (error) {
@@ -2108,7 +2109,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                 // console.log("Request cancelled");
             } else {
                 // console.log("API Error:", error);
-                Alert.alert('Error while searching');
+                AppAlert.alert('Error while searching');
             }
         } finally {
             setIsLoading(false);
@@ -2365,17 +2366,17 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                     ? 'Validation Error'
                     : 'Carton Not Saved';
 
-        Alert.alert(title, message);
+        AppAlert.alert(title, message);
     };
 
     const handleAddCarton = async () => {
         if (!CartonNo) {
-            Alert.alert("Error", "Please scan carton first");
+            AppAlert.alert("Error", "Please scan carton first");
             return;
         }
 
         if (!mainUId) {
-            Alert.alert(
+            AppAlert.alert(
                 "Session Error",
                 "Creel session is not started. Please go back and tap Save & Next again."
             );
@@ -2383,7 +2384,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
 
         if (sessionStatus === 'FINAL') {
-            Alert.alert(
+            AppAlert.alert(
                 "Completed",
                 "This creel is already FINAL and cannot accept more cartons."
             );
@@ -2405,7 +2406,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         );
 
         if (isDuplicate) {
-            Alert.alert(
+            AppAlert.alert(
                 "Duplicate Carton",
                 `Carton ${normalizedCartonNo} is already added in this creel.`
             );
@@ -2418,7 +2419,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         const availableQty = parseFloat(getScannedObj?.Wt || '0');
 
         if (availableChees > 0 && enteredChees > availableChees) {
-            Alert.alert(
+            AppAlert.alert(
                 "Validation Error",
                 `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableChees}).`
             );
@@ -2426,7 +2427,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
 
         if (availableQty > 0 && enteredQty > availableQty) {
-            Alert.alert(
+            AppAlert.alert(
                 "Validation Error",
                 `Entered Quantity (${enteredQty}) cannot be greater than Available Quantity (${availableQty}).`
             );
@@ -2434,12 +2435,12 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
         }
 
         if (!Number.isFinite(enteredChees) || enteredChees <= 0) {
-            Alert.alert("Validation Error", "Chees must be greater than 0.");
+            AppAlert.alert("Validation Error", "Chees must be greater than 0.");
             return;
         }
 
         if (!Number.isFinite(enteredQty) || enteredQty <= 0) {
-            Alert.alert("Validation Error", "Qty must be greater than 0.");
+            AppAlert.alert("Validation Error", "Qty must be greater than 0.");
             return;
         }
 
@@ -2649,15 +2650,15 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     const handleFinalSubmit = async () => {
         if (!mainUId) {
-            Alert.alert('Session Error', 'Creel session UID is missing.');
+            AppAlert.alert('Session Error', 'Creel session UID is missing.');
             return;
         }
         if (cartonSummary.some(item => item.isPending)) {
-            Alert.alert('Please Wait', 'One or more carton scans are still being saved.');
+            AppAlert.alert('Please Wait', 'One or more carton scans are still being saved.');
             return;
         }
         if (cartonSummary.length === 0) {
-            Alert.alert('Validation', 'At least one carton is required.');
+            AppAlert.alert('Validation', 'At least one carton is required.');
             return;
         }
 
@@ -2698,7 +2699,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     // const discardDraftSession = () => {
     //     if (!mainUId || sessionStatus !== 'DRAFT') return;
 
-    //     Alert.alert(
+    //     AppAlert.alert(
     //         'Discard Draft Creel',
     //         'This will reverse stock for every scanned carton and permanently delete this draft. Continue?',
     //         [
@@ -2757,9 +2758,9 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     //                         setSessionStatus('');
     //                         resetAllFields();
     //                         await fetchBrowseData();
-    //                         Alert.alert('Draft Discarded', response.data.message || 'Draft creel discarded successfully.');
+    //                         AppAlert.alert('Draft Discarded', response.data.message || 'Draft creel discarded successfully.');
     //                     } catch (error: any) {
-    //                         Alert.alert('Discard Failed', error?.response?.data?.message || error?.message || 'Unable to discard draft.');
+    //                         AppAlert.alert('Discard Failed', error?.response?.data?.message || error?.message || 'Unable to discard draft.');
     //                     } finally {
     //                         setIsDelete(false);
     //                     }
@@ -2773,7 +2774,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     const discardDraftSession = () => {
         if (!mainUId || sessionStatus !== 'DRAFT') return;
 
-        Alert.alert(
+        AppAlert.alert(
             'Discard Draft Creel',
             'This will reverse stock for every scanned carton and permanently delete this draft. Continue?',
             [
@@ -2846,7 +2847,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 // Yaha modal/drawer CLOSE NAHI karna.
                                 // Pehle API ka success message dikhega.
 
-                                Alert.alert(
+                                AppAlert.alert(
                                     'Draft Discarded',
                                     String(apiMessage),
                                     [
@@ -2928,7 +2929,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 // Yaha bhi actual response.message show hoga.
                                 // Top-level message true/false show nahi hoga.
 
-                                Alert.alert(
+                                AppAlert.alert(
                                     'Discard Failed',
                                     String(apiMessage),
                                     [
@@ -2960,7 +2961,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                 error?.message ||
                                 'Unable to discard draft.';
 
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Discard Failed',
                                 String(errorMessage),
                                 [
@@ -3174,7 +3175,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
 
     const handleAdd = () => {
         if (!design) {
-            Alert.alert('Please select Design');
+            AppAlert.alert('Please select Design');
             return;
         }
 
@@ -3222,7 +3223,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             else {
                 setIsLoading(false);
                 console.error('Unexpected response structure:', response.data);
-                Alert.alert(`${response.data}`);
+                AppAlert.alert(`${response.data}`);
             }
         } catch (error) {
             //console.log("API sendScannedValue error:", error);
@@ -3271,7 +3272,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
             setIsCreelModalVisible(false);
             setIsScanModalVisible(true);
         } catch (error: any) {
-            Alert.alert('Unable to Start', error?.response?.data?.message || error?.message || 'Please try again.');
+            AppAlert.alert('Unable to Start', error?.response?.data?.message || error?.message || 'Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -3689,7 +3690,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     ) || null;
 
     const confirmDelete = (item) => {
-        Alert.alert(
+        AppAlert.alert(
             "Delete Creel",
             `Are you sure you want to delete this Creel ${item.CreelId}?`,
             [
@@ -3707,7 +3708,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const confirmcartondelete = (item) => {
-        Alert.alert(
+        AppAlert.alert(
             "Delete Creel",
             `Are you sure you want to delete this Carton ${item.cartonNo}?`,
             [
@@ -3725,7 +3726,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
     };
 
     const handleDelete = (index) => {
-        Alert.alert(
+        AppAlert.alert(
             "Delete",
             "Are you sure you want to remove this carton?",
             [
@@ -4266,23 +4267,23 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                 style={styles.saveBtn}
                                                 onPress={() => {
                                                     if (!selectedmachine) {
-                                                        Alert.alert("Validation", "Select Machine");
+                                                        AppAlert.alert("Validation", "Select Machine");
                                                         return;
                                                     }
                                                     if (!creelId?.trim()) {
-                                                        Alert.alert("Validation", "Enter Creel ID");
+                                                        AppAlert.alert("Validation", "Enter Creel ID");
                                                         return;
                                                     }
                                                     if (!setupDate) {
-                                                        Alert.alert("Validation", "Select Setup Date");
+                                                        AppAlert.alert("Validation", "Select Setup Date");
                                                         return;
                                                     }
                                                     if (!shift) {
-                                                        Alert.alert("Validation", "Select Shift");
+                                                        AppAlert.alert("Validation", "Select Shift");
                                                         return;
                                                     }
                                                     if (!selectedstocktype) {
-                                                        Alert.alert("Validation", "Select Stock Type");
+                                                        AppAlert.alert("Validation", "Select Stock Type");
                                                         return;
                                                     }
                                                     const yearNo = FormState.values.YearNo || getCurrentFinancialYear();
@@ -4292,7 +4293,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     const fyStart = `${startYear}-04-01`;
                                                     const fyEnd = `${endYear}-03-31`;
                                                     if (selectedDate < fyStart || selectedDate > fyEnd) {
-                                                        Alert.alert(
+                                                        AppAlert.alert(
                                                             " ",
                                                             "⚠️ Date could not be less than current financial year.",
                                                             [
@@ -4564,7 +4565,7 @@ const CreelManagementSystem: React.FC<Props> = ({ token, navigation, isConnected
                                                     style={[styles.okBtn, { flex: 1 }]}
                                                     onPress={() => {
                                                         if (!selectedItem) {
-                                                            Alert.alert("Select carton first");
+                                                            AppAlert.alert("Select carton first");
                                                             return;
                                                         }
 

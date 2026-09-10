@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import axios from "axios";
 import { API } from "../../common/API/dynamicAPI";
 import { fetchAllStoredata, } from '../../common/API/Functions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useRouter } from 'expo-router';
 
 const ProductionMergeAuth = ({ token }) => {

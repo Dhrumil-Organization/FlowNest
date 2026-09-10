@@ -1,5 +1,5 @@
 // utils/feedbackStorage.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 export interface Feedback {
   id: string;

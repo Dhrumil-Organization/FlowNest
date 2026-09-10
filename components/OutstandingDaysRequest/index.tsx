@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -137,7 +138,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             setData(res.data.success ? res.data.data : []);
             setAllHistoryData([]);
         } catch {
-            Alert.alert("Error", "Server error");
+            AppAlert.alert("Error", "Server error");
         } finally {
             setIsLoading(false);
         }
@@ -185,7 +186,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoading(false);
@@ -251,7 +252,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPartyLoading(false);
@@ -289,7 +290,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             }
             const numericValue = parseInt(value, 10);
             if (isNaN(numericValue) || numericValue < 0) {
-                Alert.alert('Invalid Input', 'Please enter a valid positive integer.');
+                AppAlert.alert('Invalid Input', 'Please enter a valid positive integer.');
                 return;
             }
             setEditableValues(prev => ({
@@ -332,13 +333,13 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
             const numericNewLimit2 = parseInt(updatedItem.limit2, 10);
             const numericLimit1 = parseFloat(updatedItem.limit1.replace(/,/g, ''));
             if (isNaN(numericNewLimit2)) {
-                Alert.alert('Validation Error', 'Requested OS Days cannot be empty or invalid for Party Name: ' + updatedItem.parname);
+                AppAlert.alert('Validation Error', 'Requested OS Days cannot be empty or invalid for Party Name: ' + updatedItem.parname);
                 return false;
             } else if (numericNewLimit2 === 0) {
-                Alert.alert('Validation Error', 'Requested OS Days cannot be 0 for Party Name: ' + updatedItem.parname);
+                AppAlert.alert('Validation Error', 'Requested OS Days cannot be 0 for Party Name: ' + updatedItem.parname);
                 return false;
             } else if (numericNewLimit2 < 0) {
-                Alert.alert('Validation Error', 'Requested OS Days cannot be negative for Party Name: ' + updatedItem.parname);
+                AppAlert.alert('Validation Error', 'Requested OS Days cannot be negative for Party Name: ' + updatedItem.parname);
                 return false;
             }
         }
@@ -350,7 +351,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
         if (!selectedItem) return;
         const currentLimit2 = editableValues[selectedItem.uid]?.limit2 || selectedItem.limit2;
         if (currentLimit2 === '' || currentLimit2 === undefined) {
-            Alert.alert('Validation Error', 'Requested OS Days cannot be empty.');
+            AppAlert.alert('Validation Error', 'Requested OS Days cannot be empty.');
             return;
         }
 
@@ -490,11 +491,11 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                 setMainParData(data.mainpardata);
                 setBillsData(data.osbills || []);
             } else {
-                Alert.alert('Error', response.data.message || 'Failed to fetch bills');
+                AppAlert.alert('Error', response.data.message || 'Failed to fetch bills');
                 closeBillsModal();
             }
         } catch (error) {
-            Alert.alert('Error', 'Server error');
+            AppAlert.alert('Error', 'Server error');
             closeBillsModal();
         } finally {
             setInfoLoading(false);
@@ -791,7 +792,7 @@ const OutstandingDaysRequest: React.FC<Props> = ({ token, username }) => {
                                             return;
                                         }
                                         if (!/^\d*$/.test(text)) {
-                                            Alert.alert('Invalid Input', 'Please enter a valid integer (no decimals allowed).');
+                                            AppAlert.alert('Invalid Input', 'Please enter a valid integer (no decimals allowed).');
                                             return;
                                         }
                                         handleEdit(item.uid, 'limit2', text);

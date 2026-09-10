@@ -1,6 +1,8 @@
+import AppAlert from '@/common/utils/appAlert';
 // utils/profileStorage.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import * as ImagePicker from 'expo-image-picker';
+import { getLoginSource } from '@/src/platform/runtime';
 
 export interface UserProfile {
     // Basic Info
@@ -53,7 +55,7 @@ export interface UserProfile {
 }
 
 const PROFILE_KEY = '@flow_nest_user_profile';
-const SESSION_KEY = '@flow_nest_session';
+const SESSION_KEY = 'flow_nest_session';
 
 // Get current profile from login data
 export const buildProfileFromLogin = async (loginData: any): Promise<UserProfile> => {
@@ -75,7 +77,7 @@ export const buildProfileFromLogin = async (loginData: any): Promise<UserProfile
             role1: loginData.role1 || existing?.role1 || null,
             userOf: loginData.userof || existing?.userOf || '',
             menuApps: loginData.usermenu || existing?.menuApps || '',
-            loginFrom: loginData.user?.regsrc || 'web',
+            loginFrom: getLoginSource(),
             isNewUser: false,
 
             yearNo: loginData.year?.YearNo || existing?.yearNo || '',
@@ -110,6 +112,9 @@ export const buildProfileFromLogin = async (loginData: any): Promise<UserProfile
             token: profile.accessToken,
             loggedInAt: profile.lastLoginAt,
         }));
+        // Remove the old AsyncStorage session key used before SecureStore.
+        // It contains '@', so it must never be routed to expo-secure-store.
+        await AsyncStorage.removeItem('@flow_nest_session');
         return profile;
     } catch (error) {
         console.error('Error building profile:', error);
@@ -162,7 +167,7 @@ export const captureProfileImage = async (): Promise<string | null> => {
     try {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-            alert('Camera permission is required to capture profile photo');
+            AppAlert.alert('Camera permission is required to capture profile photo');
             return null;
         }
 
@@ -189,7 +194,7 @@ export const pickProfileImage = async (): Promise<string | null> => {
     try {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            alert('Gallery permission is required to upload photo');
+            AppAlert.alert('Gallery permission is required to upload photo');
             return null;
         }
 
@@ -216,6 +221,7 @@ export const logoutSession = async (): Promise<void> => {
     try {
         await AsyncStorage.removeItem(SESSION_KEY);
         await AsyncStorage.removeItem('access_token');
+
         await AsyncStorage.removeItem('user_details');
         await AsyncStorage.removeItem('user_menu_apps');
         await AsyncStorage.removeItem('get_property');
@@ -245,6 +251,7 @@ export const clearUserProfile = async (): Promise<void> => {
     try {
         await AsyncStorage.removeItem(PROFILE_KEY);
         await AsyncStorage.removeItem(SESSION_KEY);
+        await AsyncStorage.removeItem('access_token');
     } catch (error) {
         console.error('Error clearing profile:', error);
     }

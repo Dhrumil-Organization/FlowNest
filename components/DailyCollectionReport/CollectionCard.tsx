@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 /* CollectionCard.tsx — left-swipe preview + label-value single-line + full remark display */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -19,7 +20,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { Swipeable } from 'react-native-gesture-handler';
 import theme from '../../android/app/src/theme';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useNavigation } from '@react-navigation/native';
 import ChequePreviewModal, { SwipePreview } from './ChequePreview';
 import Footer from '../Footer/Footer';
@@ -116,12 +117,12 @@ const CollectionCard: React.FC<{
                 await onAuthorize(authTarget, authRemark ?? '');
             } else {
                 // fallback: notify user that the parent handler isn't set
-                Alert.alert('Not configured', 'Authorize handler not provided.');
+                AppAlert.alert('Not configured', 'Authorize handler not provided.');
             }
             setAuthModalVisible(false);
         } catch (err) {
             console.error('authorize error', err);
-            Alert.alert('Error', 'Could not authorize. Please try again.');
+            AppAlert.alert('Error', 'Could not authorize. Please try again.');
         } finally {
             setAuthLoadingLocalId(null);
         }
@@ -166,7 +167,7 @@ const CollectionCard: React.FC<{
     //         // navigate if desired
     //         // @ts-ignore
     //         navigation.navigate('CollectionEdit' as never);
-    //     } catch (e) { console.error(e); Alert.alert('Error', 'Could not open editor.'); }
+    //     } catch (e) { console.error(e); AppAlert.alert('Error', 'Could not open editor.'); }
     // };
 
     // inside CollectionCard component
@@ -202,14 +203,14 @@ const CollectionCard: React.FC<{
             navigation.navigate('CollectionEdit' as never, { cachedCard: cached, mode: 'edit' } as never);
         } catch (e) {
             console.error(e);
-            Alert.alert('Error', 'Could not open editor.');
+            AppAlert.alert('Error', 'Could not open editor.');
         }
     };
 
 
     // const handleAuthorize = async (item: POTItem) => {
     //     if (onAuthorize) { onAuthorize(item); return; }
-    //     Alert.alert('Authorize', 'Implement onAuthorize prop to call the API.');
+    //     AppAlert.alert('Authorize', 'Implement onAuthorize prop to call the API.');
     // };
 
     const renderRightActions = (progress: any, dragX: any, item: POTItem) => {
@@ -282,7 +283,7 @@ const CollectionCard: React.FC<{
     //                                 <TouchableOpacity
     //                                     onPress={() => {
     //                                         // confirm then call onDelete prop (if provided)
-    //                                         Alert.alert(
+    //                                         AppAlert.alert(
     //                                             'Delete',
     //                                             'Are you sure you want to delete this record?',
     //                                             [
@@ -530,7 +531,7 @@ const CollectionCard: React.FC<{
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => {
-                                            Alert.alert('Delete', 'Are you sure?', [
+                                            AppAlert.alert('Delete', 'Are you sure?', [
                                                 { text: 'Cancel', style: 'cancel' },
                                                 { text: 'Delete', style: 'destructive', onPress: () => onDelete?.(item) },
                                             ]);
@@ -591,7 +592,7 @@ const CollectionCard: React.FC<{
                     {/* View Cheque Button (Replaces Image Thumbnail) */}
                     {attachUrl && (<>
                         <TouchableOpacity
-                            onPress={() => attachUrl ? setImageModalUrl(attachUrl) : Alert.alert('No Image', 'No cheque image available.')}
+                            onPress={() => attachUrl ? setImageModalUrl(attachUrl) : AppAlert.alert('No Image', 'No cheque image available.')}
                             style={[styles.viewChequeButton, !attachUrl && styles.viewChequeButtonDisabled]}
                         >
                             <Icon name="receipt" size={18} color={attachUrl ? theme.BRAND_ACCENT : theme.TEXT_SECONDARY} />

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View,
@@ -292,7 +293,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -331,7 +332,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -375,7 +376,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -420,7 +421,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -478,7 +479,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -591,25 +592,25 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
@@ -621,7 +622,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
                 )
@@ -794,12 +795,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             const pdfUrlFromApi = apiResp?.data?.results?.purchase_order_detail;
             console.log('pdfUrlFromApi:', apiResp, pdfUrlFromApi);
             if (!pdfUrlFromApi) {
-                Alert.alert('Error', 'PDF URL not found in server response');
+                AppAlert.alert('Error', 'PDF URL not found in server response');
                 return;
             }
             const pdfResp = await axios.get(pdfUrlFromApi, { responseType: 'arraybuffer' });
             if (!pdfResp || !pdfResp.data) {
-                Alert.alert('Error', 'Failed to download PDF bytes');
+                AppAlert.alert('Error', 'Failed to download PDF bytes');
                 return;
             }
             const buffer = Buffer.from(new Uint8Array(pdfResp.data));
@@ -812,7 +813,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             setShowPdfModal(true);
         } catch (err: any) {
             console.error('handleCallURL error:', err);
-            Alert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
+            AppAlert.alert('Error', err?.message || 'Failed to fetch/preview PDF');
         } finally {
             setLocationLoading(false);
             setPdfLoading(false);
@@ -825,7 +826,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             await Share.share({ url: urlToShare } as any);
         } catch (err) {
             console.warn('shareLocalFile error', err);
-            Alert.alert('Share failed', err?.message || String(err));
+            AppAlert.alert('Share failed', err?.message || String(err));
         }
     };
 
@@ -841,7 +842,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
 
         const handleDownload = async () => {
             try {
-                if (!pdfUrl) { Alert.alert('No file', 'No PDF available to download'); return; }
+                if (!pdfUrl) { AppAlert.alert('No file', 'No PDF available to download'); return; }
 
                 // iOS: open share sheet (no Downloads folder concept for RNFS copy)
                 if (Platform.OS === 'ios') {
@@ -853,7 +854,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 // const ok = await askAndRequestStoragePermission();
                 // if (!ok) {
                 //     // user denied; offer share fallback
-                //     Alert.alert(
+                //     AppAlert.alert(
                 //         'Cannot save',
                 //         'Storage permission not granted. You can share the file to save it elsewhere.',
                 //         [
@@ -874,12 +875,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     if (ToastAndroid) {
                         ToastAndroid.show(`Saved to Downloads: ${fileName}`, ToastAndroid.LONG);
                     } else {
-                        Alert.alert('Saved', `Saved to Downloads:\n${destPath}`);
+                        AppAlert.alert('Saved', `Saved to Downloads:\n${destPath}`);
                     }
                 } catch (copyErr: any) {
                     console.error('copyFile failed', copyErr);
                     // If copy fails due to Android 11+ restrictions, ask user to give All files access
-                    Alert.alert(
+                    AppAlert.alert(
                         'Save failed',
                         'Could not save to Downloads. Allow "All files access" or grant storage permission in Settings, or share the file instead.',
                         [
@@ -891,7 +892,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                 }
             } catch (err) {
                 console.error('handleDownload error', err);
-                Alert.alert('Error', `Could not save PDF: ${err?.message || err}`);
+                AppAlert.alert('Error', `Could not save PDF: ${err?.message || err}`);
             }
         };
 
@@ -922,7 +923,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                 style={{ flex: 1 }}
                                 onError={(e) => {
                                     console.error('react-native-pdf error', e);
-                                    Alert.alert('Error', 'Failed to render PDF');
+                                    AppAlert.alert('Error', 'Failed to render PDF');
                                 }}
                             />
                         ) : (

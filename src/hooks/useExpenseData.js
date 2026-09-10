@@ -39,7 +39,7 @@
 //   const loadedCount = Object.values(states).filter(s => s.status === 'done').length;
 //   return { months, states, loadedCount, total: months.length, refresh, retryMonth };
 // }
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';

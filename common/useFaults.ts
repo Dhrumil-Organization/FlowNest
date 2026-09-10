@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import axios from 'axios';
 import { useState } from 'react';
 import { Alert } from 'react-native';
@@ -43,11 +44,11 @@ export const useFaults = (token: string) => {
         setFaultsData(response.data.response.data);
         setShowFaultsModal(true);
       } else {
-        Alert.alert('Error', 'No faults data received.');
+        AppAlert.alert('Error', 'No faults data received.');
       }
     } catch (error) {
       console.error('Failed to fetch faults:', error);
-      Alert.alert('Error', 'Failed to fetch faults.');
+      AppAlert.alert('Error', 'Failed to fetch faults.');
     } finally {
       setFaultsLoading(false);
     }

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
 import { fetchAllStoredata } from '@/common/API/Functions';
 import { crlimtreq_styles } from '@/common/Style';
@@ -5,7 +6,7 @@ import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -361,7 +362,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -404,7 +405,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsHistoryLoadingYPO(false);
@@ -460,7 +461,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -529,7 +530,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsLoadingYPO(false);
@@ -587,7 +588,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', 'Server error');
+                // AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setIsPrdoOrderLoadingYPO(false);
@@ -701,25 +702,25 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             //     parseFloat(numericNewLimit2).toFixed(2) ===
             //     parseFloat(numericLimit1).toFixed(2)
             // ) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (updatedItem.limit2 === '0' || parseFloat(updatedItem.limit2) === 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (parseFloat(updatedItem.limit2) < 0) {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
             //     )
             //     return false;
             // } else if (!updatedItem.limit2 || updatedItem.limit2.trim() === '') {
-            //     Alert.alert(
+            //     AppAlert.alert(
             //         'Validation Error',
             //         'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
             //     )
@@ -731,7 +732,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
                 )
@@ -807,7 +808,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }
@@ -975,12 +976,12 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 setMailLogData(response.data.data);
                 setMailLogModal(true);
             } else {
-                Alert.alert('Info', 'No Data Found');
+                AppAlert.alert('Info', 'No Data Found');
             }
 
         } catch (error) {
             console.log('❌ Mail Error:', error);
-            Alert.alert('Error', 'Mail API failed');
+            AppAlert.alert('Error', 'Mail API failed');
         } finally {
             setIsLoadingYPO(false);
         }

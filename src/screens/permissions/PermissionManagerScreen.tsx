@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -126,7 +127,7 @@ export function PermissionManagerScreen() {
       setUserId(uid || null);
       if (rid) await loadRole(rid);
     } catch (e: any) {
-      Alert.alert('Access setup', e?.message || 'Unable to load access control.');
+      AppAlert.alert('Access setup', e?.message || 'Unable to load access control.');
     } finally {
       setSyncing(false);
       setLoading(false);
@@ -155,7 +156,7 @@ export function PermissionManagerScreen() {
   );
 
   const changeMode = async (m: Mode) => {
-    if (dirty) { Alert.alert('Unsaved changes', 'Save or discard changes before switching.'); return; }
+    if (dirty) { AppAlert.alert('Unsaved changes', 'Save or discard changes before switching.'); return; }
     setMode(m);
     if (m === 'role' && roleId) await loadRole(roleId);
     if (m === 'user' && userId) await loadUser(userId);
@@ -204,9 +205,9 @@ export function PermissionManagerScreen() {
       setSaving(true);
       if (mode === 'role') { await AppAccessAPI.saveRole(roleId!, rows); await loadRole(roleId!); }
       else { await AppAccessAPI.saveUser(userId!, userRoleIds, rows); await loadUser(userId!); }
-      Alert.alert('Saved', 'Permissions were saved and reloaded from the database.');
+      AppAlert.alert('Saved', 'Permissions were saved and reloaded from the database.');
     } catch (e: any) {
-      Alert.alert('Save failed', e?.message || 'Unable to save permissions.');
+      AppAlert.alert('Save failed', e?.message || 'Unable to save permissions.');
     } finally {
       setSaving(false);
     }

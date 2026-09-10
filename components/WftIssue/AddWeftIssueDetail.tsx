@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, FlatList, ActivityIndicator, Alert, TextInput as RNTextInput, } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -11,7 +12,7 @@ import { API } from '../../common/API/dynamicAPI';
 // import Snackbar from '@/common/utils/snackbarCompat';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownforweft from '@/Shared/PartyDropdownforweft';
@@ -316,7 +317,7 @@ const AddWeftIssueDetail = (props) => {
                     }
                 }));
             } else if (res?.validate === 'false') {
-                Alert.alert(
+                AppAlert.alert(
                     'Oops!!!',
                     res?.message || 'Something went wrong!',
                     [
@@ -578,7 +579,7 @@ const AddWeftIssueDetail = (props) => {
             //     text: 'OK',
             //     onPress: () => { },
             // });
-            Alert.alert(`${firstError}`);
+            AppAlert.alert(`${firstError}`);
 
             return;
         }

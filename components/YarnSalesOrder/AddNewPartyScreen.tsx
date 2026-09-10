@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // AddNewPartyScreen.js
 
 import React, { useState, useEffect } from 'react';
@@ -14,7 +15,7 @@ import {
 import { useSalesOrder } from './SalesOrderContext';
 import { API } from '../../common/API/dynamicAPI';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 const AddNewPartyScreen = ({ navigation, route, token }) => {
 
@@ -138,11 +139,11 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                 setStateName(stateName.toUpperCase());
                 setZip(zipcode || '');
             } else {
-                Alert.alert('Load detail data failed', res.data?.message || 'Unable to load data');
+                AppAlert.alert('Load detail data failed', res.data?.message || 'Unable to load data');
             }
         } catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.res?.data?.message || 'Something went wrong while saving',
             );
@@ -153,19 +154,19 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
 
     const handleSaveParty = () => {
         if (!partyName.trim()) {
-            Alert.alert('Validation', 'Please enter party name');
+            AppAlert.alert('Validation', 'Please enter party name');
             return;
         }
 
         if (!deliveryAddress.trim()) {
-            Alert.alert('Validation', 'Please enter delivery address');
+            AppAlert.alert('Validation', 'Please enter delivery address');
             return;
         }
 
         let mobileNo = tel1.replace(/\s/g, '');
 
         if (!mobileNo) {
-            Alert.alert('Validation', 'Please enter telephone number');
+            AppAlert.alert('Validation', 'Please enter telephone number');
             return;
         }
 
@@ -180,7 +181,7 @@ const AddNewPartyScreen = ({ navigation, route, token }) => {
                 onlyDigits.length === 12
             )
         ) {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation',
                 'Please enter valid telephone number'
             );

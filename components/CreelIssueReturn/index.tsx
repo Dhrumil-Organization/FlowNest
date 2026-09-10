@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from "axios";
@@ -22,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // import { API } from "../../common/API/dynamicAPI";
 import { fetchPropertyData } from '../../common/API/Functions';
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { Snackbar } from '@/common/utils/snackbarCompat';
 
 const CreelIssueReturn = ({ token, navigation }) => {
@@ -437,7 +438,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
 
     // const printBrowseSticker = async (item, selectedPrinterName = printer) => {
     //     if (!item) {
-    //         Alert.alert("Print", "Printing data not found.");
+    //         AppAlert.alert("Print", "Printing data not found.");
     //         return;
     //     }
 
@@ -476,12 +477,12 @@ const CreelIssueReturn = ({ token, navigation }) => {
     //         const res = response?.data;
 
     //         if (res?.success) {
-    //             Alert.alert(
+    //             AppAlert.alert(
     //                 "Print Successful",
     //                 `${res?.printed ?? 1} label(s) sent to printer.`
     //             );
     //         } else {
-    //             Alert.alert(
+    //             AppAlert.alert(
     //                 "Print Failed",
     //                 res?.message || "Operation failed."
     //             );
@@ -492,7 +493,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
     //             error?.response?.data || error?.message
     //         );
 
-    //         Alert.alert(
+    //         AppAlert.alert(
     //             "Print Failed",
     //             error?.response?.data?.error ||
     //             error?.response?.data?.message ||
@@ -508,7 +509,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
 
     const printBrowseSticker = async (item, selectedPrinterName = printer) => {
         if (!item) {
-            Alert.alert('Printing sticker data is empty');
+            AppAlert.alert('Printing sticker data is empty');
             return false;
         }
         const printerToUse = selectedPrinterName || printer;
@@ -544,7 +545,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
             printerToUse == null ||
             printerToUse === ''
         ) {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
 
@@ -653,7 +654,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
                             },
                         });
 
-                        Alert.alert(
+                        AppAlert.alert(
                             'Print Successful',
                             `✅ ${res.printed ?? 1} label(s) sent to printer.`
                         );
@@ -670,7 +671,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
                             },
                         });
 
-                        Alert.alert(
+                        AppAlert.alert(
                             res.message || 'Operation failed'
                         );
                     }
@@ -700,7 +701,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
                         },
                     });
 
-                    Alert.alert(
+                    AppAlert.alert(
                         errorMessage
                     );
                 });
@@ -720,7 +721,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
                 },
             });
 
-            Alert.alert(
+            AppAlert.alert(
                 'printing sticker data is empty'
             );
         }

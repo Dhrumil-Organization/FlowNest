@@ -1,5 +1,6 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -159,7 +160,7 @@ const InquiryNotesScreen: React.FC<Props> = () => {
         setEditingNote(null);
         setText('');
       } catch (e: any) {
-        Alert.alert('Error', e?.response?.data?.message || 'Failed to update note');
+        AppAlert.alert('Error', e?.response?.data?.message || 'Failed to update note');
       } finally {
         setSending(false);
       }
@@ -191,14 +192,14 @@ const InquiryNotesScreen: React.FC<Props> = () => {
       // Remove the optimistic note on failure
       setNotes(prev => prev.filter(n => n.id !== tempNote.id));
       setText(trimmed); // restore text
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to send note');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to send note');
     } finally {
       setSending(false);
     }
   };
 
   const handleLongPress = (note: InquiryNote) => {
-    Alert.alert('Note Options', undefined, [
+    AppAlert.alert('Note Options', undefined, [
       {
         text: 'Edit',
         onPress: () => {
@@ -210,7 +211,7 @@ const InquiryNotesScreen: React.FC<Props> = () => {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Delete Note?', 'This cannot be undone.', [
+          AppAlert.alert('Delete Note?', 'This cannot be undone.', [
             { text: 'Cancel', style: 'cancel' },
             {
               text: 'Delete',
@@ -220,7 +221,7 @@ const InquiryNotesScreen: React.FC<Props> = () => {
                   await notesApi.delete(inquiryId, note.id, getUserPrptype, getCurrentFinancialYear());
                   setNotes(prev => prev.filter(n => n.id !== note.id));
                 } catch (e: any) {
-                  Alert.alert(
+                  AppAlert.alert(
                     'Error',
                     e?.response?.data?.message || 'Failed to delete',
                   );

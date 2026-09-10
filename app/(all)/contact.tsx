@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // import React from 'react';
 // import {
 //   View,
@@ -291,7 +292,7 @@ export default function ContactScreen() {
                 if (supported) {
                     Linking.openURL(phoneUrl);
                 } else {
-                    Alert.alert('Error', 'Phone calls not supported on this device');
+                    AppAlert.alert('Error', 'Phone calls not supported on this device');
                 }
             })
             .catch((err) => console.error(err));
@@ -300,7 +301,7 @@ export default function ContactScreen() {
     const handleEmail = (email: string) => {
         const emailUrl = `mailto:${email}`;
         Linking.openURL(emailUrl).catch(() => {
-            Alert.alert('Error', 'Email not configured on this device');
+            AppAlert.alert('Error', 'Email not configured on this device');
         });
     };
 
@@ -308,14 +309,14 @@ export default function ContactScreen() {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
         const whatsappUrl = `whatsapp://send?phone=91${cleanPhone.slice(-10)}`;
         Linking.openURL(whatsappUrl).catch(() => {
-            Alert.alert('Error', 'WhatsApp not installed');
+            AppAlert.alert('Error', 'WhatsApp not installed');
         });
     };
 
     const handleMap = (address: string) => {
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
         Linking.openURL(mapUrl).catch(() => {
-            Alert.alert('Error', 'Cannot open maps');
+            AppAlert.alert('Error', 'Cannot open maps');
         });
     };
 
@@ -332,19 +333,19 @@ export default function ContactScreen() {
 
     const validateForm = (): boolean => {
         if (!formData.name.trim()) {
-            Alert.alert('Required', 'Please enter your name');
+            AppAlert.alert('Required', 'Please enter your name');
             return false;
         }
         if (!formData.email.trim() || !formData.email.includes('@')) {
-            Alert.alert('Invalid Email', 'Please enter a valid email address');
+            AppAlert.alert('Invalid Email', 'Please enter a valid email address');
             return false;
         }
         if (!formData.subject.trim()) {
-            Alert.alert('Required', 'Please enter a subject');
+            AppAlert.alert('Required', 'Please enter a subject');
             return false;
         }
         if (!formData.message.trim() || formData.message.length < 10) {
-            Alert.alert('Too Short', 'Please enter at least 10 characters in your message');
+            AppAlert.alert('Too Short', 'Please enter at least 10 characters in your message');
             return false;
         }
         return true;
@@ -360,7 +361,7 @@ export default function ContactScreen() {
             if (Platform.OS !== 'web') {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
-            Alert.alert(
+            AppAlert.alert(
                 '✅ Message Sent!',
                 `Thank you ${formData.name}!\n\nWe've received your inquiry and our team will get back to you within 24 hours.`,
                 [

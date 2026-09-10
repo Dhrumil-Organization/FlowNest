@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useState } from 'react';
 import {
     View,
@@ -29,7 +30,7 @@ const PdfViewerScreenMain = () => {
     const preparePdf = async () => {
         try {
             if (!pdfUrl) {
-                Alert.alert('Error', 'PDF URL not found');
+                AppAlert.alert('Error', 'PDF URL not found');
                 return;
             }
 
@@ -42,7 +43,7 @@ const PdfViewerScreenMain = () => {
             setLocalPdfPath(uri);
         } catch (err) {
             console.log('PDF LOAD ERROR =>', err);
-            Alert.alert('Error', 'Unable to load PDF');
+            AppAlert.alert('Error', 'Unable to load PDF');
         } finally {
             setLoadingPdf(false);
         }
@@ -52,13 +53,13 @@ const PdfViewerScreenMain = () => {
     const handleShare = async () => {
         try {
             if (!pdfUrl) {
-                Alert.alert('Error', 'PDF URL not found');
+                AppAlert.alert('Error', 'PDF URL not found');
                 return;
             }
 
             const isAvailable = await Sharing.isAvailableAsync();
             if (!isAvailable) {
-                Alert.alert('Error', 'Sharing not available');
+                AppAlert.alert('Error', 'Sharing not available');
                 return;
             }
 
@@ -80,7 +81,7 @@ const PdfViewerScreenMain = () => {
             }
         } catch (err) {
             console.log('SHARE ERROR =>', err);
-            Alert.alert('Error', 'Unable to share PDF');
+            AppAlert.alert('Error', 'Unable to share PDF');
         }
     };
 
@@ -88,7 +89,7 @@ const PdfViewerScreenMain = () => {
     const handleDownload = async () => {
         try {
             if (!pdfUrl) {
-                Alert.alert('Error', 'PDF URL not found');
+                AppAlert.alert('Error', 'PDF URL not found');
                 return;
             }
 
@@ -99,10 +100,10 @@ const PdfViewerScreenMain = () => {
 
             const { uri } = await FileSystem.downloadAsync(pdfUrl, destination);
 
-            Alert.alert('Downloaded', `PDF saved to: ${destination}`);
+            AppAlert.alert('Downloaded', `PDF saved to: ${destination}`);
         } catch (err) {
             console.log('DOWNLOAD ERROR =>', err);
-            Alert.alert('Error', err?.message || 'Unable to download PDF');
+            AppAlert.alert('Error', err?.message || 'Unable to download PDF');
         } finally {
             setDownloading(false);
         }
@@ -155,7 +156,7 @@ const PdfViewerScreenMain = () => {
                     style={styles.pdf}
                     onError={(e) => {
                         console.log('PDF ERROR =>', e);
-                        Alert.alert('Error', 'Failed to load PDF');
+                        AppAlert.alert('Error', 'Failed to load PDF');
                     }}
                 />
             ) : (

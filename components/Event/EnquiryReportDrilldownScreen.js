@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // // EnquiryReportDrilldownScreen.js
 // // Per-user enquiry drilldown: list, view detail, edit, delete.
 // // EXPO version — icons via @expo/vector-icons.
@@ -21,7 +22,7 @@
 // import { MaterialIcons as Icon } from '@expo/vector-icons';
 // import { getCurrentFinancialYear } from '../../common/commonfunction';
 // import { deleteEnquiries } from './syncService';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import HeaderBarwithBack from '@/components/Header';
 // import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -100,7 +101,7 @@
 //       );
 
 //       if (result.success === true) {
-//         Alert.alert(`${result.message} for ${item.party_name}!`);
+//         AppAlert.alert(`${result.message} for ${item.party_name}!`);
 //         loadEnquiries();
 //       }
 //     } catch (err) {
@@ -382,7 +383,7 @@
 import { API } from '@/common/API/dynamicAPI';
 import HeaderBarwithBack from '@/components/Header';
 import { MaterialIcons as Icon } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -486,7 +487,7 @@ export default function EnquiryReportDrilldownScreen({ token, username }) {
       );
 
       if (result.success === true) {
-        Alert.alert(`${result.message} for ${item.party_name}!`);
+        AppAlert.alert(`${result.message} for ${item.party_name}!`);
         loadEnquiries();
       }
     } catch (err) {

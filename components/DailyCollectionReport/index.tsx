@@ -16,7 +16,7 @@ import {
 // import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
 import CustomDrawer from './CustomDrawer';

@@ -10,9 +10,9 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 // import { API } from '../../common/API/dynamicAPI';
 // import Snackbar from '@/common/utils/snackbarCompat';
 // import FullScreenLoader from '../Loader/Loader';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 const { height } = Dimensions.get('window');
 
 const CustomDrawer = (props) => {

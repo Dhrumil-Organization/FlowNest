@@ -1,6 +1,6 @@
 // import React, { useEffect, useState, useCallback, useRef } from 'react';
 // import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, TextInput, Alert, Animated as RNAnimated } from 'react-native';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { debounce } from 'lodash';
 // import Icon from 'react-native-vector-icons/MaterialIcons';
 // import HeaderBarwithBack from '../../HeaderBarwithBack/HeaderBarwithBack';
@@ -467,7 +467,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, TextInput, Alert, Animated as RNAnimated, ScrollView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { debounce } from 'lodash';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import HeaderBarwithBack from '../../HeaderBarwithBack/HeaderBarwithBack';

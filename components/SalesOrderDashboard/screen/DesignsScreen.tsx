@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // ═══════════════════════════════════════════════════════════════
 // FILE: screens/designs/DesignsScreen.tsx
 // ✅ FIXED — adds the 3 MISSING pieces from the web artifact:
@@ -872,7 +873,7 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                 params: e?.config?.params,
             });
 
-            Alert.alert('Design list error', String(msg));
+            AppAlert.alert('Design list error', String(msg));
         }
         finally { setLoading(false); setRefreshing(false); }
     }, [filter, search, designs.length]);
@@ -1214,22 +1215,22 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
 
     const save = async () => {
         if (!String(form.code || '').trim()) {
-            Alert.alert('Validation', 'Design code is required.');
+            AppAlert.alert('Validation', 'Design code is required.');
             return;
         }
 
         if (!String(form.category || '').trim()) {
-            Alert.alert('Validation', 'Category is required.');
+            AppAlert.alert('Validation', 'Category is required.');
             return;
         }
 
         if (!Array.isArray(form.warp_yarns) || form.warp_yarns.length === 0) {
-            Alert.alert('Validation', 'At least one warp yarn is required.');
+            AppAlert.alert('Validation', 'At least one warp yarn is required.');
             return;
         }
 
         if (!Array.isArray(form.weft_yarns) || form.weft_yarns.length === 0) {
-            Alert.alert('Validation', 'At least one weft yarn is required.');
+            AppAlert.alert('Validation', 'At least one weft yarn is required.');
             return;
         }
 
@@ -1318,7 +1319,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 );
             }
 
-            Alert.alert(
+            AppAlert.alert(
                 'Saved',
                 `Design saved successfully.\n\nID: ${saved.id}`
             );
@@ -1336,7 +1337,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 url: e?.config?.url,
             });
 
-            Alert.alert(
+            AppAlert.alert(
                 'Design save failed',
                 String(
                     e?.response?.data?.message ||
@@ -1697,7 +1698,7 @@ function ShadePickerModal({ visible, onSelect, onClose }: {
     }, [rows, search]);
 
     const addManual = () => {
-        if (!name.trim()) { Alert.alert('Shade name required'); return; }
+        if (!name.trim()) { AppAlert.alert('Shade name required'); return; }
         onSelect({ color_name: name.trim(), shade_no: shadeNo.trim() || name.trim(), hex: /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : '#808080' });
         onClose();
     };
@@ -1733,7 +1734,7 @@ function YarnShadeBlock({ yarn, direction, bands, onChange }: {
     const unit = direction === 'warp' ? `${Number(yarn.epi || 0)} EPI` : `${Number(yarn.ppi || 0)} PPI`;
 
     const add = () => {
-        if (!pendingShade) { Alert.alert('Shade required', 'Select a shade first.'); return; }
+        if (!pendingShade) { AppAlert.alert('Shade required', 'Select a shade first.'); return; }
         const n = Math.max(1, Math.round(Number(count) || 1));
         onChange([...bands, {
             ...pendingShade,
@@ -1821,13 +1822,13 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
     const allWeft = Object.values(weftBands).flat();
 
     const save = async () => {
-        if (!baseDesign) { Alert.alert('Main Design required'); return; }
-        if (!subCode.trim()) { Alert.alert('Sub Design code required'); return; }
+        if (!baseDesign) { AppAlert.alert('Main Design required'); return; }
+        if (!subCode.trim()) { AppAlert.alert('Sub Design code required'); return; }
         if (baseDesign.type === 'YD' && allWarp.length === 0 && allWeft.length === 0) {
-            Alert.alert('Shade pattern required', 'Add at least one warp or weft shade band.'); return;
+            AppAlert.alert('Shade pattern required', 'Add at least one warp or weft shade band.'); return;
         }
         if (baseDesign.type === 'PD' && !commercialName.trim()) {
-            Alert.alert('Commercial shade required', 'Enter the final piece-dyed shade name.'); return;
+            AppAlert.alert('Commercial shade required', 'Enter the final piece-dyed shade name.'); return;
         }
 
         setSaving(true);
@@ -1851,11 +1852,11 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                 weft_patterns: toPatterns(allWeft),
             } as any);
 
-            Alert.alert('Saved', 'Sub Design saved successfully.');
+            AppAlert.alert('Saved', 'Sub Design saved successfully.');
             setWarpBands({}); setWeftBands({});
             setSubCode(`${baseDesign.code.replace(/\s+/g, '-')}-01`);
         } catch (e: any) {
-            Alert.alert('Save failed', e?.response?.data?.message || e?.message || 'Unable to save Sub Design');
+            AppAlert.alert('Save failed', e?.response?.data?.message || e?.message || 'Unable to save Sub Design');
         } finally { setSaving(false); }
     };
 

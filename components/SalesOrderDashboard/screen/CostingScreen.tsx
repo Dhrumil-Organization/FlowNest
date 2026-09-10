@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
@@ -340,10 +341,10 @@ function CostSheetPreviewModal({
                     UTI: 'com.adobe.pdf',
                 });
             } else {
-                Alert.alert('PDF Created', file.uri);
+                AppAlert.alert('PDF Created', file.uri);
             }
         } catch (e: any) {
-            Alert.alert('PDF Error', e?.message || 'Unable to create costing PDF');
+            AppAlert.alert('PDF Error', e?.message || 'Unable to create costing PDF');
         } finally {
             setExporting(false);
         }
@@ -364,7 +365,7 @@ function CostSheetPreviewModal({
                 await Share.share({ message: shareText });
             }
         } catch (e: any) {
-            Alert.alert('Share Error', e?.message || 'Unable to share costing');
+            AppAlert.alert('Share Error', e?.message || 'Unable to share costing');
         } finally {
             setExporting(false);
         }
@@ -628,7 +629,7 @@ function CostingTab({ onSaved, reopenId, onReopenLoaded }: { onSaved: () => void
             setDyeMap(dm);
             setSizingMap(sm);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         }
     };
 
@@ -648,7 +649,7 @@ function CostingTab({ onSaved, reopenId, onReopenLoaded }: { onSaved: () => void
             });
             setResult(normalizeComputeResult(res.data));
         } catch (e: any) {
-            Alert.alert('Compute Error', e.message);
+            AppAlert.alert('Compute Error', e.message);
         } finally {
             setComputing(false);
         }
@@ -662,7 +663,7 @@ function CostingTab({ onSaved, reopenId, onReopenLoaded }: { onSaved: () => void
     }, [mdId, subDesignId, selectedColourway?.code, tierCode, scenarioGroupId, priceMap, dyeMap, sizingMap, params]);
 
     const save = async () => {
-        if (!result) { Alert.alert('Compute first'); return; }
+        if (!result) { AppAlert.alert('Compute first'); return; }
         setSaving(true);
         try {
             await CostingAPI.save({
@@ -674,10 +675,10 @@ function CostingTab({ onSaved, reopenId, onReopenLoaded }: { onSaved: () => void
                 scenario_group_id: scenarioGroupId || null,
                 price_map: priceMap, dye_map: dyeMap, sizing_map: sizingMap, ...params
             });
-            Alert.alert('Saved ✓', 'Costing record saved to history');
+            AppAlert.alert('Saved ✓', 'Costing record saved to history');
             onSaved();
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         } finally {
             setSaving(false);
         }
@@ -724,7 +725,7 @@ function CostingTab({ onSaved, reopenId, onReopenLoaded }: { onSaved: () => void
                 setResult(null);
                 onReopenLoaded();
             } catch (e: any) {
-                Alert.alert('Reopen Error', e?.response?.data?.message || e.message || 'Unable to reopen costing');
+                AppAlert.alert('Reopen Error', e?.response?.data?.message || e.message || 'Unable to reopen costing');
                 onReopenLoaded();
             }
         })();
@@ -982,7 +983,7 @@ function HistoryTab({ refreshKey, onReopen }: { refreshKey: number; onReopen: (i
             const res = await CostingAPI.history();
             setGroups(res.data.data);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -1071,7 +1072,7 @@ function VarianceTab() {
             const res = await CostingAPI.variance(id);
             setData(res.data.data);
         } catch (e: any) {
-            Alert.alert('Error', e.message);
+            AppAlert.alert('Error', e.message);
         } finally {
             setLoading(false);
         }

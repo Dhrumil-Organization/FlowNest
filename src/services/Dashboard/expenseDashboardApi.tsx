@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios, { AxiosError } from 'axios';
 import { resolveNewErpApiBaseUrl } from '@/src/api/client';
 

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -14,7 +15,7 @@ import {
 
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCurrentFinancialYear } from '../../common/commonfunction';
 import Button from '../components/Button';
@@ -97,7 +98,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
       console.log("Rights res:", data?.response?.module_rights);
       setUserRights(data?.response?.module_rights);
     } catch (e: any) {
-      Alert.alert('Error', e || 'Unable to fetch Rights');
+      AppAlert.alert('Error', e || 'Unable to fetch Rights');
     } finally {
       setLoading(false);
     }
@@ -114,7 +115,7 @@ const InquiryDetailScreen: React.FC<Props> = ({ route, navigation, username, get
       const { pdf_url } = await inquiryApi.downloadPdf(inquiry.id, getUserPrptype, getCurrentFinancialYear());
       Linking.openURL(pdf_url);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to download PDF');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to download PDF');
     }
   };
 

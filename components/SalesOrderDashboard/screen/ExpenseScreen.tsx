@@ -2,7 +2,7 @@
 // Complete rebuild matching all 14 screenshots
 
 import { T } from '@/common/utils/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useRef, useState } from 'react';
 import {

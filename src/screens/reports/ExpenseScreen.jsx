@@ -1,7 +1,7 @@
 // // ExpenseScreen.jsx — Madhusudhan Fabrics (React Native)
 // // Complete rebuild matching all 14 screenshots
 
-// import AsyncStorage from "@react-native-async-storage/async-storage";
+// import AsyncStorage from "@/common/utils/compatibleStorage";
 // import { useFocusEffect } from "@react-navigation/native";
 // import React, { useCallback, useRef, useState } from "react";
 // import {
@@ -2391,7 +2391,7 @@
 // ExpenseScreen.jsx — Madhusudhan Fabrics (React Native)
 // Complete rebuild matching all 14 screenshots
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useRef, useState } from "react";
 import {

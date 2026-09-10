@@ -23,7 +23,7 @@ import { getCurrentFinancialYear } from '../../common/commonfunction';
 import { API } from '@/common/API/dynamicAPI';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import api from './api';
 import { isOnline } from './CardScanService';
 

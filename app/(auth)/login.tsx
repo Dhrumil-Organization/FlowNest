@@ -1,6 +1,8 @@
+import AppAlert from '@/common/utils/appAlert';
 // import { initDatabase } from '@/common/API/DatabaseManager';
 // import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
 // import { setCustomUsername } from '@/common/utils/feedbackStorage';
+// import { getLoginSource } from '@/src/platform/runtime';
 // import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 // import {
 //     fetchAndCacheGlobalData,
@@ -9,7 +11,7 @@
 // } from '@/common/utils/sqliteCacheManager';
 // import { saveCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { useNavigation } from '@react-navigation/native';
 // import axios from 'axios';
 // import * as Device from 'expo-device';
@@ -135,12 +137,12 @@
 //         const noti_token = getNotitoken;
 
 //         if (!selectedProperty) {
-//             Alert.alert("Error", "Please select property");
+//             AppAlert.alert("Error", "Please select property");
 //             return;
 //         }
 
 //         if (!username || !password) {
-//             Alert.alert("Error", "Enter username & password");
+//             AppAlert.alert("Error", "Enter username & password");
 //             return;
 //         }
 
@@ -175,7 +177,7 @@
 
 //             if (response.data.success) {
 //                 const token = response.data.response?.access_token;
-//                 const user_login_from = response.data.response?.user?.regsrc || 'web';
+//                 const user_login_from = getLoginSource();
 //                 const user_details = response.data.response?.user?.first_name || 'user';
 //                 const user_avaible = response.data.response?.user?.is_deleted || 'user';
 //                 const user_menu_apps = response.data.response?.usermenu || '';
@@ -214,12 +216,12 @@
 
 //                     //     router.replace('/(tabs)');
 //                     // } else {
-//                     //     Alert.alert("Error", response.data.message);
+//                     //     AppAlert.alert("Error", response.data.message);
 //                     // }
 
 //                     // 
 //                     if (user_avaible === "1") {
-//                         Alert.alert('Warning', `User not available!, Please Register yourself by Create Account`);
+//                         AppAlert.alert('Warning', `User not available!, Please Register yourself by Create Account`);
 //                         return;
 //                     }
 //                     else {
@@ -262,7 +264,7 @@
 //                                 // setUserDetails(user_details);
 //                                 // setMenuApps(user_menu_apps);
 //                                 // setIsLoggedIn(true);
-//                                 // Alert.alert('check', `After Login ${JSON.stringify(payload)}`);
+//                                 // AppAlert.alert('check', `After Login ${JSON.stringify(payload)}`);
 //                                 // const cachedParty = await getCachedGlobalData('party').catch(() => []);
 //                                 // await initGlobalCacheDB();
 //                                 await AsyncStorage.setItem('ENABLE_DEVICE_CHECK', 'true');
@@ -342,23 +344,23 @@
 //                             // setUserDetails(user_details);
 //                             // setMenuApps(user_menu_apps);
 //                             // setIsLoggedIn(true);
-//                             // Alert.alert('check', `After Login ${JSON.stringify(payload)}`);
+//                             // AppAlert.alert('check', `After Login ${JSON.stringify(payload)}`);
 //                             // const cachedParty = await getCachedGlobalData('party').catch(() => []);
 //                             // await initGlobalCacheDB();
 
 //                         } else {
-//                             Alert.alert('❌ Error', `${response.data.response.message}`);
+//                             AppAlert.alert('❌ Error', `${response.data.response.message}`);
 //                         }
 //                     }
 //                 } else {
-//                     Alert.alert('❌ Error', `${response.data.message}`);
+//                     AppAlert.alert('❌ Error', `${response.data.message}`);
 //                 }
 //             }
 //         }
 
 //         catch (err: any) {
 //             console.log("❌ LOGIN ERROR:", err?.response || err);
-//             Alert.alert("Error", "Login failed");
+//             AppAlert.alert("Error", "Login failed");
 //         } finally {
 //             setIsLoading(false);
 //         }
@@ -730,6 +732,7 @@
 // });
 import { initDatabase } from '@/common/API/DatabaseManager';
 import { fetchMasterSyncPartyDataPerPrptypeCache, getPrptypeSummary, normalizePrptype } from '@/common/API/Functions';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { setCustomUsername } from '@/common/utils/feedbackStorage';
 import { buildProfileFromLogin } from '@/common/utils/profileStorage';
 import {
@@ -738,8 +741,8 @@ import {
     initGlobalCacheDB
 } from '@/common/utils/sqliteCacheManager';
 import { saveCredentialsForPropertySwitch } from '@/src/lib/biometricAuth';
+import { getLoginSource } from '@/src/platform/runtime';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import axios from 'axios';
 import * as Device from 'expo-device';
@@ -749,7 +752,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     Image,
     ScrollView,
     StyleSheet,
@@ -908,18 +910,18 @@ export default function LoginScreen() {
         const noti_token = getNotitoken;
 
         if (!selectedProperty) {
-            Alert.alert("Error", "Please select property");
+            AppAlert.alert("Error", "Please select property");
             return;
         }
 
         if (!username || !password) {
-            Alert.alert("Error", "Enter username & password");
+            AppAlert.alert("Error", "Enter username & password");
             return;
         }
 
         // Extra validation before making API call
         if (!isPasswordValid(validation)) {
-            Alert.alert("Error", "Password does not meet security requirements");
+            AppAlert.alert("Error", "Password does not meet security requirements");
             return;
         }
 
@@ -951,7 +953,7 @@ export default function LoginScreen() {
 
             if (response.data.success) {
                 const token = response.data.response?.access_token;
-                const user_login_from = response.data.response?.user?.regsrc || 'web';
+                const user_login_from = getLoginSource();
                 const user_details = response.data.response?.user?.first_name || 'user';
                 const user_avaible = response.data.response?.user?.is_deleted || 'user';
                 const user_menu_apps = response.data.response?.usermenu || '';
@@ -971,17 +973,21 @@ export default function LoginScreen() {
 
                 if (response.data.success === true) {
                     if (user_avaible === "1") {
-                        Alert.alert('Warning', `User not available!, Please Register yourself by Create Account`);
+                        AppAlert.alert('Warning', `User not available!, Please Register yourself by Create Account`);
                         return;
                     } else {
                         if (token && user_details && user_menu_apps) {
+                            console.log('🚀 USER LOGIN FROM WEB11');
+                            if (user_login_from !== "web") {
+                                console.log('🚀 USER LOGIN FROM WEB11 app');
                             await saveCredentialsForPropertySwitch(username.trim(), password.trim());
+                            }
+                            console.log('🚀 USER LOGIN FROM WEB12');
 
                             await AsyncStorage.setItem(
                                 'mobile_raw_login_response',
                                 JSON.stringify(response.data.response || {})
                             );
-
                             await AsyncStorage.setItem('access_token', token);
                             await AsyncStorage.setItem('user_details', user_details);
                             await AsyncStorage.setItem('user_menu_apps', user_menu_apps);
@@ -1003,6 +1009,7 @@ export default function LoginScreen() {
                             });
 
                             if (user_login_from === "web") {
+                                console.log('🚀 USER LOGIN FROM WEB');
                                 await AsyncStorage.setItem('ENABLE_DEVICE_CHECK', 'true');
                                 router.replace('/(tabs)');
                                 await initGlobalCacheDB();
@@ -1040,16 +1047,16 @@ export default function LoginScreen() {
                                 }
                             }
                         } else {
-                            Alert.alert('❌ Error', `${response.data.response.message}`);
+                            AppAlert.alert('❌ Error', `${response.data.response.message}`);
                         }
                     }
                 } else {
-                    Alert.alert('❌ Error', `${response.data.message}`);
+                    AppAlert.alert('❌ Error', `${response.data.message}`);
                 }
             }
         } catch (err: any) {
             console.log("❌ LOGIN ERROR:", err?.response || err);
-            Alert.alert("Error", "Login failed");
+            AppAlert.alert("Error", "Login failed");
         } finally {
             setIsLoading(false);
         }

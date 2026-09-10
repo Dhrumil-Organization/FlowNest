@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -15,7 +16,7 @@ import {
 } from 'react-native';
 // import { StatusBar } from 'expo-status-bar';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -515,11 +516,11 @@ const YarnSalesOrder = ({ token }) => {
                 setDeleteSuccessVisible(true);
 
             } else {
-                Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
+                AppAlert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
             }
         } catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.res?.data?.message || 'Something went wrong while saving',
             );
@@ -939,7 +940,7 @@ const YarnSalesOrder = ({ token }) => {
                     onPress={() => {
 
                         if (!selectedProperty?.PrpCode) {
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Required',
                                 'Please select property first'
                             );

@@ -1,7 +1,7 @@
 // Simple in-memory i18n for tour text.
 // User can toggle language; persisted in AsyncStorage.
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 export type TourLanguage = 'en' | 'hi';
 

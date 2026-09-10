@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from "axios";
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,7 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from "../../common/API/dynamicAPI";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@/common/utils/compatibleStorage";
 import { Snackbar } from '@/common/utils/snackbarCompat';
 // import CustomSearchableDropdown from "../Shared/CustomSearchableDropdown";
 
@@ -757,7 +758,7 @@ const CreelIssueReturnModifyEntry = ({ navigation, route }) => {
 
     const printSticker = () => {
         if (typeof printer == 'undefined' || printer == null || printer == '') {
-            Alert.alert('Please select printer first.');
+            AppAlert.alert('Please select printer first.');
             return false;
         }
         else {

@@ -1,6 +1,7 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, FlatList, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { API } from '../../../common/API/dynamicAPI';
 import { debounce } from 'lodash';
@@ -518,7 +519,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
         } catch (error) {
             setAPILoading(false);
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             setAPILoading(false);
             // setTrackingLoader(false);
@@ -565,7 +566,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             }
         } catch (error) {
             console.error("Error in handleCardPressCurrent:", error);
-            Alert.alert("Error", "Failed to close the order");
+            AppAlert.alert("Error", "Failed to close the order");
         } finally {
             setAPILoading(false);
         }
@@ -606,7 +607,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 const pdfUrl = res?.data?.results?.sales_order;
 
                 if (!pdfUrl) {
-                    Alert.alert('PDF Error', 'PDF URL not found.');
+                    AppAlert.alert('PDF Error', 'PDF URL not found.');
                     return;
                 }
 
@@ -615,7 +616,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     title: 'Sales Order',
                 });
             } else {
-                Alert.alert(
+                AppAlert.alert(
                     'PDF Failed',
                     res?.data?.message || 'PDF generation failed.'
                 );
@@ -623,7 +624,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
         } catch (error) {
             console.log('PDF ERROR =>', error?.response?.data || error.message);
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.response?.data?.message || 'Unable to generate PDF.'
             );

@@ -6,7 +6,7 @@
 import { PermissionRouteGuard } from '@/src/core/navigation';
 import { OrdersScreen } from '@/src/screens/orders/OrdersScreen';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 export default function OrdersRoute() {

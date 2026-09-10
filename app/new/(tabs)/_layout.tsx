@@ -322,6 +322,7 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   monthlysalestarget: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Monthly Sales Target' },
   orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
   priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Chart Priority' },
+  datalog: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Datalog' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },

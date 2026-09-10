@@ -1,6 +1,7 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { API } from '../../../common/API/dynamicAPI';
 import { debounce } from 'lodash';
@@ -466,7 +467,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
             }
         } catch (error) {
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             // setTrackingLoader(false);
         }

@@ -1,5 +1,5 @@
 import { executeCallback } from '@/common/utils/callbackRegistry';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';

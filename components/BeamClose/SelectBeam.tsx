@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import axios from "axios";
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from "react";
@@ -59,7 +60,7 @@ const SelectBeam = ({ visible, onClose, FormState, token, txntype, setFormState 
     const handleDemo = (rowData) => {
         if (!rowData) return;
 
-        Alert.alert(
+        AppAlert.alert(
             "Confirm",
             `Do you want to open this Beam entry ${rowData.BeamNo}?`,
             [
@@ -137,7 +138,7 @@ const SelectBeam = ({ visible, onClose, FormState, token, txntype, setFormState 
             );
 
             if (response.data.success === true) {
-                Alert.alert("Success", "Saved successfully.");
+                AppAlert.alert("Success", "Saved successfully.");
 
                 // 👉 FormState update bhi yahin karo
                 setFormState(prev => ({
@@ -153,12 +154,12 @@ const SelectBeam = ({ visible, onClose, FormState, token, txntype, setFormState 
                 }));
                 onClose(); // modal close
             } else {
-                Alert.alert("Warning", response.data.message);
+                AppAlert.alert("Warning", response.data.message);
             }
 
         } catch (error) {
             console.log("SAVE ERROR:", error);
-            Alert.alert("Error", "Something went wrong");
+            AppAlert.alert("Error", "Something went wrong");
         } finally {
             setLoading(false);
         }

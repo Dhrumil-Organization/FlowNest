@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -11,7 +12,7 @@ import {
 } from 'react-native';
 
 import HeaderBarwithBack from '@/components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -77,17 +78,17 @@ const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) =
 
   const sendEmail = async () => {
     if (!isValidEmail(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      AppAlert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
     setSending(true);
     try {
       await inquiryApi.sendEmail(id, { email, subject, message: emailMessage, prptype: getUserPrptype, yearno: "27" });
-      Alert.alert('Sent!', 'Quotation emailed successfully', [
+      AppAlert.alert('Sent!', 'Quotation emailed successfully', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to send email');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to send email');
     } finally {
       setSending(false);
     }
@@ -95,17 +96,17 @@ const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) =
 
   const sendWhatsapp = async () => {
     if (!isValidMobile(mobile)) {
-      Alert.alert('Invalid Mobile', 'Please enter a valid 10-digit mobile');
+      AppAlert.alert('Invalid Mobile', 'Please enter a valid 10-digit mobile');
       return;
     }
     setSending(true);
     try {
       await inquiryApi.sendWhatsapp(id, { mobile, message: waMessage, prptype: getUserPrptype, yearno: "27" });
-      Alert.alert('Sent!', 'Quotation sent via WhatsApp', [
+      AppAlert.alert('Sent!', 'Quotation sent via WhatsApp', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to send WhatsApp');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to send WhatsApp');
     } finally {
       setSending(false);
     }
@@ -118,7 +119,7 @@ const SendQuotationScreen: React.FC<Props> = ({ route, navigation, username }) =
       const { pdf_url } = await inquiryApi.downloadPdf(id, getUserPrptype, "27");
       Linking.openURL(pdf_url);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to generate PDF');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to generate PDF');
     } finally {
       setSending(false);
     }

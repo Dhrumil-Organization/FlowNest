@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,7 +14,7 @@ import { fetchPropertyData } from '../../common/API/Functions';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { API } from "../../common/API/dynamicAPI";
 import { useSalesOrder } from './SalesOrderContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMobileUserPreference } from '../../hooks/useMobileUserPreference';
 
@@ -707,11 +708,11 @@ const YarnSalesOrder = ({ token,
                 setDeleteSuccessVisible(true);
 
             } else {
-                Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
+                AppAlert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
             }
         } catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.res?.data?.message || 'Something went wrong while saving',
             );
@@ -1132,7 +1133,7 @@ const YarnSalesOrder = ({ token,
                     onPress={() => {
 
                         if (!selectedProperty?.PrpCode) {
-                            Alert.alert(
+                            AppAlert.alert(
                                 'Required',
                                 'Please select property first'
                             );

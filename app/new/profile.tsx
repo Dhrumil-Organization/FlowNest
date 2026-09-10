@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // ─────────────────────────────────────────────────────────────
 // FILE: app/new/profile.tsx
 // Profile screen — opened from the avatar chip in AppHeader (top-right,
@@ -98,7 +99,7 @@ export default function ProfileScreen() {
   const name = fullName(user);
 
   const confirmSignOut = () =>
-    Alert.alert('Sign out?', 'This will clear the mobile session on this device.', [
+    AppAlert.alert('Sign out?', 'This will clear the mobile session on this device.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void logout() },
     ]);

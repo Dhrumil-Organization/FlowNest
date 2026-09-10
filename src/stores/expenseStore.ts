@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import AsyncStorage from '@/common/utils/compatibleStorage'
 
 const INIT_UNITS = ['01-Jun','02-Jun','03-Jun','04-Jun'].map(d => ({
   d, mwLooms:0, mwLuwa:0, sudLooms:0, sudLuwa:0, wjetLooms:0, warping:0, misc:0,

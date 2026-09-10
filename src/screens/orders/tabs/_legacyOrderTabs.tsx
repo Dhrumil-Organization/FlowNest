@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/orders/tabs/_legacyOrderTabs.tsx
 // ─────────────────────────────────────────────────────────────────────────
 // TEMPORARY — NOT YET MIGRATED. This file is AuthTab, TrackingTab, and
@@ -12,7 +13,7 @@
 // the root screen are fully converted; these three are next. Delete this
 // file once all three are migrated into their own proper files.
 // ─────────────────────────────────────────────────────────────────────────
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -253,7 +254,7 @@ function AuthOrderModal({
 
     const loadAddDesigns = async () => {
         if (!editPrpCode || !token) {
-            Alert.alert('Unable to add item', 'Property or login information is missing.');
+            AppAlert.alert('Unable to add item', 'Property or login information is missing.');
             return;
         }
 
@@ -271,7 +272,7 @@ function AuthOrderModal({
             setAddDesignList(Array.isArray(data) ? data : []);
         } catch (e: any) {
             setAddDesignList([]);
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load items',
                 e?.response?.data?.message || e?.message || 'Please try again.'
             );
@@ -313,7 +314,7 @@ function AuthOrderModal({
             setAddItemList(Array.isArray(data) ? data : []);
         } catch (e: any) {
             setAddItemList([]);
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load designs',
                 e?.response?.data?.message || e?.message || 'Please try again.'
             );
@@ -346,7 +347,7 @@ function AuthOrderModal({
             setAddShadeList(Array.isArray(data) ? data : []);
         } catch (e: any) {
             setAddShadeList([]);
-            Alert.alert(
+            AppAlert.alert(
                 'Unable to load shades',
                 e?.response?.data?.message || e?.message || 'Please try again.'
             );
@@ -360,19 +361,19 @@ function AuthOrderModal({
         const rate = parseNum(addRate);
 
         if (!addDesign) {
-            Alert.alert('Item required', 'Select an item.');
+            AppAlert.alert('Item required', 'Select an item.');
             return;
         }
         if (!addItem) {
-            Alert.alert('Design required', 'Select a design.');
+            AppAlert.alert('Design required', 'Select a design.');
             return;
         }
         if (!addShade) {
-            Alert.alert('Shade required', 'Select a shade.');
+            AppAlert.alert('Shade required', 'Select a shade.');
             return;
         }
         if (qty <= 0 || rate <= 0) {
-            Alert.alert('Quantity and rate required', 'Enter quantity and rate greater than zero.');
+            AppAlert.alert('Quantity and rate required', 'Enter quantity and rate greater than zero.');
             return;
         }
 
@@ -383,7 +384,7 @@ function AuthOrderModal({
         );
 
         if (duplicate) {
-            Alert.alert(
+            AppAlert.alert(
                 'Combination already exists',
                 'This item, design and shade combination is already present in the order.'
             );
@@ -478,7 +479,7 @@ function AuthOrderModal({
         if (!isEdit || saving) return;
 
         if (!rows.length) {
-            Alert.alert('Cannot update', 'This sales order does not contain any item rows.');
+            AppAlert.alert('Cannot update', 'This sales order does not contain any item rows.');
             return;
         }
 
@@ -487,7 +488,7 @@ function AuthOrderModal({
         );
 
         if (invalidIndex >= 0) {
-            Alert.alert(
+            AppAlert.alert(
                 'Invalid quantity or rate',
                 `Enter a quantity and rate greater than zero in item ${invalidIndex + 1}.`
             );
@@ -1163,7 +1164,7 @@ function AuthTab({ token }) {
 
         // From date cannot be after To date.
         if (toDate && nextFrom.getTime() > new Date(toDate).setHours(0, 0, 0, 0)) {
-            Alert.alert('Invalid date', 'From date cannot be greater than To date.');
+            AppAlert.alert('Invalid date', 'From date cannot be greater than To date.');
             return;
         }
 
@@ -1180,7 +1181,7 @@ function AuthTab({ token }) {
 
         // To date cannot be before From date.
         if (fromDate && nextTo.getTime() < new Date(fromDate).setHours(0, 0, 0, 0)) {
-            Alert.alert('Invalid date', 'To date cannot be less than From date.');
+            AppAlert.alert('Invalid date', 'To date cannot be less than From date.');
             return;
         }
 
@@ -1293,12 +1294,12 @@ function AuthTab({ token }) {
 
             if (res.data?.success) {
                 load();
-                Alert.alert('Done', `Order ${action}d successfully`);
+                AppAlert.alert('Done', `Order ${action}d successfully`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Action failed');
+                AppAlert.alert('Failed', res.data?.message || 'Action failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setApproving(null);
         }
@@ -1332,7 +1333,7 @@ function AuthTab({ token }) {
 
     const openOrder = (item, mode) => {
         if (mode === 'edit' && Number(item.IsAuth || 0) !== 0) {
-            Alert.alert('Cannot modify', 'An authorized sales order cannot be modified.');
+            AppAlert.alert('Cannot modify', 'An authorized sales order cannot be modified.');
             return;
         }
         setOrderModal({ visible: true, mode, record: item });
@@ -1423,14 +1424,14 @@ function AuthTab({ token }) {
             await load();
 
             const addedCount = rows.filter(row => row._isNew).length;
-            Alert.alert(
+            AppAlert.alert(
                 'Updated',
                 addedCount > 0
                     ? `Sales order updated successfully. ${addedCount} new item${addedCount === 1 ? '' : 's'} added.`
                     : 'Sales order updated successfully.'
             );
         } catch (e: any) {
-            Alert.alert(
+            AppAlert.alert(
                 'Update failed',
                 e?.response?.data?.message || e?.message || 'Unable to update the sales order.'
             );
@@ -1476,9 +1477,9 @@ function AuthTab({ token }) {
                 String(previous) === String(item.UId) ? null : previous
             );
 
-            Alert.alert('Deleted', 'Sales order removed successfully.');
+            AppAlert.alert('Deleted', 'Sales order removed successfully.');
         } catch (e: any) {
-            Alert.alert(
+            AppAlert.alert(
                 'Cannot delete order',
                 e?.response?.data?.message ||
                 e?.message ||
@@ -1492,7 +1493,7 @@ function AuthTab({ token }) {
     const confirmDelete = (item) => {
         if (deletingId || savingEdit || approving) return;
 
-        Alert.alert(
+        AppAlert.alert(
             'Delete sales order?',
             `${getSoId(item)} will be permanently removed. This is allowed only when the order is not in use.`,
             [
@@ -2179,7 +2180,7 @@ function TrackingTab({ token }) {
         const enteredQty = Number(totalDispatchQty || 0);
 
         if (enteredQty > pendingQty) {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation',
                 `Dispatch Qty cannot exceed Pending Qty (${pendingQty.toFixed(3)} m)`
             );
@@ -2190,7 +2191,7 @@ function TrackingTab({ token }) {
             .filter((sh) => dispChecked[sh.ShdCode] && num(dispQtys[sh.ShdCode]) > 0)
             .map((sh) => ({ ShdCode: sh.ShdCode, Qty: num(dispQtys[sh.ShdCode]) }));
         if (items.length === 0) {
-            Alert.alert('Required', 'Enter at least one dispatch quantity');
+            AppAlert.alert('Required', 'Enter at least one dispatch quantity');
             return;
         }
         try {
@@ -2204,12 +2205,12 @@ function TrackingTab({ token }) {
             if (res.data?.success) {
                 setDispItem(null);
                 load();
-                Alert.alert('Done', 'Dispatched successfully');
+                AppAlert.alert('Done', 'Dispatched successfully');
             } else {
-                Alert.alert('Failed', res.data?.message || 'Dispatch failed');
+                AppAlert.alert('Failed', res.data?.message || 'Dispatch failed');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setDispatching(false);
         }
@@ -2264,12 +2265,12 @@ function TrackingTab({ token }) {
                 setConfirmItem(null);
                 setConfirmShadeRow(null);
                 load();
-                Alert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
+                AppAlert.alert('Done', `APC confirmed as ${shade.ShdName || shade.ShadeName}`);
             } else {
-                Alert.alert('Failed', res.data?.message || 'Could not confirm shade');
+                AppAlert.alert('Failed', res.data?.message || 'Could not confirm shade');
             }
         } catch (e) {
-            Alert.alert('Error', e?.message);
+            AppAlert.alert('Error', e?.message);
         } finally {
             setConfirmSaving(false);
         }
@@ -2299,9 +2300,9 @@ function TrackingTab({ token }) {
     const copyJobChart = () => {
         try {
             Clipboard.setString(buildJobChartText(jobItem));
-            Alert.alert('Copied', 'Job chart copied to clipboard');
+            AppAlert.alert('Copied', 'Job chart copied to clipboard');
         } catch (e) {
-            Alert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
+            AppAlert.alert('Error', 'Clipboard unavailable — install @react-native-clipboard/clipboard');
         }
     };
 

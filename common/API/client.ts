@@ -1,6 +1,6 @@
 // // src/api/client.ts  (or common/API/client.ts — match your path)
 // import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { API, initAPI } from './dynamicAPI';
 
 // const cleanBase = (value?: string | null) => {
@@ -381,7 +381,7 @@
 
 // src/api/client.ts  (or common/API/client.ts — match your path)
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { API, initAPI } from './dynamicAPI';
 
 const cleanBase = (value?: string | null) => {

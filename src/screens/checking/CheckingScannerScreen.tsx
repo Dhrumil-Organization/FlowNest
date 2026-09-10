@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/checking/CheckingScannerScreen.tsx
 // Migrated from the old CheckingScanner/index.tsx to the app's standard
 // architecture. Business logic (validation rules, payload shapes, API
@@ -13,7 +14,7 @@ import { API_BASE_URL } from '@/src/api/client';
 import { usePermission } from '@/src/core/permissions';
 import { T } from '@/src/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -215,7 +216,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
             sendScannedValue(value);
         } catch {
             resetScanFields();
-            Alert.alert('Invalid QR', 'QR format not valid');
+            AppAlert.alert('Invalid QR', 'QR format not valid');
         }
         setIsScanning(false);
     };
@@ -366,7 +367,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
             if (response.data.success && response.data.response.design) {
                 setData(response.data.response.design);
             } else {
-                Alert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
+                AppAlert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
             }
         } catch (error) {
             console.log('API sendScannedValue error:', error);
@@ -400,10 +401,10 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
                 } else {
                     setDesigndata([]);
                     setWarpLen('0');
-                    Alert.alert('No Data Found');
+                    AppAlert.alert('No Data Found');
                 }
             } else {
-                Alert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
+                AppAlert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
             }
         } catch (error) {
             console.log('API sendScannedValue1 error:', error);
@@ -443,19 +444,19 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
     };
 
     const handleSubmitScan = async () => {
-        if (!canScan) return Alert.alert('Not permitted', 'You do not have permission to save scan entries.');
-        if (!beamNo) return Alert.alert('Beam no can not be blank');
-        if (!takaNo) return Alert.alert('Taka no can not be blank');
-        if (!design) return Alert.alert('Design can not be blank.');
-        if (!meter || parseFloat(meter) <= 0) return Alert.alert('Meter can not be blank or 0.');
+        if (!canScan) return AppAlert.alert('Not permitted', 'You do not have permission to save scan entries.');
+        if (!beamNo) return AppAlert.alert('Beam no can not be blank');
+        if (!takaNo) return AppAlert.alert('Taka no can not be blank');
+        if (!design) return AppAlert.alert('Design can not be blank.');
+        if (!meter || parseFloat(meter) <= 0) return AppAlert.alert('Meter can not be blank or 0.');
         if (parseFloat(meter) > parseFloat(getWarpLen))
-            return Alert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
-        if (!kgs || parseFloat(kgs) <= 0) return Alert.alert('Kgs can not be blank or 0.');
-        if (!grade) return Alert.alert('Grade can not be blank.');
-        if (!checker) return Alert.alert('Checker can not be blank.');
-        if (!shift) return Alert.alert('Shift can not be blank.');
-        if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
-        if (!operator) return Alert.alert('Operator can not be blank.');
+            return AppAlert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
+        if (!kgs || parseFloat(kgs) <= 0) return AppAlert.alert('Kgs can not be blank or 0.');
+        if (!grade) return AppAlert.alert('Grade can not be blank.');
+        if (!checker) return AppAlert.alert('Checker can not be blank.');
+        if (!shift) return AppAlert.alert('Shift can not be blank.');
+        if (!Designdata.length) return AppAlert.alert('Design data missing. Select design again.');
+        if (!operator) return AppAlert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -525,10 +526,10 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
                     setSavedData(response.data.data.main[0]);
                 }
                 getAllPrinters();
-                Alert.alert('Saved', 'Saved successfully');
+                AppAlert.alert('Saved', 'Saved successfully');
             } else {
                 setDataSaved(false);
-                Alert.alert('Save failed', response.data.message || 'Save failed');
+                AppAlert.alert('Save failed', response.data.message || 'Save failed');
             }
         } catch (error) {
             setDataSaved(false);
@@ -584,25 +585,25 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
     });
 
     const printStickerForData = async (rowData: any) => {
-        if (!canPrint) return Alert.alert('Not permitted', 'You do not have permission to print.');
+        if (!canPrint) return AppAlert.alert('Not permitted', 'You do not have permission to print.');
         const printerName = printer || '';
-        if (!printerName) return Alert.alert('Printer Required', 'Please select printer first.');
+        if (!printerName) return AppAlert.alert('Printer Required', 'Please select printer first.');
         if (!rowData || Object.keys(rowData).length === 0)
-            return Alert.alert('Print Error', 'Sticker data is empty.');
+            return AppAlert.alert('Print Error', 'Sticker data is empty.');
         setIsLoading(true);
         try {
             const response = await PrinterAPI.printSticker(PRINTSTICKER_URL, buildStickerParams(rowData, printerName), getPrinterHeaders());
             const res = response.data || {};
 
             if (res.success) {
-                Alert.alert('Printed', `${res.printed || 1} label(s) sent to printer.`);
+                AppAlert.alert('Printed', `${res.printed || 1} label(s) sent to printer.`);
                 setPrinterModalVisible(false);
                 setPendingPrintItem(null);
             } else {
-                Alert.alert('Print failed', res.message || 'Print failed');
+                AppAlert.alert('Print failed', res.message || 'Print failed');
             }
         } catch (error: any) {
-            Alert.alert(
+            AppAlert.alert(
                 'Print failed',
                 error?.response?.data?.message || error?.response?.data?.error || error.message || 'Print failed',
             );
@@ -637,7 +638,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
                 err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Printer service not reachable';
             setPrinterError(message);
             setPrinters([]);
-            Alert.alert('Printer Error', String(message));
+            AppAlert.alert('Printer Error', String(message));
         } finally {
             setPrinterLoading(false);
         }
@@ -663,7 +664,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
             if (response.data.success && response.data.response.design) {
                 setdesigndata(response.data.response.design);
             } else {
-                Alert.alert('No Design Data Found');
+                AppAlert.alert('No Design Data Found');
             }
         } catch (error) {
             console.log('API error:', error);
@@ -941,7 +942,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
                 fetchdesign();
                 fetchManualGradeCheckerOperatorShift();
             } else {
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
             }
         } catch (error) {
             console.log('API error:', error);
@@ -952,7 +953,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
 
     const showAlert = (message: string) =>
         new Promise<void>((resolve) => {
-            Alert.alert('Validation Error', message, [{ text: 'OK', onPress: () => resolve() }], {
+            AppAlert.alert('Validation Error', message, [{ text: 'OK', onPress: () => resolve() }], {
                 cancelable: false,
             });
         });
@@ -1011,7 +1012,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
     };
 
     const handlesave = async () => {
-        if (!canManualEntry) return Alert.alert('Not permitted', 'You do not have permission to save manual entries.');
+        if (!canManualEntry) return AppAlert.alert('Not permitted', 'You do not have permission to save manual entries.');
         const userPtype = await AsyncStorage.getItem('user_prptype');
         const isValid = await validateForm();
         if (!isValid) return;
@@ -1038,7 +1039,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
             const response = await CheckingAPI.addAutoCheckingDetail(payloadObj);
 
             if (response.data.success === true) {
-                Alert.alert('Success', 'Data Saved Successfully', [
+                AppAlert.alert('Success', 'Data Saved Successfully', [
                     {
                         text: 'OK',
                         onPress: async () => {
@@ -1049,7 +1050,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
                     },
                 ]);
             } else {
-                Alert.alert('Save failed', `${response.data.message}`);
+                AppAlert.alert('Save failed', `${response.data.message}`);
             }
         } catch (error) {
             console.log('API handlesave error:', error);
@@ -1106,7 +1107,7 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
     });
 
     const handledelete = async () => {
-        if (!canDelete) return Alert.alert('Not permitted', 'You do not have permission to delete records.');
+        if (!canDelete) return AppAlert.alert('Not permitted', 'You do not have permission to delete records.');
         try {
             setShowDeleteAlert(false);
             if (!selectedDeleteItem) return;
@@ -1127,20 +1128,20 @@ export const CheckingScannerScreen: React.FC<Props> = ({ token }) => {
             const response = await CheckingAPI.deleteCheckingDetail(infoPyload);
 
             if (response.data.success) {
-                Alert.alert('Success', response.data.message || 'Record deleted successfully');
+                AppAlert.alert('Success', response.data.message || 'Record deleted successfully');
                 await handleScannerList();
             } else {
-                Alert.alert('Warning', response.data.message);
+                AppAlert.alert('Warning', response.data.message);
             }
         } catch (error) {
-            Alert.alert('Error', 'Something went wrong');
+            AppAlert.alert('Error', 'Something went wrong');
         } finally {
             setIsDeleteLoading(false);
         }
     };
 
     const openPrinterForScannerRow = async (item: any) => {
-        if (!canPrint) return Alert.alert('Not permitted', 'You do not have permission to print.');
+        if (!canPrint) return AppAlert.alert('Not permitted', 'You do not have permission to print.');
         setPendingPrintItem(item);
         setPrinterModalVisible(true);
         if (getPrinters.length === 0) await getAllPrinters();

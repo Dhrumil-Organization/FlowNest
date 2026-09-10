@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -287,7 +288,7 @@ export function ManufacturingControlTower({ route }: any) {
             const res = await RealCostingChainAPI.dashboard(params);
             setPayload(res.data?.response || null);
         } catch (e: any) {
-            Alert.alert('Control Tower Error', e?.response?.data?.message || e?.message || 'Unable to load dashboard');
+            AppAlert.alert('Control Tower Error', e?.response?.data?.message || e?.message || 'Unable to load dashboard');
         } finally {
             setLoading(false);
             setRefreshing(false);

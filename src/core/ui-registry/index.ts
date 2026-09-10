@@ -3,6 +3,7 @@
 import './modules/core-navigation.ui';
 import './modules/greyPacking.ui';
 import './modules/priority.ui';
+import './modules/datalog.ui';
 import './modules/design.ui';
 import './modules/management.ui';
 import './modules/production.ui';

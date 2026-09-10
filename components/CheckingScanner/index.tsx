@@ -1273,7 +1273,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 txntype: 'chekingScanner',
                 yearno: getCurrentFinancialYear(),
                 EMode: 'M',
-                d2: form.d2 || [],
+                // d2: form.d2 || [],
+                d2: (Array.isArray(form.d2) ? form.d2 : [])
+                    .filter((item: any) => String(item?.Remark ?? '').trim() !== ''),
             };
 
             console.log('handlesave payloadObj:', payloadObj);
@@ -2917,6 +2919,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                         data={faultsData}
                         initialFilledData={form.d2 || []}
                         cacheKey={form.UId || ''}
+                        beamNo={FormState.values.BeamNo || form.BeamNo || ''}
+                        takaNo={FormState.values.TakaNo || ''}
+                        meter={meter || ''}
                         fetchData={async (cacheKey: string) => {
                             const params = {
                                 UId: cacheKey,

@@ -1,10 +1,11 @@
+import AppAlert from '@/common/utils/appAlert';
 import { generateFinancialYearOptions, getCurrentFinancialYearMain } from '@/common/API/Functions';
 import { crlimtreq_styles } from '@/common/Style';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -236,7 +237,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -299,7 +300,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -350,7 +351,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -414,7 +415,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', `Server error: ${error}`);
+                AppAlert.alert('Error', `Server error: ${error}`);
             }
         } finally {
             // setIsLoading(false);
@@ -636,16 +637,16 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
                 setsalessumdata(response.data.data.salessumdata);
                 // await saveToCache(CACHE_KEY_CONFIRM_ACTION, { payload, response: response.data });
             } else if (response.data.success === false) {
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setsalesdata([]);
                 setsalessumdata([]);
             } else {
-                Alert.alert('No Data Found!');
+                AppAlert.alert('No Data Found!');
                 setsalesdata([]);
                 setsalessumdata([]);
             }
         } catch (error) {
-            Alert.alert('Server Error', error as string);
+            AppAlert.alert('Server Error', error as string);
             setsalesdata([]);
             setsalessumdata([]);
         } finally {
@@ -697,7 +698,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             // }
         } catch (error) {
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             setTrackingLoader(false);
         }
@@ -737,7 +738,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
     //         }
     //     } catch (error) {
     //         console.error("Error in handleCardPress:", error);
-    //         Alert.alert("Error", "Failed to process party details");
+    //         AppAlert.alert("Error", "Failed to process party details");
     //     } finally {
     //         setTrackingLoader(false);
     //     }
@@ -793,7 +794,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             }
         } catch (error) {
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             setTrackingLoader(false);
         }
@@ -840,7 +841,7 @@ const SalesOrderTracking: React.FC<{ token: string, username: string }> = ({ tok
             }
         } catch (error) {
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             setTrackingLoader(false);
         }

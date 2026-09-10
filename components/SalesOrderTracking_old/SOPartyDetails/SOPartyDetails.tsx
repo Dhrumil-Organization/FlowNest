@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { debounce } from 'lodash';
@@ -494,7 +495,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ token, username }) => {
         } catch (error) {
             setAPILoading(false);
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             setAPILoading(false);
             // setTrackingLoader(false);

@@ -10,7 +10,7 @@
 // import { MainTabs } from '@/src/navigation/MainTabs';
 // import RoleLoginScreen from '@/src/screens/auth/RoleLoginScreen';
 // import { useAppSessionStore } from '@/src/stores/AppSessionStore';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import * as Device from 'expo-device';
 // import * as Notifications from 'expo-notifications';
 // import { Stack, useRouter } from 'expo-router';
@@ -18,6 +18,8 @@
 // import { StyleSheet, View } from 'react-native';
 // import AccessDeniedScreen from '../common/access-denied';
 // import FullScreenLoader from '../components/FullScreenLoader';
+// import AppAlertHost from '@/components/AppAlertHost';
+// import { getLoginSource, isWeb } from '@/src/platform/runtime';
 
 
 // export default function RootLayout() {
@@ -291,19 +293,21 @@
 import { initAPI, initAPIForPrinterList, initAPIForSticker } from '@/common/API/dynamicAPI';
 import { NotificationProvider } from '@/common/context/NotificationContext';
 import { initDB } from '@/common/utils/chatDB';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { registerSnackbar } from '@/common/utils/snackbar';
 import { initGlobalCacheDB } from '@/common/utils/sqliteCacheManager';
+import AppAlertHost from '@/components/AppAlertHost';
 import { initDb } from '@/components/Event/db';
 import Snackbar, { SnackbarType } from '@/components/Snackbar';
 import { SalesOrderProvider } from '@/components/YarnSalesOrder/SalesOrderContext';
 import { getFCMToken } from '@/hooks/NotificationService';
-import { AppCoreProvider } from '@/src/core/AppCoreProvider';
 import { initNewErpAPI } from '@/src/api/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppCoreProvider } from '@/src/core/AppCoreProvider';
+import { getLoginSource, isWeb } from '@/src/platform/runtime';
 import * as Device from 'expo-device';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import AccessDeniedScreen from '../common/access-denied';
 import FullScreenLoader from '../components/FullScreenLoader';
 
@@ -362,7 +366,7 @@ export default function RootLayout() {
   //   initializeDatabases();
   // }, []);
   useEffect(() => {
-    if (Platform.OS === "web") {
+    if (isWeb()) {
       return;
     }
 
@@ -387,7 +391,7 @@ export default function RootLayout() {
   // }, [token, getUsertype]);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
+    if (isWeb()) return;
 
     if (!token) return;
     if (!getUsertype) return;
@@ -418,6 +422,7 @@ export default function RootLayout() {
     const initApp = async () => {
       try {
         console.log('🚀 App Start');
+        await AsyncStorage.setItem('LOGIN_SOURCE', getLoginSource());
 
         const deviceId = Device.osInternalBuildId || 'test-device';
         await AsyncStorage.setItem('cache_deviceId', deviceId);
@@ -488,6 +493,7 @@ export default function RootLayout() {
                 </>
               )}
             </Stack>
+            {isWeb() && <AppAlertHost />}
             <View style={styles.snackbarHost} pointerEvents="box-none">
               <Snackbar
                 visible={snackbar.visible}

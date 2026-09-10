@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -1258,7 +1259,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         });
     };
     const removeRow = row => {
-        Alert.alert('Delete Row', 'Are you sure you want to delete this shade?', [
+        AppAlert.alert('Delete Row', 'Are you sure you want to delete this shade?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Delete',
@@ -1274,34 +1275,34 @@ const OrderSummaryScreen = ({ navigation, route }) => {
 
     const validateBeforeSave = () => {
         if (!currentParty?.ParCode) {
-            Alert.alert('Required', 'Please select party.');
+            AppAlert.alert('Required', 'Please select party.');
             return false;
         }
 
         if (!ddays || ddays == '0') {
-            Alert.alert('Required', 'Delivery Days cannot be blank.');
+            AppAlert.alert('Required', 'Delivery Days cannot be blank.');
             return false;
         }
 
         if (rows.length === 0) {
-            Alert.alert('Required', 'Please add at least one item.');
+            AppAlert.alert('Required', 'Please add at least one item.');
             return false;
         }
 
 
         for (const row of rows) {
             if (!row.ItmCode || !row.GrdCode || !row.ShdCode) {
-                Alert.alert('Invalid Row', 'Item/design/shade missing.');
+                AppAlert.alert('Invalid Row', 'Item/design/shade missing.');
                 return false;
             }
 
             if (num(row.Qty) <= 0) {
-                Alert.alert('Invalid Qty', `${row.ItmName} - ${row.ShdName}`);
+                AppAlert.alert('Invalid Qty', `${row.ItmName} - ${row.ShdName}`);
                 return false;
             }
 
             if (num(row.Rate) <= 0) {
-                Alert.alert('Invalid Rate', `${row.ItmName} - ${row.ShdName}`);
+                AppAlert.alert('Invalid Rate', `${row.ItmName} - ${row.ShdName}`);
                 return false;
             }
         }
@@ -1409,7 +1410,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 : [];
 
             if (!main?.UId) {
-                Alert.alert('Error', 'Sales order not found');
+                AppAlert.alert('Error', 'Sales order not found');
                 return;
             }
             setAutoLocked(
@@ -1474,7 +1475,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         } catch (error) {
             console.log('LOAD SO ERROR =>', error?.response?.data || error);
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.response?.data?.message || 'Unable to load sales order',
             );
@@ -1528,7 +1529,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 error?.response?.data || error
             );
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.response?.data?.message ||
                 'Unable to load delivery address',
@@ -1873,12 +1874,12 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     }
                 });
             } else {
-                Alert.alert('Save Failed', res.data?.message || 'Unable to save order');
+                AppAlert.alert('Save Failed', res.data?.message || 'Unable to save order');
             }
         }
         catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.res?.data?.message || 'Something went wrong while saving',
             );
@@ -1911,7 +1912,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
     //             error?.res?.data || error.message,
     //         );
 
-    //         Alert.alert(
+    //         AppAlert.alert(
     //             'Error',
     //             error?.res?.data?.message ||
     //             'Something went wrong while saving',
@@ -1974,11 +1975,11 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     // });
                 }, 1200);
             } else {
-                Alert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
+                AppAlert.alert('Delete Failed', res.data?.message || 'Unable to delete order');
             }
         } catch (error) {
             console.log('SAVE ORDER ERROR:', error?.res?.data || error.message);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.res?.data?.message || 'Something went wrong while saving',
             );
@@ -2022,7 +2023,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                 const pdfUrl = res?.data?.results?.sales_order;
 
                 if (!pdfUrl) {
-                    Alert.alert('PDF Error', 'PDF URL not found.');
+                    AppAlert.alert('PDF Error', 'PDF URL not found.');
                     return;
                 }
 
@@ -2038,7 +2039,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     }
                 });
             } else {
-                Alert.alert(
+                AppAlert.alert(
                     'PDF Failed',
                     res?.data?.message || 'PDF generation failed.'
                 );
@@ -2046,7 +2047,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
         } catch (error) {
             console.log('PDF ERROR =>', error?.response?.data || error.message);
 
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.response?.data?.message || 'Unable to generate PDF.'
             );
@@ -2131,7 +2132,7 @@ const OrderSummaryScreen = ({ navigation, route }) => {
                     <TouchableOpacity
                         style={styles.menuBtn}
                         onPress={() => {
-                            Alert.alert('Row Action', 'Choose action', [
+                            AppAlert.alert('Row Action', 'Choose action', [
                                 {
                                     text: 'Edit',
                                     onPress: () => editRow(item),

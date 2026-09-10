@@ -13,7 +13,7 @@ import { API } from '@/common/API/dynamicAPI';
 import CustomDrawer from './CustomDrawer';
 import AddBeamGaiting from './AddBeamGaiting';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { crlimtreq_styles } from '@/common/Style';
 import HeaderBarwithBack from '@/components/Header';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';

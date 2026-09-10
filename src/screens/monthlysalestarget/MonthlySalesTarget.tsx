@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 import client from '@/common/API/client_fix_design';
 import { getCurrentFinancialYear } from '@/common/commonfunction';
 import { T } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -158,7 +159,7 @@ export function MonthlySalesTargetScreen() {
 
             if (response.data?.success) {
                 setSaveLoading(false);
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     message,
                     [
@@ -172,7 +173,7 @@ export function MonthlySalesTargetScreen() {
                     { cancelable: false }
                 );
             } else {
-                Alert.alert("Error", message);
+                AppAlert.alert("Error", message);
             }
         } catch (error: any) {
             setSaveLoading(false);
@@ -180,7 +181,7 @@ export function MonthlySalesTargetScreen() {
                 error.response?.data?.message ||
                 error.response?.data?.response?.message ||
                 error.message;
-            Alert.alert("Error", message);
+            AppAlert.alert("Error", message);
         } finally {
             setSaveLoading(false);
             setSaving(false);

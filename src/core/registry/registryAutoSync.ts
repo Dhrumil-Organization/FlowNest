@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 import { AppAccessAPI, unwrapAccessResponse } from '../../api/accessControl';
 import { createPermissionRegistrySyncPayload } from '../../registry';

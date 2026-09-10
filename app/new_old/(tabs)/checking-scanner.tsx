@@ -1,7 +1,7 @@
 import { PermissionRouteGuard } from '@/src/core/navigation';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { CheckingScannerScreen } from '@/src/screens/checking/CheckingScannerScreen';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
 
 export default function CheckingScannerRoute() {

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // FILE: src/screens/greyPacking/GreyPackingScannerScreen.tsx
 // Sudamo Textile ERP - Grey Packing mobile live scanner.
 // Header once -> scan continuously -> every green scan is SQL committed -> finish.
@@ -10,7 +11,7 @@ import SearchablePickerModal, {
 import SearchableMultiSelectModal, {
   SearchableMultiSelectOption,
 } from '@/src/components/ui/SearchableMultiSelectModal';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { fetchPropertyData } from '@/src/api/legacyFunctions';
 import { useBusinessContext } from '@/src/core/business';
 import { usePermission } from '@/src/core/permissions';
@@ -470,7 +471,7 @@ export default function GreyPackingScannerScreen() {
         if (selected) setDepartmentName(selected.label);
       }
     } catch (error) {
-      Alert.alert('Department', apiError(error));
+      AppAlert.alert('Department', apiError(error));
     } finally {
       setDepartmentLoading(false);
     }
@@ -501,7 +502,7 @@ export default function GreyPackingScannerScreen() {
         if (selected) setPackingTypeName(selected.label);
       }
     } catch (error) {
-      Alert.alert('Packing Type', apiError(error));
+      AppAlert.alert('Packing Type', apiError(error));
     } finally {
       setPackingTypeLoading(false);
     }
@@ -540,7 +541,7 @@ export default function GreyPackingScannerScreen() {
         );
       }
     } catch (error) {
-      Alert.alert('Checked By', apiError(error));
+      AppAlert.alert('Checked By', apiError(error));
     } finally {
       setCheckedByLoading(false);
     }
@@ -577,7 +578,7 @@ export default function GreyPackingScannerScreen() {
         : [];
       setTransactionTypeOptions(options);
     } catch (error) {
-      Alert.alert('Transaction Type', apiError(error));
+      AppAlert.alert('Transaction Type', apiError(error));
     } finally {
       setTransactionTypeLoading(false);
     }
@@ -646,7 +647,7 @@ export default function GreyPackingScannerScreen() {
         return sessionData;
       } catch (error) {
         if (isNetworkLikeError(error)) setConnectionBlocked(true);
-        if (!silent) Alert.alert('Grey Packing', apiError(error));
+        if (!silent) AppAlert.alert('Grey Packing', apiError(error));
         return null;
       } finally {
         if (!silent) setBusy(false);
@@ -745,7 +746,7 @@ export default function GreyPackingScannerScreen() {
       }
       if (!isOpen) return false;
 
-      Alert.alert(
+      AppAlert.alert(
         'Leave Grey Packing?',
         `${n(summary.total_taka)} Taka are already saved. You can safely resume this packing later.`,
         [
@@ -760,31 +761,31 @@ export default function GreyPackingScannerScreen() {
 
   const startSession = async () => {
     if (!canStart) {
-      Alert.alert('Access denied', 'You do not have Add permission for Grey Packing.');
+      AppAlert.alert('Access denied', 'You do not have Add permission for Grey Packing.');
       return;
     }
     if (!isReady) {
-      Alert.alert('Business context missing', 'Property, financial year and store are required.');
+      AppAlert.alert('Business context missing', 'Property, financial year and store are required.');
       return;
     }
     if (!voucherNo || !voucherMonth) {
-      Alert.alert('Voucher No', 'Valid voucher number is required.');
+      AppAlert.alert('Voucher No', 'Valid voucher number is required.');
       return;
     }
     if (!departmentCode.trim()) {
-      Alert.alert('Department', 'Department is required.');
+      AppAlert.alert('Department', 'Department is required.');
       return;
     }
     if (!packingType.trim()) {
-      Alert.alert('Packing Type', 'Packing Type is required.');
+      AppAlert.alert('Packing Type', 'Packing Type is required.');
       return;
     }
     if (!checkedByCode.trim()) {
-      Alert.alert('Checked By', 'Checked By is required.');
+      AppAlert.alert('Checked By', 'Checked By is required.');
       return;
     }
     if (selectedTransactionTypes.length === 0) {
-      Alert.alert('Transaction Type', 'Select at least one Transaction Type.');
+      AppAlert.alert('Transaction Type', 'Select at least one Transaction Type.');
       return;
     }
 
@@ -837,7 +838,7 @@ export default function GreyPackingScannerScreen() {
       if (!permission?.granted) await requestPermission();
     } catch (error) {
       if (isNetworkLikeError(error)) setConnectionBlocked(true);
-      Alert.alert('Unable to Start Packing', apiError(error));
+      AppAlert.alert('Unable to Start Packing', apiError(error));
     } finally {
       setBusy(false);
     }
@@ -858,7 +859,7 @@ export default function GreyPackingScannerScreen() {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result?.granted) {
-        Alert.alert(
+        AppAlert.alert(
           'Camera Permission',
           'Camera access is required to scan Taka/Carton QR codes.',
         );
@@ -972,17 +973,17 @@ export default function GreyPackingScannerScreen() {
       scanLock.current = false;
       setNotice({ type: 'info', text: 'Server connection restored. Scanning can continue.' });
     } else {
-      Alert.alert('Still Offline', 'Unable to confirm live Grey Packing state.');
+      AppAlert.alert('Still Offline', 'Unable to confirm live Grey Packing state.');
     }
   };
 
   const removeScan = (row: D2Row) => {
     if (!canRemove) {
-      Alert.alert('Access denied', 'You do not have permission to remove a scanned Taka.');
+      AppAlert.alert('Access denied', 'You do not have permission to remove a scanned Taka.');
       return;
     }
 
-    Alert.alert(
+    AppAlert.alert(
       'Remove Taka?',
       `Taka ${row.TakaNo || ''} will be removed and its original source balance restored.`,
       [
@@ -1008,7 +1009,7 @@ export default function GreyPackingScannerScreen() {
               setNotice({ type: 'info', text: `Taka ${row.TakaNo || ''} removed. Balance restored.` });
             } catch (error) {
               if (isNetworkLikeError(error)) setConnectionBlocked(true);
-              Alert.alert('Unable to Remove Taka', apiError(error));
+              AppAlert.alert('Unable to Remove Taka', apiError(error));
             } finally {
               setBusy(false);
             }
@@ -1021,7 +1022,7 @@ export default function GreyPackingScannerScreen() {
   const cancelEmptyPacking = () => {
     if (!isOpen || n(summary.total_taka) !== 0) return;
 
-    Alert.alert(
+    AppAlert.alert(
       'Cancel Packing?',
       'No Taka/Carton has been scanned. This empty packing header will be deleted.',
       [
@@ -1069,7 +1070,7 @@ export default function GreyPackingScannerScreen() {
               setCameraScreenVisible(false);
             } catch (error) {
               if (isNetworkLikeError(error)) setConnectionBlocked(true);
-              Alert.alert('Unable to Cancel Packing', apiError(error));
+              AppAlert.alert('Unable to Cancel Packing', apiError(error));
               setCameraScreenVisible(false);
               scanLock.current = false;
             } finally {
@@ -1083,15 +1084,15 @@ export default function GreyPackingScannerScreen() {
 
   const finishPacking = () => {
     if (!canComplete) {
-      Alert.alert('Access denied', 'You do not have permission to complete Grey Packing.');
+      AppAlert.alert('Access denied', 'You do not have permission to complete Grey Packing.');
       return;
     }
     if (n(summary.total_taka) <= 0) {
-      Alert.alert('Nothing to Finish', 'Scan at least one Taka.');
+      AppAlert.alert('Nothing to Finish', 'Scan at least one Taka.');
       return;
     }
 
-    Alert.alert(
+    AppAlert.alert(
       'Finish Packing?',
       `${n(summary.total_taka)} Taka • ${f3(summary.total_qty)} Mtr\n\nFinishing does not consume stock again. It closes this live packing session.`,
       [
@@ -1114,7 +1115,7 @@ export default function GreyPackingScannerScreen() {
               setNotice({ type: 'ok', text: 'Packing completed successfully.' });
             } catch (error) {
               if (isNetworkLikeError(error)) setConnectionBlocked(true);
-              Alert.alert('Unable to Finish Packing', apiError(error));
+              AppAlert.alert('Unable to Finish Packing', apiError(error));
             } finally {
               setBusy(false);
             }
@@ -1870,7 +1871,7 @@ export default function GreyPackingScannerScreen() {
       setMode('browseList');
     } catch (error) {
       console.log('[GreyPacking] PackingList error:', error);
-      Alert.alert('Browse List', apiError(error));
+      AppAlert.alert('Browse List', apiError(error));
     } finally {
       setBrowseListLoading(false);
     }
@@ -1917,7 +1918,7 @@ export default function GreyPackingScannerScreen() {
               : [];
             setPropertyOptions(options);
           } catch (error) {
-            Alert.alert('Property', apiError(error));
+            AppAlert.alert('Property', apiError(error));
           } finally {
             setPropertyLoading(false);
           }
@@ -1962,7 +1963,7 @@ export default function GreyPackingScannerScreen() {
 
           // Do not switch FY while an open packing session is active.
           if (uid > 0 && isOpen) {
-            Alert.alert(
+            AppAlert.alert(
               'Packing in progress',
               'Finish or leave the current packing before changing the financial year.',
             );

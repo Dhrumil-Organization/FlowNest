@@ -1,5 +1,5 @@
 // src/api/client.ts  (or common/API/client.ts — match your path)
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { API, initAPI } from './dynamicAPI';
 

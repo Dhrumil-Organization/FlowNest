@@ -13,7 +13,7 @@
 // import Icon from '@expo/vector-icons/MaterialIcons';
 // import theme from '@/components/theme';
 // import logo from '../../assets/images/logo.png';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 
 // const { width } = Dimensions.get('window');
 
@@ -397,7 +397,7 @@
 // });
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';

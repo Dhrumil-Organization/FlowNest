@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { getCurrentFinancialYear } from '@/common/commonfunction';
 import { DashboardAPI, DashboardCard, DashboardView, ExpenseDashboardData } from '@/src/api/dashboard';
 import { EmptyState, ProgressBar } from '@/src/components/dashboard/DashboardPrimitives';
@@ -222,7 +223,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
     outstanding: canAccess('dashboard.outstanding_detail'),
   }), [canAccess]);
 
-  const confirmLogout = () => Alert.alert('Sign out?', 'This will clear the mobile session on this device.', [
+  const confirmLogout = () => AppAlert.alert('Sign out?', 'This will clear the mobile session on this device.', [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Sign out', style: 'destructive', onPress: logout },
   ]);

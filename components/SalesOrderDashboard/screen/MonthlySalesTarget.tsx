@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // ─────────────────────────────────────────────────────────────
 // FILE: app/new/monthly-sales-target.tsx
 //
@@ -28,7 +29,7 @@
 import { API } from '@/common/API/dynamicAPI';
 import { T } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from "axios";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -237,7 +238,7 @@ export default function MonthlySalesTargetScreen({
                 "Operation completed.";
 
             if (response.data?.success) {
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     message,
                     [
@@ -253,7 +254,7 @@ export default function MonthlySalesTargetScreen({
                     { cancelable: false }
                 );
             } else {
-                Alert.alert("Error", message);
+                AppAlert.alert("Error", message);
             }
         } catch (error) {
             console.log("Save API Error :", error);
@@ -264,9 +265,9 @@ export default function MonthlySalesTargetScreen({
                     error.response?.data?.response?.message ||
                     error.message;
 
-                Alert.alert("Error", message);
+                AppAlert.alert("Error", message);
             } else {
-                Alert.alert("Error", "Something went wrong.");
+                AppAlert.alert("Error", "Something went wrong.");
             }
         } finally {
             setSaving(false);
@@ -349,7 +350,7 @@ export default function MonthlySalesTargetScreen({
 
     // const handleSaveSelected = async () => {
     //     if (!rows.some((r) => selected[r.id])) {
-    //         Alert.alert("Select at least one row.");
+    //         AppAlert.alert("Select at least one row.");
     //         return;
     //     }
 
@@ -360,7 +361,7 @@ export default function MonthlySalesTargetScreen({
         const selectedRows = rows.filter((r) => selected[r.id]);
 
         if (selectedRows.length === 0) {
-            Alert.alert("Select at least one row.");
+            AppAlert.alert("Select at least one row.");
             return;
         }
 
@@ -377,7 +378,7 @@ export default function MonthlySalesTargetScreen({
         // });
 
         // if (invalidRow) {
-        //     Alert.alert(
+        //     AppAlert.alert(
         //         "Validation",
         //         "Target value cannot be blank ."
         //     );
@@ -445,15 +446,15 @@ export default function MonthlySalesTargetScreen({
                 "Deleted Successfully";
 
             if (response.data.success) {
-                Alert.alert("Success", message);
+                AppAlert.alert("Success", message);
 
                 // Grid refresh
                 loadTargetsForPeriod(month, year);
             } else {
-                Alert.alert("Error", message);
+                AppAlert.alert("Error", message);
             }
         } catch (error: any) {
-            Alert.alert(
+            AppAlert.alert(
                 "Error",
                 error.response?.data?.message || "Something went wrong."
             );

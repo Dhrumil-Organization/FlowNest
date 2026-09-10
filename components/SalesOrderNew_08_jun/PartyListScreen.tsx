@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import { API } from "../../common/API/dynamicAPI";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useSalesOrder } from './SalesOrderContext';
 const API_BASE_URL = 'https://erp.sharpskillit.com/api';
 import { SafeAreaView } from 'react-native-safe-area-context';

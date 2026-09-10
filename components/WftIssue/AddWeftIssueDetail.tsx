@@ -8,7 +8,7 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 import { Switch } from 'react-native';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from '@/common/utils/snackbarCompat';
+// import Snackbar from 'react-native-snackbar';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -590,7 +590,8 @@ const AddWeftIssueDetail = (props) => {
         setShowNextModal(false);
         // props.onNext && props.onNext();
         props.onNext && props.onNext({
-            hasIssueDesignAccess: canShowIssueDesign
+            hasIssueDesignAccess: canShowIssueDesign,
+            StkType: values.StkType || ''
         });
     };
 

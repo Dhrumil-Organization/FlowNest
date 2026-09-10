@@ -9,7 +9,7 @@ import {
     View,
     PanResponder,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { colors, fontSize, radius, spacing } from './theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
 

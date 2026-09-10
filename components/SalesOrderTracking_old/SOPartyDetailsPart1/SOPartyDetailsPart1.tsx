@@ -1,6 +1,6 @@
 // import React, { useEffect, useState, useCallback, useRef } from 'react';
 // import { View, Text, StyleSheet, Dimensions, FlatList, TouchableOpacity, TextInput, Alert, Animated as RNAnimated } from 'react-native';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { debounce } from 'lodash';
 // import Icon from 'react-native-vector-icons/MaterialIcons';
 // import HeaderBarwithBack from '../../HeaderBarwithBack/HeaderBarwithBack';
@@ -467,7 +467,7 @@
 
 import HeaderBarwithBack from '@/components/Header';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams } from 'expo-router';
 import { debounce } from 'lodash';
 import React, { useCallback, useEffect, useRef, useState } from 'react';

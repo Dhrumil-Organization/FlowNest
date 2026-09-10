@@ -1,6 +1,7 @@
+import AppAlert from '@/common/utils/appAlert';
 import { getCurrentFinancialYear } from '@/common/commonfunction';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -148,7 +149,7 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
                 "Operation completed.";
 
             if (response.data?.success) {
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     message,
                     [
@@ -162,14 +163,14 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
                     { cancelable: false }
                 );
             } else {
-                Alert.alert("Error", message);
+                AppAlert.alert("Error", message);
             }
         } catch (error: any) {
             const message =
                 error.response?.data?.message ||
                 error.response?.data?.response?.message ||
                 error.message;
-            Alert.alert("Error", message);
+            AppAlert.alert("Error", message);
         } finally {
             setSaving(false);
         }

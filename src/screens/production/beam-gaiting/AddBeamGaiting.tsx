@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
@@ -21,14 +22,14 @@ import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import { API } from '@/src/api/client';
 // import Snackbar from 'react-native-snackbar';
-const showSnackbar = (message: string) => Alert.alert('Notice', message);
-const showError = (message: string) => Alert.alert('Error', message);
-const showWarning = (message: string) => Alert.alert('Warning', message);
+const showSnackbar = (message: string) => AppAlert.alert('Notice', message);
+const showError = (message: string) => AppAlert.alert('Error', message);
+const showWarning = (message: string) => AppAlert.alert('Warning', message);
 // import FullScreenLoader from '../Loader/Loader';
 // import { values } from 'lodash';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import PartyDropdown from '../LegacySearchableDropdown';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
@@ -478,7 +479,7 @@ const CartonAddDrawer = (props) => {
     //                 }
     //             }));
     //         } else if (res?.validate === 'false') {
-    //             Alert.alert(
+    //             AppAlert.alert(
     //                 'Oops!!!',
     //                 res?.message || 'Something went wrong!'
     //             ).then(() => {
@@ -549,7 +550,7 @@ const CartonAddDrawer = (props) => {
                     }
                 }));
             } else if (res?.validate === 'false') {
-                Alert.alert(
+                AppAlert.alert(
                     'Oops!!!',
                     res?.message || 'Something went wrong!',
                     [
@@ -580,7 +581,7 @@ const CartonAddDrawer = (props) => {
 
     const showAlert = (message) => {
         return new Promise((resolve) => {
-            Alert.alert(
+            AppAlert.alert(
                 'Validation Error',
                 message,
                 [
@@ -726,7 +727,7 @@ const CartonAddDrawer = (props) => {
 
             if (response.data.success === true) {
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     "Data Saved Successfully ✅",
                     [
@@ -766,7 +767,7 @@ const CartonAddDrawer = (props) => {
                 //     textColor: '#fff',
                 //     action: { text: 'OK', textColor: 'red' },
                 // });
-                Alert.alert(`${response.data.message}`)
+                AppAlert.alert(`${response.data.message}`)
 
             }
         } catch (error) {
@@ -1262,11 +1263,11 @@ const CartonAddDrawer = (props) => {
                                         placeholder="Suffix"
                                         onChangeText={(text) => {
                                             if (!FormState.values.VouDate) {
-                                                Alert.alert("Please select Voucher Date first");
+                                                AppAlert.alert("Please select Voucher Date first");
                                                 return;
                                             }
                                             if (!FormState.values.VouNo) {
-                                                Alert.alert("Please enter Voucher No");
+                                                AppAlert.alert("Please enter Voucher No");
                                                 return;
                                             }
 

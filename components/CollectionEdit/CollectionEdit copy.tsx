@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     View,
@@ -22,7 +23,7 @@ import { crlimtreq_styles } from '../../common/Styles/Style';
 import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 import theme from '../../android/app/src/theme';
 import ChequeForm from './ChequeForm';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { fetchPropertyData, fetchCurrentYearData, getPrptypeFolder, getPrptypeSummary, getPrptypeIndex, writePrptypeCache, addPrptypeToIndex, loadAllPrptypeCaches, normalizePrptype } from '../../common/API/Functions';
 import { SuccessModal } from '../Shared/SuccessModal';
 import { API } from '../../common/API/dynamicAPI';
@@ -488,7 +489,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
 
         } catch (error) {
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setInitialLoading(false);
@@ -542,7 +543,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
 
     //     } catch (error) {
     //         if (!axios.isCancel(error)) {
-    //             Alert.alert('Error', 'Server error');
+    //             AppAlert.alert('Error', 'Server error');
     //         }
     //     } finally {
     //         setInitialLoading(false);
@@ -657,7 +658,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             if (!axios.isCancel(error)) {
                 console.error('ShowChequeDataEdit error', error);
-                if (!background) Alert.alert('Error', 'Server error');
+                if (!background) AppAlert.alert('Error', 'Server error');
             } else {
                 console.log('ShowChequeDataEdit cancelled');
             }
@@ -774,7 +775,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             setAdjLoading(false);
             if (!axios.isCancel(error)) {
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             setAdjLoading(false);
@@ -859,7 +860,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
     //     } catch (error) {
     //         if (!axios.isCancel(error)) {
     //             setPartyLoading(false);
-    //             Alert.alert('Error', 'Server error');
+    //             AppAlert.alert('Error', 'Server error');
     //         }
     //     } finally {
     //         // setIsLoading(false);
@@ -1124,7 +1125,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
     //         if (!axios.isCancel(error)) {
     //             setBankLoading(false);
     //             setBranchLoading(false);
-    //             Alert.alert('Error', 'Server error');
+    //             AppAlert.alert('Error', 'Server error');
     //         }
     //     } finally {
     //         // setIsLoading(false);
@@ -1398,7 +1399,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             if (!axios.isCancel(error)) {
                 setPaymentLoading(false);
-                Alert.alert('Error', 'Server error');
+                AppAlert.alert('Error', 'Server error');
             }
         } finally {
             // setIsLoading(false);
@@ -1506,25 +1507,25 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
                 parseFloat(numericNewLimit2).toFixed(2) ===
                 parseFloat(numericLimit1).toFixed(2)
             ) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be equal to Old Limit for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (updatedItem.CrLimit === '0' || parseFloat(updatedItem.CrLimit) === 0) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be 0 for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (parseFloat(updatedItem.CrLimit) < 0) {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be negative for Party Name: ' + updatedItem.parname
                 )
                 return false;
             } else if (!updatedItem.CrLimit || updatedItem.CrLimit.trim() === '') {
-                Alert.alert(
+                AppAlert.alert(
                     'Validation Error',
                     'Requested Limit cannot be empty or invalid for Party Name: ' + updatedItem.parname
                 )
@@ -1583,7 +1584,7 @@ const CollectionEdit: React.FC<Props> = ({ token, username }) => {
                 // Check if sum > Amount
                 if (setAmtSum > amount) {
                     setSaveLoading(false);
-                    Alert.alert(
+                    AppAlert.alert(
                         "Validation Error",
                         "The total of adjustment amounts cannot exceed the cheque amount. Please reduce the adjustment amounts and try again.",
                         [{ text: "OK" }]

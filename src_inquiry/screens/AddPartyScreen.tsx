@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -11,7 +12,7 @@ import {
 
 import { executeCallback } from '@/common/utils/callbackRegistry';
 import HeaderBarwithBack from '@/components/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getCurrentFinancialYear } from '../../common/commonfunction';
 import Button from '../components/Button';
@@ -64,7 +65,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
   const verifyGstin = async (getUserPrptype) => {
     const g = gstin.trim().toUpperCase();
     if (!isValidGSTIN(g)) {
-      Alert.alert('Invalid GSTIN', 'Please enter a valid 15-digit GSTIN');
+      AppAlert.alert('Invalid GSTIN', 'Please enter a valid 15-digit GSTIN');
       return;
     }
     setVerifying(true);
@@ -77,7 +78,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
       setPincode(data.pincode);
       setVerified(true);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Unable to fetch GSTIN');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Unable to fetch GSTIN');
     } finally {
       setVerifying(false);
     }
@@ -111,7 +112,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
   //     onSaved(partyData); // ✅ Bas itna kaam hai
   //     // navigation.goBack();
   //   } catch (e: any) {
-  //     Alert.alert('Error', e?.response?.data?.message || 'Failed to save party');
+  //     AppAlert.alert('Error', e?.response?.data?.message || 'Failed to save party');
   //   } finally {
   //     setSaving(false);
   //   }
@@ -138,7 +139,7 @@ const AddPartyScreen: React.FC<Props> = ({ route, navigation, username }) => {
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save party');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to save party');
     } finally {
       setSaving(false);
     }

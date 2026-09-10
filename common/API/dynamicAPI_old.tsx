@@ -1,4 +1,4 @@
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 
 // export let API: string = "https://apig.tms-webapp.com"; // ✅ default
 
@@ -17,7 +17,7 @@
 //     return API;
 // };
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
  
 // 🔁 Change only this flag when needed
 const IS_LOCAL = false; // true = it will use local apis url , false = it will use live api url

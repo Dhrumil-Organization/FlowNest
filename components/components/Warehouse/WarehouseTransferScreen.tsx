@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
@@ -21,7 +22,7 @@ import CartonCard from "./components/CartonCard";
 import { styles, COLORS } from "./components/WarehouseStyles";
 import { API } from "@/common/API/dynamicAPI";
 import axios from "axios";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 const keyOf = item =>
   String(
@@ -114,7 +115,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
 
   // const loadData = async () => {
   //   if (!toLocation.trim()) {
-  //     return Alert.alert("Validation", "Please enter/select To Location");
+  //     return AppAlert.alert("Validation", "Please enter/select To Location");
   //   }
 
   //   try {
@@ -135,7 +136,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
 
   //     setCartons(Array.isArray(rows) ? rows : []);
   //   } catch (e) {
-  //     Alert.alert(
+  //     AppAlert.alert(
   //       "Error",
   //       e?.response?.data?.message || "Failed to load cartons"
   //     );
@@ -179,7 +180,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
 
       setCartons(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      Alert.alert(
+      AppAlert.alert(
         "Error",
         e?.response?.data?.message || e?.response?.data?.error ||
         e?.message ||
@@ -238,7 +239,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
       setLocationData(filteredRows);
 
     } catch (e) {
-      Alert.alert(
+      AppAlert.alert(
         "Error",
         e?.response?.data?.message || e?.response?.data?.error ||
         e?.message ||
@@ -259,7 +260,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
     const selectedRows = Object.values(selected);
 
     if (!selectedRows.length) {
-      return Alert.alert("Validation", "Please select at least one carton");
+      return AppAlert.alert("Validation", "Please select at least one carton");
     }
 
     try {
@@ -288,13 +289,13 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
       console.log("response", res);
 
       if (res?.data?.success === false) {
-        return Alert.alert(
+        return AppAlert.alert(
           "Error",
           res?.data?.message || "Failed to save assign"
         );
       }
 
-      Alert.alert("Success", res?.data?.message || "Assign saved successfully", [
+      AppAlert.alert("Success", res?.data?.message || "Assign saved successfully", [
         {
           text: "OK",
           onPress: () => {
@@ -305,7 +306,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
         },
       ]);
     } catch (e) {
-      Alert.alert(
+      AppAlert.alert(
         "Error",
         e?.response?.data?.message ||
         e?.response?.data?.error ||
@@ -322,7 +323,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
     const key = keyOf(item);
 
     if (!key) {
-      return Alert.alert("Validation", "Carton number missing");
+      return AppAlert.alert("Validation", "Carton number missing");
     }
 
     setSelected(prev => {
@@ -349,11 +350,11 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
   Keyboard.dismiss();
 
   if (!toLocation.trim()) {
-    return Alert.alert("Validation", "Please enter/select To Location");
+    return AppAlert.alert("Validation", "Please enter/select To Location");
   }
 
   if (!cartons.length) {
-    return Alert.alert("Validation", "Please load carton data first");
+    return AppAlert.alert("Validation", "Please load carton data first");
   }
 
   navigation.navigate("WarehouseQRScanner", {

@@ -1,8 +1,9 @@
+import AppAlert from '@/common/utils/appAlert';
 // import FullScreenLoader from '@/components/FullScreenLoader';
 // import HeaderBarwithBack from '@/components/Header';
 // import theme from '@/components/theme';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // import axios from 'axios';
 // import { useLocalSearchParams, useRouter } from 'expo-router';
 // import { debounce } from 'lodash';
@@ -530,7 +531,7 @@
 //         } catch (error) {
 //             setAPILoading(false);
 //             console.error("Error in handleCardPress:", error);
-//             Alert.alert("Error", "Failed to process party details");
+//             AppAlert.alert("Error", "Failed to process party details");
 //         } finally {
 //             setAPILoading(false);
 //             // setTrackingLoader(false);
@@ -577,7 +578,7 @@
 //             }
 //         } catch (error) {
 //             console.error("Error in handleCardPressCurrent:", error);
-//             Alert.alert("Error", "Failed to close the order");
+//             AppAlert.alert("Error", "Failed to close the order");
 //         } finally {
 //             setAPILoading(false);
 //         }
@@ -620,7 +621,7 @@
 //                 const pdfUrl = res?.data?.results?.sales_order;
 
 //                 if (!pdfUrl) {
-//                     Alert.alert('PDF Error', 'PDF URL not found.');
+//                     AppAlert.alert('PDF Error', 'PDF URL not found.');
 //                     return;
 //                 }
 
@@ -633,7 +634,7 @@
 //                     params: { pdfUrl, title: 'Sales Order' },
 //                 });
 //             } else {
-//                 Alert.alert(
+//                 AppAlert.alert(
 //                     'PDF Failed',
 //                     res?.data?.message || 'PDF generation failed.'
 //                 );
@@ -642,7 +643,7 @@
 //             console.log('PDF ERROR =>', error?.response?.data || error.message);
 //             setPrintAPILoading(false);
 
-//             Alert.alert(
+//             AppAlert.alert(
 //                 'Error',
 //                 error?.response?.data?.message || 'Unable to generate PDF.'
 //             );
@@ -1121,7 +1122,7 @@ import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { debounce } from 'lodash';
@@ -1381,14 +1382,14 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
         } catch (error) {
             setAPILoading(false);
             console.error("Error in handleCardPress:", error);
-            Alert.alert("Error", "Failed to process party details");
+            AppAlert.alert("Error", "Failed to process party details");
         } finally {
             setAPILoading(false);
         }
     };
 
     const handleCardPressCurrent = async (order: PartyDetail) => {
-        Alert.alert(
+        AppAlert.alert(
             "Close Order",
             `Are you sure you want to close this order (SO-${order.sono})?`,
             [
@@ -1428,13 +1429,13 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                                         )
                                     };
                                 });
-                                Alert.alert("Success", "Order closed successfully.");
+                                AppAlert.alert("Success", "Order closed successfully.");
                             } else {
-                                Alert.alert("Error", response.data.message || "Failed to close order.");
+                                AppAlert.alert("Error", response.data.message || "Failed to close order.");
                             }
                         } catch (error) {
                             console.error("Error in handleCardPressCurrent:", error);
-                            Alert.alert("Error", "Failed to close the order");
+                            AppAlert.alert("Error", "Failed to close the order");
                         } finally {
                             setAPILoading(false);
                         }
@@ -1472,7 +1473,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 setPrintAPILoading(false);
                 const pdfUrl = res?.data?.results?.sales_order;
                 if (!pdfUrl) {
-                    Alert.alert('PDF Error', 'PDF URL not found.');
+                    AppAlert.alert('PDF Error', 'PDF URL not found.');
                     return;
                 }
                 router.push({
@@ -1480,7 +1481,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                     params: { pdfUrl, title: 'Sales Order' },
                 });
             } else {
-                Alert.alert(
+                AppAlert.alert(
                     'PDF Failed',
                     res?.data?.message || 'PDF generation failed.'
                 );
@@ -1488,7 +1489,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
         } catch (error) {
             console.log('PDF ERROR =>', error?.response?.data || error.message);
             setPrintAPILoading(false);
-            Alert.alert(
+            AppAlert.alert(
                 'Error',
                 error?.response?.data?.message || 'Unable to generate PDF.'
             );

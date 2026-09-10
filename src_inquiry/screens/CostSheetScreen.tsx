@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -307,12 +308,12 @@ const CostSheetScreen: React.FC<Props> = () => {
     try {
       const saved = await costSheetApi.saveDraft(inquiryId, designId, getUserPrptype, getCurrentFinancialYear(), sheet);
       setSheet(saved);
-      // Alert.alert('Saved', 'Cost sheet saved as draft');
-      Alert.alert('Saved', 'Cost sheet saved as draft', [
+      // AppAlert.alert('Saved', 'Cost sheet saved as draft');
+      AppAlert.alert('Saved', 'Cost sheet saved as draft', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to save');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -320,10 +321,10 @@ const CostSheetScreen: React.FC<Props> = () => {
 
   const submitForAuth = async (getUserPrptype) => {
     if (!sheet.sale_rate || sheet.sale_rate <= 0) {
-      Alert.alert('Missing', 'Please enter sale rate before submitting');
+      AppAlert.alert('Missing', 'Please enter sale rate before submitting');
       return;
     }
-    Alert.alert(
+    AppAlert.alert(
       'Submit for authorization?',
       `Total cost: ${formatCurrency(sheet.total_cost)}\nSale rate: ${formatCurrency(
         sheet.sale_rate,
@@ -344,11 +345,11 @@ const CostSheetScreen: React.FC<Props> = () => {
                 getCurrentFinancialYear()
               );
               setSheet(submitted);
-              Alert.alert('Submitted', 'Cost sheet sent for authorization', [
+              AppAlert.alert('Submitted', 'Cost sheet sent for authorization', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
             } catch (e: any) {
-              Alert.alert(
+              AppAlert.alert(
                 'Error',
                 e?.response?.data?.message || 'Failed to submit',
               );
@@ -364,7 +365,7 @@ const CostSheetScreen: React.FC<Props> = () => {
   const submitSimple = async (getUserPrptype) => {
     const rate = parseFloat(simpleRate);
     if (!rate || rate <= 0) {
-      Alert.alert('Missing', 'Enter a valid rate');
+      AppAlert.alert('Missing', 'Enter a valid rate');
       return;
     }
     setSubmitting(true);
@@ -378,11 +379,11 @@ const CostSheetScreen: React.FC<Props> = () => {
           },
         ],
       });
-      Alert.alert('Saved', 'Simple costing submitted', [
+      AppAlert.alert('Saved', 'Simple costing submitted', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed');
+      AppAlert.alert('Error', e?.response?.data?.message || 'Failed');
     } finally {
       setSubmitting(false);
     }

@@ -4,7 +4,7 @@
 // No axios dependency required.
 // ─────────────────────────────────────────────────────────────
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 // import { API } from '../../common/API/dynamicAPI';
 
 //export const API_BASE_URL = 'https://apig.tms-webapp.com';

@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
@@ -38,7 +39,7 @@ export function ColourwayScreen() {
         };
         addSub(sub);
         autoSave();
-        Alert.alert('Saved', `${nextCode} added.`, [
+        AppAlert.alert('Saved', `${nextCode} added.`, [
             { text: 'OK', onPress: () => router.back() },
         ]);
     };

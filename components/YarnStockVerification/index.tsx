@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, ScrollView } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -166,7 +167,7 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
             const response_details = await axios.post(`${API}/api/getparentdesign`, payload, { headers });
             if (response.data.success === true && response.data.data.length === 0) {
                 setIsLoading(false);
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
                 setPOTData([]);
             } else if (response.data.success === true && response.data.data.length > 0) {
                 setIsLoading(false);
@@ -174,11 +175,11 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
                 closeDrawer();
             } else if (response.data.success === false) {
                 setIsLoading(false);
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setPOTData([]);
             } else {
                 setIsLoading(false);
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setPOTData([]);
             }
             if (response_details.data.success === true && response_details.data.data.length > 0) {
@@ -186,7 +187,7 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             setIsLoading(false);
-            Alert.alert('Server Error');
+            AppAlert.alert('Server Error');
             setPOTData([]);
         }
     };
@@ -336,7 +337,7 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
     //         const response = await axios.post(`${API}/api/update_verify_manual_stock`, payload, { headers });
 
     //         if (response.data.success === true && response.data.data.length === 0) {
-    //             Alert.alert('No Data Found');
+    //             AppAlert.alert('No Data Found');
     //             setIsLoading(false)
     //         } else if (response.data.success === true && response.data.data.length > 0) {
     //             setSavedCartons(getSavedCartons => [...getSavedCartons, response.data.data[0].UId])
@@ -354,15 +355,15 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
 
     //             setIsLoading(false)
     //         } else if (response.data.success === false) {
-    //             Alert.alert(`${response.data.message}`);
+    //             AppAlert.alert(`${response.data.message}`);
     //             setIsLoading(false)
     //         } else {
-    //             Alert.alert(`${response.data.message}`);
+    //             AppAlert.alert(`${response.data.message}`);
     //             setIsLoading(false)
     //         }
     //     } catch (error) {
     //         setIsLoading(false)
-    //         Alert.alert('Server Error :' + error)
+    //         AppAlert.alert('Server Error :' + error)
     //     }
     //     setModalOpen(false);
     // }
@@ -396,7 +397,7 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
             const response = await axios.post(`${API}/api/update_verify_manual_stock`, payload, { headers });
 
             if (response.data.success === true && response.data.data.length === 0) {
-                Alert.alert('No Data Found');
+                AppAlert.alert('No Data Found');
                 setIsLoading(false);
             } else if (response.data.success === true && response.data.data.length > 0) {
                 setSavedCartons(getSavedCartons => [...getSavedCartons, response.data.data[0].UId]);
@@ -407,15 +408,15 @@ const YarnStockVerification: React.FC<Props> = ({ token, username }) => {
                 });
                 setIsLoading(false);
             } else if (response.data.success === false) {
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setIsLoading(false);
             } else {
-                Alert.alert(`${response.data.message}`);
+                AppAlert.alert(`${response.data.message}`);
                 setIsLoading(false);
             }
         } catch (error) {
             setIsLoading(false);
-            Alert.alert('Server Error :' + error);
+            AppAlert.alert('Server Error :' + error);
         }
         setModalOpen(false);
     };

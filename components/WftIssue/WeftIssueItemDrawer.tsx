@@ -17,7 +17,7 @@ import { BarcodeScanningResult } from 'expo-camera';
 // import { Picker } from '@react-native-picker/picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView } from 'react-native';
-// import Snackbar from '@/common/utils/snackbarCompat';
+// import Snackbar from 'react-native-snackbar';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import { Switch } from 'react-native';
 import CustomDrawer from './CustomDrawer';

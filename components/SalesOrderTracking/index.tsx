@@ -1,9 +1,10 @@
+import AppAlert from '@/common/utils/appAlert';
 // import { crlimtreq_styles } from '@/common/Style';
 // import FullScreenLoader from '@/components/FullScreenLoader';
 // import HeaderBar from '@/components/Header';
 // import theme from '@/components/theme';
 // import Icon from '@expo/vector-icons/MaterialIcons';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@/common/utils/compatibleStorage';
 // // import Clipboard from '@react-native-clipboard/clipboard';
 // import axios from 'axios';
 // import { useRouter } from 'expo-router';
@@ -237,7 +238,7 @@
 //         const orderUId = item?.suid || '';
 
 //         if (!orderUId) {
-//             Alert.alert('Error', 'Order reference (UId) not found on this item.');
+//             AppAlert.alert('Error', 'Order reference (UId) not found on this item.');
 //             return;
 //         }
 
@@ -323,7 +324,7 @@
 //             }
 //         } catch (error) {
 //             console.error('fetchAllocations error:', error);
-//             Alert.alert('Error', 'Failed to load allocation details.');
+//             AppAlert.alert('Error', 'Failed to load allocation details.');
 //         } finally {
 //             setJobChartLoading(false);
 //         }
@@ -378,7 +379,7 @@
 
 //     const handleAddAllocationRow = () => {
 //         // if (!canEditAllocation()) {
-//         //     Alert.alert(
+//         //     AppAlert.alert(
 //         //         'Not Allowed',
 //         //         jobChartRef?.status === 'CLOSED'
 //         //             ? 'This design is closed. Allocation cannot be modified.'
@@ -401,11 +402,11 @@
 //             )
 //         }
 //         if (!selectedShade) {
-//             Alert.alert('Error', 'Please select a shade first.');
+//             AppAlert.alert('Error', 'Please select a shade first.');
 //             return;
 //         }
 //         if (!addQty || parseFloat(addQty) <= 0) {
-//             Alert.alert('Error', 'Please enter a valid quantity.');
+//             AppAlert.alert('Error', 'Please enter a valid quantity.');
 //             return;
 //         }
 
@@ -414,7 +415,7 @@
 //             a => String(a.ShdCode) === String(selectedShade.Code),
 //         );
 //         if (alreadyExists) {
-//             Alert.alert(
+//             AppAlert.alert(
 //                 'Duplicate Shade',
 //                 'This shade is already allocated. Please edit the existing quantity instead of adding it again.',
 //             );
@@ -426,7 +427,7 @@
 //         const newQty = parseFloat(addQty);
 //         const pendingMeter = jobChartRef?.pendingMeter || 0;
 //         if (currentTotal + newQty > pendingMeter) {
-//             Alert.alert(
+//             AppAlert.alert(
 //                 'Exceeds Pending Meter',
 //                 `Total allocation (${formatNumber(String(currentTotal + newQty))} m) can't exceed pending meter (${formatNumber(String(pendingMeter))} m). You can add up to ${formatNumber(String(Math.max(pendingMeter - currentTotal, 0)))} m more.`,
 //             );
@@ -464,7 +465,7 @@
 
 //         const totalQty = getTotalAllocatedQty();
 //         if (totalQty > (jobChartRef.pendingMeter || 0)) {
-//             Alert.alert('Error', 'Total allocation exceeds pending meter. Please adjust quantities before saving.');
+//             AppAlert.alert('Error', 'Total allocation exceeds pending meter. Please adjust quantities before saving.');
 //             return;
 //         }
 
@@ -504,15 +505,15 @@
 //             console.log('🔵 so-allocation/sync response:', response.data);
 
 //             if (response.data.success) {
-//                 Alert.alert('Success', response.data.response?.message || 'Allocation saved.');
+//                 AppAlert.alert('Success', response.data.response?.message || 'Allocation saved.');
 //                 // 🔁 Re-fetch fresh data from server after successful save
 //                 await fetchAllocations(jobChartRef);
 //             } else {
-//                 Alert.alert('Error', response.data.message || 'Failed to save allocation.');
+//                 AppAlert.alert('Error', response.data.message || 'Failed to save allocation.');
 //             }
 //         } catch (error) {
 //             console.error('handleSaveAllocations error:', error);
-//             Alert.alert('Error', 'Failed to save allocation.');
+//             AppAlert.alert('Error', 'Failed to save allocation.');
 //         } finally {
 //             setJobChartSaving(false);
 //         }
@@ -529,7 +530,7 @@
 //     //     );
 //     //     const text = `REF: ${jobChartRef?.dsnCode || ''}\nDESIGN: ${jobChartRef?.dsnName || ''}\n\n${lines.join('\n')}\n\nTOTAL: ${formatNumber(getJobChartTotal())} m`;
 //     //     Clipboard.setString(text);
-//     //     Alert.alert('Copied', 'Job chart text copied to clipboard.');
+//     //     AppAlert.alert('Copied', 'Job chart text copied to clipboard.');
 //     // };
 //     // ///////////////////////////////////////////////////////////////////
 
@@ -710,7 +711,7 @@
 //             }
 //         } catch (error) {
 //             if (!axios.isCancel(error)) {
-//                 Alert.alert('Error', `Server error: ${error}`);
+//                 AppAlert.alert('Error', `Server error: ${error}`);
 //             }
 //         } finally {
 //             // setIsLoading(false);
@@ -776,7 +777,7 @@
 //             }
 //         } catch (error) {
 //             if (!axios.isCancel(error)) {
-//                 Alert.alert('Error', `Server error: ${error}`);
+//                 AppAlert.alert('Error', `Server error: ${error}`);
 //             }
 //         } finally {
 //             // setIsLoading(false);
@@ -827,7 +828,7 @@
 //             }
 //         } catch (error) {
 //             if (!axios.isCancel(error)) {
-//                 Alert.alert('Error', `Server error: ${error}`);
+//                 AppAlert.alert('Error', `Server error: ${error}`);
 //             }
 //         } finally {
 //             // setIsLoading(false);
@@ -891,7 +892,7 @@
 //             }
 //         } catch (error) {
 //             if (!axios.isCancel(error)) {
-//                 Alert.alert('Error', `Server error: ${error}`);
+//                 AppAlert.alert('Error', `Server error: ${error}`);
 //             }
 //         } finally {
 //             // setIsLoading(false);
@@ -1257,11 +1258,11 @@
 //                     setsalessumdata(response.data.data.salessumdata);
 //                     // await saveToCache(CACHE_KEY_CONFIRM_ACTION, { payload, response: response.data });
 //                 } else if (response.data.success === false) {
-//                     Alert.alert(`${response.data.message}`);
+//                     AppAlert.alert(`${response.data.message}`);
 //                     setsalesdata([]);
 //                     setsalessumdata([]);
 //                 } else {
-//                     Alert.alert('No Data Found!');
+//                     AppAlert.alert('No Data Found!');
 //                     setsalesdata([]);
 //                     setsalessumdata([]);
 //                 }
@@ -1270,7 +1271,7 @@
 //                 }
 //                 console.log('🔵 responsedsn hiii');
 //             } catch (error) {
-//                 Alert.alert('Error', `Server error: ${error?.message}`);
+//                 AppAlert.alert('Error', `Server error: ${error?.message}`);
 //                 setsalesdata([]);
 //                 setsalessumdata([]);
 //             } finally {
@@ -1355,7 +1356,7 @@
 //                     setDData(partyData);
 //                     openDesignModal(response.data.data, payload);
 //                 } else {
-//                     Alert.alert('No Data Found!');
+//                     AppAlert.alert('No Data Found!');
 //                 }
 //             }
 //             if (responsedes?.data?.data) {
@@ -1372,7 +1373,7 @@
 //             // }
 //         } catch (error) {
 //             console.error('Error in handleCardPress:', error);
-//             Alert.alert('Error', 'Failed to process party details');
+//             AppAlert.alert('Error', 'Failed to process party details');
 //         } finally {
 //             setTrackingLoader(false);
 //         }
@@ -1463,7 +1464,7 @@
 //             }
 //         } catch (error) {
 //             console.error('Error in handleCardPress:', error);
-//             Alert.alert('Error', 'Failed to process party details');
+//             AppAlert.alert('Error', 'Failed to process party details');
 //         } finally {
 //             setIsLoading(false);
 //         }
@@ -1816,7 +1817,7 @@
 //             }
 //         } catch (error) {
 //             console.error('Error in handleCardPress:', error);
-//             Alert.alert('Error', 'Failed to process party details');
+//             AppAlert.alert('Error', 'Failed to process party details');
 //         } finally {
 //             setTrackingLoader(false);
 //         }
@@ -1920,7 +1921,7 @@
 //             }
 //         } catch (error) {
 //             console.error('Error in handleCardPress:', error);
-//             Alert.alert('Error', 'Failed to process party details');
+//             AppAlert.alert('Error', 'Failed to process party details');
 //         } finally {
 //             setTrackingLoader(false);
 //         }
@@ -2060,7 +2061,7 @@
 //         } catch (error) {
 //             if (!axios.isCancel(error)) {
 
-//                 Alert.alert('Error', `Server error: ${error.message}`);
+//                 AppAlert.alert('Error', `Server error: ${error.message}`);
 //             }
 //         }
 //     };
@@ -3146,7 +3147,7 @@
 //                                                     style={[styles.shadePickerRow, isUsed && styles.shadePickerRowDisabled]}
 //                                                     onPress={() => {
 //                                                         if (isUsed) {
-//                                                             Alert.alert('Already Allocated', 'This shade is already in the list.');
+//                                                             AppAlert.alert('Already Allocated', 'This shade is already in the list.');
 //                                                             return;
 //                                                         }
 //                                                         handleSelectShade(s);
@@ -4005,7 +4006,7 @@ import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 // import Clipboard from '@react-native-clipboard/clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -4098,11 +4099,11 @@ const useToast = () => ({
   showApiError: (error: any, fallback = 'Something went wrong.') => {
     console.error(fallback, error);
     const message = error?.response?.data?.message || error?.message || fallback;
-    Alert.alert('Error', String(message));
+    AppAlert.alert('Error', String(message));
   },
-  showInfo: (message: string, title = 'Info') => Alert.alert(title, message),
-  showSuccess: (message: string, title = 'Success') => Alert.alert(title, message),
-  showWarning: (message: string, title = 'Warning') => Alert.alert(title, message),
+  showInfo: (message: string, title = 'Info') => AppAlert.alert(title, message),
+  showSuccess: (message: string, title = 'Success') => AppAlert.alert(title, message),
+  showWarning: (message: string, title = 'Warning') => AppAlert.alert(title, message),
 });
 
 type ApcChart = {
@@ -4345,11 +4346,11 @@ const SalesOrderTracking: React.FC<{
     const srno = String(item?.OrderSrNo ?? item?.SrNo ?? item?.srno ?? '').trim();
 
     if (!orderUId) {
-      Alert.alert('Error', 'Order reference (UId) not found on this item.');
+      AppAlert.alert('Error', 'Order reference (UId) not found on this item.');
       return;
     }
     if (!srno) {
-      Alert.alert('Error', 'Sales-order detail SrNo not found on this item.');
+      AppAlert.alert('Error', 'Sales-order detail SrNo not found on this item.');
       return;
     }
 
@@ -4453,7 +4454,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       console.error('fetchAllocations error:', error);
-      Alert.alert('Error', 'Failed to load allocation details.');
+      AppAlert.alert('Error', 'Failed to load allocation details.');
     } finally {
       setJobChartLoading(false);
     }
@@ -4508,7 +4509,7 @@ const SalesOrderTracking: React.FC<{
 
   const handleAddAllocationRow = () => {
     // if (!canEditAllocation()) {
-    //     Alert.alert(
+    //     AppAlert.alert(
     //         'Not Allowed',
     //         jobChartRef?.status === 'CLOSED'
     //             ? 'This design is closed. Allocation cannot be modified.'
@@ -4531,11 +4532,11 @@ const SalesOrderTracking: React.FC<{
       )
     }
     if (!selectedShade) {
-      Alert.alert('Error', 'Please select a shade first.');
+      AppAlert.alert('Error', 'Please select a shade first.');
       return;
     }
     if (!addQty || parseFloat(addQty) <= 0) {
-      Alert.alert('Error', 'Please enter a valid quantity.');
+      AppAlert.alert('Error', 'Please enter a valid quantity.');
       return;
     }
 
@@ -4544,7 +4545,7 @@ const SalesOrderTracking: React.FC<{
       a => String(a.ShdCode) === String(selectedShade.Code),
     );
     if (alreadyExists) {
-      Alert.alert(
+      AppAlert.alert(
         'Duplicate Shade',
         'This shade is already allocated. Please edit the existing quantity instead of adding it again.',
       );
@@ -4556,7 +4557,7 @@ const SalesOrderTracking: React.FC<{
     const newQty = parseFloat(addQty);
     const pendingMeter = jobChartRef?.pendingMeter || 0;
     if (currentTotal + newQty > pendingMeter) {
-      Alert.alert(
+      AppAlert.alert(
         'Exceeds Pending Meter',
         `Total allocation (${formatNumber(String(currentTotal + newQty))} m) can't exceed pending meter (${formatNumber(String(pendingMeter))} m). You can add up to ${formatNumber(String(Math.max(pendingMeter - currentTotal, 0)))} m more.`,
       );
@@ -4594,7 +4595,7 @@ const SalesOrderTracking: React.FC<{
 
     const totalQty = getTotalAllocatedQty();
     if (totalQty > (jobChartRef.pendingMeter || 0)) {
-      Alert.alert('Error', 'Total allocation exceeds pending meter. Please adjust quantities before saving.');
+      AppAlert.alert('Error', 'Total allocation exceeds pending meter. Please adjust quantities before saving.');
       return;
     }
 
@@ -4634,15 +4635,15 @@ const SalesOrderTracking: React.FC<{
       console.log('🔵 so-allocation/sync response:', response.data);
 
       if (response.data.success) {
-        Alert.alert('Success', response.data.response?.message || 'Allocation saved.');
+        AppAlert.alert('Success', response.data.response?.message || 'Allocation saved.');
         // 🔁 Re-fetch fresh data from server after successful save
         await fetchAllocations(jobChartRef);
       } else {
-        Alert.alert('Error', response.data.message || 'Failed to save allocation.');
+        AppAlert.alert('Error', response.data.message || 'Failed to save allocation.');
       }
     } catch (error) {
       console.error('handleSaveAllocations error:', error);
-      Alert.alert('Error', 'Failed to save allocation.');
+      AppAlert.alert('Error', 'Failed to save allocation.');
     } finally {
       setJobChartSaving(false);
     }
@@ -4659,7 +4660,7 @@ const SalesOrderTracking: React.FC<{
   //     );
   //     const text = `REF: ${jobChartRef?.dsnCode || ''}\nDESIGN: ${jobChartRef?.dsnName || ''}\n\n${lines.join('\n')}\n\nTOTAL: ${formatNumber(getJobChartTotal())} m`;
   //     Clipboard.setString(text);
-  //     Alert.alert('Copied', 'Job chart text copied to clipboard.');
+  //     AppAlert.alert('Copied', 'Job chart text copied to clipboard.');
   // };
   // ///////////////////////////////////////////////////////////////////
 
@@ -4840,7 +4841,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       if (!axios.isCancel(error)) {
-        Alert.alert('Error', `Server error: ${error}`);
+        AppAlert.alert('Error', `Server error: ${error}`);
       }
     } finally {
       // setIsLoading(false);
@@ -4906,7 +4907,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       if (!axios.isCancel(error)) {
-        Alert.alert('Error', `Server error: ${error}`);
+        AppAlert.alert('Error', `Server error: ${error}`);
       }
     } finally {
       // setIsLoading(false);
@@ -4957,7 +4958,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       if (!axios.isCancel(error)) {
-        Alert.alert('Error', `Server error: ${error}`);
+        AppAlert.alert('Error', `Server error: ${error}`);
       }
     } finally {
       // setIsLoading(false);
@@ -5021,7 +5022,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       if (!axios.isCancel(error)) {
-        Alert.alert('Error', `Server error: ${error}`);
+        AppAlert.alert('Error', `Server error: ${error}`);
       }
     } finally {
       // setIsLoading(false);
@@ -5387,11 +5388,11 @@ const SalesOrderTracking: React.FC<{
           setsalessumdata(response.data.data.salessumdata);
           // await saveToCache(CACHE_KEY_CONFIRM_ACTION, { payload, response: response.data });
         } else if (response.data.success === false) {
-          Alert.alert(`${response.data.message}`);
+          AppAlert.alert(`${response.data.message}`);
           setsalesdata([]);
           setsalessumdata([]);
         } else {
-          Alert.alert('No Data Found!');
+          AppAlert.alert('No Data Found!');
           setsalesdata([]);
           setsalessumdata([]);
         }
@@ -5400,7 +5401,7 @@ const SalesOrderTracking: React.FC<{
         }
         console.log('🔵 responsedsn hiii');
       } catch (error) {
-        Alert.alert('Error', `Server error: ${error?.message}`);
+        AppAlert.alert('Error', `Server error: ${error?.message}`);
         setsalesdata([]);
         setsalessumdata([]);
       } finally {
@@ -5485,7 +5486,7 @@ const SalesOrderTracking: React.FC<{
           setDData(partyData);
           openDesignModal(response.data.data, payload);
         } else {
-          Alert.alert('No Data Found!');
+          AppAlert.alert('No Data Found!');
         }
       }
       if (responsedes?.data?.data) {
@@ -5502,7 +5503,7 @@ const SalesOrderTracking: React.FC<{
       // }
     } catch (error) {
       console.error('Error in handleCardPress:', error);
-      Alert.alert('Error', 'Failed to process party details');
+      AppAlert.alert('Error', 'Failed to process party details');
     } finally {
       setTrackingLoader(false);
     }
@@ -5593,7 +5594,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       console.error('Error in handleCardPress:', error);
-      Alert.alert('Error', 'Failed to process party details');
+      AppAlert.alert('Error', 'Failed to process party details');
     } finally {
       setIsLoading(false);
     }
@@ -5946,7 +5947,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       console.error('Error in handleCardPress:', error);
-      Alert.alert('Error', 'Failed to process party details');
+      AppAlert.alert('Error', 'Failed to process party details');
     } finally {
       setTrackingLoader(false);
     }
@@ -6050,7 +6051,7 @@ const SalesOrderTracking: React.FC<{
       }
     } catch (error) {
       console.error('Error in handleCardPress:', error);
-      Alert.alert('Error', 'Failed to process party details');
+      AppAlert.alert('Error', 'Failed to process party details');
     } finally {
       setTrackingLoader(false);
     }
@@ -6190,7 +6191,7 @@ const SalesOrderTracking: React.FC<{
     } catch (error) {
       if (!axios.isCancel(error)) {
 
-        Alert.alert('Error', `Server error: ${error.message}`);
+        AppAlert.alert('Error', `Server error: ${error.message}`);
       }
     }
   };

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 
 import {colors, fontSize, radius, spacing} from '../utils/theme';
 import {i18n, useTourStrings} from '../i18n/tour';

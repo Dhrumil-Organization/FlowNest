@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useRef, useState } from 'react';
 // import React, { useEffect, useRef, useState } from 'react';
 import { Animated, FlatList, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -434,7 +435,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             const response = await axios.post(`${API}/api/get_dashoutshead`, payload, { headers });
             if (response.data.success === true) {
                 setdashSubHeadLoading(false);
-                // Alert.alert('No Data Found');
+                // AppAlert.alert('No Data Found');
                 console.log('🔵 dashSubHead API Response:', payload, response);
                 const maindata = response.data.data.data;
                 setdashSubHead(maindata);
@@ -443,7 +444,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
         } catch (error) {
             setdashSubHeadLoading(false);
             // setIsLoading(false);
-            // Alert.alert('Server Error');
+            // AppAlert.alert('Server Error');
             console.log("Error", error);
         }
 
@@ -661,7 +662,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', `Server error1: ${error}`);
+                // AppAlert.alert('Error', `Server error1: ${error}`);
                 console.log("Error", error);
             }
         } finally {
@@ -713,7 +714,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', `Server error2: ${error}`);
+                // AppAlert.alert('Error', `Server error2: ${error}`);
                 console.log("Error", error);
             }
         } finally {
@@ -776,7 +777,7 @@ const ReceivablesSudamo: React.FC<Props> = ({ token, username }) => {
             }
         } catch (error) {
             if (!axios.isCancel(error)) {
-                // Alert.alert('Error', `Server error3: ${error}`);
+                // AppAlert.alert('Error', `Server error3: ${error}`);
                 console.log("Error", error);
             }
         } finally {

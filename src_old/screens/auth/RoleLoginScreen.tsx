@@ -1,3 +1,4 @@
+import AppAlert from '@/common/utils/appAlert';
 // ─────────────────────────────────────────────────────────────
 // FILE: src/screens/auth/RoleLoginScreen.tsx
 // FIXED: removes repeated iOS password-save / biometric prompt loop.
@@ -68,10 +69,10 @@ export function RoleLoginScreen() {
       const rememberAction = bioSupported && rememberMe ? 'save' : bioSupported ? 'clear' : undefined;
       const outcome = await performLogin(username, password, rememberAction);
       if (!outcome.success) {
-        Alert.alert('Login failed', outcome.message);
+        AppAlert.alert('Login failed', outcome.message);
       } else if (outcome.message) {
         // e.g. "Remember me" was requested but the device lock confirm failed.
-        Alert.alert('Note', outcome.message);
+        AppAlert.alert('Note', outcome.message);
       }
       // On success, AppSessionStore's token flips to truthy and the
       // route watching it (app/new/role-login.tsx) redirects into the

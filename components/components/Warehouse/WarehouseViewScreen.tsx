@@ -1,10 +1,11 @@
+import AppAlert from '@/common/utils/appAlert';
 import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, TextInput, FlatList, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import WarehouseHeader from "./components/WarehouseHeader";
 import { warehouseApi } from "./services/warehouseApi";
 import CartonCard from "./components/CartonCard";
 import { styles, COLORS } from "./components/WarehouseStyles";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { API } from "@/common/API/dynamicAPI";
 import axios from "axios";
 
@@ -67,7 +68,7 @@ export default function WarehouseViewScreen({ token, navigation, route }) {
 
       setCartons(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      Alert.alert(
+      AppAlert.alert(
         "Error",
         e?.response?.data?.message || e?.response?.data?.error ||
         e?.message ||

@@ -1,4 +1,3 @@
-import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Animated, Dimensions, ScrollView, FlatList, ActivityIndicator, Alert, TextInput as RNTextInput, } from 'react-native';
 import Icon from '@expo/vector-icons/MaterialIcons';
@@ -9,10 +8,10 @@ import SearchableDropdown from '@/Shared/SearchableDropdown';
 import { Switch } from 'react-native';
 import axios from 'axios';
 import { API } from '../../common/API/dynamicAPI';
-// import Snackbar from '@/common/utils/snackbarCompat';
+// import Snackbar from 'react-native-snackbar';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import FullScreenLoader from '@/components/FullScreenLoader';
-import AsyncStorage from '@/common/utils/compatibleStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownforweft from '@/Shared/PartyDropdownforweft';
@@ -317,7 +316,7 @@ const AddWeftIssueDetail = (props) => {
                     }
                 }));
             } else if (res?.validate === 'false') {
-                AppAlert.alert(
+                Alert.alert(
                     'Oops!!!',
                     res?.message || 'Something went wrong!',
                     [
@@ -579,7 +578,7 @@ const AddWeftIssueDetail = (props) => {
             //     text: 'OK',
             //     onPress: () => { },
             // });
-            AppAlert.alert(`${firstError}`);
+            Alert.alert(`${firstError}`);
 
             return;
         }
@@ -591,7 +590,8 @@ const AddWeftIssueDetail = (props) => {
         setShowNextModal(false);
         // props.onNext && props.onNext();
         props.onNext && props.onNext({
-            hasIssueDesignAccess: canShowIssueDesign
+            hasIssueDesignAccess: canShowIssueDesign,
+            StkType: values.StkType || ''
         });
     };
 

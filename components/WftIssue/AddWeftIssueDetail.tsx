@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownforweft from '@/Shared/PartyDropdownforweft';
+import AppAlert from '@/common/utils/appAlert';
 
 const { height } = Dimensions.get('window');
 
@@ -316,7 +317,7 @@ const AddWeftIssueDetail = (props) => {
                     }
                 }));
             } else if (res?.validate === 'false') {
-                Alert.alert(
+                AppAlert.alert(
                     'Oops!!!',
                     res?.message || 'Something went wrong!',
                     [
@@ -578,7 +579,7 @@ const AddWeftIssueDetail = (props) => {
             //     text: 'OK',
             //     onPress: () => { },
             // });
-            Alert.alert(`${firstError}`);
+            AppAlert.alert(`${firstError}`);
 
             return;
         }

@@ -4029,6 +4029,51 @@ export default function GreyPackingScannerScreen() {
     });
   }, [AllPackingDataList, browseSearch]);
 
+
+  // const loadPackingbrowselist = useCallback(async () => {
+  //   if (!isReady) return;
+
+  //   const payload = {
+  //     prpcode: selectedPrpCode,
+  //     yearno: selectedYearNo,
+  //     employeecode: '',
+  //     txntype: TXN_TYPE,
+  //   };
+
+  //   console.log('[GreyPacking] PackingList payload:', payload);
+  //   setBrowseListLoading(true);
+
+  //   // Keep the current Header ScrollView position when the loading state updates.
+  //   requestAnimationFrame(() => {
+  //     requestAnimationFrame(() => {
+  //       headerScrollRef.current?.scrollTo({
+  //         y: headerScrollY.current,
+  //         animated: false,
+  //       });
+  //     });
+  //   });
+
+  //   try {
+  //     const response = await GreyPackingAPI.PackingList(payload);
+
+  //     console.log('[GreyPacking] PackingList response:', response);
+
+  //     const data = webResponseData(response);
+  //     console.log('[GreyPacking] PackingList response data:', data);
+
+  //     const list = Array.isArray(data) ? data : [];
+
+  //     setPackingDataList(list);
+  //     setBrowseSearch('');
+  //     setMode('browseList');
+  //   } catch (error) {
+  //     console.log('[GreyPacking] PackingList error:', error);
+  //     AppAlert.alert('Browse List', apiError(error));
+  //   } finally {
+  //     setBrowseListLoading(false);
+  //   }
+  // }, [isReady, selectedPrpCode, selectedYearNo]);
+
   const BrowseList = useMemo(() => (
     <View style={styles.browseScreen}>
       <View style={styles.browseHeader}>

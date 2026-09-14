@@ -1,6 +1,7 @@
-import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import AppAlert from '@/common/utils/appAlert';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
     StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
@@ -306,7 +307,7 @@ function CostSheetPreviewModal({
                             <View style={pm.smallCard}>
                                 <Text style={pm.smallLabel}>DAILY CONVERSION</Text>
                                 <Text style={pm.smallText}>Prod / day: <Text style={pm.bold}>{result.snap_prod_day?.toFixed(0)} m</Text></Text>
-                                <Text style={pm.smallText}>Conversion / day: <Text style={pm.bold}>{r0(result.snap_prod_day * result.snap_final_cost)}</Text></Text>
+                                <Text style={pm.smallText}>Conversion / day: <Text style={pm.bold}>{r0(result.snap_per_day_conversion)}</Text></Text>
                             </View>
                             <View style={pm.smallCard}>
                                 <Text style={pm.smallLabel}>CONTRIBUTION</Text>
@@ -1772,10 +1773,10 @@ const blankTempDraft = (): TempDraft => ({
  * TEMP ENGINE — mirrors the frozen rules in App\Services\CostingEngine.
  *
  * Deliberate parity points:
- * - warp grams = EPI × reed space × GPM
+ * - warp costing grams = EPI × reed space × GPM × (1 + warp wastage%)
  * - PPI table = PPI loom + 2
- * - weft uses table/loom PPI factor
- * - warp/weft wastage adds COST ONLY
+ * - weft uses on-table PPI and RS/reed-space, not greige width
+ * - warp/weft wastage is included in yarn consumption before cost
  * - selvedge uses TOTAL ENDS and is excluded from body GLM
  * - YD = base + dye; PD ignores per-yarn dye
  * - sizing is warp-only ₹/kg
@@ -1803,11 +1804,14 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const ppiLoom = d.weft.reduce((sum, r) => sum + tempNum(r.basis), 0);
     const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;
     const weftFactor = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+    const warpWastage = tempPct(d.warpWaste);
+    const weftWastage = tempPct(d.weftWaste);
 
     const warpRows: TempComputedRow[] = d.warp.map(r => {
         const gpm = tempRowGpm(r);
         const epi = tempNum(r.basis);
-        const grams = epi * reedSpace * gpm;
+        const baseGrams = epi * reedSpace * gpm;
+        const grams = baseGrams * (1 + warpWastage / 100);
         const kg = grams / 1000;
         const price = tempNonNegative(r.price);
         const dye = isYD ? tempNonNegative(r.dye) : 0;
@@ -1830,7 +1834,8 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const weftRows: TempComputedRow[] = d.weft.map(r => {
         const gpm = tempRowGpm(r);
         const ppi = tempNum(r.basis);
-        const grams = ppi * weftFactor * greigeWidth * gpm;
+        const baseGrams = ppi * weftFactor * reedSpace * gpm;
+        const grams = baseGrams * (1 + weftWastage / 100);
         const kg = grams / 1000;
         const price = tempNonNegative(r.price);
         const dye = isYD ? tempNonNegative(r.dye) : 0;
@@ -1880,11 +1885,12 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const weftCost = weftRows.reduce((s, r) => s + r.cost, 0);
     const selvedgeCost = selvedgeRow?.cost || 0;
 
-    const warpWasteCost = warpCost * tempPct(d.warpWaste) / 100;
-    const weftWasteCost = weftCost * tempPct(d.weftWaste) / 100;
+    // Costs already include wastage-adjusted consumption. These are reporting-only increments.
+    const warpWasteCost = warpWastage > 0 ? warpCost * warpWastage / (100 + warpWastage) : 0;
+    const weftWasteCost = weftWastage > 0 ? weftCost * weftWastage / (100 + weftWastage) : 0;
     const wasteCost = warpWasteCost + weftWasteCost;
 
-    const rawMaterial = warpCost + weftCost + selvedgeCost + wasteCost;
+    const rawMaterial = warpCost + weftCost + selvedgeCost;
     const weavingCost = tempNonNegative(d.params.weavingRate) * ppiTable;
     const greigeMfg = rawMaterial + weavingCost;
 
@@ -1893,8 +1899,8 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
 
     // Selvedge excluded from body GLM exactly like production CostingEngine.
     const greigeGLM =
-        warpRows.reduce((s, r) => s + r.grams_per_metre, 0)
-        + weftRows.reduce((s, r) => s + r.grams_per_metre, 0);
+        warpRows.reduce((s, r) => s + (r.grams_per_metre / (1 + warpWastage / 100)), 0)
+        + weftRows.reduce((s, r) => s + (r.grams_per_metre / (1 + weftWastage / 100)), 0);
 
     const greigeKg = greigeGLM > 0
         ? greigePrice / (greigeGLM / 1000)

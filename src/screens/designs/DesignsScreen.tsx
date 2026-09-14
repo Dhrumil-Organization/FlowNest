@@ -1,4 +1,3 @@
-import AppAlert from '@/common/utils/appAlert';
 // ═══════════════════════════════════════════════════════════════
 // FILE: screens/designs/DesignsScreen.tsx
 // ✅ MERGED VERSION
@@ -31,7 +30,9 @@ import { T } from '../../theme';
 // ✅ CHANGED: import from the new lightweight client instead of legacyClient
 // import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
 import { Ionicons } from '@expo/vector-icons';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
 import AsyncStorage from '@/common/utils/compatibleStorage';
+import AppAlert from '@/common/utils/appAlert';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 
 const SHORT = (c: string) =>
@@ -133,14 +134,14 @@ function calcSpec(d: any) {
     // picks pack closer as length shrinks in finishing
     const ppiFinished = gf < 1 ? ppiTable / (1 - gf) : ppiTable;
 
-    // ── GLM (per-yarn, same formulas as CostingEngine::compute) ──
+    // ── Physical GLM (RS/reed-space basis, matching CostingEngine base consumption) ──
     let warpGLM = 0;
     warpYarns.forEach((y) => {
         warpGLM += (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
     });
     let weftGLM = 0;
     weftYarns.forEach((y) => {
-        weftGLM += (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
+        weftGLM += (Number(y.ppi) || 0) * wf * reed * GPM(y.sys, Number(y.cnt));
     });
     const greigGLM = warpGLM + weftGLM;
     const widthGreigeM = widthGreige * 0.0254;

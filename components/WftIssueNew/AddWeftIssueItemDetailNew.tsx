@@ -33,7 +33,8 @@ const AddWeftIssueDetail = (props) => {
         editData,
         mainUId,
         isEditMode,
-        hasIssueDesignAccess = false
+        hasIssueDesignAccess = false,
+        issueMode
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;

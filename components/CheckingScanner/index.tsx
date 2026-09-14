@@ -1,4 +1,3 @@
-import AppAlert from '@/common/utils/appAlert';
 import CustomPicker from '@/common/CustomPicker';
 import { checkingScannerStyles } from '@/common/Style';
 import { useFaults } from '@/common/useFaults';
@@ -6,7 +5,7 @@ import { showError, showSuccess } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
@@ -32,7 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from '../../common/API/dynamicAPI';
 import FaultsModal from './FaultsModal';
 import ScannerFaultsModal from './ScannerFaultsModal';
-
+import { isWeb } from '@/src/platform/runtime';
 interface Props {
     token: string;
     username: string;
@@ -266,7 +265,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             sendScannedValue(value);
         } catch {
             resetScanFields();
-            AppAlert.alert('Invalid QR', 'QR format not valid');
+            Alert.alert('Invalid QR', 'QR format not valid');
         }
         setIsScanning(false);
     };
@@ -456,7 +455,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             if (response.data.success && response.data.response.design) {
                 setData(response.data.response.design);
             } else {
-                AppAlert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
+                Alert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
             }
         } catch (error) {
             console.log('API sendScannedValue error:', error);
@@ -507,10 +506,10 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 } else {
                     setDesigndata([]);
                     setWarpLen('0');
-                    AppAlert.alert('No Data Found');
+                    Alert.alert('No Data Found');
                 }
             } else {
-                AppAlert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
+                Alert.alert('Error', `${response.data?.message || 'Unexpected response'}`);
             }
         } catch (error) {
             console.log('API sendScannedValue1 error:', error);
@@ -550,18 +549,18 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleSubmitScan = async () => {
-        if (!beamNo) return AppAlert.alert('Beam no can not be blank');
-        if (!takaNo) return AppAlert.alert('Taka no can not be blank');
-        if (!design) return AppAlert.alert('Design can not be blank.');
-        if (!meter || parseFloat(meter) <= 0) return AppAlert.alert('Meter can not be blank or 0.');
+        if (!beamNo) return Alert.alert('Beam no can not be blank');
+        if (!takaNo) return Alert.alert('Taka no can not be blank');
+        if (!design) return Alert.alert('Design can not be blank.');
+        if (!meter || parseFloat(meter) <= 0) return Alert.alert('Meter can not be blank or 0.');
         if (parseFloat(meter) > parseFloat(getWarpLen))
-            return AppAlert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
-        if (!kgs || parseFloat(kgs) <= 0) return AppAlert.alert('Kgs can not be blank or 0.');
-        if (!grade) return AppAlert.alert('Grade can not be blank.');
-        if (!checker) return AppAlert.alert('Checker can not be blank.');
-        if (!shift) return AppAlert.alert('Shift can not be blank.');
-        if (!Designdata.length) return AppAlert.alert('Design data missing. Select design again.');
-        // if (!operator) return AppAlert.alert('Operator can not be blank.');
+            return Alert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
+        if (!kgs || parseFloat(kgs) <= 0) return Alert.alert('Kgs can not be blank or 0.');
+        if (!grade) return Alert.alert('Grade can not be blank.');
+        if (!checker) return Alert.alert('Checker can not be blank.');
+        if (!shift) return Alert.alert('Shift can not be blank.');
+        if (!Designdata.length) return Alert.alert('Design data missing. Select design again.');
+        // if (!operator) return Alert.alert('Operator can not be blank.');
 
         let finalObj: any = {};
         getData.forEach((el: any) => {
@@ -710,9 +709,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
     const printStickerForData = async (rowData: any) => {
         const printerName = printer || '';
-        if (!printerName) return AppAlert.alert('Printer Required', 'Please select printer first.');
+        if (!printerName) return Alert.alert('Printer Required', 'Please select printer first.');
         if (!rowData || Object.keys(rowData).length === 0)
-            return AppAlert.alert('Print Error', 'Sticker data is empty.');
+            return Alert.alert('Print Error', 'Sticker data is empty.');
         console.log("rowdata", rowData, printerName);
         setIsLoading(true);
         try {
@@ -764,7 +763,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Printer service not reachable';
             setPrinterError(message);
             setPrinters([]);
-            AppAlert.alert('Printer Error', String(message));
+            Alert.alert('Printer Error', String(message));
         } finally {
             setPrinterLoading(false);
         }
@@ -800,7 +799,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             if (response.data.success && response.data.response.design) {
                 setdesigndata(response.data.response.design);
             } else {
-                AppAlert.alert('No Design Data Found');
+                Alert.alert('No Design Data Found');
             }
         } catch (error) {
             console.log('API error:', error);
@@ -1182,7 +1181,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 fetchdesign();
                 fetchManualGradeCheckerOperatorShift();
             } else {
-                AppAlert.alert('No Data Found');
+                Alert.alert('No Data Found');
             }
         } catch (error) {
             console.log('API error:', error);
@@ -1193,7 +1192,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
 
     const showAlert = (message: string) =>
         new Promise<void>((resolve) => {
-            AppAlert.alert('Validation Error', message, [{ text: 'OK', onPress: () => resolve() }], {
+            Alert.alert('Validation Error', message, [{ text: 'OK', onPress: () => resolve() }], {
                 cancelable: false,
             });
         });
@@ -1273,9 +1272,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 txntype: 'chekingScanner',
                 yearno: getCurrentFinancialYear(),
                 EMode: 'M',
-                // d2: form.d2 || [],
-                d2: (Array.isArray(form.d2) ? form.d2 : [])
-                    .filter((item: any) => String(item?.Remark ?? '').trim() !== ''),
+                d2: form.d2 || [],
             };
 
             console.log('handlesave payloadObj:', payloadObj);
@@ -1290,7 +1287,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
             console.log('handlesave response:', response);
 
             if (response.data.success === true) {
-                AppAlert.alert('Success', 'Data Saved Successfully ✅', [
+                Alert.alert('Success', 'Data Saved Successfully ✅', [
                     {
                         text: 'OK',
                         onPress: async () => {
@@ -1401,11 +1398,11 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     //         console.log('handledelete response:', response);
 
     //         // if (response.data.success) {
-    //         //     AppAlert.alert('Success', response.data.message || 'Record deleted successfully');
+    //         //     Alert.alert('Success', response.data.message || 'Record deleted successfully');
     //         //     await handleScannerList();
     //         // } 
     //         if (response.data.success) {
-    //             AppAlert.alert(
+    //             Alert.alert(
     //                 'Success',
     //                 response.data.message || 'Delete successfully',
     //                 [
@@ -1420,10 +1417,10 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     //             );
     //         }
     //         else {
-    //             AppAlert.alert('Warning', response.data.message);
+    //             Alert.alert('Warning', response.data.message);
     //         }
     //     } catch (error) {
-    //         AppAlert.alert('Error', 'Something went wrong');
+    //         Alert.alert('Error', 'Something went wrong');
     //     } finally {
     //         setIsDeleteLoading(false);
     //     }
@@ -1551,7 +1548,30 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         setRefreshing(false);
     };
 
-    if (!permission) {
+    // if (!permission) {
+    //     return (
+    //         <View style={styles.centered}>
+    //             <ActivityIndicator size="large" color="#007EA7" />
+    //             <Text>Initializing camera...</Text>
+    //         </View>
+    //     );
+    // }
+
+    // if (!permission.granted) {
+    //     return (
+    //         <View style={[styles.centered, { padding: 20 }]}>
+    //             <Icon name="camera-alt" size={60} color="#999" />
+    //             <Text style={{ marginTop: 15, fontSize: 16, textAlign: 'center' }}>
+    //                 Camera permission is required
+    //             </Text>
+    //             <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+    //                 <Text style={{ color: '#fff', fontWeight: '700' }}>Grant Permission</Text>
+    //             </TouchableOpacity>
+    //         </View>
+    //     );
+    // }
+
+    if (!isWeb && !permission) {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#007EA7" />
@@ -1560,15 +1580,28 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         );
     }
 
-    if (!permission.granted) {
+    if (!isWeb && !permission.granted) {
         return (
             <View style={[styles.centered, { padding: 20 }]}>
                 <Icon name="camera-alt" size={60} color="#999" />
-                <Text style={{ marginTop: 15, fontSize: 16, textAlign: 'center' }}>
+
+                <Text
+                    style={{
+                        marginTop: 15,
+                        fontSize: 16,
+                        textAlign: 'center'
+                    }}
+                >
                     Camera permission is required
                 </Text>
-                <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>Grant Permission</Text>
+
+                <TouchableOpacity
+                    style={styles.permissionBtn}
+                    onPress={requestPermission}
+                >
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>
+                        Grant Permission
+                    </Text>
                 </TouchableOpacity>
             </View>
         );
@@ -1784,7 +1817,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const handleRemoveLastTaka = (row: any) => {
         if (!row) return;
 
-        AppAlert.alert(
+        Alert.alert(
             'Remove Last Taka',
             `Are you sure you want to remove Last Taka from Taka No ${row?.TakaNo || ''}?`,
             [
@@ -2919,9 +2952,6 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                         data={faultsData}
                         initialFilledData={form.d2 || []}
                         cacheKey={form.UId || ''}
-                        beamNo={FormState.values.BeamNo || form.BeamNo || ''}
-                        takaNo={FormState.values.TakaNo || ''}
-                        meter={meter || ''}
                         fetchData={async (cacheKey: string) => {
                             const params = {
                                 UId: cacheKey,

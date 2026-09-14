@@ -1,4 +1,3 @@
-import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
     View,
@@ -26,7 +25,7 @@ import {
 } from "react-native-vision-camera";
 import HeaderBarwithBack from "../HeaderBarwithBack/HeaderBarwithBack";
 import { Picker } from "@react-native-picker/picker";
-import AsyncStorage from "@/common/utils/compatibleStorage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ScrollView } from "react-native";
 import Snackbar from '@/common/utils/snackbarCompat';
 import { Switch } from "react-native";
@@ -243,7 +242,7 @@ const CheckingScanner: React.FC<Props> = ({
                 setShift("");
                 setPrinter("");
                 setPrinters([]);
-                AppAlert.alert("Invalid QR", "QR format not valid");
+                Alert.alert("Invalid QR", "QR format not valid");
             }
             setIsScanning(false);
         },
@@ -454,7 +453,7 @@ const CheckingScanner: React.FC<Props> = ({
             } else {
                 setIsLoading(false);
                 console.error("Unexpected response structure:", response.data);
-                AppAlert.alert(`${response.data}`);
+                Alert.alert(`${response.data}`);
             }
         } catch (error) {
             //console.log("API sendScannedValue error:", error);
@@ -568,12 +567,12 @@ const CheckingScanner: React.FC<Props> = ({
                     setDesigndata([]);
                     setWarpLen("0");
 
-                    AppAlert.alert("No Data Found");
+                    Alert.alert("No Data Found");
                 }
             } else {
                 setIsLoading(false);
                 console.error("Unexpected response structure:", response.data);
-                AppAlert.alert(`${response.data}`);
+                Alert.alert(`${response.data}`);
             }
         } catch (error) {
             //console.log("API sendScannedValue error:", error);
@@ -648,13 +647,13 @@ const CheckingScanner: React.FC<Props> = ({
 
     const handleSubmitScan = async () => {
         if (typeof beamNo == "undefined" || beamNo == null || beamNo == "") {
-            AppAlert.alert("Beam no can not be blank");
+            Alert.alert("Beam no can not be blank");
             return false;
         } else if (typeof takaNo == "undefined" || takaNo == null || takaNo == "") {
-            AppAlert.alert("Taka no can not be blank");
+            Alert.alert("Taka no can not be blank");
             return false;
         } else if (typeof design == "undefined" || design == null || design == "") {
-            AppAlert.alert("Design can not be blank.");
+            Alert.alert("Design can not be blank.");
             return false;
         } else if (
             typeof meter == "undefined" ||
@@ -662,7 +661,7 @@ const CheckingScanner: React.FC<Props> = ({
             meter == "" ||
             parseInt(meter) <= 0
         ) {
-            AppAlert.alert("Meter can not be blank or 0.");
+            Alert.alert("Meter can not be blank or 0.");
             return false;
         } else if (
             typeof meter == "undefined" ||
@@ -670,7 +669,7 @@ const CheckingScanner: React.FC<Props> = ({
             meter == "" ||
             (parseInt(meter) > 0 && parseFloat(meter) > parseFloat(getWarpLen))
         ) {
-            AppAlert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
+            Alert.alert(`Meter ${meter} can not be greater than ${getWarpLen}.`);
             return false;
         } else if (
             typeof kgs == "undefined" ||
@@ -678,7 +677,7 @@ const CheckingScanner: React.FC<Props> = ({
             kgs == "" ||
             parseInt(kgs) <= 0
         ) {
-            AppAlert.alert("Kgs can not be blank or 0.");
+            Alert.alert("Kgs can not be blank or 0.");
             return false;
         } else if (
             typeof kgs == "undefined" ||
@@ -686,20 +685,20 @@ const CheckingScanner: React.FC<Props> = ({
             kgs == "" ||
             parseInt(kgs) <= 0
         ) {
-            AppAlert.alert("Kgs can not be blank or 0.");
+            Alert.alert("Kgs can not be blank or 0.");
             return false;
         } else if (typeof grade == "undefined" || grade == null || grade == "") {
-            AppAlert.alert("Grade can not be blank.");
+            Alert.alert("Grade can not be blank.");
             return false;
         } else if (
             typeof checker == "undefined" ||
             checker == null ||
             checker == ""
         ) {
-            AppAlert.alert("Checker can not be blank.");
+            Alert.alert("Checker can not be blank.");
             return false;
         } else if (typeof shift == "undefined" || shift == null || shift == "") {
-            AppAlert.alert("Shift can not be blank.");
+            Alert.alert("Shift can not be blank.");
             return false;
         } else {
             let finalObj = new Object();
@@ -943,12 +942,12 @@ const CheckingScanner: React.FC<Props> = ({
         const printerName = printer || "";
 
         if (!printerName) {
-            AppAlert.alert("Printer Required", "Please select printer first.");
+            Alert.alert("Printer Required", "Please select printer first.");
             return;
         }
 
         if (!rowData || Object.keys(rowData).length === 0) {
-            AppAlert.alert("Print Error", "Sticker data is empty.");
+            Alert.alert("Print Error", "Sticker data is empty.");
             return;
         }
 
@@ -1063,7 +1062,7 @@ const CheckingScanner: React.FC<Props> = ({
                 baseURL: err?.config?.baseURL,
             });
 
-            AppAlert.alert("Printer Error", String(message));
+            Alert.alert("Printer Error", String(message));
         } finally {
             setPrinterLoading(false);
             setIsLoading(false);
@@ -1152,7 +1151,7 @@ const CheckingScanner: React.FC<Props> = ({
                 setdesigndata(response.data.response.design);
             } else {
                 console.error("Unexpected response structure:", response.data);
-                AppAlert.alert("No Design Data Found");
+                Alert.alert("No Design Data Found");
             }
         } catch (error) {
             console.log("API error:", error);
@@ -1531,7 +1530,7 @@ const CheckingScanner: React.FC<Props> = ({
                 fetchdesign();
                 fetchManualGradeCheckerShift();
             } else {
-                AppAlert.alert("No Data Found");
+                Alert.alert("No Data Found");
             }
         } catch (error) {
             console.log("API error:", error);
@@ -1542,7 +1541,7 @@ const CheckingScanner: React.FC<Props> = ({
 
     const showAlert = (message) => {
         return new Promise((resolve) => {
-            AppAlert.alert(
+            Alert.alert(
                 "Validation Error",
                 message,
                 [
@@ -1767,7 +1766,7 @@ const CheckingScanner: React.FC<Props> = ({
             // console.log("response", response);
 
             if (response.data.success === true) {
-                AppAlert.alert("Success", "Data Saved Successfully ✅", [
+                Alert.alert("Success", "Data Saved Successfully ✅", [
                     {
                         text: "OK",
                         onPress: async () => {
@@ -1962,19 +1961,19 @@ const CheckingScanner: React.FC<Props> = ({
 
                 setVisibleData(updatedData);
 
-                AppAlert.alert(
+                Alert.alert(
                     "Success",
                     response.data.message || "Record deleted successfully",
                 );
 
                 await handleScannerList();
             } else {
-                AppAlert.alert("Warning", response.data.message);
+                Alert.alert("Warning", response.data.message);
             }
         } catch (error) {
             console.log("DELETE ERROR =>", error);
 
-            AppAlert.alert("Error", "Something went wrong");
+            Alert.alert("Error", "Something went wrong");
         } finally {
             setIsDeleteLoading(false);
         }

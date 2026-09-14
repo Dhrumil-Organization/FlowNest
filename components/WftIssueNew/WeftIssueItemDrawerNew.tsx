@@ -51,7 +51,8 @@ const WeftIssueItemDrawer = ({
     editData,
     closeAllDrawers,
     resetAllData,
-    fetchbrowse
+    fetchbrowse,
+    issueMode
 }) => {
     // const device = useCameraDevice('back');
     // ✅ REPLACE with this:
@@ -1381,7 +1382,9 @@ const WeftIssueItemDrawer = ({
                     ExpProdQty: newCarton.ExpProdQty || 0,
                     DsnRcpSrNo: FormState.values.srno,
                     DsnCode: FormState.values.DsnCode,
-                }]
+                    ExpProdQtyType: issueMode == 'new' ? '1' : '0'
+                }],
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("direct add payload", payloadObj);
@@ -1584,23 +1587,34 @@ const WeftIssueItemDrawer = ({
 
         try {
             const historyPayload = {
-                PrpCode: FormState.values.PrpCode,
-                YearNo: FormState.values.YearNo,
+                // PrpCode: FormState.values.PrpCode,
+                // YearNo: FormState.values.YearNo,
+                // txntype: 'beam_weft_issue',
+                // reqqty: newCarton?.qty,
+                // MRUId: '0',
+                // MRSrNo: '0',
+                // ItmCode: newCarton?.ItmCode,
+                // ShdCode: newCarton?.ShdCode,
+                // // PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo,
+                // PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo || '',
+                // beamuid: FormState.values.BeamUId,
+                // dsncode: FormState.values.DsnCode
+
+                prpcode: FormState.values.PrpCode,
+                yearno: FormState.values.YearNo,
                 txntype: 'beam_weft_issue',
-                WfIssQty: newCarton?.qty,
-                MRUId: '0',
-                MRSrNo: '0',
-                ItmCode: newCarton?.ItmCode,
-                ShdCode: newCarton?.ShdCode,
-                // PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo,
-                PlnWfSrNo: FormState.values.srno || newCarton?.DsnRcpSrNo || '',
+                reqqty: newCarton?.qty,
+                itmcode: newCarton?.ItmCode,
+                shdcode: newCarton?.ShdCode,
+                srno: FormState.values.srno || newCarton?.DsnRcpSrNo || '',
                 beamuid: FormState.values.BeamUId,
-                dsncode: FormState.values.DsnCode
+                dsncode: FormState.values.DsnCode,
+                IssUId: FormState.values.UId
             };
 
             console.log("get_expprodqty_from_issueqty historyPayload", historyPayload);
             const response = await axios.get(
-                `${API}/api/get_expprodqty_from_issueqty`, getRequestConfig(
+                `${API}/api/getExpectedWeftIssue`, getRequestConfig(
                     {
                         params: { ...historyPayload }
                     }
@@ -1730,7 +1744,8 @@ const WeftIssueItemDrawer = ({
                     ExpProdQty: item.ExpProdQty || 0,
                     DsnRcpSrNo: FormState.values.srno,
                     DsnCode: FormState.values.DsnCode,
-                }))
+                })),
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("edit payload", payloadObj);

@@ -1,4 +1,3 @@
-import AppAlert from '@/common/utils/appAlert';
 // ═══════════════════════════════════════════════════════════════
 // FILE: screens/designs/DesignsScreen.tsx
 // ✅ MERGED VERSION
@@ -31,7 +30,7 @@ import { T } from '../../theme';
 // ✅ CHANGED: import from the new lightweight client instead of legacyClient
 // import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import client, { DesignAPI, ItemAPI, type Design, type GetItem, type YarnMaster } from '../../../common/API/client_fix_design';
 
 const SHORT = (c: string) =>
@@ -133,14 +132,14 @@ function calcSpec(d: any) {
     // picks pack closer as length shrinks in finishing
     const ppiFinished = gf < 1 ? ppiTable / (1 - gf) : ppiTable;
 
-    // ── GLM (per-yarn, same formulas as CostingEngine::compute) ──
+    // ── Physical GLM (RS/reed-space basis, matching CostingEngine base consumption) ──
     let warpGLM = 0;
     warpYarns.forEach((y) => {
         warpGLM += (Number(y.epi) || 0) * reed * GPM(y.sys, Number(y.cnt));
     });
     let weftGLM = 0;
     weftYarns.forEach((y) => {
-        weftGLM += (Number(y.ppi) || 0) * wf * widthGreige * GPM(y.sys, Number(y.cnt));
+        weftGLM += (Number(y.ppi) || 0) * wf * reed * GPM(y.sys, Number(y.cnt));
     });
     const greigGLM = warpGLM + weftGLM;
     const widthGreigeM = widthGreige * 0.0254;
@@ -813,7 +812,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
         const actualItemCode = String(item.itm_code || item.mi_id || '').trim();
 
         if (!actualItemCode) {
-            AppAlert.alert(
+            Alert.alert(
                 'Invalid Yarn Item',
                 'The selected row does not contain an actual ItmCode.'
             );
@@ -858,7 +857,7 @@ function YarnPickerModal({ visible, title = 'Select yarn', onSelect, onClose }: 
             return;
         }
 
-        AppAlert.alert(
+        Alert.alert(
             'Yarn item unavailable',
             'This Main Yarn does not contain a directly selectable item. Please refresh the help and try again.'
         );
@@ -1531,7 +1530,7 @@ function CatalogTab({ onSelectDesign, onEditDesign, }: { onSelectDesign: (d: Des
                 requestId,
             });
 
-            AppAlert.alert('Design list error', String(msg));
+            Alert.alert('Design list error', String(msg));
         } finally {
             if (requestId === requestSequence.current) {
                 setLoading(false);
@@ -1891,22 +1890,22 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
     // ✅ validated + verified save (ported logic)
     const save = async () => {
         if (!String(form.code || '').trim()) {
-            AppAlert.alert('Validation', 'Design code is required.');
+            Alert.alert('Validation', 'Design code is required.');
             return;
         }
 
         if (!String(form.category || '').trim()) {
-            AppAlert.alert('Validation', 'Category is required.');
+            Alert.alert('Validation', 'Category is required.');
             return;
         }
 
         if (!Array.isArray(form.warp_yarns) || form.warp_yarns.length === 0) {
-            AppAlert.alert('Validation', 'At least one warp yarn is required.');
+            Alert.alert('Validation', 'At least one warp yarn is required.');
             return;
         }
 
         if (!Array.isArray(form.weft_yarns) || form.weft_yarns.length === 0) {
-            AppAlert.alert('Validation', 'At least one weft yarn is required.');
+            Alert.alert('Validation', 'At least one weft yarn is required.');
             return;
         }
 
@@ -2168,7 +2167,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 );
             }
 
-            AppAlert.alert(
+            Alert.alert(
                 'Saved',
                 `Design saved successfully.\n\nID: ${savedId}`
             );
@@ -2189,7 +2188,7 @@ function DesignTab({ design, onRefresh, onCancelEdit }: {
                 e?.response?.data ??
                 {};
 
-            AppAlert.alert(
+            Alert.alert(
                 'Design save failed',
                 String(
                     errorBody?.message ||
@@ -2522,7 +2521,7 @@ function ShadePickerModal({ visible, onSelect, onClose }: {
     }, [rows, search]);
 
     const addManual = () => {
-        if (!name.trim()) { AppAlert.alert('Shade name required'); return; }
+        if (!name.trim()) { Alert.alert('Shade name required'); return; }
         onSelect({ color_name: name.trim(), shade_no: shadeNo.trim() || name.trim(), hex: /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : '#808080' });
         onClose();
     };
@@ -2560,7 +2559,7 @@ function YarnShadeBlock({ yarn, direction, bands, onChange }: {
     const unit = direction === 'warp' ? `${Number(yarn.epi || 0)} EPI` : `${Number(yarn.ppi || 0)} PPI`;
 
     const add = () => {
-        if (!pendingShade) { AppAlert.alert('Shade required', 'Select a shade first.'); return; }
+        if (!pendingShade) { Alert.alert('Shade required', 'Select a shade first.'); return; }
         const n = Math.max(1, Math.round(Number(count) || 1));
         onChange([...bands, {
             ...pendingShade,
@@ -2648,13 +2647,13 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
     const allWeft = Object.values(weftBands).flat();
 
     const save = async () => {
-        if (!baseDesign) { AppAlert.alert('Main Design required'); return; }
-        if (!subCode.trim()) { AppAlert.alert('Sub Design code required'); return; }
+        if (!baseDesign) { Alert.alert('Main Design required'); return; }
+        if (!subCode.trim()) { Alert.alert('Sub Design code required'); return; }
         if (baseDesign.type === 'YD' && allWarp.length === 0 && allWeft.length === 0) {
-            AppAlert.alert('Shade pattern required', 'Add at least one warp or weft shade band.'); return;
+            Alert.alert('Shade pattern required', 'Add at least one warp or weft shade band.'); return;
         }
         if (baseDesign.type === 'PD' && !commercialName.trim()) {
-            AppAlert.alert('Commercial shade required', 'Enter the final piece-dyed shade name.'); return;
+            Alert.alert('Commercial shade required', 'Enter the final piece-dyed shade name.'); return;
         }
 
         setSaving(true);
@@ -2678,11 +2677,11 @@ function ColourwayTab({ design, onNavigateToCatalog }: { design: Design | null; 
                 weft_patterns: toPatterns(allWeft),
             } as any);
 
-            AppAlert.alert('Saved', 'Sub Design saved successfully.');
+            Alert.alert('Saved', 'Sub Design saved successfully.');
             setWarpBands({}); setWeftBands({});
             setSubCode(`${baseDesign.code.replace(/\s+/g, '-')}-01`);
         } catch (e: any) {
-            AppAlert.alert('Save failed', e?.response?.data?.message || e?.message || 'Unable to save Sub Design');
+            Alert.alert('Save failed', e?.response?.data?.message || e?.message || 'Unable to save Sub Design');
         } finally { setSaving(false); }
     };
 
@@ -3018,11 +3017,11 @@ const cw3 = StyleSheet.create({
 //     // Single handler for both Add and Update (dynamic based on editingAliasId)
 //     const handleAddOrUpdateAlias = () => {
 //         if (!aliasInput.trim()) {
-//             AppAlert.alert('Error', 'Alias name cannot be empty.');
+//             Alert.alert('Error', 'Alias name cannot be empty.');
 //             return;
 //         }
 //         if (!selectedDesign) {
-//             AppAlert.alert('Error', 'Please select a main design first.');
+//             Alert.alert('Error', 'Please select a main design first.');
 //             return;
 //         }
 
@@ -3055,7 +3054,7 @@ const cw3 = StyleSheet.create({
 
 //     // Delete an alias
 //     const handleDeleteAlias = (id: string) => {
-//         AppAlert.alert(
+//         Alert.alert(
 //             'Delete Alias',
 //             'Are you sure you want to delete this alias?',
 //             [
@@ -3195,7 +3194,7 @@ const cw3 = StyleSheet.create({
 //                             design_code: selectedDesign?.code,
 //                         }));
 //                         console.log('SAVED ALIASES', payload);
-//                         AppAlert.alert('Success', `Aliases saved for ${selectedDesign?.code || 'design'}.`);
+//                         Alert.alert('Success', `Aliases saved for ${selectedDesign?.code || 'design'}.`);
 //                     }}
 //                 >
 //                     <Text style={styles.saveButtonText}>Save Aliases</Text>
@@ -3616,7 +3615,7 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
                 "Operation completed.";
 
             if (response.data?.success) {
-                AppAlert.alert(
+                Alert.alert(
                     "Success",
                     message,
                     [
@@ -3630,14 +3629,14 @@ function MonthlySalesTargetTab({ design }: { design: Design | null }) {
                     { cancelable: false }
                 );
             } else {
-                AppAlert.alert("Error", message);
+                Alert.alert("Error", message);
             }
         } catch (error: any) {
             const message =
                 error.response?.data?.message ||
                 error.response?.data?.response?.message ||
                 error.message;
-            AppAlert.alert("Error", message);
+            Alert.alert("Error", message);
         } finally {
             setSaving(false);
         }
@@ -4377,7 +4376,7 @@ function AliasesDesignPickerModal({
             setHasMore(Boolean(meta.has_more));
         } catch (error: any) {
             setDesigns([]);
-            AppAlert.alert(
+            Alert.alert(
                 'Design help unavailable',
                 String(error?.response?.data?.message || error?.message || 'Unable to load designs.')
             );
@@ -4494,7 +4493,7 @@ function AliasesTab({ design }: { design: Design | null }) {
             })));
         } catch (error: any) {
             setAliases([]);
-            AppAlert.alert(
+            Alert.alert(
                 'Aliases unavailable',
                 String(error?.response?.data?.message || error?.message || 'Unable to load aliases.')
             );
@@ -4536,15 +4535,15 @@ function AliasesTab({ design }: { design: Design | null }) {
     const addOrUpdate = () => {
         const name = aliasInput.trim();
         if (!selectedDesign) {
-            AppAlert.alert('Select design', 'Please select a Main Design first.');
+            Alert.alert('Select design', 'Please select a Main Design first.');
             return;
         }
         if (!name) {
-            AppAlert.alert('Alias required', 'Enter the new alias name.');
+            Alert.alert('Alias required', 'Enter the new alias name.');
             return;
         }
         if (name.length > 40) {
-            AppAlert.alert('Alias too long', 'Alias name cannot exceed 40 characters.');
+            Alert.alert('Alias too long', 'Alias name cannot exceed 40 characters.');
             return;
         }
 
@@ -4554,7 +4553,7 @@ function AliasesTab({ design }: { design: Design | null }) {
             row.dsn_name.trim().toUpperCase() === name.toUpperCase()
         );
         if (duplicate) {
-            AppAlert.alert('Duplicate alias', 'This alias name is already present in the array.');
+            Alert.alert('Duplicate alias', 'This alias name is already present in the array.');
             return;
         }
 
@@ -4583,7 +4582,7 @@ function AliasesTab({ design }: { design: Design | null }) {
     };
 
     const deleteAlias = (row: DesignAliasRow) => {
-        AppAlert.alert('Delete Alias', 'This will soft delete the saved ERP alias when you press Save Aliases.', [
+        Alert.alert('Delete Alias', 'This will soft delete the saved ERP alias when you press Save Aliases.', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Delete',
@@ -4604,7 +4603,7 @@ function AliasesTab({ design }: { design: Design | null }) {
 
     const saveAliases = async () => {
         if (!selectedDesign) {
-            AppAlert.alert('Select design', 'Please select a Main Design first.');
+            Alert.alert('Select design', 'Please select a Main Design first.');
             return;
         }
 
@@ -4617,7 +4616,7 @@ function AliasesTab({ design }: { design: Design | null }) {
             }));
 
         if (changes.length === 0) {
-            AppAlert.alert('No changes', 'Add, edit, or delete an alias before saving.');
+            Alert.alert('No changes', 'Add, edit, or delete an alias before saving.');
             return;
         }
 
@@ -4634,9 +4633,9 @@ function AliasesTab({ design }: { design: Design | null }) {
             }
             await loadAliases(selectedDesign);
             cancelEdit();
-            AppAlert.alert('Saved', 'Aliases saved successfully in DAPDesign.');
+            Alert.alert('Saved', 'Aliases saved successfully in DAPDesign.');
         } catch (error: any) {
-            AppAlert.alert(
+            Alert.alert(
                 'Alias save failed',
                 String(error?.response?.data?.message || error?.message || 'Unable to save aliases.')
             );

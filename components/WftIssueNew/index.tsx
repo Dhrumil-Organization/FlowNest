@@ -14,9 +14,9 @@ import HeaderBarwithBack from '@/components/Header';
 // import { ScrollView } from 'react-native';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import CustomDrawer from './CustomDrawer';
-import AddWeftIssueDetail from './AddWeftIssueDetail';
-import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
-import WeftIssueItemDrawer from './WeftIssueItemDrawer';
+import AddWeftIssueDetailNew from './AddWeftIssueDetailNew';
+import AddWeftIssueItemDetailNew from './AddWeftIssueItemDetailNew';
+import WeftIssueItemDrawerNew from './WeftIssueItemDrawerNew';
 // import Snackbar from 'react-native-snackbar';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 
@@ -29,6 +29,7 @@ interface Props {
     username: string;
     userid?: any;
     onBackToModeSelector?: () => void;
+    issueMode: string
 }
 
 type GridItem = {
@@ -51,7 +52,7 @@ type YarnIssueItem = {
 
 };
 
-const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelector }) => {
+const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelector, issueMode }) => {
     // const { hasPermission, requestPermission } = useCameraPermission();
     const [isLoading, setIsLoading] = useState(false);
     const [getDataSaved, setDataSaved] = useState(false)
@@ -105,10 +106,9 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
     console.log("getallpropertydata", getAllPropertyData)
 
     console.log("FormState.values", FormState.values);
-    console.log("data", data);
-    console.log("FormState.values.LngName", FormState.values.LngName);
     console.log("FormState.values.PrpCode", FormState.values.PrpCode);
-
+    console.log("issueMode", issueMode);
+    
     const cancelToken = useRef(null);
 
     const getRequestConfig = (props: any) => ({
@@ -173,13 +173,14 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
     const handleDetailNext = (data?: { hasIssueDesignAccess?: boolean; StkType?: string }) => {
         // Process House (P) does not require the intermediate item-selection screen.
         // Go directly to the next drawer instead.
-        if (data?.StkType === 'P') {
-            if (typeof data.hasIssueDesignAccess === 'boolean') {
-                setHasIssueDesignAccess(data.hasIssueDesignAccess);
-            }
-            openScannerDrawer();
-            return;
-        }
+        
+        // if (data?.StkType === 'P') {
+        //     if (typeof data.hasIssueDesignAccess === 'boolean') {
+        //         setHasIssueDesignAccess(data.hasIssueDesignAccess);
+        //     }
+        //     openScannerDrawer();
+        //     return;
+        // }
 
         openItemDetailDrawer(data);
     };
@@ -878,11 +879,12 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
                     getAllYearData={getAllYearData}
                     setAllYearData={setAllYearData}
                     token={token}
+                    issueMode={issueMode}
                 />
             )}
 
             {isDetailVisible && (
-                <AddWeftIssueDetail
+                <AddWeftIssueDetailNew
                     isVisible={isDetailVisible}
                     onClose={detailcloseDrawer}
                     onNext={handleDetailNext}
@@ -905,11 +907,12 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
                     editData={editData}
                     isItemdetailvisible={isItemdetailvisible}
                     resetFlag={resetFlag}
+                    issueMode={issueMode}
                 />
             )}
 
             {isItemdetailvisible && (
-                <AddWeftIssueItemDetail
+                <AddWeftIssueItemDetailNew
                     isVisible={isItemdetailvisible}
                     onClose={itemdetaildrawerclose}
                     onNext={openScannerDrawer}
@@ -931,11 +934,12 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
                     mainUId={mainUId}
                     handleclick={handleViewClick}
                     editData={editData}
+                    issueMode={issueMode}
                 />
             )}
 
             {isItemVisible && (
-                <WeftIssueItemDrawer
+                <WeftIssueItemDrawerNew
                     isVisible={isItemVisible}
                     onClose={closeItemDrawer}
                     FormState={FormState}
@@ -946,7 +950,8 @@ const WftIssue: React.FC<Props> = ({ token, username, userid, onBackToModeSelect
                     editData={editData}
                     resetAllData={resetAllData}
                     closeAllDrawers={closeAllDrawers}
-                    fetchbrowse={fetchbrowse} // 🔥 yahi pass hoga
+                    fetchbrowse={fetchbrowse}
+                    issueMode={issueMode}// 🔥 yahi pass hoga
                 />
             )}
         </>

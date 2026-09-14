@@ -40,6 +40,9 @@ interface FaultsModalProps {
   onEntriesChange: (entries: FaultCatalogItem[]) => void;
   onClose: () => void;
   loading?: boolean;
+  beamNo?: string;
+  takaNo?: string;
+  meter?: string;
 }
 
 const same = (a: FaultCatalogItem, b: FaultCatalogItem) => a.UId === b.UId && a.SubSr === b.SubSr;
@@ -53,6 +56,9 @@ const FaultsModal: React.FC<FaultsModalProps> = ({
   onEntriesChange,
   onClose,
   loading = false,
+  beamNo = '',
+  takaNo = '',
+  meter = '',
 }) => {
   const [catalog, setCatalog] = useState<FaultCatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);

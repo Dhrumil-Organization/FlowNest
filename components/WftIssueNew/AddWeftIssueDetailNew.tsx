@@ -37,7 +37,8 @@ const AddWeftIssueDetail = (props) => {
         isEditMode,
         isItemdetailvisible,
         resetFlag,
-        userid
+        userid,
+        issueMode
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;

@@ -1,6 +1,5 @@
-import AppAlert from '@/common/utils/appAlert';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import AsyncStorage from '@/common/utils/compatibleStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
     StyleSheet, Alert, ActivityIndicator, FlatList, RefreshControl, Modal, Share,
@@ -235,7 +234,7 @@ function CostSheetPreviewModal({
         try {
             await Share.share({ message: shareText });
         } catch (e: any) {
-            AppAlert.alert('Share Error', e?.message || 'Unable to share costing');
+            Alert.alert('Share Error', e?.message || 'Unable to share costing');
         }
     };
 
@@ -306,7 +305,7 @@ function CostSheetPreviewModal({
                             <View style={pm.smallCard}>
                                 <Text style={pm.smallLabel}>DAILY CONVERSION</Text>
                                 <Text style={pm.smallText}>Prod / day: <Text style={pm.bold}>{result.snap_prod_day?.toFixed(0)} m</Text></Text>
-                                <Text style={pm.smallText}>Conversion / day: <Text style={pm.bold}>{r0(result.snap_prod_day * result.snap_final_cost)}</Text></Text>
+                                <Text style={pm.smallText}>Conversion / day: <Text style={pm.bold}>{r0(result.snap_per_day_conversion)}</Text></Text>
                             </View>
                             <View style={pm.smallCard}>
                                 <Text style={pm.smallLabel}>CONTRIBUTION</Text>
@@ -554,7 +553,7 @@ function CostingTab({
                 await applyLatestSavedInputs(full);
             }
         } catch (e: any) {
-            AppAlert.alert('Error', e?.response?.data?.message || e.message || 'Unable to load design');
+            Alert.alert('Error', e?.response?.data?.message || e.message || 'Unable to load design');
         } finally {
             setDesignLoading(false);
         }
@@ -732,7 +731,7 @@ function CostingTab({
                         'REOPEN COSTING ERROR:',
                         e?.response?.data || e
                     );
-                    AppAlert.alert(
+                    Alert.alert(
                         'Unable to reopen costing',
                         e?.response?.data?.message ||
                         e?.message ||
@@ -770,7 +769,7 @@ function CostingTab({
             });
             setResult(res.data.data);
         } catch (e: any) {
-            AppAlert.alert('Compute Error', e.message);
+            Alert.alert('Compute Error', e.message);
         } finally {
             setComputing(false);
         }
@@ -784,14 +783,14 @@ function CostingTab({
     }, [mdId, priceMap, dyeMap, ydTiers, subTiers, params, adjust]);
 
     // const save = async () => {
-    //     if (!result) { AppAlert.alert('Compute first'); return; }
+    //     if (!result) { Alert.alert('Compute first'); return; }
     //     setSaving(true);
     //     try {
     //         await CostingAPI.save({ md_id: mdId, price_map: priceMap, dye_map: dyeMap, ...params });
-    //         AppAlert.alert('Saved ✓', 'Costing record saved to history');
+    //         Alert.alert('Saved ✓', 'Costing record saved to history');
     //         onSaved();
     //     } catch (e: any) {
-    //         AppAlert.alert('Error', e.message);
+    //         Alert.alert('Error', e.message);
     //     } finally {
     //         setSaving(false);
     //     }
@@ -799,7 +798,7 @@ function CostingTab({
 
     const save = async () => {
         if (!result) {
-            AppAlert.alert('Compute first');
+            Alert.alert('Compute first');
             return;
         }
         setSaving(true);
@@ -818,14 +817,14 @@ function CostingTab({
             const response = await CostingAPI.save(payload);
             console.log("SAVE RESPONSE:", response?.data);
             if (response?.data?.success) {
-                AppAlert.alert("Success", response.data.message);
+                Alert.alert("Success", response.data.message);
                 onSaved();
             } else {
-                AppAlert.alert("Error", response?.data?.message);
+                Alert.alert("Error", response?.data?.message);
             }
         } catch (e: any) {
             console.log("SAVE ERROR:", e?.response?.data || e);
-            AppAlert.alert("Error", e?.response?.data?.message || e?.message);
+            Alert.alert("Error", e?.response?.data?.message || e?.message);
         } finally {
             setSaving(false);
         }
@@ -1772,10 +1771,10 @@ const blankTempDraft = (): TempDraft => ({
  * TEMP ENGINE — mirrors the frozen rules in App\Services\CostingEngine.
  *
  * Deliberate parity points:
- * - warp grams = EPI × reed space × GPM
+ * - warp costing grams = EPI × reed space × GPM × (1 + warp wastage%)
  * - PPI table = PPI loom + 2
- * - weft uses table/loom PPI factor
- * - warp/weft wastage adds COST ONLY
+ * - weft uses on-table PPI and RS/reed-space, not greige width
+ * - warp/weft wastage is included in yarn consumption before cost
  * - selvedge uses TOTAL ENDS and is excluded from body GLM
  * - YD = base + dye; PD ignores per-yarn dye
  * - sizing is warp-only ₹/kg
@@ -1803,11 +1802,14 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const ppiLoom = d.weft.reduce((sum, r) => sum + tempNum(r.basis), 0);
     const ppiTable = ppiLoom > 0 ? ppiLoom + 2 : 0;
     const weftFactor = ppiLoom > 0 ? ppiTable / ppiLoom : 1;
+    const warpWastage = tempPct(d.warpWaste);
+    const weftWastage = tempPct(d.weftWaste);
 
     const warpRows: TempComputedRow[] = d.warp.map(r => {
         const gpm = tempRowGpm(r);
         const epi = tempNum(r.basis);
-        const grams = epi * reedSpace * gpm;
+        const baseGrams = epi * reedSpace * gpm;
+        const grams = baseGrams * (1 + warpWastage / 100);
         const kg = grams / 1000;
         const price = tempNonNegative(r.price);
         const dye = isYD ? tempNonNegative(r.dye) : 0;
@@ -1830,7 +1832,8 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const weftRows: TempComputedRow[] = d.weft.map(r => {
         const gpm = tempRowGpm(r);
         const ppi = tempNum(r.basis);
-        const grams = ppi * weftFactor * greigeWidth * gpm;
+        const baseGrams = ppi * weftFactor * reedSpace * gpm;
+        const grams = baseGrams * (1 + weftWastage / 100);
         const kg = grams / 1000;
         const price = tempNonNegative(r.price);
         const dye = isYD ? tempNonNegative(r.dye) : 0;
@@ -1880,11 +1883,12 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
     const weftCost = weftRows.reduce((s, r) => s + r.cost, 0);
     const selvedgeCost = selvedgeRow?.cost || 0;
 
-    const warpWasteCost = warpCost * tempPct(d.warpWaste) / 100;
-    const weftWasteCost = weftCost * tempPct(d.weftWaste) / 100;
+    // Costs already include wastage-adjusted consumption. These are reporting-only increments.
+    const warpWasteCost = warpWastage > 0 ? warpCost * warpWastage / (100 + warpWastage) : 0;
+    const weftWasteCost = weftWastage > 0 ? weftCost * weftWastage / (100 + weftWastage) : 0;
     const wasteCost = warpWasteCost + weftWasteCost;
 
-    const rawMaterial = warpCost + weftCost + selvedgeCost + wasteCost;
+    const rawMaterial = warpCost + weftCost + selvedgeCost;
     const weavingCost = tempNonNegative(d.params.weavingRate) * ppiTable;
     const greigeMfg = rawMaterial + weavingCost;
 
@@ -1893,8 +1897,8 @@ function computeTemporaryCosting(d: TempDraft): TempComputed | null {
 
     // Selvedge excluded from body GLM exactly like production CostingEngine.
     const greigeGLM =
-        warpRows.reduce((s, r) => s + r.grams_per_metre, 0)
-        + weftRows.reduce((s, r) => s + r.grams_per_metre, 0);
+        warpRows.reduce((s, r) => s + (r.grams_per_metre / (1 + warpWastage / 100)), 0)
+        + weftRows.reduce((s, r) => s + (r.grams_per_metre / (1 + weftWastage / 100)), 0);
 
     const greigeKg = greigeGLM > 0
         ? greigePrice / (greigeGLM / 1000)
@@ -2408,7 +2412,7 @@ function TempCostingTab() {
         try {
             await AsyncStorage.setItem(TEMP_STORAGE_KEY, JSON.stringify(rows.slice(0, 50)));
         } catch (e: any) {
-            AppAlert.alert('Temporary costing', e?.message || 'Unable to save temporary costing locally.');
+            Alert.alert('Temporary costing', e?.message || 'Unable to save temporary costing locally.');
         }
     }, []);
 
@@ -2469,7 +2473,7 @@ function TempCostingTab() {
 
     const saveTemp = async () => {
         if (!result) {
-            AppAlert.alert(
+            Alert.alert(
                 'Temporary costing',
                 'Enter Reed Space and at least one valid Warp and Weft yarn before saving.'
             );
@@ -2486,7 +2490,7 @@ function TempCostingTab() {
                 result: JSON.parse(JSON.stringify(result)),
             };
             await persistSaved([rec, ...saved]);
-            AppAlert.alert('Temporary costing', 'Temporary costing saved on this device.');
+            Alert.alert('Temporary costing', 'Temporary costing saved on this device.');
         } finally {
             setSavingTemp(false);
         }
@@ -2513,7 +2517,7 @@ function TempCostingTab() {
         try {
             await Share.share({ message: lines.join('\n') });
         } catch (e: any) {
-            AppAlert.alert('Share Error', e?.message || 'Unable to share temporary costing.');
+            Alert.alert('Share Error', e?.message || 'Unable to share temporary costing.');
         }
     };
 
@@ -3117,7 +3121,7 @@ function HistoryTab({
         } catch (e: any) {
             console.log('history error', e?.response?.data || e);
 
-            AppAlert.alert(
+            Alert.alert(
                 'History Error',
                 e?.response?.data?.message ||
                 e?.message ||
@@ -3950,7 +3954,7 @@ function VarianceTab() {
                 e?.response?.data || e
             );
 
-            AppAlert.alert(
+            Alert.alert(
                 'Error',
                 e?.response?.data?.message ||
                 e?.message ||

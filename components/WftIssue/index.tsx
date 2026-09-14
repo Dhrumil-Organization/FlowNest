@@ -18,7 +18,6 @@ import AddWeftIssueItemDetail from './AddWeftIssueItemDetail';
 import WeftIssueItemDrawer from './WeftIssueItemDrawer';
 // import Snackbar from 'react-native-snackbar';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
-import WftIssueNew from '../WftIssueNew';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
@@ -99,9 +98,6 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     const [successMessage, setSuccessMessage] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
     const [resetFlag, setResetFlag] = useState(false);
-    // Entry mode selector: choose the original/previous screen or the independent new copy.
-    const [showIssueModeModal, setShowIssueModeModal] = useState(true);
-    const [issueMode, setIssueMode] = useState<'old' | 'new' | null>(null);
     // const [filteredData, setFilteredData] = useState([]);
     console.log("getallpropertydata", getAllPropertyData)
 
@@ -169,20 +165,6 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
         setIsItemVisible(false);
         setisItemdetailvisible(false);
         setIsDetailVisible(true);
-    };
-
-    const handleDetailNext = (data?: { hasIssueDesignAccess?: boolean; StkType?: string }) => {
-        // Process House (P) does not require the intermediate item-selection screen.
-        // Go directly to the next drawer instead.
-        if (data?.StkType === 'P') {
-            if (typeof data.hasIssueDesignAccess === 'boolean') {
-                setHasIssueDesignAccess(data.hasIssueDesignAccess);
-            }
-            openScannerDrawer();
-            return;
-        }
-
-        openItemDetailDrawer(data);
     };
 
     const openItemDetailDrawer = (data?: { hasIssueDesignAccess?: boolean }) => {
@@ -678,81 +660,8 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
         );
     };
 
-    if (issueMode === 'new') {
-        return (
-            <WftIssueNew
-                token={token}
-                username={username}
-                userid={userid}
-                onBackToModeSelector={() => {
-                    setIssueMode(null);
-                    setShowIssueModeModal(true);
-                }}
-            />
-        );
-    }
-
     return (
         <>
-            <Modal
-                visible={showIssueModeModal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowIssueModeModal(false)}
-            >
-                <View style={styles.modeOverlay}>
-                    <View style={styles.modeCard}>
-                        <View style={styles.modeIconWrap}>
-                            <Icon name="content-copy" size={28} color="#0e7490" />
-                        </View>
-                        <Text style={styles.modeTitle}>Weft Issue</Text>
-                        {/* <Text style={styles.modeSubtitle}>
-                            Select how you want to open Weft Issue
-                        </Text> */}
-
-                        <TouchableOpacity
-                            style={styles.modeOptionPrimary}
-                            onPress={() => {
-                                setIssueMode('new');
-                                setShowIssueModeModal(false);
-                            }}
-                            activeOpacity={0.85}
-                        >
-                            <View style={styles.modeOptionIcon}>
-                                <Icon name="add-circle-outline" size={25} color="#fff" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.modeOptionTitleLight}>New Weft Issue</Text>
-                                <Text style={styles.modeOptionDescLight}>
-                                    Continue with the new screen
-                                </Text>
-                            </View>
-                            <Icon name="chevron-right" size={24} color="#fff" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.modeOption}
-                            onPress={() => {
-                                setIssueMode('old');
-                                setShowIssueModeModal(false);
-                            }}
-                            activeOpacity={0.85}
-                        >
-                            <View style={styles.modeOptionIconOld}>
-                                <Icon name="history" size={25} color="#0e7490" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.modeOptionTitle}>Previous Weft Issue</Text>
-                                <Text style={styles.modeOptionDesc}>
-                                    Continue with the existing screen
-                                </Text>
-                            </View>
-                            <Icon name="chevron-right" size={24} color="#64748b" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
             {/* {isLoading && <FullScreenLoader />} */}
 
             {isLoading && (
@@ -948,7 +857,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
                 <AddWeftIssueDetail
                     isVisible={isDetailVisible}
                     onClose={detailcloseDrawer}
-                    onNext={handleDetailNext}
+                    onNext={openItemDetailDrawer}
                     selectedYear={selectedYear}
                     onYearChange={setSelectedYear}
                     onLoadPress={handleLoadPress}
@@ -1017,90 +926,6 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
 };
 export default WftIssue;
 const styles = StyleSheet.create({
-    modeOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 22,
-    },
-    modeCard: {
-        width: '100%',
-        maxWidth: 430,
-        backgroundColor: '#fff',
-        borderRadius: 24,
-        padding: 22,
-        elevation: 12,
-        shadowColor: '#000',
-        shadowOpacity: 0.18,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-    },
-    modeIconWrap: {
-        width: 58,
-        height: 58,
-        borderRadius: 18,
-        backgroundColor: '#e6f7fa',
-        justifyContent: 'center',
-        alignItems: 'center',
-        alignSelf: 'center',
-        marginBottom: 12,
-    },
-    modeTitle: {
-        textAlign: 'center',
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#0f172a',
-    },
-    modeSubtitle: {
-        textAlign: 'center',
-        color: '#64748b',
-        fontSize: 13,
-        marginTop: 5,
-        marginBottom: 20,
-    },
-    modeOptionPrimary: {
-        minHeight: 76,
-        borderRadius: 16,
-        paddingHorizontal: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#0e7490',
-        marginBottom: 12,
-    },
-    modeOption: {
-        minHeight: 76,
-        borderRadius: 16,
-        paddingHorizontal: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    modeOptionIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 13,
-        backgroundColor: 'rgba(255,255,255,0.18)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    modeOptionIconOld: {
-        width: 44,
-        height: 44,
-        borderRadius: 13,
-        backgroundColor: '#e6f7fa',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    modeOptionTitleLight: { color: '#fff', fontSize: 15, fontWeight: '800' },
-    modeOptionDescLight: { color: '#d9f4f7', fontSize: 11, marginTop: 3 },
-    modeOptionTitle: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
-    modeOptionDesc: { color: '#64748b', fontSize: 11, marginTop: 3 },
-
     okButton: {
         backgroundColor: '#2e7d32',
         paddingHorizontal: 25,

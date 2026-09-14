@@ -590,8 +590,7 @@ const AddWeftIssueDetail = (props) => {
         setShowNextModal(false);
         // props.onNext && props.onNext();
         props.onNext && props.onNext({
-            hasIssueDesignAccess: canShowIssueDesign,
-            StkType: values.StkType || ''
+            hasIssueDesignAccess: canShowIssueDesign
         });
     };
 

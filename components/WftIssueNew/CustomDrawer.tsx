@@ -25,7 +25,8 @@ const CustomDrawer = (props) => {
         setFormState,
         getAllYearData,
         onLoadPress,
-        token
+        token,
+        issueMode
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;

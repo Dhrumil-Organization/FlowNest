@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
     ActivityIndicator,
     Animated,
-    Alert,
     BackHandler,
     KeyboardAvoidingView,
     Modal,
     Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -14,6 +14,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import AppAlert from '@/common/utils/appAlert';
 // import theme from '../../android/app/src/theme';
 import { yarnmanagementsystemstyle } from '@/common/Style';
 import HeaderBarwithBack from '@/components/Header';
@@ -23,7 +24,8 @@ import { API } from '../../common/API/dynamicAPI';
 
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownYarn from '@/Shared/PartyDropdownYarn';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
 import CustomDrawer from './CustomDrawer';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -643,6 +645,8 @@ const SpunTab: React.FC = () => {
     const {
         isLoading,
         setIsLoading,
+        refreshing,
+        setRefreshing,
         getDataSaved,
         setDataSaved,
         setupDate,
@@ -765,6 +769,8 @@ const SpunTab: React.FC = () => {
         setShowActionMenu,
         isModifyMode,
         setIsModifyMode,
+        modifyItemName,
+        setModifyItemName,
         currentScreen,
         setCurrentScreen,
         today,
@@ -838,7 +844,7 @@ const SpunTab: React.FC = () => {
                         onPress={handleAddClick}
                     >
                         <Text style={yarnmanagementsystemstyle.addButtonText}>
-                            + Add Spun Item
+                            + Add Spun Main Item
                         </Text>
                     </TouchableOpacity>
 
@@ -846,6 +852,15 @@ const SpunTab: React.FC = () => {
                         style={{ marginTop: 10 }}
                         contentContainerStyle={{ paddingBottom: 20 }}
                         showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => {
+                                    setRefreshing(true);
+                                    fetchbrowse(activeTab);
+                                }}
+                            />
+                        }
                     >
                         {isLoading ? (
                             <YarnSkeleton variant="main" />
@@ -956,6 +971,30 @@ const SpunTab: React.FC = () => {
                             style={{ marginTop: 10 }}
                             contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
                         >
+                            {isModifyMode ? (
+                                <View style={yarnUi.formIntro}>
+                                    <View style={yarnUi.sectionIcon}>
+                                        <Icon name="edit" size={22} color={YARN_UI.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={yarnUi.formIntroTitle}>Modify Spun Main Item</Text>
+                                        <Text style={yarnUi.formIntroSub} numberOfLines={2}>
+                                            Item: {modifyItemName || spunForm?.WNameCode || spunForm?.linkitmcode || 'Selected Item'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={yarnUi.formIntro}>
+                                    <View style={yarnUi.sectionIcon}>
+                                        <Icon name="create-new-folder" size={22} color={YARN_UI.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={yarnUi.formIntroTitle}>Add Spun Main Item</Text>
+                                        <Text style={yarnUi.formIntroSub}>Complete the yarn details below. Required fields are marked with *.</Text>
+                                    </View>
+                                </View>
+                            )}
+
                             <View style={[yarnmanagementsystemstyle.formCard, { flex: 1 }]}>
 
                                 <Text style={yarnmanagementsystemstyle.formTitle}>
@@ -1246,8 +1285,18 @@ const SpunTab: React.FC = () => {
                                     <View style={yarnmanagementsystemstyle.inputBox}>
                                         <TextInput
                                             placeholder="Denier..."
-                                            value={spunForm.denier}
-                                            editable={false}
+                                            value={String(spunForm.denier ?? '')}
+                                            editable={true}
+                                            keyboardType="decimal-pad"
+                                            onChangeText={(text) => {
+                                                // Denier is auto-calculated initially, but remains editable
+                                                // so the user can override the calculated value when required.
+                                                if (!/^[0-9]*\.?[0-9]*$/.test(text)) return;
+                                                setSpunForm(prev => ({
+                                                    ...prev,
+                                                    denier: text
+                                                }));
+                                            }}
                                             style={{
                                                 color: '#000',
                                                 opacity: 1,
@@ -1367,6 +1416,8 @@ const FilamentTab: React.FC = () => {
     const {
         isLoading,
         setIsLoading,
+        refreshing,
+        setRefreshing,
         getDataSaved,
         setDataSaved,
         setupDate,
@@ -1485,6 +1536,8 @@ const FilamentTab: React.FC = () => {
         setShowActionMenu,
         isModifyMode,
         setIsModifyMode,
+        modifyItemName,
+        setModifyItemName,
         currentScreen,
         setCurrentScreen,
         today,
@@ -1554,7 +1607,7 @@ const FilamentTab: React.FC = () => {
                         onPress={handleAddClick}
                     >
                         <Text style={yarnmanagementsystemstyle.addButtonText}>
-                            + Add Filament Item
+                            + Add Filament Main Item
                         </Text>
                     </TouchableOpacity>
 
@@ -1562,6 +1615,15 @@ const FilamentTab: React.FC = () => {
                         style={{ marginTop: 10 }}
                         contentContainerStyle={{ paddingBottom: 20 }}
                         showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => {
+                                    setRefreshing(true);
+                                    fetchbrowse(activeTab);
+                                }}
+                            />
+                        }
                     >
                         {isLoading ? (
                             <YarnSkeleton variant="main" />
@@ -1681,6 +1743,30 @@ const FilamentTab: React.FC = () => {
                             style={{ marginTop: 0 }}
                             contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
                         >
+                            {isModifyMode ? (
+                                <View style={yarnUi.formIntro}>
+                                    <View style={yarnUi.sectionIcon}>
+                                        <Icon name="edit" size={22} color={YARN_UI.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={yarnUi.formIntroTitle}>Modify Filament Main Item</Text>
+                                        <Text style={yarnUi.formIntroSub} numberOfLines={2}>
+                                            Item: {modifyItemName || filamentForm?.WNameCode || filamentForm?.linkitmcode || 'Selected Item'}
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <View style={yarnUi.formIntro}>
+                                    <View style={yarnUi.sectionIcon}>
+                                        <Icon name="create-new-folder" size={22} color={YARN_UI.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={yarnUi.formIntroTitle}>Add Filament Main Item</Text>
+                                        <Text style={yarnUi.formIntroSub}>Complete the yarn details below. Required fields are marked with *.</Text>
+                                    </View>
+                                </View>
+                            )}
+
                             <View style={[yarnmanagementsystemstyle.formCard, { flex: 1 }]}>
 
                                 {/* 🔹 Heading */}
@@ -2041,8 +2127,18 @@ const FilamentTab: React.FC = () => {
                                     <View style={yarnmanagementsystemstyle.inputBox}>
                                         <TextInput
                                             placeholder="Denier..."
-                                            value={filamentForm.denier}
-                                            editable={false}
+                                            value={String(filamentForm.denier ?? '')}
+                                            editable={true}
+                                            keyboardType="decimal-pad"
+                                            onChangeText={(text) => {
+                                                // Denier is auto-calculated initially, but remains editable
+                                                // so the user can override the calculated value when required.
+                                                if (!/^[0-9]*\.?[0-9]*$/.test(text)) return;
+                                                setFilamentForm(prev => ({
+                                                    ...prev,
+                                                    denier: text
+                                                }));
+                                            }}
                                             style={{
                                                 color: '#000',
                                                 opacity: 1,
@@ -2166,9 +2262,14 @@ const SubItemCreateTab: React.FC = () => {
     const {
         isLoading,
         setIsLoading,
+        refreshing,
+        setRefreshing,
         subItemOpeningLoading,
         setSubItemOpeningLoading,
         subItemFormLoading,
+        // setSubItemFormLoading,
+        subItemListLoading,
+        setSubItemListLoading,
         subItemSaveLoading,
         setSubItemSaveLoading,
         deleteLoading,
@@ -2298,6 +2399,8 @@ const SubItemCreateTab: React.FC = () => {
         setShowActionMenu,
         isModifyMode,
         setIsModifyMode,
+        modifyItemName,
+        setModifyItemName,
         currentScreen,
         setCurrentScreen,
         today,
@@ -2359,6 +2462,7 @@ const SubItemCreateTab: React.FC = () => {
         CARD_COLORS,
         token,
         username,
+        setSubItemFormLoading
     } = ctx;
 
     // IMPORTANT: Back from Sub Item form must return to the Sub Item LIST,
@@ -2368,6 +2472,8 @@ const SubItemCreateTab: React.FC = () => {
         setShowActionMenu(false);
         setActionItem(null);
         setIsLoading(false);
+        setSubItemFormLoading(false);
+        setSubItemSaveLoading(false);
         setIsModifyMode(false);
         setSubItemTab('LIST');
         setShowSubItemCard(true);
@@ -2451,7 +2557,23 @@ const SubItemCreateTab: React.FC = () => {
                         </View>
                     </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                    <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 100 }}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => {
+                                    if (!subItemParent?.itmcode) {
+                                        setRefreshing(false);
+                                        return;
+                                    }
+                                    setRefreshing(true);
+                                    fetchSubItemList(subItemParent);
+                                }}
+                            />
+                        }
+                    >
                         {isLoading ? (
                             <YarnSkeleton variant="sublist" />
                         ) : !browsedata || browsedata.length === 0 ? (
@@ -2674,15 +2796,29 @@ const SubItemCreateTab: React.FC = () => {
                         style={{ marginTop: 0, backgroundColor: YARN_UI.canvas }}
                         contentContainerStyle={{ paddingBottom: 100 }}
                     >
-                        <View style={yarnUi.formIntro}>
-                            <View style={yarnUi.sectionIcon}>
-                                <Icon name="create-new-folder" size={22} color={YARN_UI.primary} />
+                        {isModifyMode ? (
+                            <View style={yarnUi.formIntro}>
+                                <View style={yarnUi.sectionIcon}>
+                                    <Icon name="edit" size={22} color={YARN_UI.primary} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={yarnUi.formIntroTitle}>Modify Sub Item</Text>
+                                    <Text style={yarnUi.formIntroSub} numberOfLines={2}>
+                                        Item: {modifyItemName || subitemform?.name || subitemform?.WNameCode || 'Selected Sub Item'}
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={yarnUi.formIntroTitle}>{isModifyMode ? "Modify Sub Item" : "Create Sub Item"}</Text>
-                                <Text style={yarnUi.formIntroSub}>Complete the yarn details below. Required fields are marked with *.</Text>
+                        ) : (
+                            <View style={yarnUi.formIntro}>
+                                <View style={yarnUi.sectionIcon}>
+                                    <Icon name="create-new-folder" size={22} color={YARN_UI.primary} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={yarnUi.formIntroTitle}>Create Sub Item</Text>
+                                    <Text style={yarnUi.formIntroSub}>Complete the yarn details below. Required fields are marked with *.</Text>
+                                </View>
                             </View>
-                        </View>
+                        )}
                         <View style={yarnmanagementsystemstyle.formCard}>
                             <View style={yarnmanagementsystemstyle.inputGroup}>
                                 <Text style={yarnmanagementsystemstyle.label}>
@@ -3203,6 +3339,8 @@ const BrowseTab: React.FC = () => {
     const {
         isLoading,
         setIsLoading,
+        refreshing,
+        setRefreshing,
         getDataSaved,
         setDataSaved,
         setupDate,
@@ -3321,6 +3459,8 @@ const BrowseTab: React.FC = () => {
         setShowActionMenu,
         isModifyMode,
         setIsModifyMode,
+        modifyItemName,
+        setModifyItemName,
         currentScreen,
         setCurrentScreen,
         today,
@@ -3409,9 +3549,25 @@ const BrowseTab: React.FC = () => {
                     </View>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 88 }}>
-                    {isLoading ? (
-                        <YarnSkeleton variant="browse" />
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 88 }}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => {
+                                if (!browseParentItem?.itmcode) {
+                                    setRefreshing(false);
+                                    return;
+                                }
+                                setRefreshing(true);
+                                fetchbrowsedata(browseParentItem);
+                            }}
+                        />
+                    }
+                >
+                    {subItemListLoading ? (
+                        <YarnSkeleton variant="sublist" />
                     ) : !browsedata || browsedata.length === 0 ? (
                         <View style={yarnUi.emptyState}>
                             <View style={yarnUi.emptyIcon}>
@@ -3586,6 +3742,8 @@ const PartyTab: React.FC = () => {
         setShowActionMenu,
         isModifyMode,
         setIsModifyMode,
+        modifyItemName,
+        setModifyItemName,
         currentScreen,
         setCurrentScreen,
         partyReturnToSubItemList,
@@ -3879,6 +4037,12 @@ const PartyTab: React.FC = () => {
 const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const [isLoading, setIsLoading] = useState(false);
+    // Pull-to-refresh loader for the main, sub-item and browse lists.
+    const [refreshing, setRefreshing] = useState(false);
+    // Dedicated loader for loading an existing MAIN item before opening Modify form.
+    // This is separate from isLoading because the main list is hidden only after
+    // yarnitemshow returns, so isLoading alone is not visible on the form.
+    const [mainItemFormLoading, setMainItemFormLoading] = useState(false);
     // Dedicated loader only for the Create New Sub Item transition.
     // Keeps the Sub Item List skeleton from appearing while yarnitemshow loads.
     const [subItemOpeningLoading, setSubItemOpeningLoading] = useState(false);
@@ -3886,6 +4050,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     // This is intentionally separate from isLoading because isLoading is also
     // used by the Sub Item LIST skeleton.
     const [subItemFormLoading, setSubItemFormLoading] = useState(false);
+    // Dedicated loader only for the Sub Item LIST.
+    const [subItemListLoading, setSubItemListLoading] = useState(false);
     const [subItemSaveLoading, setSubItemSaveLoading] = useState(false);
     // Dedicated loader for yarnitemdelete; independent from list/form loaders.
     const [deleteLoading, setDeleteLoading] = useState(false);
@@ -4034,6 +4200,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     const [actionItem, setActionItem] = useState(null);
     const [showActionMenu, setShowActionMenu] = useState(false);
     const [isModifyMode, setIsModifyMode] = useState(false);
+    // Name of the exact item currently being modified. Used in the form intro.
+    const [modifyItemName, setModifyItemName] = useState('');
 
     // Screen-style navigation. Only one screen is rendered at a time.
     // LIST -> SPUN_FORM / FILAMENT_FORM / SUB_ITEM / BROWSE / PARTY
@@ -4154,9 +4322,57 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const cancelToken = useRef(null);
 
+    // Keep the latest auth token in a ref so API calls never depend only on a
+    // possibly stale/temporarily empty prop token. The login flow stores the
+    // token in AsyncStorage as `access_token`.
+    const authTokenRef = useRef<string>(token || '');
+
+    useEffect(() => {
+        let mounted = true;
+
+        const syncAuthToken = async () => {
+            try {
+                const storedToken = await AsyncStorage.getItem('access_token');
+                if (!mounted) return;
+
+                const resolvedToken = String(storedToken || token || '').trim();
+                if (resolvedToken) {
+                    authTokenRef.current = resolvedToken;
+                }
+            } catch (error) {
+                console.log('Auth token sync error:', error);
+                if (token) authTokenRef.current = String(token).trim();
+            }
+        };
+
+        // Prop token wins immediately when available. Then confirm the same
+        // token from persistent storage to protect against a transient empty prop.
+        if (token) {
+            authTokenRef.current = String(token).trim();
+        }
+        syncAuthToken();
+
+        return () => { mounted = false; };
+    }, [token]);
+
+    const getAuthToken = async () => {
+        const currentToken = String(authTokenRef.current || token || '').trim();
+        if (currentToken) return currentToken;
+
+        const storedToken = String(
+            (await AsyncStorage.getItem('access_token')) || ''
+        ).trim();
+
+        if (storedToken) {
+            authTokenRef.current = storedToken;
+        }
+
+        return storedToken;
+    };
+
     const getRequestConfig = (props: any) => ({
         headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${authTokenRef.current || token || ''}`,
             'Content-Type': 'application/json',
             Accept: 'application/json',
         },
@@ -4172,7 +4388,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     txntype: 'yarn_creation_item_master'
                 },
                 headers: {
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${authTokenRef.current || token || ''}`
                 }
             });
             if (response.data?.success) {
@@ -4215,7 +4431,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 historyPayload,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authTokenRef.current || token || ''}`,
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
                     },
@@ -4328,19 +4544,28 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             );
             console.log("count API Response:", response);
 
-            const data = response?.data?.data?.data || [];
-            if (response?.data?.success && response?.data?.data?.data?.length > 0) {
+            const data = Array.isArray(response?.data?.data?.data)
+                ? response.data.data.data
+                : [];
+
+            if (response?.data?.success && data.length > 0) {
                 setcountdata(data);
-            } else {
-                setcountdata([]);
+                // IMPORTANT: Return the fresh API result as well. React state
+                // updates are asynchronous, so callers must not immediately
+                // read countdata after setcountdata().
+                return data;
             }
+
+            setcountdata([]);
+            return [];
 
         } catch (error) {
             if (axios.isCancel(error)) {
                 console.log("Request cancelled:", error.message);
             } else {
-                console.log("API getyarnblend error:", error);
+                console.log("API getyarncount error:", error);
             }
+            return [];
         } finally {
             setIsLoading(false);
         }
@@ -4726,20 +4951,43 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleModifyItem = async (item) => {
+        await getAuthToken();
         setShowActionMenu(false);
         setActionItem(null);
+
+        setModifyItemName(
+            String(item?.WNameCode || item?.itmname || item?.ItmName || item?.name || 'Selected Item')
+        );
 
         const itmcode = item?.itmcode;
         const strcode = FormState.values.yarnstrcode;
         const userPtype = await AsyncStorage.getItem('user_prptype');
 
         if (!itmcode) {
-            Alert.alert("Error", "Item code not found.");
+            AppAlert.alert("Error", "Item code not found.");
             return;
         }
 
         try {
-            setIsLoading(true);
+            // Show the Modify form immediately with a dedicated loader instead of
+            // showing the list loader while yarnitemshow is fetching details.
+            setIsLoading(false);
+            setMainItemFormLoading(true);
+            if (activeTab === 'Spun') {
+                setShowFilamentCard(false);
+                setShowSubItemCard(false);
+                setshowbrwosecard(false);
+                setpartycard(false);
+                setShowSpunCard(true);
+                setCurrentScreen('SPUN_FORM');
+            } else {
+                setShowSpunCard(false);
+                setShowSubItemCard(false);
+                setshowbrwosecard(false);
+                setpartycard(false);
+                setShowFilamentCard(true);
+                setCurrentScreen('FILAMENT_FORM');
+            }
 
             if (cancelToken.current) {
                 // cancelToken.current.cancel("Cancelled previous request");
@@ -4768,7 +5016,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const mainItem = response?.data?.data?.maindata?.[0];
 
             if (!response?.data?.success || !mainItem) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message || "Item details not found."
                 );
@@ -4785,7 +5033,22 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const countNo = mainCodeParts?.[1] || '';
             const plyValue = mainCodeParts?.[2] || '';
 
-            const countName = mainItem?.CountType || mainItem?.count || '';
+            // IMPORTANT: Count Type and Count are two different API values.
+            // yarnitemshow returns: counttype = Count Type master id (e.g. 8)
+            // and count = actual Count value (e.g. 56).
+            // Never use `count` to find the Count Type dropdown item.
+            const countTypeId = String(
+                mainItem?.counttype ??
+                mainItem?.CountTypeId ??
+                mainItem?.WCounttype ??
+                ''
+            );
+            const countTypeName = String(
+                mainItem?.CountType ??
+                mainItem?.counttypeName ??
+                ''
+            );
+            const countValue = String(mainItem?.count ?? '');
             const otherValue = mainItem?.other || '';
 
             // Match API values with the actual dropdown objects so the
@@ -4841,12 +5104,34 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
             }
 
-            const selectedCountObj =
-                findByIdOrName(countdata, countName) || {
-                    id: mainItem?.count || countName,
-                    name: countName,
-                    formula: ''
-                };
+            // First match Count Type by its master id (`counttype` = 8).
+            // IMPORTANT: countdata is React state and can still contain the
+            // previous/empty list when yarnitemshow finishes before yarncount.
+            // If the selected id/name is not available, wait for yarncount and
+            // use that fresh response directly instead of waiting for state.
+            let countMasterData = Array.isArray(countdata) ? countdata : [];
+            let selectedCountObj =
+                findByIdOrName(countMasterData, countTypeId) ||
+                findByIdOrName(countMasterData, countTypeName);
+
+            if (countTypeId && (!selectedCountObj?.name || !selectedCountObj?.formula)) {
+                const freshCountData = await fetchBlendcount();
+                if (Array.isArray(freshCountData) && freshCountData.length > 0) {
+                    countMasterData = freshCountData;
+                    selectedCountObj =
+                        findByIdOrName(countMasterData, countTypeId) ||
+                        findByIdOrName(countMasterData, countTypeName);
+                }
+            }
+
+            // Last fallback keeps the API id/name visible even if yarncount
+            // itself is temporarily unavailable. Never use Count (`countValue`)
+            // as Count Type id.
+            selectedCountObj = selectedCountObj || {
+                id: countTypeId,
+                name: countTypeName || countTypeId,
+                formula: ''
+            };
 
             const selectedPlyObj =
                 findPly(plyValue) || {
@@ -4858,9 +5143,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 ItmCode: String(mainItem?.itmcode || itmcode),
                 linkitmcode: mainItem?.maincode || '',
                 denier: mainItem?.denier || '',
-                count_no: countNo,
-                count: selectedCountObj?.name || countName,
-                count_id: selectedCountObj?.id || '',
+                // `count_no` is the actual Count value (56).
+                // `count` is the selected Count Type name, while `count_id` is its id (8).
+                count_no: countValue || countNo,
+                count: selectedCountObj?.name || countTypeName,
+                count_id: selectedCountObj?.id || countTypeId,
                 formula: selectedCountObj?.formula || '',
                 ply: selectedPlyObj?.ply || plyValue,
                 ply_id: selectedPlyObj?.id || '',
@@ -4930,10 +5217,14 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 console.log("yarnitemshow request cancelled:", error.message);
             } else {
                 console.log("yarnitemshow error:", error);
-                Alert.alert("Error", "Unable to load item details.");
+                setShowSpunCard(false);
+                setShowFilamentCard(false);
+                setCurrentScreen('LIST');
+                AppAlert.alert("Error", "Unable to load item details.");
             }
         } finally {
             setIsLoading(false);
+            setMainItemFormLoading(false);
         }
     };
 
@@ -4955,8 +5246,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     // Dedicated yarnwbrowse call for the Sub Item list.
     const fetchSubItemList = async (item) => {
         if (!item?.itmcode) {
-            Alert.alert('Error', 'Main item code not found.');
+            AppAlert.alert('Error', 'Main item code not found.');
             setbrowsedata([]);
+            setRefreshing(false);
             return;
         }
 
@@ -4969,7 +5261,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             userPtype;
 
         try {
-            setIsLoading(true);
+            setSubItemListLoading(true);
             const payload = {
                 txntype: 'yarn_creation_item_master',
                 mitmcode: item.itmcode,
@@ -4990,14 +5282,15 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             console.log('Sub Item yarnwbrowse error:', error);
             setbrowsedata([]);
         } finally {
-            setIsLoading(false);
+            setSubItemListLoading(false);
+            setRefreshing(false);
         }
     };
 
     const handleOpenSubItemForm = async (item = subItemParent) => {
         const parentItem = item || subItemParent;
         if (!parentItem) {
-            Alert.alert('Error', 'Main item not found.');
+            AppAlert.alert('Error', 'Main item not found.');
             return;
         }
 
@@ -5006,7 +5299,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         const userPtype = await AsyncStorage.getItem('user_prptype');
 
         if (!mainCode) {
-            Alert.alert('Error', 'Main item code not found.');
+            AppAlert.alert('Error', 'Main item code not found.');
             return;
         }
 
@@ -5018,6 +5311,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
             // Keep the selected MAIN item as the parent for Create New Sub Item.
             setSubItemParent(parentItem);
+            setModifyItemName('');
             setIsModifyMode(false);
             setSubItemTab('CREATE');
             setShowSubItemCard(true);
@@ -5049,7 +5343,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const showItem = response?.data?.data?.maindata?.[0];
 
             if (!response?.data?.success || !showItem) {
-                Alert.alert(
+                AppAlert.alert(
                     'Warning',
                     response?.data?.message || 'Main item details not found.'
                 );
@@ -5061,7 +5355,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             // Existing mapping/value-setting logic is kept below.
             // IMPORTANT: fetchmitem() return value is preserved because it is
             // required by the existing blend fallback/value mapping.
-            const [_, mapped] = await Promise.all([
+            const [_, mapped, freshCountData] = await Promise.all([
                 soshow(),
                 fetchmitem(),
                 fetchBlendcount(),
@@ -5093,11 +5387,19 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 ''
             );
 
+            // Use the SAME fresh yarncount response returned by Promise.all.
+            // Do not read countdata here because setcountdata() has not
+            // necessarily committed the new state yet.
+            const countMasterList =
+                Array.isArray(freshCountData) && freshCountData.length > 0
+                    ? freshCountData
+                    : (Array.isArray(countdata) ? countdata : []);
+
             const selectedCountObj =
-                (countdata || []).find(
+                countMasterList.find(
                     ct => String(ct?.id ?? '') === selectedCountId
                 ) ||
-                (countdata || []).find(
+                countMasterList.find(
                     ct => String(ct?.name ?? '') === String(showItem?.CountType ?? '')
                 ) ||
                 null;
@@ -5193,7 +5495,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             setSubItemTab('LIST');
             setShowSubItemCard(true);
             setCurrentScreen('SUB_ITEM');
-            Alert.alert('Error', 'Unable to load main item details.');
+            AppAlert.alert('Error', 'Unable to load main item details.');
         }
     };
 
@@ -5214,12 +5516,16 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     const handleSubItemModify = async (item) => {
         const parent = subItemParent;
 
+        setModifyItemName(
+            String(item?.WNameCode || item?.itmname || item?.ItmName || item?.name || 'Selected Sub Item')
+        );
+
         const itmcode = item?.itmcode;
         const strcode = FormState.values.yarnstrcode;
         const userPtype = await AsyncStorage.getItem('user_prptype');
 
         if (!itmcode) {
-            Alert.alert('Error', 'Sub item code not found.');
+            AppAlert.alert('Error', 'Sub item code not found.');
             return;
         }
 
@@ -5248,7 +5554,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const showItem = response?.data?.data?.maindata?.[0];
 
             if (!response?.data?.success || !showItem) {
-                Alert.alert(
+                AppAlert.alert(
                     'Warning',
                     response?.data?.message || 'Sub item details not found.'
                 );
@@ -5274,7 +5580,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             setSubItemTab('CREATE');
         } catch (error) {
             console.log('Sub Item yarnitemshow error:', error);
-            Alert.alert('Error', 'Unable to load sub item details.');
+            AppAlert.alert('Error', 'Unable to load sub item details.');
         } finally {
             setIsLoading(false);
         }
@@ -5283,12 +5589,15 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     // NEW: Load selected Sub Item details from yarnitemshow and map the complete response into the Sub Item Modify form.
     const handleSubItemModifyShow = async (item) => {
         const parent = subItemParent;
+        setModifyItemName(
+            String(item?.WNameCode || item?.itmname || item?.ItmName || item?.name || 'Selected Sub Item')
+        );
         const itmcode = item?.itmcode;
         const strcode = FormState.values.yarnstrcode;
         const userPtype = await AsyncStorage.getItem('user_prptype');
 
         if (!itmcode) {
-            Alert.alert('Error', 'Sub item code not found.');
+            AppAlert.alert('Error', 'Sub item code not found.');
             return;
         }
 
@@ -5315,12 +5624,16 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const showItem = response?.data?.data?.maindata?.[0];
 
             if (!response?.data?.success || !showItem) {
-                Alert.alert(
+                AppAlert.alert(
                     'Warning',
                     response?.data?.message || 'Sub item details not found.'
                 );
                 return;
             }
+
+            setModifyItemName(
+                String(showItem?.itmname || item?.WNameCode || item?.itmname || item?.ItmName || 'Selected Sub Item')
+            );
 
             // BlendDisplay -> Blend textbox rows + percentages.
             const apiBlendList = Array.isArray(showItem?.BlendDisplay)
@@ -5344,6 +5657,49 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             setselectedsubply(selectedPly);
 
             // subyarntype/subyarntypename -> actual Yarn Type dropdown object.
+            // Restore Count Type + formula as well.
+            // IMPORTANT: Sub Item denier calculation needs the count-type formula.
+            // Previously modify mode restored count_id using showItem.count (e.g. 68)
+            // and did not restore WCounttype/formula, so calculateSubitemDenier()
+            // could not find a formula after the user changed the Count field.
+            const apiCountTypeId = String(
+                showItem?.CountTypeId ??
+                showItem?.WCounttype ??
+                showItem?.counttype ??
+                ''
+            );
+            const apiCountTypeName = String(
+                showItem?.CountType ??
+                showItem?.counttypeName ??
+                ''
+            );
+            let countMasterList = Array.isArray(countdata) ? countdata : [];
+            let matchedCountType =
+                countMasterList.find(ct => String(ct?.id ?? '') === apiCountTypeId) ||
+                countMasterList.find(ct => String(ct?.name ?? '') === apiCountTypeName) ||
+                countMasterList.find(ct => String(ct?.name ?? '') === String(showItem?.count ?? '')) ||
+                null;
+
+            // If yarnitemshow gives id=8 but countdata is stale/empty, fetch
+            // yarncount and match against the fresh response immediately.
+            if (apiCountTypeId && (!matchedCountType?.name || !matchedCountType?.formula)) {
+                const freshCountData = await fetchBlendcount();
+                if (Array.isArray(freshCountData) && freshCountData.length > 0) {
+                    countMasterList = freshCountData;
+                    matchedCountType =
+                        countMasterList.find(ct => String(ct?.id ?? '') === apiCountTypeId) ||
+                        countMasterList.find(ct => String(ct?.name ?? '') === apiCountTypeName) ||
+                        null;
+                }
+            }
+
+            const restoredCountTypeId = String(matchedCountType?.id ?? apiCountTypeId ?? '');
+            const restoredCountTypeName = String(
+                matchedCountType?.name ?? apiCountTypeName ?? apiCountTypeId ?? ''
+            );
+            const restoredCountFormula =
+                String(matchedCountType?.formula ?? showItem?.formula ?? '');
+
             const apiSubTypeId = String(showItem?.subyarntype ?? '');
             const apiSubTypeName = String(showItem?.subyarntypename ?? '');
             const matchedSubType =
@@ -5359,6 +5715,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             setselectedsubitem(selectedSubType);
 
             // Set all Sub Item form fields from yarnitemshow response.
+            // Keep both CountTypeId (WCounttype) and its formula in state so
+            // changing Count never makes Denier disappear in Modify mode.
             setsubitemform(prev => ({
                 ...prev,
                 WNameCode: parent?.WNameCode || showItem?.itmname || '',
@@ -5368,11 +5726,14 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 ItmCode: String(showItem?.itmcode || itmcode),
                 linkitmcode: showItem?.maincode || '',
                 denier: String(showItem?.denier ?? ''),
+                formula: restoredCountFormula,
+                WCounttype: restoredCountTypeId,
                 blend: apiBlendList.map(blend => blend.name),
                 blend_id: apiBlendList.map(blend => blend.id),
-                count: String(showItem?.count ?? ''),
+                // Count = Count Type NAME; count_no = actual numeric Count.
+                count: restoredCountTypeName,
                 count_no: String(showItem?.count ?? ''),
-                count_id: String(showItem?.count ?? ''),
+                count_id: restoredCountTypeId,
                 ply: apiPly,
                 ply_id: selectedPly?.id ? String(selectedPly.id) : apiPly,
                 subtype_id: apiSubTypeId,
@@ -5385,7 +5746,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             setSubItemTab('CREATE');
         } catch (error) {
             console.log('Sub Item Modify Show error:', error);
-            Alert.alert('Error', 'Unable to load sub item details.');
+            AppAlert.alert('Error', 'Unable to load sub item details.');
         } finally {
             setIsLoading(false);
         }
@@ -5439,6 +5800,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const confirmDeleteItem = async () => {
+        await getAuthToken();
         if (!deleteTarget || deleteLoading) return;
 
         // For SUB delete, ALWAYS use the selected sub row's own itmcode.
@@ -5617,6 +5979,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const fetchbrowsedata = async (item) => {
+        await getAuthToken();
+        // Main Item Browse -> Sub Item LIST first; + on each row opens Party.
         setBrowseParentItem(item);
         const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
@@ -5675,6 +6039,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             }
         } finally {
             setIsLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -5858,13 +6223,13 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 .replace(/ply/g, ply);
 
             // evaluate expression
-            // const result = eval(expr);
-
-            // return Number(result).toFixed(2);
-
             const result = eval(expr);
 
-            return roundDenier(Number(result));
+            return Number(result).toFixed(2);
+
+            // const result = eval(expr);
+
+            // return roundDenier(Number(result));
 
         } catch (e) {
             console.log("Formula error:", e);
@@ -5927,13 +6292,16 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
         if (!count || !ply) return '';
 
-        const countType = countdata?.find(
-            ct => String(ct.id) === String(values.WCounttype)
+        const countType = countdata?.find(ct =>
+            String(ct?.id ?? '') === String(values?.WCounttype ?? values?.count_id ?? '')
+        ) || countdata?.find(ct =>
+            String(ct?.name ?? '') === String(values?.count ?? '')
         );
 
-        // Prefer the formula restored from yarnitemshow -> CountTypeId
-        // and fall back to the count master formula.
-        const formula = values.formula || countType?.formula;
+        // Prefer the formula restored from yarnitemshow -> CountTypeId,
+        // then the count master formula. This prevents Denier from becoming
+        // blank when Count is edited in Sub Item Modify mode.
+        const formula = String(values?.formula || countType?.formula || '').trim();
 
         console.log("Sub Item Count:", count);
         console.log("Sub Item Ply:", ply);
@@ -5998,10 +6366,11 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleaddspun = async () => {
+        await getAuthToken();
         const userPtype = await AsyncStorage.getItem('user_prptype');
         const errorMessage = validateSpunForm();
         if (errorMessage) {
-            Alert.alert("Validation", errorMessage);
+            AppAlert.alert("Validation", errorMessage);
             return;
         }
         try {
@@ -6034,7 +6403,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 Payload,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authTokenRef.current || token || ''}`,
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
                     },
@@ -6051,7 +6420,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
                 console.log("savedItemCode", savedItemCode);
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     isModifyMode
                         ? `Item ${savedItemCode} modified successfully.`
@@ -6088,7 +6457,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
             }
             else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -6147,11 +6516,12 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleaddfilament = async () => {
+        await getAuthToken();
         const userPtype = await AsyncStorage.getItem('user_prptype');
 
         const errorMessage = validateFilamentForm();
         if (errorMessage) {
-            Alert.alert("Validation", errorMessage);
+            AppAlert.alert("Validation", errorMessage);
             return;
         }
 
@@ -6186,7 +6556,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 Payload,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authTokenRef.current || token || ''}`,
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
                     },
@@ -6201,7 +6571,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     filamentForm.ItmCode ||
                     filamentForm.linkitmcode;
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     isModifyMode
                         ? `Item ${savedItemCode} modified successfully.`
@@ -6248,7 +6618,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
 
             } else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -6260,7 +6630,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 console.log("Request cancelled:", error.message);
             } else {
                 console.log("API error:", error);
-                Alert.alert("Error", "Something went wrong");
+                AppAlert.alert("Error", "Something went wrong");
             }
         }
         finally {
@@ -6270,6 +6640,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const handleAddClick = async () => {
         setCardSearch('');
+        setModifyItemName('');
 
         // ADD must never inherit data from the previous MODIFY operation.
         // Clear both forms before opening the selected tab's form.
@@ -6303,12 +6674,12 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
 
     const subitemvalidate = () => {
         if (!subitemform.WNameCode) {
-            Alert.alert("Validation", "Yarn Main Code required");
+            AppAlert.alert("Validation", "Yarn Main Code required");
             return false;
         }
 
         if (!blendList || blendList.length === 0) {
-            Alert.alert("Validation", "Please select blend");
+            AppAlert.alert("Validation", "Please select blend");
             return false;
         }
 
@@ -6318,7 +6689,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const per = Number(blendList[i].per);
 
             if (!per || per <= 0) {
-                Alert.alert("Validation", `Enter valid % for ${blendList[i].name}`);
+                AppAlert.alert("Validation", `Enter valid % for ${blendList[i].name}`);
                 return false;
             }
 
@@ -6326,7 +6697,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         }
 
         if (total !== 100) {
-            Alert.alert("Validation", `Total percentage must be 100. Current: ${total}`);
+            AppAlert.alert("Validation", `Total percentage must be 100. Current: ${total}`);
             return false;
         }
 
@@ -6336,17 +6707,17 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         // }
 
         if (!subitemform.count_no) {
-            Alert.alert("Validation", "Please enter count value");
+            AppAlert.alert("Validation", "Please enter count value");
             return false;
         }
 
         if (!subitemform.ply_id) {
-            Alert.alert("Validation", "Please select Ply");
+            AppAlert.alert("Validation", "Please select Ply");
             return false;
         }
 
         if (!subitemform.subtype_id) {
-            Alert.alert("Validation", "Please enter yarn type");
+            AppAlert.alert("Validation", "Please enter yarn type");
             return false;
         }
 
@@ -6355,7 +6726,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         //     return false;
         // }
         if (!subitemform.linkitmcode) {
-            Alert.alert("Validation", "Please enter Sub Item Name");
+            AppAlert.alert("Validation", "Please enter Sub Item Name");
             return false;
         }
 
@@ -6368,6 +6739,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const handleModifySubItem = async () => {
+        await getAuthToken();
         const userPtype = await AsyncStorage.getItem('user_prptype');
         const isValid = subitemvalidate();
 
@@ -6384,7 +6756,10 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             const Payload = {
                 maincode: subitemform.linkitmcode,
                 denier: subitemform.denier,
-                blendid: subitemform.WBlend,
+                // blendid: subitemform.WBlend,
+                blend: Array.isArray(subitemform.blend_id)
+                    ? subitemform.blend_id.join('/')
+                    : subitemform.blend_id || '',
                 count: subitemform.count_no,
                 ply: subitemform.ply_id,
                 mitmcode: subitemform.mitmcode || '',
@@ -6394,7 +6769,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     per: Number(b.per || 0)
                 })),
                 prptype: userPtype,
-                txntype: 'yarn_creation_item_master',
+                txntype: 'SUBITEM',
                 yarntype: subitemform.WYarnType,
                 strcode: FormState.values.yarnstrcode,
                 linkitmcode: subitemform.ItmCode || '',
@@ -6410,7 +6785,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 Payload,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authTokenRef.current || token || ''}`,
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
                     },
@@ -6426,7 +6801,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     subitemform.ItmCode ||
                     '';
 
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Sub Item ${savedItemCode} updated successfully.`,
                     [{
@@ -6470,12 +6845,23 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                             setselectedsubitemtypedata([]);
 
                             setIsModifyMode(false);
-                            goToSubItemMainList();
+                            setIsModifyMode(false);
+                             setSubItemFormLoading(false);
+                             setSubItemTab('LIST');
+                             setShowSubItemCard(true);
+                             setShowSpunCard(false);
+                             setShowFilamentCard(false);
+                             setshowbrwosecard(false);
+                             setpartycard(false);
+                             setCurrentScreen('SUB_ITEM');
+                             if (subItemParent?.itmcode) {
+                                 fetchSubItemList(subItemParent);
+                             }
                         }
                     }]
                 );
             } else {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message || "Unable to update Sub Item."
                 );
@@ -6485,7 +6871,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 console.log("Request cancelled:", error.message);
             } else {
                 console.log("Sub Item modify error:", error);
-                Alert.alert("Error", "Unable to update Sub Item.");
+                AppAlert.alert("Error", "Unable to update Sub Item.");
             }
         } finally {
             setSubItemSaveLoading(false);
@@ -6493,6 +6879,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const handlesubitemadd = async () => {
+        await getAuthToken();
         const userPtype = await AsyncStorage.getItem('user_prptype');
         console.log("yarn type", subitemform.WYarnType)
         const isValid = subitemvalidate();
@@ -6533,7 +6920,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 Payload,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authTokenRef.current || token || ''}`,
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
                     },
@@ -6543,7 +6930,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             console.log("spun add response", response);
             if (response?.data?.success) {
                 const newItemCode = response?.data?.data?.data?.itmcode;
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Item ${newItemCode} Saved successfully.`,
                     [
@@ -6586,14 +6973,25 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                 setselectedsubply([]);
                                 setselectedsubcount([]);
                                 setselectedsubitem([]);
-                                goToSubItemMainList();
+                                setIsModifyMode(false);
+                                 setSubItemFormLoading(false);
+                                 setSubItemTab('LIST');
+                                 setShowSubItemCard(true);
+                                 setShowSpunCard(false);
+                                 setShowFilamentCard(false);
+                                 setshowbrwosecard(false);
+                                 setpartycard(false);
+                                 setCurrentScreen('SUB_ITEM');
+                                 if (subItemParent?.itmcode) {
+                                     fetchSubItemList(subItemParent);
+                                 }
                             }
                         }
                     ]
                 );
             }
             else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -6655,27 +7053,29 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             }
         } finally {
             setIsLoading(false);
+            setRefreshing(false);
         }
     };
 
     const partyitemvalidation = () => {
         if (!partyForm.acccode) {
-            Alert.alert("Validation", "Party Can not be blank");
+            AppAlert.alert("Validation", "Party Can not be blank");
             return false;
         }
         if (!partyForm.ItemName) {
-            Alert.alert("Validation", "Please enter Item value");
+            AppAlert.alert("Validation", "Please enter Item value");
             return false;
         }
         return true;
     };
 
     const handleaddparty = async () => {
+        await getAuthToken();
         const userPtype = await AsyncStorage.getItem('user_prptype');
         const isValid = partyitemvalidation();
         if (!isValid) return;
         if (!selectedBrowseItem?.itmcode) {
-            Alert.alert("Error", "Please select item from list");
+            AppAlert.alert("Error", "Please select item from list");
             return;
         }
         try {
@@ -6701,7 +7101,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 Payload,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${authTokenRef.current || token || ''}`,
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
                     },
@@ -6711,7 +7111,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
             console.log("party add response", response);
             if (response?.data?.success) {
                 const newItemCode = response?.data?.data?.data?.itmcode;
-                Alert.alert(
+                AppAlert.alert(
                     "Success",
                     `Item Saved successfully.`,
                     [
@@ -6749,7 +7149,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                 );
             }
             else if (response?.data?.success === false) {
-                Alert.alert(
+                AppAlert.alert(
                     "Warning",
                     response?.data?.message
                 );
@@ -6768,6 +7168,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     };
 
     const fetchpartybrowse = async (tabValue, itmcode) => {
+        await getAuthToken();
         const userPtype = await AsyncStorage.getItem('user_prptype');
         try {
             setIsLoading(true);
@@ -6856,9 +7257,12 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
     const yarnContext = {
         isLoading,
         setIsLoading,
+        refreshing,
+        setRefreshing,
         subItemOpeningLoading,
         setSubItemOpeningLoading,
         subItemFormLoading,
+        subItemListLoading,
         subItemSaveLoading,
         setSubItemSaveLoading,
         getDataSaved,
@@ -6983,6 +7387,8 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         setShowActionMenu,
         isModifyMode,
         setIsModifyMode,
+        modifyItemName,
+        setModifyItemName,
         currentScreen,
         setCurrentScreen,
         partyReturnToSubItemList,
@@ -7049,8 +7455,9 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
         CARD_COLORS1,
         filteredData,
         CARD_COLORS,
-        token,
+        token: authTokenRef.current || token || '',
         username,
+        setSubItemFormLoading
     };
 
     // Full-screen main item forms (Spun / Filament).
@@ -7104,8 +7511,52 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                     setFormState={setFormState}
                     getAllYearData={getAllYearData}
                     setAllYearData={setAllYearData}
-                    token={token}
+                    token={authTokenRef.current || token || ''}
                 />
+
+                {mainItemFormLoading && (
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(255,255,255,0.88)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 999,
+                        }}
+                    >
+                        <View
+                            style={{
+                                minWidth: 170,
+                                paddingVertical: 20,
+                                paddingHorizontal: 24,
+                                borderRadius: 14,
+                                backgroundColor: '#FFFFFF',
+                                alignItems: 'center',
+                                elevation: 6,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 3 },
+                                shadowOpacity: 0.12,
+                                shadowRadius: 8,
+                            }}
+                        >
+                            <ActivityIndicator size="large" color={YARN_UI.primary} />
+                            <Text
+                                style={{
+                                    marginTop: 10,
+                                    fontSize: 14,
+                                    fontWeight: '700',
+                                    color: YARN_UI.ink,
+                                }}
+                            >
+                                Loading item...
+                            </Text>
+                        </View>
+                    </View>
+                )}
             </View>
         </YarnManagementContext.Provider>
     );
@@ -7268,7 +7719,7 @@ const YarnManagementSystem: React.FC<Props> = ({ token, username }) => {
                                                 <View style={yarnUi.actionIcon}>
                                                     <Icon name="edit" size={20} color={YARN_UI.primary} />
                                                 </View>
-                                                <Text style={yarnUi.actionLabel}>Modify Item</Text>
+                                                <Text style={yarnUi.actionLabel}>Modify Main Item</Text>
                                             </TouchableOpacity>
 
                                             <TouchableOpacity

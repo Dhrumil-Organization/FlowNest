@@ -1,4 +1,5 @@
 import { getLoginSource } from '@/src/platform/runtime';
+import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import AppAlert from '@/common/utils/appAlert';
 /////// [3] /////////
 import { initDatabase } from '@/common/API/DatabaseManager';
@@ -151,6 +152,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
 
     // Property switch is available only when the successful login response
     // explicitly contains switchuserlogin = 1.
+    const embedded = isEmbeddedWeb();
     const [switchUserLogin, setSwitchUserLogin] = useState(false);
     const [switchingProperty, setSwitchingProperty] = useState(false);
 
@@ -198,7 +200,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
             try {
                 const parsed = rawLogin ? JSON.parse(rawLogin) : null;
                 setSwitchUserLogin(
-                    Number(parsed?.switchuserlogin ?? 0) === 1
+                    !embedded && Number(parsed?.switchuserlogin ?? 0) === 1
                 );
             } catch {
                 setSwitchUserLogin(false);
@@ -206,7 +208,7 @@ const HomeScreen: React.FC<Props> = ({ navigation, username }) => {
         };
         load();
         checkConnectivity();
-    }, []);
+    }, [embedded]);
 
     // Load usage counts silently from storage
     useEffect(() => {

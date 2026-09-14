@@ -1,6 +1,6 @@
-import AppAlert from '@/common/utils/appAlert';
 import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
+import AppAlert from '@/common/utils/appAlert';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBar from '@/components/Header';
 import theme from '@/components/theme';
@@ -9,14 +9,13 @@ import axios from 'axios';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     TextInput as RNTextInput,
+    ScrollView,
     Text,
     TouchableOpacity,
-    View,
-    ScrollView
+    View
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import PartyHistoryModal from './PartyHistoryModal/PartyHistoryModal';
@@ -1030,6 +1029,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 </TouchableOpacity> */}
                 <TouchableOpacity
                     onPress={() => {
+                        console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
                         if (isConnected && !item.isProcessed) {
                             const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
                             setWebViewUrl(url);
@@ -1279,6 +1279,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     <TouchableOpacity
                         onPress={() => {
                             if (isConnected && !item.isProcessed) {
+                                console.log('🔵item', `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`);
                                 const url = `https://ind.tms-webapp.com/app-weavingtemplete/${item.prpcode}/${item.yearno}/${item.costuid}/production_order_sudo`;
                                 setWebViewUrl(url);
                                 setShowWebViewModal(true);
@@ -1564,7 +1565,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     );
 
 
-    // eslint-disable-next-line react/no-unstable-nested-components
+     
     const TabBar = ({ activeTabSPO, setActiveTabSPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>
             <TouchableOpacity

@@ -377,6 +377,7 @@ import {
 import logo from '../assets/images/logo.png';
 // 👇 apne project ke actual path ke hisaab se adjust karo
 import { useNotificationCenter } from '../common/context/NotificationContext';
+import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import theme from './theme';
 
 export default function Header({
@@ -457,7 +458,7 @@ export default function Header({
                     await AsyncStorage.removeItem('user_prptype');
                     await AsyncStorage.removeItem('user_id');
                     await AsyncStorage.removeItem('yno');
-                    router.replace('/(all)/landing');
+                    router.replace(isEmbeddedWeb() ? '/embed' : '/(all)/landing');
                 },
             },
         ]);

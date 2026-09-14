@@ -1,19 +1,19 @@
-import AppAlert from '@/common/utils/appAlert';
 import CustomPicker from '@/common/CustomPicker';
 import { checkingScannerStyles } from '@/common/Style';
 import { useFaults } from '@/common/useFaults';
+import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { showError, showSuccess } from '@/common/utils/snackbar';
 import HeaderBarwithBack from '@/components/Header';
 import PartyDropdown from '@/Shared/PartyDropdown';
+import { isWeb } from '@/src/platform/runtime';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     KeyboardAvoidingView,
     Modal,
@@ -26,11 +26,10 @@ import {
     TextInput,
     TouchableOpacity,
     useWindowDimensions,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from '../../common/API/dynamicAPI';
-import FaultsModal from './FaultsModal';
 import ScannerFaultsModal from './ScannerFaultsModal';
 
 interface Props {
@@ -131,7 +130,6 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
     const [manualOperatorData, setManualOperatorData] = useState<any[]>([]);
     const [selectedManualOperator, setSelectedManualOperator] = useState<any>(null);
     // 
-    const [faultSaveLoading, setFaultSaveLoading] = useState(false);
     const {
         faultsData,
         setFaultsData,
@@ -1465,6 +1463,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 yearno: getCurrentFinancialYear(),
                 txntype: 'beam_checking',
                 d1: clearedData,
+                IsEntry: "1",
             };
 
             // 👇 auto save (cleared) faults
@@ -1551,7 +1550,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         setRefreshing(false);
     };
 
-    if (!permission) {
+    if (!permission && !isWeb) {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator size="large" color="#007EA7" />
@@ -1560,7 +1559,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         );
     }
 
-    if (!permission.granted) {
+    if (!permission?.granted && !isWeb) {
         return (
             <View style={[styles.centered, { padding: 20 }]}>
                 <Icon name="camera-alt" size={60} color="#999" />
@@ -1696,88 +1695,6 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         setSelectedScannerRow(item);
 
         setScannerFaultModal(true);
-
-    };
-
-    const saveScannerFault = async (updatedFaults: any[]) => {
-
-        if (!selectedScannerRow) return;
-
-        try {
-
-            setScannerFaultLoading(true);
-
-            const payload = {
-
-                ShfCode: selectedScannerRow.ShfCode,
-                ChkDate: selectedScannerRow.ChkDate,
-                MacGrp: selectedScannerRow.MacGrp,
-                PrpCode: selectedScannerRow.PrpCode,
-                // yearno: selectedScannerRow.yearno,
-                BeamNo: selectedScannerRow.BeamNo,
-                SrNo: selectedScannerRow.SrNo,
-                UId: selectedScannerRow.UId,
-                yearno: getCurrentFinancialYear(),
-
-                txntype: "beam_checking",
-
-                d1: updatedFaults,
-
-            };
-
-            console.log(
-                "Scanner Fault Save Payload",
-                payload
-            );
-
-            const response = await axios.post(
-                `${API}/api/add_checking_fault`,
-                payload,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                        "X-Requested-With": "XMLHttpRequest",
-                    },
-                }
-            );
-
-            console.log(response.data);
-
-            if (response.data.success) {
-
-                setScannerFaultModal(false);
-
-                await handleScannerList();
-
-                showSuccess(
-                    response.data.message ||
-                    "Fault Saved Successfully",
-                    {
-                        text: "OK",
-                    }
-                );
-
-            } else {
-
-                showError(
-                    response.data.message ||
-                    "Save Failed"
-                );
-
-            }
-
-        } catch (e) {
-
-            console.log(e);
-
-            showError("Unable to save faults.");
-
-        } finally {
-
-            setScannerFaultLoading(false);
-
-        }
 
     };
 
@@ -2385,20 +2302,7 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                             <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={() => handleScannerList('S')}>
                                                 <Text style={checkingScannerStyles.submitText}>Scanner List</Text>
                                             </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={checkingScannerStyles.submitBtn1}
-                                                onPress={() => handleSaveFaults(form, FormState)}
-                                                disabled={faultsLoading}
-                                            >
-                                                <Text style={styles.buttonText}>
-                                                    {/* {faultsLoading ? 'Loading...' : `Select Faults [${form.d2?.length || 0}]`} */}
-                                                    {faultsLoading ? 'Loading...' : `Faults`}
-                                                </Text>
-                                            </TouchableOpacity>
                                         </View>
-                                        {/* <TouchableOpacity style={checkingScannerStyles.submitBtn1} onPress={handleSubmitScan}>
-                                            <Text style={checkingScannerStyles.submitText}>Save Entry</Text>
-                                        </TouchableOpacity> */}
                                     </View>
                                     <TouchableOpacity style={[{ marginTop: 12 }, checkingScannerStyles.submitBtn1]} onPress={handleSubmitScan}>
                                         <Text style={checkingScannerStyles.submitText}>Save Entry</Text>
@@ -2759,25 +2663,6 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                                                         opacity: manualSaveLoading ? 0.7 : 1,
                                                     },
                                                 ]}
-                                                onPress={() => handleSaveFaults(form, FormState)}
-                                                disabled={faultsLoading}
-                                            >
-                                                <Text style={styles.buttonText}>
-                                                    {/* {faultsLoading ? 'Loading...' : `Select Faults [${form.d2?.length || 0}]`} */}
-                                                    {faultsLoading ? 'Loading...' : `Faults`}
-                                                </Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[
-                                                    checkingScannerStyles.submitBtn1,
-                                                    {
-                                                        marginTop: 12,
-                                                        height: 50,
-                                                        width: '100%',
-                                                        alignSelf: 'stretch',
-                                                        opacity: manualSaveLoading ? 0.7 : 1,
-                                                    },
-                                                ]}
                                                 onPress={() => handlesave(form)}
                                                 disabled={manualSaveLoading}
                                             >
@@ -2914,129 +2799,18 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                         </View>
                     </Modal>
 
-                    <FaultsModal
-                        visible={showFaultsModal}
-                        data={faultsData}
-                        initialFilledData={form.d2 || []}
-                        cacheKey={form.UId || ''}
-                        beamNo={FormState.values.BeamNo || form.BeamNo || ''}
-                        takaNo={FormState.values.TakaNo || ''}
-                        meter={meter || ''}
-                        fetchData={async (cacheKey: string) => {
-                            const params = {
-                                UId: cacheKey,
-                                SrNo: '0',
-                                BeamNo: form.BeamNo || '',
-                                ShfCode: FormState.values.ShfCode,
-                                ChkDate: form.ChkDate,
-                                PrpCode: form.PrpCode || '',
-                                yearno: form.YearNo,
-                                txntype: 'beam_checking',
-                            };
-                            const response = await axios.get(`${API}/api/get_checking_fault_help`, {
-                                headers: {
-                                    Authorization: `Bearer ${token}`,
-                                    'Content-Type': 'application/json',
-                                    Accept: 'application/json',
-                                },
-                                params,
-                            });
-                            return response.data.response.data;
-                        }}
-                        onClose={() => setShowFaultsModal(false)}
-                        // onOK={async (updatedData) => {
-
-                        //     try {
-
-                        //         setFaultSaveLoading(true);
-
-                        //         const payload = {
-                        //             ShfCode: form.ShfCode,
-                        //             ChkDate: form.ChkDate,
-                        //             MacGrp: form.MacGrp,
-                        //             PrpCode: form.PrpCode,
-                        //             yearno: getCurrentFinancialYear(),
-                        //             BeamNo: form.BeamNo,
-                        //             txntype: "beam_checking",
-
-                        //             d1: updatedData
-                        //         };
-
-                        //         console.log("Fault Payload", payload);
-
-                        //         const headers = {
-                        //             Authorization: `Bearer ${token}`,
-                        //             "Content-Type": "application/json",
-                        //             "X-Requested-With": "XMLHttpRequest",
-                        //         };
-
-                        //         const response = await axios.post(
-                        //             `${API}/api/add_checking_fault`,
-                        //             payload,
-                        //             { headers }
-                        //         );
-
-                        //         console.log(response.data);
-
-                        //         if (response.data.success) {
-
-                        //             setForm(prev => ({
-                        //                 ...prev,
-                        //                 d2: updatedData,
-                        //             }));
-
-                        //             setShowFaultsModal(false);
-
-                        //             showSuccess(
-                        //                 response.data.message || "Fault saved successfully",
-                        //                 {
-                        //                     text: "OK",
-                        //                     onPress: () => { }
-                        //                 }
-                        //             );
-
-                        //         } else {
-
-                        //             showError(
-                        //                 response.data.message || "Save failed",
-                        //                 {
-                        //                     text: "OK",
-                        //                     onPress: () => { }
-                        //                 }
-                        //             );
-
-                        //         }
-
-                        //     } catch (error) {
-
-                        //         console.log(error);
-
-                        //         showError(
-                        //             "Something went wrong",
-                        //             {
-                        //                 text: "OK",
-                        //                 onPress: () => { }
-                        //             }
-                        //         );
-
-                        //     } finally {
-
-                        //         setFaultSaveLoading(false);
-
-                        //     }
-
-                        // }}
-                        onOK={(updatedData) => { setForm((prev) => ({ ...prev, d2: updatedData })); setShowFaultsModal(false); }}
-                        loading={faultSaveLoading}
-                    />
-
                     <ScannerFaultsModal
                         visible={scannerFaultModal}
                         token={token}
                         rowData={selectedScannerRow}
                         loading={scannerFaultLoading}
                         onClose={() => setScannerFaultModal(false)}
-                        onOK={saveScannerFault}
+                        onSaved={() => {
+                            // Row-level counts/labels ko background mein refresh kar do,
+                            // bina modal band kiye — taaki user turant agla fault bhi
+                            // add/remove kar sake.
+                            handleScannerList();
+                        }}
                     />
 
                     {/* Scanner list modal */}

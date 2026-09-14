@@ -304,6 +304,7 @@ import { getFCMToken } from '@/hooks/NotificationService';
 import { initNewErpAPI } from '@/src/api/client';
 import { AppCoreProvider } from '@/src/core/AppCoreProvider';
 import { getLoginSource, isWeb } from '@/src/platform/runtime';
+import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 import * as Device from 'expo-device';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -313,6 +314,7 @@ import FullScreenLoader from '../components/FullScreenLoader';
 
 export default function RootLayout() {
   const router = useRouter();
+  const embedded = isEmbeddedWeb();
   const [isReady, setIsReady] = useState(false);
   const [lookupPlatform, setLookupPlatform] = useState<string | null>(null);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
@@ -403,6 +405,7 @@ export default function RootLayout() {
   // to a dashboard. Only a stored authenticated session can enter a protected
   // Legacy/New ERP route on app bootstrap.
   useEffect(() => {
+    if (embedded) return;
     if (!isReady || !isAllowed || isLoggedIn === null) return;
 
     if (!isLoggedIn) {
@@ -416,7 +419,7 @@ export default function RootLayout() {
     }
 
     router.replace('/(tabs)');
-  }, [isReady, isAllowed, isLoggedIn, lookupPlatform, router]);
+  }, [embedded, isReady, isAllowed, isLoggedIn, lookupPlatform, router]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -485,6 +488,7 @@ export default function RootLayout() {
                 <>
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="new" />
+                  <Stack.Screen name="embed" />
                 </>
               ) : (
                 <>

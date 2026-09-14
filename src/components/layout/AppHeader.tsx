@@ -11,6 +11,7 @@ import { performLogin } from '../../core/authFlow';
 import { getCredentialsForPropertySwitch } from '../../lib/biometricAuth';
 import { useAppSessionStore } from '../../stores/AppSessionStore';
 import { T } from '../../theme';
+import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
 
 type Props = { eyebrow?: string; title: string; subtitle?: string; right?: React.ReactNode; showSignOut?: boolean };
 
@@ -58,7 +59,8 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   // the active option inside the picker modal — previously the modal gave
   // no indication at all of which property you were currently on.
   const [currentProperty, setCurrentProperty] = useState<NewErpProperty | null>(null);
-  const switchUserLogin = Number(rawLoginResponse?.switchuserlogin ?? 0) === 1;
+  const embedded = isEmbeddedWeb();
+  const switchUserLogin = !embedded && Number(rawLoginResponse?.switchuserlogin ?? 0) === 1;
 
   const PROPERTY_LABELS: Record<NewErpProperty, string> = {
     sudamo_knits: 'Sudamo / Knits',
@@ -139,7 +141,17 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
   };
 
   const signOut = () => AppAlert.alert('Sign out?', 'This will clear the mobile session on this device.', [
-    { text: 'Cancel', style: 'cancel' }, { text: 'Sign out', style: 'destructive', onPress: logout }
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Sign out',
+      style: 'destructive',
+      onPress: async () => {
+        await logout();
+        if (embedded) {
+          router.replace('/embed' as any);
+        }
+      },
+    },
   ]);
   const displayTitle = isGreyPackingRoute ? 'Grey Packing' : title;
   const displayEyebrow = isGreyPackingRoute ? 'SUDAMO TEXTILE ERP' : eyebrow;

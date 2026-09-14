@@ -1,452 +1,226 @@
+// FILE: components/CheckingScanner/ScannerFaultsModal.tsx
+// "Faults" modal opened from a Scanner List row (already-saved checking
+// record — real SrNo/UId). This is the ONLY place in the app that has the
+// Faults feature.
+//
+// get_checking_fault_help ("browse") returns THREE arrays:
+//   - data            -> full catalog, catalog's own SubSr, Remark already
+//                         merged in wherever a value exists right now.
+//   - default_faults  -> the SAME full catalog but always blank Remark —
+//                         this is what "Select Faults" (the pickable grid)
+//                         renders, so every fault always shows exactly
+//                         once no matter how many times it's been added.
+//   - filterdata      -> ONLY the faults that are actually saved for this
+//                         row right now. Its SubSr is a running record
+//                         number (1, 2, 3…) — completely independent from
+//                         the catalog's own SubSr — because the same fault
+//                         can be saved more than once (different Remark
+//                         values), so filterdata is keyed by RsnCode, not
+//                         by catalog SubSr. This is what "Added Faults"
+//                         renders, each with an X to remove it.
+//
+// ADD flow:
+//   - User taps a catalog (default_faults) chip with a Fault Value typed.
+//   - We need a SubSr for the new filterdata row that can NEVER collide
+//     with one already in use:
+//       · If this RsnCode has no entry yet in filterdata -> use the
+//         catalog item's own SubSr as a starting point.
+//       · If this RsnCode already has one (or more) entries in filterdata
+//         (i.e. the same fault is being added again) -> take the highest
+//         SubSr among filterdata rows with that SAME RsnCode and use +1.
+//       · Either way, if that candidate SubSr happens to already be used
+//         by ANY other filterdata row, keep bumping it until it's unique.
+//         SubSr must never repeat.
+//   - POST add_checking_fault with `d1` = the full, updated filterdata
+//     array (existing rows untouched + the new row appended), plus the
+//     constant `IsEntry: "1"` flag the API expects.
+//   - On success, re-run the browse call so `catalog`/`addedFaults` always
+//     mirror exactly what the server has.
+//
+// REMOVE flow:
+//   - `d1` = the full filterdata array, with ONLY the removed row's Remark
+//     blanked out (every other row goes through untouched, same SubSr).
+//   - Same `IsEntry: "1"` flag, same browse-refresh afterwards.
 import { API } from '@/common/API/dynamicAPI';
 import { getCurrentFinancialYear } from '@/common/commonfunction';
-import Icon from '@expo/vector-icons/MaterialIcons';
+import { showError } from '@/common/utils/snackbar';
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-
-interface Fault {
-    Faults: string;
-    RDesc: string;
-    Remark: string;
-    RsnCode: string;
-    SrNo: string;
-    SubSr: string;
-    UId: string;
-}
+import React, { useCallback, useEffect, useState } from 'react';
+import FaultSelector, { FaultCatalogItem } from './FaultSelector';
 
 interface ScannerFaultsModalProps {
-    visible: boolean;
-    token: string;
-    rowData: any;
-    loading?: boolean;
-    onClose: () => void;
-    onOK: (updatedData: any[]) => Promise<void>;
+  visible: boolean;
+  token: string;
+  rowData: any;
+  loading?: boolean;
+  onClose: () => void;
+  // Fired (fire-and-forget) after every successful refresh so the parent
+  // can silently update the underlying Scanner List row, without closing
+  // this modal.
+  onSaved?: () => void;
 }
 
-const sanitizeRemarkInput = (text: string) => {
-    return text.replace(/[^0-9,\- ]/g, '');
+const toInt = (v: any) => {
+  const n = parseInt(String(v ?? '').trim(), 10);
+  return Number.isFinite(n) ? n : 0;
 };
 
 const ScannerFaultsModal: React.FC<ScannerFaultsModalProps> = ({
-    visible,
-    token,
-    rowData,
-    loading = false,
-    onClose,
-    onOK,
+  visible,
+  token,
+  rowData,
+  loading = false,
+  onClose,
+  onSaved,
 }) => {
+  const [catalog, setCatalog] = useState<FaultCatalogItem[]>([]); // default_faults
+  const [addedFaults, setAddedFaults] = useState<FaultCatalogItem[]>([]); // filterdata
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
 
-    const [faultsData, setFaultsData] = useState<any[]>([]);
-    const [pageLoading, setPageLoading] = useState(false);
-    const [searchText, setSearchText] = useState('');
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
 
-    const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
+  const buildPayloadBase = () => ({
+    ShfCode: rowData?.ShfCode || '',
+    ChkDate: rowData?.ChkDate || '',
+    MacGrp: rowData?.MacGrp || '',
+    PrpCode: rowData?.PrpCode || '',
+    BeamNo: rowData?.BeamNo || '',
+    SrNo: rowData?.SrNo || '',
+    UId: rowData?.UId || '',
+    yearno: getCurrentFinancialYear(),
+    txntype: 'beam_checking',
+  });
+
+  // The "browse" call — always the source of truth for what's rendered.
+  const loadCatalog = useCallback(async () => {
+    if (!rowData) return;
+    setCatalogLoading(true);
+    try {
+      const response = await axios.get(`${API}/api/get_checking_fault_help`, {
+        headers,
+        params: buildPayloadBase(),
+      });
+      const payload = response?.data?.response || response?.data || {};
+      setCatalog(payload.default_faults || []);
+      setAddedFaults(
+        (payload.filterdata || []).filter((item: FaultCatalogItem) => String(item.Remark ?? '').trim() !== '')
+      );
+    } catch (error) {
+      console.log('ScannerFaultsModal loadCatalog error:', error);
+      setCatalog([]);
+      setAddedFaults([]);
+    } finally {
+      setCatalogLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowData]);
+
+  useEffect(() => {
+    if (visible) loadCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, rowData]);
+
+  const persist = async (d1: FaultCatalogItem[]) => {
+    const payload = { ...buildPayloadBase(), IsEntry: '1', d1 };
+    return axios.post(`${API}/api/add_checking_fault`, payload, { headers });
+  };
+
+  // SubSr for a brand-new filterdata row must NEVER collide with one
+  // already in use. See the file-level comment for the exact rule.
+  const nextSubSrFor = (fault: FaultCatalogItem): string => {
+    const usedSubSr = new Set(addedFaults.map((e) => e.SubSr));
+    const sameRsn = addedFaults.filter((e) => e.RsnCode === fault.RsnCode);
+
+    let candidate = sameRsn.length === 0
+      ? toInt(fault.SubSr)
+      : Math.max(...sameRsn.map((e) => toInt(e.SubSr))) + 1;
+
+    if (candidate <= 0) candidate = 1;
+    while (usedSubSr.has(String(candidate))) candidate += 1;
+
+    return String(candidate);
+  };
+
+  const handleAddFault = async (fault: FaultCatalogItem, remarkValue: string) => {
+    const key = `${fault.UId}_${fault.SubSr}`;
+    const newRow: FaultCatalogItem = {
+      UId: fault.UId,
+      SrNo: fault.SrNo,
+      SubSr: nextSubSrFor(fault),
+      RsnCode: fault.RsnCode,
+      RDesc: fault.RDesc,
+      Faults: fault.Faults,
+      Remark: remarkValue,
     };
+    const d1 = [...addedFaults, newRow];
 
-    useEffect(() => {
+    setBusy(true);
+    setBusyItemKey(key);
+    try {
+      const response = await persist(d1);
+      if (response.data?.success) {
+        await loadCatalog();
+        onSaved?.();
+      } else {
+        showError(response.data?.message || 'Fault save failed');
+      }
+    } catch (error) {
+      console.log('ScannerFaultsModal handleAddFault error:', error);
+      showError('Unable to save fault.');
+    } finally {
+      setBusy(false);
+      setBusyItemKey(null);
+    }
+  };
 
-        if (!visible || !rowData) return;
-
-        loadFaults();
-
-    }, [visible, rowData]);
-
-    const loadFaults = async () => {
-
-        try {
-
-            setPageLoading(true);
-
-            const payload = {
-
-                ShfCode: rowData.ShfCode,
-                ChkDate: rowData.ChkDate,
-                MacGrp: rowData.MacGrp,
-                PrpCode: rowData.PrpCode,
-                // yearno: rowData.yearno,
-                BeamNo: rowData.BeamNo,
-                SrNo: rowData.SrNo,
-                UId: rowData.UId,
-                yearno: getCurrentFinancialYear(),
-
-                txntype: "beam_checking",
-
-            };
-
-            console.log(
-                "Scanner Fault Fetch Payload",
-                payload
-            );
-
-            // const response = await axios.post(
-            //     `${API}/api/get_checking_fault_help`,
-            //     payload,
-            //     { headers }
-            // );
-
-            const response = await axios.get(`${API}/api/get_checking_fault_help`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                },
-                params: payload,
-            });
-
-            console.log(
-                "Scanner Fault Fetch Response",
-                response.data
-            );
-
-            const apiData =
-                response?.data?.data ||
-                response?.data?.response?.data ||
-                [];
-
-            setFaultsData(apiData);
-
-        } catch (e) {
-
-            console.log(e);
-
-        } finally {
-
-            setPageLoading(false);
-
-        }
-
-    };
-
-    // Modal band hone pe search reset
-    useEffect(() => {
-        if (!visible) {
-            setSearchText('');
-        }
-    }, [visible]);
-
-    const handleRemarkChange = (
-        uid: string,
-        subSr: string,
-        remark: string
-    ) => {
-        const cleanedRemark = sanitizeRemarkInput(remark); // 👈 sanitize
-
-        setFaultsData(prev =>
-            prev.map(item =>
-                item.UId === uid &&
-                    item.SubSr === subSr
-                    ? {
-                        ...item,
-                        Remark: cleanedRemark,
-                    }
-                    : item
-            )
-        );
-    };
-
-    const handleOK = async () => {
-
-        await onOK(faultsData);
-
-    };
-
-    // 👇 Search se filter
-    const filteredFaultsData = faultsData.filter((item) => {
-        if (!searchText.trim()) return true;
-        const q = searchText.toLowerCase();
-        return (
-            (item.RDesc ?? '').toLowerCase().includes(q) ||
-            (item.RsnCode ?? '').toLowerCase().includes(q) ||
-            (item.SubSr ?? '').toString().toLowerCase().includes(q) ||
-            (item.Faults ?? '').toLowerCase().includes(q)
-        );
-    });
-
-    return (
-
-        <Modal
-            visible={visible}
-            animationType="slide"
-            transparent={false}
-        >
-
-            <View style={styles.modalContainer}>
-
-                <View style={styles.modalHeader}>
-
-                    <Text style={styles.modalTitle}>
-                        Scanner Faults
-                    </Text>
-
-                    <TouchableOpacity
-                        onPress={onClose}
-                    >
-                        <Icon
-                            name="close"
-                            size={24}
-                            color="#000"
-                        />
-                    </TouchableOpacity>
-
-                </View>
-
-                {/* 👇 Naya search box */}
-                <View style={styles.searchContainer}>
-                    <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search by description or code"
-                        placeholderTextColor="#999"
-                        value={searchText}
-                        onChangeText={setSearchText}
-                    />
-                    {searchText.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchText('')}>
-                            <Icon name="close" size={18} color="#999" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-
-                {
-                    pageLoading ?
-
-                        <View
-                            style={styles.loaderContainer}
-                        >
-
-                            <ActivityIndicator
-                                size="large"
-                            />
-
-                        </View>
-
-                        :
-
-                        <FlatList
-                            data={filteredFaultsData} // 👈 filtered data use kiya
-                            keyExtractor={(item, index) => `${item.UId}_${item.SubSr}_${index}`}
-                            ListEmptyComponent={
-                                <Text style={styles.noResultText}>No matching faults found</Text>
-                            }
-                            renderItem={({ item }) => (
-                                <View style={styles.faultItem}>
-                                    <View style={styles.faultHeader}>
-                                        <View style={{ flex: 1 }}>
-                                            {/* <Text style={styles.faultSubSr}>Sr. No : {item.SubSr}</Text> */}
-                                            <Text style={styles.faultDesc}>{item.RDesc}</Text>
-                                        </View>
-                                        {/* <Text style={styles.reasonCode}>{item.RsnCode}</Text> */}
-                                    </View>
-
-                                    <TextInput
-                                        style={styles.input}
-                                        value={item.Remark ?? ""}
-                                        placeholder="123, 345-678"
-                                        placeholderTextColor="#999"
-                                        onChangeText={(text) =>
-                                            handleRemarkChange(item.UId, item.SubSr, text)
-                                        }
-                                    />
-                                </View>
-                            )}
-                        />
-
-                }
-                <View style={styles.modalFooter}>
-
-                    <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={onClose}
-                        disabled={loading}
-                    >
-                        <Text style={styles.cancelText}>
-                            Cancel
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.okButton,
-                            loading && { opacity: 0.6 },
-                        ]}
-                        onPress={handleOK}
-                        disabled={loading}
-                    >
-
-                        {
-                            loading ?
-
-                                <ActivityIndicator
-                                    color="#fff"
-                                />
-
-                                :
-
-                                <Text style={styles.okText}>
-                                    OK
-                                </Text>
-
-                        }
-
-                    </TouchableOpacity>
-
-                </View>
-
-            </View>
-
-        </Modal>
-
+  const handleRemoveFault = async (entry: FaultCatalogItem) => {
+    const key = `${entry.RsnCode}_${entry.SubSr}`;
+    const d1 = addedFaults.map((e) =>
+      e.RsnCode === entry.RsnCode && e.SubSr === entry.SubSr ? { ...e, Remark: '' } : e
     );
 
+    setBusy(true);
+    setBusyItemKey(key);
+    try {
+      const response = await persist(d1);
+      if (response.data?.success) {
+        await loadCatalog();
+        onSaved?.();
+      } else {
+        showError(response.data?.message || 'Unable to remove fault');
+      }
+    } catch (error) {
+      console.log('ScannerFaultsModal handleRemoveFault error:', error);
+      showError('Unable to remove fault.');
+    } finally {
+      setBusy(false);
+      setBusyItemKey(null);
+    }
+  };
+
+  return (
+    <FaultSelector
+      visible={visible}
+      title="Scanner Faults"
+      catalog={catalog}
+      addedFaults={addedFaults}
+      catalogLoading={catalogLoading}
+      busy={busy || loading}
+      busyItemKey={busyItemKey}
+      beamNo={rowData?.BeamNo || ''}
+      takaNo={rowData?.TakaNo || ''}
+      meter={rowData?.Qty || rowData?.Meter || ''}
+      onClose={onClose}
+      onAddFault={handleAddFault}
+      onRemoveFault={handleRemoveFault}
+    />
+  );
 };
-
-const styles = StyleSheet.create({
-
-    modalContainer: {
-        flex: 1,
-        backgroundColor: "#fff",
-        padding: 16,
-    },
-
-    loaderContainer: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-
-    modalHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginTop: 55,
-        marginBottom: 18,
-    },
-
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: "700",
-        color: "#111",
-    },
-
-    faultItem: {
-        borderWidth: 1,
-        borderColor: "#E5E5E5",
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 12,
-        backgroundColor: "#fff",
-    },
-
-    faultHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: 1,
-    },
-
-    faultSubSr: {
-        fontSize: 13,
-        color: "#555",
-        fontWeight: "600",
-    },
-
-    faultDesc: {
-        fontSize: 15,
-        color: "#222",
-        marginTop: 4,
-        fontWeight: "600",
-    },
-
-    reasonCode: {
-        fontSize: 14,
-        color: "#007AFF",
-        fontWeight: "700",
-    },
-
-    input: {
-        borderWidth: 1,
-        borderColor: "#DADADA",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        marginTop: 8,
-        color: "#000",
-        fontSize: 14,
-        backgroundColor: "#FFF",
-    },
-
-    modalFooter: {
-        flexDirection: "row",
-        justifyContent: "flex-end",
-        marginTop: 16,
-    },
-
-    cancelButton: {
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        marginRight: 12,
-    },
-
-    cancelText: {
-        color: "#007AFF",
-        fontWeight: "700",
-        fontSize: 15,
-    },
-
-    okButton: {
-        backgroundColor: "#007AFF",
-        borderRadius: 8,
-        paddingHorizontal: 26,
-        paddingVertical: 12,
-        justifyContent: "center",
-        alignItems: "center",
-        minWidth: 90,
-    },
-
-    okText: {
-        color: "#FFF",
-        fontWeight: "700",
-        fontSize: 15,
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#DADADA',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        marginBottom: 14,
-        backgroundColor: '#fafafa',
-    },
-    searchIcon: {
-        marginRight: 6,
-    },
-    searchInput: {
-        flex: 1,
-        paddingVertical: 10,
-        fontSize: 14,
-        color: '#000',
-    },
-    noResultText: {
-        textAlign: 'center',
-        color: '#999',
-        marginTop: 20,
-        fontSize: 14,
-    },
-});
 
 export default ScannerFaultsModal;

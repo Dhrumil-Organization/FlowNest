@@ -1,643 +1,168 @@
-// import Icon from '@expo/vector-icons/MaterialIcons';
-// import React, { useEffect, useState } from 'react';
-// import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+// FILE: components/CheckingScanner/FaultsModal.tsx
+// "Faults" modal for the Manual Entry + QR Scanner tabs.
+//
+// Browse-driven flow (single source of truth = get_checking_fault_help):
+//   1. Modal opens -> loadCatalog() (the "browse" call) populates `catalog`.
+//   2. User types a Fault Value, taps a catalog chip -> we build the FULL
+//      catalog as `d1`, with the tapped item's Remark set to the typed
+//      value and every item's `isEntry` recomputed (1 if that item's
+//      Remark ends up non-empty, 0 otherwise), and POST add_checking_fault.
+//   3. On success we re-run loadCatalog() so `catalog` (and therefore what
+//      renders) always matches the server exactly.
+//   4. Tapping X on an added chip does the same thing but clears that
+//      item's Remark first.
+//   5. `onEntriesChange` fires after every successful refresh so the
+//      parent (index.tsx) can keep `form.d2` in sync for the final Save.
+import { API } from '@/common/API/dynamicAPI';
+import { showError } from '@/common/utils/snackbar';
+import axios from 'axios';
+import React, { useCallback, useEffect, useState } from 'react';
+import FaultSelector, { FaultCatalogItem } from './FaultSelector';
 
-// interface Fault {
-//   Faults: string;
-//   RDesc: string;
-//   Remark: string;
-//   RsnCode: string;
-//   SrNo: string;
-//   SubSr: string;
-//   UId: string;
-// }
-
-// interface FaultsModalProps {
-//   visible: boolean;
-//   data: Fault[];
-//   initialFilledData: any[];
-//   cacheKey: string;
-//   fetchData: (cacheKey: string) => Promise<Fault[]>;
-//   onClose: () => void;
-//   onOK: (updatedData: any[]) => void;
-//   loading?: boolean;
-// }
-
-// const FaultsModal: React.FC<FaultsModalProps> = ({
-//   visible,
-//   data,
-//   initialFilledData = [], // Default to empty array if undefined
-//   cacheKey,
-//   fetchData,
-//   onClose,
-//   onOK,
-//   loading = false,
-// }) => {
-//   // State for selected faults and their remarks
-//   const [selectedFaults, setSelectedFaults] = useState<any[]>([]);
-//   const [faultsData, setFaultsData] = useState<any[]>([]);
-//   // const [localData, setLocalData] = useState<Fault[]>(data);
-
-//   // Initialize selectedFaults with initialFilledData
-//   useEffect(() => {
-//     if (initialFilledData && Array.isArray(initialFilledData)) {
-//       setSelectedFaults(
-//         initialFilledData.map((fault) => ({
-//           ...fault,
-//           Remark: fault.Remark || '', // Ensure Remark is initialized
-//         }))
-//       );
-//     } else {
-//       setSelectedFaults([]); // Fallback to empty array
-//     }
-//   }, [initialFilledData]);
-
-//   useEffect(() => {
-//     if (!visible) return;
-
-//     const loadFaults = async () => {
-//       const apiData = await fetchData(cacheKey);
-
-//       const finalData = apiData.map(item => {
-//         const old = initialFilledData.find(
-//           x => x.UId === item.UId && x.SubSr === item.SubSr
-//         );
-
-//         return {
-//           ...item,
-//           Remark: old?.Remark ?? "",
-//         };
-//       });
-
-//       setFaultsData(finalData);
-//     };
-
-//     loadFaults();
-
-//   }, [visible, cacheKey, initialFilledData]);
-
-//   // Fetch faults data when modal opens
-
-
-//   // Toggle fault selection
-//   const toggleFaultSelection = (fault: Fault) => {
-//     const isSelected = selectedFaults.some((item) => item.UId === fault.UId);
-
-//     if (isSelected) {
-//       // Remove the fault if already selected
-//       setSelectedFaults(selectedFaults.filter((item) => item.UId !== fault.UId));
-//     } else {
-//       // Add the fault with an empty Remark if not selected
-//       setSelectedFaults([
-//         ...selectedFaults,
-//         {
-//           ...fault,
-//           Remark: '', // Initialize Remark as empty
-//         },
-//       ]);
-//     }
-//   };
-
-//   // Update the Remark for a specific fault
-//   const handleRemarkChange = (uid: string, SubSr: string, remark: string) => {
-
-//     setFaultsData(prev =>
-//       prev.map(item =>
-//         item.UId === uid && item.SubSr === SubSr
-//           ? {
-//             ...item,
-//             Remark: remark,
-//           }
-//           : item
-//       )
-//     );
-
-//   };
-
-//   // Save selected faults and their remarks
-//   const handleOK = () => {
-
-//     onOK(faultsData);
-
-//   };
-
-//   return (
-//     <Modal visible={visible} animationType="slide" transparent={false}>
-//       <View style={styles.modalContainer}>
-//         <View style={styles.modalHeader}>
-//           <Text style={styles.modalTitle}>Select Faults</Text>
-//           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-//             <Icon name="close" size={24} color="#000" />
-//           </TouchableOpacity>
-//         </View>
-
-//         <FlatList
-//           data={faultsData}
-//           keyExtractor={(item) => item.UId}
-//           renderItem={({ item }) => (
-
-//             <View style={styles.faultItem}>
-
-//               <View style={styles.faultHeader}>
-
-//                 <View style={styles.faultLeftColumn}>
-//                   <Text style={styles.faultSubSr}>
-//                     Sr. No: {item.SubSr}
-//                   </Text>
-
-//                   <Text style={styles.faultRDesc}>
-//                     {item.RDesc}
-//                   </Text>
-//                 </View>
-
-//                 <View style={styles.faultRightColumn}>
-//                   <Text style={styles.faultRsnCode}>
-//                     {item.RsnCode}
-//                   </Text>
-//                 </View>
-
-//               </View>
-
-//               <TextInput
-//                 style={styles.remarkInput}
-//                 placeholder="123, 345-678"
-//                 placeholderTextColor="#999"
-//                 value={item.Remark ?? ""}
-//                 onChangeText={(text) =>
-//                   handleRemarkChange(item.UId, item.SubSr, text)
-//                 }
-//               />
-
-//             </View>
-
-//           )}
-//         />
-
-//         <View style={styles.modalFooter}>
-//           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-//             <Text style={styles.buttonText}>Cancel</Text>
-//           </TouchableOpacity>
-//           <TouchableOpacity
-//             style={[styles.okButton, loading && { opacity: 0.6 }]}
-//             onPress={handleOK}
-//             disabled={loading}
-//           >
-//             {
-//               loading
-//                 ? <ActivityIndicator color="#fff" />
-//                 : <Text style={styles.okButtonText}>OK</Text>
-//             }
-//           </TouchableOpacity>
-//         </View>
-//       </View>
-//     </Modal>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//   modalContainer: {
-//     flex: 1,
-//     backgroundColor: '#fff',
-//     padding: 16,
-//   },
-//   modalHeader: {
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     alignItems: 'center',
-//     marginBottom: 16,
-//     marginTop: 30,
-//   },
-//   modalTitle: {
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//   },
-//   closeButton: {
-//     padding: 8,
-//   },
-//   faultItem: {
-//     padding: 12,
-//     borderBottomWidth: 1,
-//     borderBottomColor: '#eee',
-//     marginBottom: 8,
-//   },
-//   selectedFaultItem: {
-//     backgroundColor: '#e3f2fd',
-//   },
-//   faultHeader: {
-//     flexDirection: 'row',
-//     justifyContent: 'space-between',
-//     marginBottom: 8,
-//   },
-//   faultLeftColumn: {
-//     flex: 1,
-//   },
-//   faultRightColumn: {
-//     alignItems: 'flex-end',
-//   },
-//   faultSubSr: {
-//     fontSize: 14,
-//     fontWeight: '600',
-//     color: '#333',
-//   },
-//   faultRDesc: {
-//     fontSize: 14,
-//     color: '#666',
-//     marginTop: 4,
-//   },
-//   faultRsnCode: {
-//     fontSize: 14,
-//     fontWeight: '600',
-//     color: '#333',
-//   },
-//   remarkInput: {
-//     borderWidth: 1,
-//     borderColor: '#ccc',
-//     borderRadius: 8,
-//     padding: 10,
-//     marginTop: 8,
-//     fontSize: 14,
-//     backgroundColor: '#fff',
-//     color: '#000',          // <-- Add this
-//   },
-//   selectButton: {
-//     marginTop: 8,
-//     padding: 10,
-//     backgroundColor: '#007AFF',
-//     borderRadius: 8,
-//     alignItems: 'center',
-//   },
-//   selectButtonText: {
-//     color: '#fff',
-//     fontWeight: 'bold',
-//   },
-//   modalFooter: {
-//     flexDirection: 'row',
-//     justifyContent: 'flex-end',
-//     marginTop: 16,
-//   },
-//   cancelButton: {
-//     padding: 12,
-//     marginRight: 16,
-//   },
-//   buttonText: {
-//     color: '#007AFF',
-//     fontWeight: 'bold',
-//   },
-//   okButton: {
-//     padding: 12,
-//     backgroundColor: '#007AFF',
-//     borderRadius: 8,
-//   },
-//   okButtonText: {
-//     color: '#fff',
-//     fontWeight: 'bold',
-//   },
-// });
-
-// export default FaultsModal;
-import Icon from '@expo/vector-icons/MaterialIcons';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-interface Fault {
-  Faults: string;
-  RDesc: string;
-  Remark: string;
-  RsnCode: string;
+interface PayloadBase {
+  ShfCode: string;
+  ChkDate: string;
+  MacGrp?: string;
+  PrpCode: string;
+  BeamNo: string;
   SrNo: string;
-  SubSr: string;
   UId: string;
+  yearno: string;
+  txntype: string;
 }
 
 interface FaultsModalProps {
   visible: boolean;
-  data: Fault[];
-  initialFilledData: any[];
+  token: string;
   cacheKey: string;
-  fetchData: (cacheKey: string) => Promise<Fault[]>;
+  fetchData: (cacheKey: string) => Promise<FaultCatalogItem[]>;
+  buildPayloadBase: () => PayloadBase;
+  onEntriesChange: (entries: FaultCatalogItem[]) => void;
   onClose: () => void;
-  onOK: (updatedData: any[]) => void;
   loading?: boolean;
 }
 
-// Sirf digits, comma, hyphen, space allow — baaki sab strip
-const sanitizeRemarkInput = (text: string) => {
-  return text.replace(/[^0-9,\- ]/g, '');
-};
+const same = (a: FaultCatalogItem, b: FaultCatalogItem) => a.UId === b.UId && a.SubSr === b.SubSr;
 
 const FaultsModal: React.FC<FaultsModalProps> = ({
   visible,
-  data,
-  initialFilledData = [],
+  token,
   cacheKey,
   fetchData,
+  buildPayloadBase,
+  onEntriesChange,
   onClose,
-  onOK,
   loading = false,
 }) => {
-  const [selectedFaults, setSelectedFaults] = useState<any[]>([]);
-  const [faultsData, setFaultsData] = useState<any[]>([]);
-  const [searchText, setSearchText] = useState('');
+  const [catalog, setCatalog] = useState<FaultCatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (initialFilledData && Array.isArray(initialFilledData)) {
-      setSelectedFaults(
-        initialFilledData.map((fault) => ({
-          ...fault,
-          Remark: fault.Remark || '',
-        }))
-      );
-    } else {
-      setSelectedFaults([]);
-    }
-  }, [initialFilledData]);
-
-  useEffect(() => {
-    if (!visible) return;
-
-    const loadFaults = async () => {
+  // The "browse" call — always the source of truth for what's rendered.
+  const loadCatalog = useCallback(async () => {
+    setCatalogLoading(true);
+    try {
       const apiData = await fetchData(cacheKey);
+      const list = apiData || [];
+      setCatalog(list);
+      onEntriesChange(list.filter((item) => String(item.Remark ?? '').trim() !== ''));
+    } catch (error) {
+      console.log('FaultsModal loadCatalog error:', error);
+      setCatalog([]);
+    } finally {
+      setCatalogLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, fetchData]);
 
-      const finalData = apiData.map(item => {
-        const old = initialFilledData.find(
-          x => x.UId === item.UId && x.SubSr === item.SubSr
-        );
-
-        return {
-          ...item,
-          Remark: old?.Remark ?? "",
-        };
-      });
-
-      setFaultsData(finalData);
-    };
-
-    loadFaults();
-
-  }, [visible, cacheKey, initialFilledData]);
-
-  // Reset search jab modal band/open ho
   useEffect(() => {
-    if (!visible) {
-      setSearchText('');
+    if (visible) loadCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, cacheKey]);
+
+  const persistAndRefresh = async (targetItem: FaultCatalogItem, remarkValue: string) => {
+    const d1 = catalog.map((c) => {
+      const remark = same(c, targetItem) ? remarkValue : String(c.Remark ?? '');
+      return {
+        Faults: c.Faults,
+        RDesc: c.RDesc,
+        RsnCode: c.RsnCode,
+        SrNo: c.SrNo,
+        SubSr: c.SubSr,
+        UId: c.UId,
+        Remark: remark,
+        // IsEntry: remark.trim() !== '' ? "1" : "0",
+      };
+    });
+
+    const payload = { ...buildPayloadBase(), IsEntry: "1", d1 };
+    const response = await axios.post(`${API}/api/add_checking_fault`, payload, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    return response;
+  };
+
+  const handleAddFault = async (fault: FaultCatalogItem, remarkValue: string) => {
+    const key = `${fault.UId}_${fault.SubSr}`;
+    setBusy(true);
+    setBusyItemKey(key);
+    try {
+      const response = await persistAndRefresh(fault, remarkValue);
+      if (response.data?.success) {
+        await loadCatalog();
+      } else {
+        showError(response.data?.message || 'Fault save failed');
+      }
+    } catch (error) {
+      console.log('FaultsModal handleAddFault error:', error);
+      showError('Unable to save fault.');
+    } finally {
+      setBusy(false);
+      setBusyItemKey(null);
     }
-  }, [visible]);
+  };
 
-  const toggleFaultSelection = (fault: Fault) => {
-    const isSelected = selectedFaults.some((item) => item.UId === fault.UId);
-
-    if (isSelected) {
-      setSelectedFaults(selectedFaults.filter((item) => item.UId !== fault.UId));
-    } else {
-      setSelectedFaults([
-        ...selectedFaults,
-        {
-          ...fault,
-          Remark: '',
-        },
-      ]);
+  const handleRemoveFault = async (fault: FaultCatalogItem) => {
+    const key = `${fault.UId}_${fault.SubSr}`;
+    setBusy(true);
+    setBusyItemKey(key);
+    try {
+      const response = await persistAndRefresh(fault, '');
+      if (response.data?.success) {
+        await loadCatalog();
+      } else {
+        showError(response.data?.message || 'Unable to remove fault');
+      }
+    } catch (error) {
+      console.log('FaultsModal handleRemoveFault error:', error);
+      showError('Unable to remove fault.');
+    } finally {
+      setBusy(false);
+      setBusyItemKey(null);
     }
   };
-
-  const handleRemarkChange = (uid: string, SubSr: string, remark: string) => {
-    const cleanedRemark = sanitizeRemarkInput(remark);
-
-    setFaultsData(prev =>
-      prev.map(item =>
-        item.UId === uid && item.SubSr === SubSr
-          ? {
-            ...item,
-            Remark: cleanedRemark,
-          }
-          : item
-      )
-    );
-  };
-
-  const handleOK = () => {
-    onOK(faultsData);
-  };
-
-  // Search se filter — RDesc, RsnCode, SubSr, Faults sab pe search chalega
-  const filteredFaultsData = faultsData.filter((item) => {
-    if (!searchText.trim()) return true;
-    const q = searchText.toLowerCase();
-    return (
-      (item.RDesc ?? '').toLowerCase().includes(q) ||
-      (item.RsnCode ?? '').toLowerCase().includes(q) ||
-      (item.SubSr ?? '').toString().toLowerCase().includes(q) ||
-      (item.Faults ?? '').toLowerCase().includes(q)
-    );
-  });
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
-      <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Select Faults</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Icon name="close" size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <Icon name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by description or code"
-            placeholderTextColor="#999"
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText('')}>
-              <Icon name="close" size={18} color="#999" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <FlatList
-          data={filteredFaultsData}
-          keyExtractor={(item) => item.UId}
-          ListEmptyComponent={
-            <Text style={styles.noResultText}>No matching faults found</Text>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.faultItem}>
-              <View style={styles.faultHeader}>
-                <View style={styles.faultLeftColumn}>
-                  {/* <Text style={styles.faultSubSr}>
-                    Sr. No: {item.SubSr}
-                  </Text> */}
-                  <Text style={styles.faultSubSr}>
-                    {item.RDesc}
-                  </Text>
-                </View>
-                {/* <View style={styles.faultRightColumn}>
-                  <Text style={styles.faultRsnCode}>
-                    {item.RsnCode}
-                  </Text>
-                </View> */}
-              </View>
-
-              <TextInput
-                style={styles.remarkInput}
-                placeholder="123, 345-678"
-                placeholderTextColor="#999"
-                value={item.Remark ?? ""}
-                keyboardType="default"
-                onChangeText={(text) =>
-                  handleRemarkChange(item.UId, item.SubSr, text)
-                }
-              />
-            </View>
-          )}
-        />
-
-        <View style={styles.modalFooter}>
-          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.okButton, loading && { opacity: 0.6 }]}
-            onPress={handleOK}
-            disabled={loading}
-          >
-            {
-              loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.okButtonText}>OK</Text>
-            }
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+    <FaultSelector
+      visible={visible}
+      title="Select Faults"
+      catalog={catalog}
+      catalogLoading={catalogLoading}
+      busy={busy || loading}
+      busyItemKey={busyItemKey}
+      beamNo={beamNo}
+      takaNo={takaNo}
+      meter={meter}
+      onClose={onClose}
+      onAddFault={handleAddFault}
+      onRemoveFault={handleRemoveFault}
+    />
   );
 };
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 30,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 12,
-    backgroundColor: '#fafafa',
-  },
-  searchIcon: {
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#000',
-  },
-  noResultText: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 20,
-    fontSize: 14,
-  },
-  faultItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginBottom: 8,
-  },
-  selectedFaultItem: {
-    backgroundColor: '#e3f2fd',
-  },
-  faultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 1,
-  },
-  faultLeftColumn: {
-    flex: 1,
-  },
-  faultRightColumn: {
-    alignItems: 'flex-end',
-  },
-  faultSubSr: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  faultRDesc: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  faultRsnCode: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  remarkInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-    fontSize: 14,
-    backgroundColor: '#fff',
-    color: '#000',
-  },
-  selectButton: {
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  selectButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-  },
-  cancelButton: {
-    padding: 12,
-    marginRight: 16,
-  },
-  buttonText: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-  },
-  okButton: {
-    padding: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  okButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-});
 
 export default FaultsModal;

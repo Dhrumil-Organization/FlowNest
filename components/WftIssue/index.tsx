@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-    View, Text, TextInput, TouchableOpacity, Alert, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
+    View, Text, TextInput, TouchableOpacity, TextInput as RNTextInput, Button, Modal, FlatList, ActivityIndicator, StyleSheet, Dimensions,
     Platform
 } from 'react-native';
 // import theme from '../../android/app/src/theme';
@@ -20,6 +20,8 @@ import WeftIssueItemDrawer from './WeftIssueItemDrawer';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 
 import { fetchAllPropertyData, fetchAllYeardata } from '../../common/API/Functions';
+import AppAlert from '@/common/utils/appAlert';
+
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 // import PartyDropdown from '../Shared/PartyDropdown';
 // import LinearGradient from 'react-native-linear-gradient';
@@ -310,7 +312,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     //             setIsEditMode(true);
     //             setMainUId(item.UId);
     //         } else {
-    //             Alert.alert("Error", "No data found");
+    //             AppAlert.alert("Error", "No data found");
     //         }
 
     //     } catch (err) {
@@ -483,7 +485,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
                 setMainUId(item.UId);
                 // setIsDetailVisible(true);
             } else {
-                Alert.alert("Error", "No data found");
+                AppAlert.alert("Error", "No data found");
             }
 
         } catch (err) {
@@ -639,7 +641,7 @@ const WftIssue: React.FC<Props> = ({ token, username, userid }) => {
     }
 
     const confirmDelete = (item) => {
-        Alert.alert(
+        AppAlert.alert(
             "Delete Creel",
             `Are you sure you want to delete this ${item.BeamNo}?`,
             [

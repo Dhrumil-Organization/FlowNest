@@ -31,7 +31,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API, PRINTSTICKER } from '../../common/API/dynamicAPI';
 import ScannerFaultsModal from './ScannerFaultsModal';
-// import { isWeb } from '@/src/platform/runtime';
+
 interface Props {
     token: string;
     username: string;
@@ -1271,7 +1271,9 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
                 txntype: 'chekingScanner',
                 yearno: getCurrentFinancialYear(),
                 EMode: 'M',
-                d2: form.d2 || [],
+                // d2: form.d2 || [],
+                d2: (Array.isArray(form.d2) ? form.d2 : [])
+                    .filter((item: any) => String(item?.Remark ?? '').trim() !== ''),
             };
 
             console.log('handlesave payloadObj:', payloadObj);
@@ -1561,24 +1563,11 @@ const CheckingScanner: React.FC<Props> = ({ token, username }) => {
         return (
             <View style={[styles.centered, { padding: 20 }]}>
                 <Icon name="camera-alt" size={60} color="#999" />
-
-                <Text
-                    style={{
-                        marginTop: 15,
-                        fontSize: 16,
-                        textAlign: 'center'
-                    }}
-                >
+                <Text style={{ marginTop: 15, fontSize: 16, textAlign: 'center' }}>
                     Camera permission is required
                 </Text>
-
-                <TouchableOpacity
-                    style={styles.permissionBtn}
-                    onPress={requestPermission}
-                >
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>
-                        Grant Permission
-                    </Text>
+                <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>Grant Permission</Text>
                 </TouchableOpacity>
             </View>
         );

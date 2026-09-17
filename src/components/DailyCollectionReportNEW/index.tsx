@@ -17,11 +17,11 @@ import {
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import theme from '@/components/theme';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
+import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/FunctionsNEW';
 import HeaderBar from '../../components/HeaderNew';
 import CustomDrawer from './CustomDrawer';
 // import Footer from '../Footer/Footer';
-import { API } from '../../common/API/dynamicAPI';
+import { API } from '@/common/API/dynamicAPI';
 
 interface CardData {
     [key: string]: string;
@@ -212,6 +212,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     //     }
     // }, [rightsMenuApps]);
 
+    console.log("daily collection reportb token", token);
+
     let cancelToken: any;
 
     useEffect(() => {
@@ -237,6 +239,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     });
 
     useEffect(() => {
+        if (!token) return
         const loadProperty = async () => {
             const getGroupdata = await fetchPropertyGroupDataDCR(token);
             const getdata = await fetchPropertyData(token);
@@ -522,6 +525,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     // cards detail api end here 
 
     useEffect(() => {
+        if (!token) return;
         const yearValue = selectedYear.split('-')[1].substring(2);
         const payload = {
             fromDate: new Date().toISOString().split('T')[0],
@@ -532,7 +536,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             txntype: "mob_collection",
         }
         fetchBrowseData(payload);
-    }, []);
+    }, [token]);
 
     const openDrawer = () => setIsDrawerVisible(true);
     const closeDrawer = () => setIsDrawerVisible(false);
@@ -2523,6 +2527,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     // sales excutivewise party over
 
     useEffect(() => {
+        if (!token) return;
         const initializeApp123 = async () => {
             try {
                 const mas = await AsyncStorage.getItem('master_sync_data_common');
@@ -2535,7 +2540,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
         };
 
         initializeApp123();
-    }, []);
+    }, [token]);
 
     const SalesExe = useCallback(async () => {
         try {
@@ -2577,10 +2582,11 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
     }, [form, currentYear]);
 
     useEffect(() => {
+        if (!token) return;
         if (form.PrpOf) {
             SalesExe();
         }
-    }, [form.PrpOf]);
+    }, [form.PrpOf, token]);
 
     const onDashboardCardPress = (card) => {
         if (!card || !card.PrpCode) return;

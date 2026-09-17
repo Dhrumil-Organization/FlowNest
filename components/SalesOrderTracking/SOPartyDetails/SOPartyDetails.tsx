@@ -1118,16 +1118,16 @@ import AppAlert from '@/common/utils/appAlert';
 
 // export default SOPartyDetails;
 
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import HeaderBarwithBack from '@/components/Header';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import axios from 'axios';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { debounce } from 'lodash';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { API } from '../../../common/API/dynamicAPI';
 
 const { width } = Dimensions.get('window');
@@ -1369,6 +1369,7 @@ const SOPartyDetails: React.FC<SOPartyDetailsProps> = ({ route, token, navigatio
                 uid: order.uid,
                 srno: order.srno,
                 sexes: seArr,
+                soallocationid: order.soallocationid
             };
             const response = await axios.post(`${API}/api/salesorderpartychallantracking`, payload, { headers });
             if (response.data.success === true) {

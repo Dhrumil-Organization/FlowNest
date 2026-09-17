@@ -1,0 +1,17 @@
+{
+  "//": "Reference only. Merge the compilerOptions.paths into your existing tsconfig.json so TypeScript/your editor resolves the same @/ alias that babel resolves at build time. The target of '@/*' MUST match the babel alias in babel.config.js.",
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

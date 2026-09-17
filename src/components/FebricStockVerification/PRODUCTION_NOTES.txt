@@ -1,0 +1,45 @@
+Fabric Stock Verification - Production Safe v3
+Date: 2026-09-02
+
+Included:
+1. Main-screen QR Scan Taka flow.
+   - Existing taka: opens verification confirmation only.
+   - Does not alter Wt / GrossWt / stock meter.
+   - Not found: short message only: "Scanned Taka <no> is not found."
+   - Manual Entry is offered explicitly; nothing auto-saves.
+
+2. Quick status chips are working filters:
+   - All
+   - Auto not found
+   - Auto found
+   - Auto for repacking
+   - Manual
+   - Duplicate
+   - Stock not found
+   Counts are shown. Tapping the active non-All filter returns to All.
+
+3. Manual Fabric Stock screen redesigned to mirror legacy Taka Manual Entry:
+   - Taka No.
+   - Mtr.
+   - Design
+   - Item
+   - Shade
+   - Is Alum Moving
+   - Stock Type
+   Property/year/store are inherited from the verification context and are not
+   repeated as operator inputs.
+
+4. Existing Laravel endpoint contract is preserved.
+   - Qty, Wt, NetWt and GrsWt receive the single entered meter value.
+   - Chees remains 0 for manual fabric entry.
+   - No original fabric transaction is created/modified by this frontend.
+
+5. Is Alum Moving:
+   - Frontend sends IsAlumMoving (1/0) and an IsNonMove compatibility value.
+   - Current reviewed Laravel insert_verify_manual_fabric_stock hard-codes
+     GRYMStk.IsNonMove = 0, so persistence of this checkbox requires the backend
+     to consume IsNonMove. No backend file was changed in this React Native package.
+
+Deployment:
+- Copy-replace the files from this folder over the existing FabricStockVerification module.
+- expo-camera remains required by FabricQrScannerModal.tsx for the main scanner.

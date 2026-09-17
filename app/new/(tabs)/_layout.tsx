@@ -268,6 +268,7 @@
 //   label: { fontSize: 11, fontWeight: '700', color: T.ink, textAlign: 'center' },
 // });
 
+import { NotificationProvider } from '@/common/context/NotificationContext';
 import { AppHeader } from '@/src/components/layout/AppHeader';
 import { useHeaderExtrasStore } from '@/src/core/layout/headerExtras';
 import { APP_NAVIGATION } from '@/src/core/navigation';
@@ -323,6 +324,9 @@ const HEADER_CONTENT: Record<string, { eyebrow?: string; title: string }> = {
   orders: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Orders' },
   priority: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Chart Priority' },
   datalog: { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Datalog' },
+  'production-order-tracking': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Production Order Tracking' },
+  'sudamo-production-order': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Sudamo Production Order' },
+  'credit-limit-request': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Credit Limit Request' },
   reports: { eyebrow: 'SUDAMO TEXTILE ERP', title: 'Reports' },
   'permissions/index': { eyebrow: 'ADMINISTRATION', title: 'Permission Manager' },
   'checking-scanner': { eyebrow: 'MADHUSUDHAN FABRICS', title: 'Checking Scanner' },
@@ -376,7 +380,20 @@ export default function TabsLayout() {
     : APP_NAVIGATION.map((item) => item.routeName).find(
       (routeName) => routeName !== 'index' && pathname.includes(routeName.replace(/\/index$/, '')),
     );
-  const header = (activeRouteName && HEADER_CONTENT[activeRouteName]) || HEADER_CONTENT.index;
+  const activeNavItem = !onDashboard
+    ? APP_NAVIGATION.find(
+      (item) => item.routeName !== 'index' && pathname.includes(item.routeName.replace(/\/index$/, '')),
+    )
+    : undefined;
+
+  // Falls back to the nav node's own `title` (from the ui-registry) when this
+  // route has no explicit HEADER_CONTENT override — so adding a brand-new
+  // feature to the ui-registry is enough to get a correct header out of the
+  // box, without also having to add an entry here.
+  const header =
+    (activeRouteName && HEADER_CONTENT[activeRouteName]) ||
+    (activeNavItem && { eyebrow: 'MADHUSUDHAN FABRICS', title: activeNavItem.title }) ||
+    HEADER_CONTENT.index;
 
   // Drill-down report screens render their own compact SubScreenHeader.
   // Do not stack the large tab-level AppHeader above them, otherwise the
@@ -621,45 +638,47 @@ function GlassTabBar({
   };
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={[
-        styles.barWrap,
-        { bottom: barBottom, left: barLeft, right: barRight },
-      ]}
-    >
-      <View style={styles.barShadow}>
-        <View style={styles.barClip}>
-          <BlurView tint="dark" intensity={55} style={StyleSheet.absoluteFillObject} />
-          <View style={[StyleSheet.absoluteFillObject, styles.tintOverlay]} />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[T.nav, T.nav, T.nav]}
-            locations={[0, 0.45, 1]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <View pointerEvents="none" style={styles.glassBorder} />
+    <NotificationProvider>
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.barWrap,
+          { bottom: barBottom, left: barLeft, right: barRight },
+        ]}
+      >
+        <View style={styles.barShadow}>
+          <View style={styles.barClip}>
+            <BlurView tint="dark" intensity={55} style={StyleSheet.absoluteFillObject} />
+            <View style={[StyleSheet.absoluteFillObject, styles.tintOverlay]} />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[T.nav, T.nav, T.nav]}
+              locations={[0, 0.45, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View pointerEvents="none" style={styles.glassBorder} />
 
-          <View style={styles.row}>
-            <Animated.View style={[styles.pill, pillStyle]} />
-            {items.map((item) => {
-              const focused = item.routeName === activeKey;
-              return (
-                <TabButton
-                  key={item.routeName}
-                  item={item}
-                  focused={!!focused}
-                  onLayout={handleLayout(item.routeName)}
-                  onPress={() => handlePress(item)}
-                />
-              );
-            })}
+            <View style={styles.row}>
+              <Animated.View style={[styles.pill, pillStyle]} />
+              {items.map((item) => {
+                const focused = item.routeName === activeKey;
+                return (
+                  <TabButton
+                    key={item.routeName}
+                    item={item}
+                    focused={!!focused}
+                    onLayout={handleLayout(item.routeName)}
+                    onPress={() => handlePress(item)}
+                  />
+                );
+              })}
+            </View>
           </View>
         </View>
       </View>
-    </View>
+    </NotificationProvider>
   );
 }
 

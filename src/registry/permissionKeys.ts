@@ -23,6 +23,10 @@ export const PermissionKeys = {
     greyPacking: 'grey_packing',
     greyPackingEntry: 'grey_packing.entry',
     greyPackingScanner: 'grey_packing.scanner',
+    production: 'production',
+    productionOrderTracking: 'production.production_order_tracking',
+    sudamoProductionOrder: 'production.sudamo_production_order',
+    creditLimitRequest: 'production.credit_limit_request',
   },
   commercial: {
     costing: 'costing',

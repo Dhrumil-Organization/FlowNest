@@ -4,11 +4,12 @@
 // Loads legacy storage + session, shows splash while hydrating,
 // then hands off to expo-router's Stack instead of React Navigation.
 // ─────────────────────────────────────────────────────────────
+import { Stack } from 'expo-router';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
 
+import { NotificationProvider } from '@/common/context/NotificationContext';
 import { AppCoreProvider } from '@/src/core/AppCoreProvider';
 import '@/src/registry';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
@@ -26,21 +27,25 @@ export default function NewAppLayout() {
 
   if (!hydrated) {
     return (
-      <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-        <View style={{ flex: 1, backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={T.copper} size="large" />
-        </View>
-      </SafeAreaProvider>
+      <NotificationProvider>
+        <SafeAreaProvider>
+          <StatusBar barStyle="light-content" backgroundColor={T.nav} />
+          <View style={{ flex: 1, backgroundColor: T.nav, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator color={T.copper} size="large" />
+          </View>
+        </SafeAreaProvider>
+      </NotificationProvider>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-      <AppCoreProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </AppCoreProvider>
-    </SafeAreaProvider>
+    <NotificationProvider>
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor={T.nav} />
+        <AppCoreProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </AppCoreProvider>
+      </SafeAreaProvider>
+    </NotificationProvider>
   );
 }

@@ -203,14 +203,14 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
     // console.log("selected tab", modalTab);
     // console.log("filterpartyData", filterpartyData)
-    useEffect(() => {
-        if (rightsMenuApps && rightsMenuApps.length > 0) {
-            const hasReport = rightsMenuApps.some(
-                (item) => item?.title === "Daily Collection Report"
-            );
-            setHasDailyCollectionReport(hasReport);
-        }
-    }, [rightsMenuApps]);
+    // useEffect(() => {
+    //     if (rightsMenuApps && rightsMenuApps.length > 0) {
+    //         const hasReport = rightsMenuApps.some(
+    //             (item) => item?.title === "Daily Collection Report"
+    //         );
+    //         setHasDailyCollectionReport(hasReport);
+    //     }
+    // }, [rightsMenuApps]);
 
     let cancelToken: any;
 

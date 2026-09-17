@@ -15,7 +15,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import PartyDropdown from '@/Shared/PartyDropdown';
 import PartyDropdownforweft from '@/Shared/PartyDropdownforweft';
-import AppAlert from '@/common/utils/appAlert';
 
 const { height } = Dimensions.get('window');
 
@@ -37,7 +36,8 @@ const AddWeftIssueDetail = (props) => {
         isEditMode,
         isItemdetailvisible,
         resetFlag,
-        userid
+        userid,
+        issueMode
     } = props;
 
     const slideAnim = useRef(new Animated.Value(0)).current;
@@ -317,7 +317,7 @@ const AddWeftIssueDetail = (props) => {
                     }
                 }));
             } else if (res?.validate === 'false') {
-                AppAlert.alert(
+                Alert.alert(
                     'Oops!!!',
                     res?.message || 'Something went wrong!',
                     [
@@ -579,7 +579,7 @@ const AddWeftIssueDetail = (props) => {
             //     text: 'OK',
             //     onPress: () => { },
             // });
-            AppAlert.alert(`${firstError}`);
+            Alert.alert(`${firstError}`);
 
             return;
         }
@@ -591,7 +591,8 @@ const AddWeftIssueDetail = (props) => {
         setShowNextModal(false);
         // props.onNext && props.onNext();
         props.onNext && props.onNext({
-            hasIssueDesignAccess: canShowIssueDesign
+            hasIssueDesignAccess: canShowIssueDesign,
+            StkType: values.StkType || ''
         });
     };
 

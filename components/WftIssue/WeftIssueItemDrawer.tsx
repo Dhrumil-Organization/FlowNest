@@ -15,15 +15,13 @@ import { useCameraDevice } from '@/Shared/expoScannerHelper';
 import { BarcodeScanningResult } from 'expo-camera';
 // import HeaderBarwithBack from '../HeaderBarwithBack/HeaderBarwithBack';
 // import { Picker } from '@react-native-picker/picker';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-import AsyncStorage from '@/common/utils/compatibleStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScrollView } from 'react-native';
 // import Snackbar from 'react-native-snackbar';
 import { showSnackbar, showSuccess, showError, showWarning } from '@/common/utils/snackbar';
 import { Switch } from 'react-native';
 import CustomDrawer from './CustomDrawer';
 import { fetchAllPropertyData, fetchAllYeardata, fetchAllStoredata } from '../../common/API/Functions';
-import AppAlert from '@/common/utils/appAlert';
 // import { ExeData, DesignData, ItemData, POTData, ItemStatus, CardPayload } from './Modal';
 // import PartyDropdown from '../Shared/PartyDropdown';
 // import SearchableDropdown from '../Shared/SearchableDropdown';
@@ -52,7 +50,8 @@ const WeftIssueItemDrawer = ({
     editData,
     closeAllDrawers,
     resetAllData,
-    fetchbrowse
+    fetchbrowse,
+    issueMode
 }) => {
     // const device = useCameraDevice('back');
     // ✅ REPLACE with this:
@@ -1046,7 +1045,7 @@ const WeftIssueItemDrawer = ({
             fetchitmgrdshdname(parsed);
             sendScannedValue(value);
         } catch (err) {
-            AppAlert.alert("Invalid QR", "QR format not valid");
+            Alert.alert("Invalid QR", "QR format not valid");
         }
         setIsScanning(false);
     };
@@ -1096,7 +1095,7 @@ const WeftIssueItemDrawer = ({
 
     const handleSearch = async () => {
         if (!searchText) {
-            AppAlert.alert('Enter carton number');
+            Alert.alert('Enter carton number');
             return;
         }
         if (cancelToken?.cancel) cancelToken.cancel();
@@ -1131,7 +1130,7 @@ const WeftIssueItemDrawer = ({
                 setSearchResults(data);
             } else {
                 setSearchResults([]);
-                AppAlert.alert('No data found');
+                Alert.alert('No data found');
             }
 
         } catch (error) {
@@ -1139,7 +1138,7 @@ const WeftIssueItemDrawer = ({
                 // console.log("Request cancelled");
             } else {
                 // console.log("API Error:", error);
-                AppAlert.alert('Error while searching');
+                Alert.alert('Error while searching');
             }
         } finally {
             setIsLoading(false);
@@ -1197,7 +1196,7 @@ const WeftIssueItemDrawer = ({
 
         // Carton validation depends on the currently selected tab.
         if (!cartonValue) {
-            AppAlert.alert(
+            Alert.alert(
                 "Validation Error",
                 isManualMode ? "Please select carton first." : "Please scan carton first."
             );
@@ -1206,7 +1205,7 @@ const WeftIssueItemDrawer = ({
 
         // Once the carton is selected, validate Chees and Quantity separately.
         if (!cheesValue && !qtyValue) {
-            AppAlert.alert(
+            Alert.alert(
                 "Validation Error",
                 "Please enter Chees and Quantity."
             );
@@ -1214,12 +1213,12 @@ const WeftIssueItemDrawer = ({
         }
 
         if (!cheesValue) {
-            AppAlert.alert("Validation Error", "Please enter Chees.");
+            Alert.alert("Validation Error", "Please enter Chees.");
             return;
         }
 
         if (!qtyValue) {
-            AppAlert.alert("Validation Error", "Please enter Quantity.");
+            Alert.alert("Validation Error", "Please enter Quantity.");
             return;
         }
 
@@ -1228,7 +1227,7 @@ const WeftIssueItemDrawer = ({
         );
 
         if (isDuplicate) {
-            AppAlert.alert("Duplicate Error", `Carton No ${cartonValue} already added.`);
+            Alert.alert("Duplicate Error", `Carton No ${cartonValue} already added.`);
             return;
         }
 
@@ -1241,17 +1240,17 @@ const WeftIssueItemDrawer = ({
         const availableQtyNumber = parseFloat(availableQtyValue);
 
         if (!Number.isFinite(enteredChees) || enteredChees <= 0) {
-            AppAlert.alert("Validation Error", "Chees must be greater than 0.");
+            Alert.alert("Validation Error", "Chees must be greater than 0.");
             return;
         }
 
         if (!Number.isFinite(enteredQty) || enteredQty <= 0) {
-            AppAlert.alert("Validation Error", "Quantity must be greater than 0.");
+            Alert.alert("Validation Error", "Quantity must be greater than 0.");
             return;
         }
 
         if (Number.isFinite(availableCheesNumber) && enteredChees > availableCheesNumber) {
-            AppAlert.alert(
+            Alert.alert(
                 "Validation Error",
                 `Entered Chees (${enteredChees}) cannot be greater than Available Chees (${availableCheesNumber}).`
             );
@@ -1259,7 +1258,7 @@ const WeftIssueItemDrawer = ({
         }
 
         if (Number.isFinite(availableQtyNumber) && enteredQty > availableQtyNumber) {
-            AppAlert.alert(
+            Alert.alert(
                 "Validation Error",
                 `Entered Quantity (${enteredQty}) cannot be greater than Available Quantity (${availableQtyNumber}).`
             );
@@ -1382,7 +1381,9 @@ const WeftIssueItemDrawer = ({
                     ExpProdQty: newCarton.ExpProdQty || 0,
                     DsnRcpSrNo: FormState.values.srno,
                     DsnCode: FormState.values.DsnCode,
-                }]
+                    ExpProdQtyType: issueMode == 'new' ? '1' : '0'
+                }],
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("direct add payload", payloadObj);
@@ -1521,7 +1522,7 @@ const WeftIssueItemDrawer = ({
             : [];
 
         if (currentD2.length === 0) {
-            AppAlert.alert(
+            Alert.alert(
                 "Validation",
                 "Please add at least one carton."
             );
@@ -1679,7 +1680,7 @@ const WeftIssueItemDrawer = ({
             } else {
                 setIsLoading(false);
                 console.error('Unexpected response structure:', response.data);
-                AppAlert.alert(`${response.data}`);
+                Alert.alert(`${response.data}`);
             }
         } catch (error) {
             //console.log("API sendScannedValue error:", error);
@@ -1731,7 +1732,8 @@ const WeftIssueItemDrawer = ({
                     ExpProdQty: item.ExpProdQty || 0,
                     DsnRcpSrNo: FormState.values.srno,
                     DsnCode: FormState.values.DsnCode,
-                }))
+                })),
+                ExpProdQtyType: issueMode == 'new' ? '1' : '0'
             };
 
             console.log("edit payload", payloadObj);
@@ -2188,7 +2190,7 @@ const WeftIssueItemDrawer = ({
         const entryUid = mainUId || savedEntryUId || FormState.values.UId || '';
 
         if (!entryUid) {
-            AppAlert.alert('Delete Error', 'Entry UID not found.');
+            Alert.alert('Delete Error', 'Entry UID not found.');
             return;
         }
 
@@ -2379,7 +2381,7 @@ const WeftIssueItemDrawer = ({
     };
 
     const confirmDeleteEntry = () => {
-        AppAlert.alert(
+        Alert.alert(
             'Delete Complete Entry',
             'Are you sure you want to delete the complete Weft Issue entry?',
             [
@@ -2394,7 +2396,7 @@ const WeftIssueItemDrawer = ({
     };
 
     const confirmcartondelete = (item) => {
-        AppAlert.alert(
+        Alert.alert(
             "Delete Creel",
             `Are you sure you want to delete this Carton ${item.cartonNo}?`,
             [
@@ -2412,7 +2414,7 @@ const WeftIssueItemDrawer = ({
     };
 
     const handleDelete = (index) => {
-        AppAlert.alert(
+        Alert.alert(
             "Delete",
             "Are you sure you want to remove this carton?",
             [
@@ -2736,7 +2738,7 @@ const WeftIssueItemDrawer = ({
                                                 style={[styles.primaryBtn, { flex: 1 }]}
                                                 onPress={() => {
                                                     if (!selectedItem) {
-                                                        AppAlert.alert("Select carton first");
+                                                        Alert.alert("Select carton first");
                                                         return;
                                                     }
                                                     const data = {

@@ -3215,6 +3215,11 @@ export default function GreyPackingScannerScreen() {
       });
       console.log("strCode", strCode);
       const result = unwrap(response);
+
+      console.log("result", result);
+
+      console.log("response", response);
+
       if (!result.success) throw new Error(result.message);
 
       setConnectionBlocked(false);
@@ -3304,7 +3309,17 @@ export default function GreyPackingScannerScreen() {
 
 
     try {
-      const response = await GreyPackingAPI.scanSave({
+      // const response = await GreyPackingAPI.scanSave({
+      //   prpcode: selectedPrpCode,
+      //   yearno: selectedYearNo,
+      //   strcode: strCode,
+      //   uid,
+      //   qrcode: qr,
+      //   txntype: TXN_TYPE,
+      //   ttype: selectedTransactionTypes,
+      // });
+
+      const payload = {
         prpcode: selectedPrpCode,
         yearno: selectedYearNo,
         strcode: strCode,
@@ -3312,11 +3327,19 @@ export default function GreyPackingScannerScreen() {
         qrcode: qr,
         txntype: TXN_TYPE,
         ttype: selectedTransactionTypes,
-      });
+      };
+
+      console.log("========== SCAN SAVE PAYLOAD ==========");
+      console.log(payload);
+      console.log("========================================");
+
+      const response = await GreyPackingAPI.scanSave(payload);
 
       const result = unwrap(response);
       const data = result.data ?? {};
-
+      console.log("result", result);
+      console.log("response", response);
+      console.log("data", data);
       if (!result.success) {
         // Server/business validation is not a network failure.
         setConnectionBlocked(false);

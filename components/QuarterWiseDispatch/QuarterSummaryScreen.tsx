@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   FlatList,
   Modal,
   RefreshControl,
@@ -22,12 +22,12 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
+// Keep the mobile design scale, but cap it so desktop/web screens do not
+// accidentally become 3x-4x larger than the original mobile UI.
 const BASE_WIDTH = 430;
 const SCREEN_PADDING = 14;
-const DASHBOARD_WIDTH = SCREEN_WIDTH - SCREEN_PADDING * 2;
-const SCALE = DASHBOARD_WIDTH / BASE_WIDTH;
+const SCREEN_WIDTH = 430;
+const SCALE = 0.94;
 const s = value => Math.round(value * SCALE);
 
 const COLORS = {
@@ -92,6 +92,10 @@ const getPendingQty = m =>
   );
 
 export default function QuarterSummaryScreen() {
+  const { width: screenWidth } = useWindowDimensions();
+  const isDesktop = screenWidth >= 1100;
+  const isTablet = screenWidth >= 700;
+
   const [fy, setFy] = useState('2026-2027');
   const [quarter, setQuarter] = useState('Q1');
   const [type, setType] = useState('ALL');
@@ -235,11 +239,12 @@ export default function QuarterSummaryScreen() {
       />
       <StatusBar style="light" backgroundColor={COLORS.teal} />
       <View style={styles.header}>
+        <View style={styles.headerInner}>
         {/* <TouchableOpacity hitSlop={12}>
           <Icon name="menu" size={s(30)} color="#fff" />
         </TouchableOpacity> */}
         <TouchableOpacity onPress={() => goBack()}>
-          <Icon name="arrow-back-ios-new" size={20} color="#fff" />
+          <Icon name="arrow-back-ios-new" size={s(20)} color="#fff" />
         </TouchableOpacity>
 
         <View style={styles.headerTextBox}>
@@ -266,6 +271,7 @@ export default function QuarterSummaryScreen() {
         <TouchableOpacity onPress={() => setPickerType('fy')} hitSlop={12}>
           <Icon name="calendar-today" size={s(25)} color="#fff" />
         </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -280,6 +286,7 @@ export default function QuarterSummaryScreen() {
           />
         }
       >
+        <View style={styles.dashboardShell}>
         <View style={styles.quarterTabs}>
           {quarters.map(q => (
             <TouchableOpacity
@@ -377,13 +384,14 @@ export default function QuarterSummaryScreen() {
 
         {!loading && !error && data && (
           <>
-            <View style={styles.kpiGrid}>
+            <View style={[styles.kpiGrid, isDesktop && styles.kpiGridDesktop]}>
               <KpiCard
                 icon="assignment"
                 title="Total Orders"
                 count={summary.orders?.count}
                 value={fmtCompact(orderQty, ` ${unit}`)}
                 color={COLORS.blue}
+                desktop={isDesktop}
               />
 
               <KpiCard
@@ -392,16 +400,16 @@ export default function QuarterSummaryScreen() {
                 count={summary.actual_dispatch?.count}
                 value={fmtCompact(dispatchQty, ` ${unit}`)}
                 color={COLORS.green}
+                desktop={isDesktop}
               />
-            </View>
 
-            <View style={styles.kpiGrid}>
               <KpiCard
                 icon="hourglass-empty"
                 title="Pending Dispatch"
                 count={summary.pending_dispatch?.count}
                 value={fmtCompact(pendingQty, ` ${unit}`)}
                 color={COLORS.orange}
+                desktop={isDesktop}
               />
 
               <KpiCard
@@ -410,6 +418,7 @@ export default function QuarterSummaryScreen() {
                 count=""
                 value={pct(summary.otd_percent)}
                 color={COLORS.purple}
+                desktop={isDesktop}
               />
             </View>
 
@@ -524,7 +533,7 @@ export default function QuarterSummaryScreen() {
                 style={styles.sameQuarterCard}
                 title={`Same Quarter Dispatch (${data?.quarter?.label || quarter})`}
               >
-                <View style={styles.sameKpiRow}>
+                <View style={[styles.sameKpiRow, !isTablet && styles.sameKpiRowCompact]}>
                   <MiniCard
                     icon="local-shipping"
                     title="Total Dispatch"
@@ -532,6 +541,7 @@ export default function QuarterSummaryScreen() {
                     value={fmtCompact(same.qty, ` ${unit}`)}
                     color={COLORS.blue}
                     bg={COLORS.softBlue}
+                    compact={!isTablet}
                   />
 
                   <MiniCard
@@ -542,6 +552,7 @@ export default function QuarterSummaryScreen() {
                     percent={summary.otd_percent}
                     color={COLORS.green}
                     bg={COLORS.softGreen}
+                    compact={!isTablet}
                   />
 
                   <MiniCard
@@ -552,6 +563,7 @@ export default function QuarterSummaryScreen() {
                     percent={summary.delay_percent}
                     color={COLORS.red}
                     bg={COLORS.softRed}
+                    compact={!isTablet}
                   />
 
                   <MiniCard
@@ -561,13 +573,17 @@ export default function QuarterSummaryScreen() {
                     value={pct(summary.otd_percent)}
                     color={COLORS.purple}
                     bg={COLORS.softPurple}
+                    compact={!isTablet}
                   />
                 </View>
               </Card>
             </View>
 
-            <View style={styles.chartRow}>
-              <Card style={styles.previousCard} title="Previous Quarter Dispatch">
+            <View style={[styles.chartRow, !isTablet && styles.chartRowStack]}>
+              <Card
+                style={[styles.previousCard, !isTablet && styles.fullWidthCard]}
+                title="Previous Quarter Dispatch"
+              >
                 <View style={styles.previousBox}>
                   <View style={styles.previousIcon}>
                     <Icon name="receipt-long" size={s(27)} color={COLORS.teal} />
@@ -591,7 +607,10 @@ export default function QuarterSummaryScreen() {
               </Card>
 
 
-              <Card style={styles.chartCard} title="Order Status (By Qty)">
+              <Card
+                style={[styles.chartCard, !isTablet && styles.fullWidthCard]}
+                title="Order Status (By Qty)"
+              >
                 <View style={styles.statusChartWrap}>
                   <DonutChart
                     total={orderQty}
@@ -623,7 +642,7 @@ export default function QuarterSummaryScreen() {
               </Card>
             </View>
 
-            <View style={styles.chartRow}>
+            <View style={[styles.chartRow, !isTablet && styles.chartRowStack]}>
               {/* <Card style={styles.chartCard} title={`Top 5 Parties by Dispatch (${unit})`}>
                 {topParties.length === 0 ? (
                   <TopPartyFallback unit={unit} />
@@ -746,6 +765,7 @@ export default function QuarterSummaryScreen() {
             <View style={styles.footerSpace} />
           </>
         )}
+        </View>
       </ScrollView>
 
       <FilterSheet
@@ -801,9 +821,9 @@ function Card({ title, subTitle, titleColor, children, style }) {
   );
 }
 
-function KpiCard({ icon, title, count, value, color }) {
+function KpiCard({ icon, title, count, value, color, desktop }) {
   return (
-    <View style={styles.kpiCard}>
+    <View style={[styles.kpiCard, desktop && styles.kpiCardDesktop]}>
       <View style={[styles.kpiIcon, { backgroundColor: color }]}>
         <Icon name={icon} size={s(22)} color="#fff" />
       </View>
@@ -952,9 +972,13 @@ function CarryMetric({ icon, label, value, color }) {
   );
 }
 
-function MiniCard({ icon, title, count, value, percent, color, bg }) {
+function MiniCard({ icon, title, count, value, percent, color, bg, compact }) {
   return (
-    <View style={[styles.miniCard, { backgroundColor: bg }]}>
+    <View style={[
+      styles.miniCard,
+      compact && styles.miniCardCompact,
+      { backgroundColor: bg },
+    ]}>
       <Icon name={icon} size={s(23)} color={color} />
 
       <Text numberOfLines={2} style={styles.miniTitle}>
@@ -1172,9 +1196,16 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: COLORS.teal,
-    paddingHorizontal: s(18),
-    paddingTop: s(16),
-    paddingBottom: s(16),
+    minHeight: s(78),
+    paddingHorizontal: s(16),
+    paddingVertical: s(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  headerInner: {
+    width: '100%',
+    maxWidth: 1480,
     flexDirection: 'row',
     alignItems: 'center',
     gap: s(14),
@@ -1186,8 +1217,9 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: s(24),
+    fontSize: s(25),
     fontWeight: '900',
+    letterSpacing: -0.3,
   },
 
   headerSubRow: {
@@ -1204,10 +1236,18 @@ const styles = StyleSheet.create({
 
   scroll: {
     flex: 1,
+    backgroundColor: COLORS.bg,
   },
 
   content: {
-    padding: s(14),
+    paddingHorizontal: s(12),
+    paddingVertical: s(14),
+    alignItems: 'center',
+  },
+
+  dashboardShell: {
+    width: '100%',
+    maxWidth: 1480,
   },
 
   quarterTabs: {
@@ -1215,7 +1255,12 @@ const styles = StyleSheet.create({
     borderRadius: s(18),
     flexDirection: 'row',
     padding: s(5),
-    elevation: 3,
+    minHeight: s(82),
+    elevation: 2,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
   },
 
   qTab: {
@@ -1358,23 +1403,37 @@ const styles = StyleSheet.create({
 
   kpiGrid: {
     flexDirection: 'row',
-    gap: s(8),
+    flexWrap: 'wrap',
+    gap: s(10),
     marginTop: s(14),
   },
 
-  kpiCard: {
+  kpiGridDesktop: {
+    flexWrap: 'nowrap',
+  },
+
+  kpiCardDesktop: {
     flex: 1,
-    minHeight: s(135),
+    width: 'auto',
+  },
+
+  kpiCard: {
+    width: '48.8%',
+    minHeight: s(145),
     backgroundColor: COLORS.card,
-    borderRadius: s(15),
-    padding: s(11),
+    borderRadius: s(17),
+    padding: s(14),
     elevation: 2,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.055,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
 
   kpiIcon: {
-    width: s(40),
-    height: s(40),
-    borderRadius: s(21),
+    width: s(44),
+    height: s(44),
+    borderRadius: s(22),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: s(12),
@@ -1382,7 +1441,7 @@ const styles = StyleSheet.create({
 
   kpiTitle: {
     color: COLORS.text,
-    fontSize: s(11),
+    fontSize: s(12),
     fontWeight: '900',
     minHeight: s(28),
   },
@@ -1395,7 +1454,7 @@ const styles = StyleSheet.create({
   },
 
   kpiValue: {
-    fontSize: s(15),
+    fontSize: s(17),
     fontWeight: '900',
     marginTop: s(2),
   },
@@ -1403,9 +1462,13 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.card,
     borderRadius: s(18),
-    padding: s(14),
+    padding: s(16),
     marginTop: s(14),
     elevation: 2,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.045,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
 
   cardTitle: {
@@ -1592,20 +1655,35 @@ const styles = StyleSheet.create({
   },
 
   previousCard: {
-    width: '48%',
+    width: '49.2%',
+  },
+
+  fullWidthCard: {
+    width: '100%',
   },
 
   sameKpiRow: {
     flexDirection: 'row',
-    gap: s(6),
+    flexWrap: 'nowrap',
+    gap: s(8),
+  },
+
+  sameKpiRowCompact: {
+    flexWrap: 'wrap',
   },
 
   miniCard: {
     flex: 1,
-    minHeight: s(104),
-    borderRadius: s(12),
-    padding: s(7),
+    minHeight: s(112),
+    borderRadius: s(14),
+    padding: s(9),
     alignItems: 'center',
+  },
+
+  miniCardCompact: {
+    flexBasis: '48%',
+    flexGrow: 0,
+    maxWidth: '48%',
   },
 
   miniTitle: {
@@ -1676,13 +1754,17 @@ const styles = StyleSheet.create({
 
   chartRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     justifyContent: 'space-between',
-    gap: s(10),
+    gap: s(12),
+  },
+
+  chartRowStack: {
+    flexDirection: 'column',
   },
 
   chartCard: {
-    width: '48%',
+    width: '49.2%',
     minHeight: s(230),
   },
 
@@ -1964,7 +2046,7 @@ const styles = StyleSheet.create({
   },
 
   monthCol: {
-    width: s(48),
+    width: s(58),
   },
 
   monthlyHeadText: {

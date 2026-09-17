@@ -7,16 +7,15 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
-    Dimensions,
     FlatList,
     Modal,
-    PixelRatio,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
     Platform,
+    useWindowDimensions,
     Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +27,10 @@ import { Snackbar } from '@/common/utils/snackbarCompat';
 
 const CreelIssueReturn = ({ token, navigation }) => {
     const router = useRouter();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const isTablet = screenWidth >= 768;
+    const isDesktop = screenWidth >= 1100;
+    const contentWidth = isDesktop ? Math.min(screenWidth - 48, 1180) : screenWidth;
     const [search, setSearch] = useState("");
 
     const [filterVisible, setFilterVisible] = useState(false);
@@ -764,13 +767,13 @@ const CreelIssueReturn = ({ token, navigation }) => {
 
                         <Text style={styles.headerTitle}>Creel Issue Return</Text>
 
-                        <TouchableOpacity onPress={() => setFilterVisible(true)}>
-                            <Icon name="tune" size={22} color="#fff" />
+                        <TouchableOpacity onPress={() => setFilterVisible(true)} style={styles.headerFilterBtn}>
+                            <Icon name="tune" size={21} color="#fff" />
                         </TouchableOpacity>
                     </LinearGradient>
 
                     {/* SEARCH */}
-                    <View style={styles.searchBox}>
+                    <View style={[styles.searchBox, { width: isDesktop ? Math.min(screenWidth - 48, 1180) : Math.max(0, screenWidth - 32), alignSelf: "center" }]}>
                         <Icon name="search" size={20} color="#000" />
                         <TextInput
                             placeholder="Search..."
@@ -786,7 +789,7 @@ const CreelIssueReturn = ({ token, navigation }) => {
                     </View>
 
                     {/* 🔥 SELECTED FILTERS */}
-                    <View style={styles.chipContainer}>
+                    <View style={[styles.chipContainer, { width: isDesktop ? Math.min(screenWidth - 48, 1180) : screenWidth, alignSelf: "center" }]}>
 
                         {/* PROPERTY */}
                         <TouchableOpacity
@@ -1092,10 +1095,11 @@ const CreelIssueReturn = ({ token, navigation }) => {
                     <FlatList
                         data={filteredCreelData}
                         keyExtractor={(item) => item.UId.toString()}
-                        contentContainerStyle={{
-                            paddingHorizontal: isTablet ? 30 : 16,
-                            paddingBottom: 180
-                        }}
+                        contentContainerStyle={[
+                            styles.listContent,
+                            isDesktop && styles.listContentDesktop,
+                            { width: "100%", alignSelf: "center" }
+                        ]}
 
                         renderItem={({ item }) => {
 
@@ -1528,473 +1532,496 @@ const CreelIssueReturn = ({ token, navigation }) => {
 
 export default CreelIssueReturn;
 
-const { width, height } = Dimensions.get("window");
-
-const isTablet = width >= 768;
-
-const scale = size =>
-    PixelRatio.roundToNearestPixel(size * (width / 375));
-
-const font = size =>
-    PixelRatio.roundToNearestPixel(size * (width / 375));
-
 const styles = StyleSheet.create({
-
+    screen: {
+        flex: 1,
+        backgroundColor: "#F4F7FA",
+    },
     header: {
+        minHeight: 74,
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingHorizontal: isTablet ? 30 : 18,
-        paddingVertical: isTablet ? 22 : 16,
-        // paddingTop: Platform.OS === "ios"
-        //     ? 55
-        //     : 40
-    },
-    headerTitle: { color: "#fff", fontSize: font(isTablet ? 22 : 18), fontWeight: "700" },
-
-    backBtn: {
-        width: isTablet ? 52 : 42,
-        height: isTablet ? 52 : 42,
-        borderRadius: isTablet ? 26 : 21,
-        backgroundColor: "rgba(255,255,255,0.2)",
-        justifyContent: "center", alignItems: "center"
-    },
-
-    searchBox: {
-        flexDirection: "row", alignItems: "center",
-        backgroundColor: "#fff", marginHorizontal: isTablet ? 28 : 16,
-        marginTop: 18,
         paddingHorizontal: 18,
-        paddingVertical: isTablet ? 18 : 12,
-        borderRadius: 18
+        paddingVertical: 12,
+        backgroundColor: "#0F6C7B",
     },
-
+    headerSide: {
+        width: 42,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    headerTitle: {
+        flex: 1,
+        color: "#fff",
+        fontSize: 20,
+        fontWeight: "800",
+        textAlign: "center",
+        marginHorizontal: 10,
+    },
+    backBtn: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: "rgba(255,255,255,0.16)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    headerFilterBtn: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.08)",
+    },
+    searchSection: {
+        width: "100%",
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 4,
+    },
+    searchBox: {
+        height: 54,
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#fff",
+        paddingHorizontal: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: "#E5EBEF",
+        shadowColor: "#0F2027",
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
+    },
     searchInput: {
         flex: 1,
-        fontSize: font(isTablet ? 18 : 15)
-    },
-
-    overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-end" },
-
-    sheet: {
-        backgroundColor: "#fff",
-        padding: 20,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20
-    },
-
-    dragBar: {
-        width: 50, height: 5, backgroundColor: "#ccc",
-        alignSelf: "center", marginBottom: 10
-    },
-
-    modalHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center"
-    },
-
-    title: { fontSize: 16, fontWeight: "600" },
-    resetText: { color: "red" },
-
-    label: {
-        marginTop: 10,
-        color: '#000'
-    },
-
-    bigInput: {
-        backgroundColor: "#F3F4F6",
-        padding: 14,
-        borderRadius: 12,
-        marginTop: 6,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        color: '#000'
-    },
-
-    inputText: {
-        flex: 1,
-        color: '#000'
-    },
-
-    dateBox: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#F3F4F6",
-        padding: 14,
-        borderRadius: 16,
-        marginTop: 6
-    },
-
-    applyBtnNew: {
-        backgroundColor: "#13879A",
-        paddingVertical: isTablet ? 18 : 14,
-        paddingHorizontal: 20,
-        borderRadius: 20,
-        marginTop: 20,
-        alignItems: "center"
-    },
-
-    applyText: { color: "#fff" },
-
-    pickerHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 15,
-        borderBottomWidth: 1,
-        borderColor: "#eee"
-    },
-
-    pickerTitle: {
+        minWidth: 0,
+        marginHorizontal: 10,
+        color: "#111827",
         fontSize: 16,
-        fontWeight: "600",
-        color: '#000'
-    },
-
-    pickerSearch: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#f1f1f1",
-        margin: 10,
-        paddingHorizontal: 10,
-        borderRadius: 10
-    },
-
-    pickerItem: {
-        padding: 15,
-        borderBottomWidth: 1,
-        borderColor: "#eee"
+        paddingVertical: 0,
     },
     chipContainer: {
+        width: "100%",
         flexDirection: "row",
         flexWrap: "wrap",
         paddingHorizontal: 16,
-        marginTop: 10,
+        paddingTop: 8,
+        paddingBottom: 4,
     },
-
     chip: {
+        maxWidth: "100%",
+        minHeight: 34,
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#E8F4F6",
-        borderRadius: 20,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginRight: 8,
-        marginBottom: 8,
-        maxWidth: "90%",
+        backgroundColor: "#E8F5F7",
+        borderWidth: 1,
+        borderColor: "#D4ECEF",
+        borderRadius: 17,
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+        marginRight: 7,
+        marginBottom: 6,
     },
-
     chipText: {
         marginHorizontal: 6,
-        fontSize: 13,
-        fontWeight: "500",
-        color: "#0F2027",
-        flexShrink: 1,
-    },
-    filterBlock: {
-        paddingHorizontal: 16,
-        marginTop: 10,
-    },
-
-    filterLabel: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: "600",
-        marginBottom: 6,
-        color: "#1010108e"
+        color: "#17343B",
+        flexShrink: 1,
+        maxWidth: 300,
     },
-
-    tabContainer: {
-        flexDirection: "row",
-        gap: 10
+    list: {
+        flex: 1,
     },
-
-    tabBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 18,
-        borderRadius: 14,
-        borderWidth: 1,
-        borderColor: "#ddd",
-        backgroundColor: "#fff"
+    listContent: {
+        width: "100%",
+        alignSelf: "center",
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 110,
     },
-
-    activeTab: {
-        backgroundColor: "#13879A",
-        borderColor: "#13879A"
+    listContentDesktop: {
+        maxWidth: 1180,
     },
-
-    tabText: {
-        fontSize: 14,
-        color: "#555"
-    },
-
-    activeText: {
-        color: "#fff",
-        fontWeight: "600"
-    },
-    card: {
+    ledgerCard: {
+        width: "100%",
         backgroundColor: "#fff",
-        borderRadius: 16,
         padding: 16,
         marginBottom: 12,
+        borderRadius: 16,
+        borderLeftWidth: 4,
+        borderColor: "#13879A",
+        shadowColor: "#102A33",
+        shadowOpacity: 0.07,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
         elevation: 3,
     },
-
     rowBetween: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-start",
     },
-
-    title: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: "#0F2027",
-    },
-
-    subText: {
-        fontSize: 12,
-        color: "#777",
-        marginTop: 4,
-    },
-
-    labelSmall: {
-        fontSize: 12,
-        color: "#555",
-    },
-
-    statusBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    // fab: {
-    //     position: "absolute",
-    //     backgroundColor: "#13879A",
-    //     width: isTablet ? 76 : 60,
-    //     height: isTablet ? 76 : 60,
-    //     borderRadius: isTablet ? 38 : 30,
-    //     bottom: isTablet ? 35 : 22,
-    //     right: isTablet ? 35 : 22,
-    //     justifyContent: "center",
-    //     alignItems: "center",
-    //     elevation: 5,
-    // },
-    fabContainer: {
-        position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-
-        alignItems: "flex-end",
-
-        paddingHorizontal: 20,
-        paddingBottom: Platform.OS === "ios" ? 34 : 20,
-
-        pointerEvents: "box-none",
-    },
-
-    fab: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: "#13879A",
-        justifyContent: "center",
-        alignItems: "center",
-        elevation: 10,
-    },
-    ledgerCard: {
-        backgroundColor: "#fff",
-        padding: isTablet ? 22 : 16,
-        marginBottom: isTablet ? 18 : 14,
-        borderRadius: isTablet ? 22 : 18,
-        borderLeftWidth: 5,
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 3
-    },
-
     dateText: {
-        fontSize: font(isTablet ? 16 : 13),
-        color: "#000"
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#52636A",
     },
-
     refBadge: {
-        backgroundColor: "#F1F3F5",
-        paddingHorizontal: isTablet ? 14 : 10,
-        paddingVertical: isTablet ? 8 : 5,
-        borderRadius: 8
+        maxWidth: "65%",
+        backgroundColor: "#F1F5F7",
+        borderRadius: 9,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
     },
-
     refText: {
         fontSize: 12,
-        color: "#000",
-        fontWeight: "500"
-    },
-
-    ledgerTitle: {
-        fontSize: 15,
-        fontWeight: "600",
-        color: "#000",
-        marginTop: 6,
-        marginBottom: 10
-    },
-
-    smallLabel1: {
-        fontSize: 13,
-        color: "#000"
-    },
-
-    amount1: {
-        fontSize: 13,
-        fontWeight: "600"
-    },
-
-    smallLabel: {
-        fontSize: font(isTablet ? 14 : 11),
-        color: "#000"
-    },
-
-    amount: {
-        fontSize: font(isTablet ? 18 : 15),
-        fontWeight: "600"
-    },
-
-    balanceText: {
-        fontSize: 15,
+        color: "#26383F",
         fontWeight: "700",
-        color: "#1565C0"
     },
     labelText: {
-        fontSize: 13,
-        color: "#000",
-        marginRight: 6
-    },
-
-    valueText: {
         fontSize: 12,
-        // fontWeight: "600",
-        color: "#000"
+        fontWeight: "600",
+        color: "#64747A",
+        marginRight: 6,
+    },
+    valueText: {
+        flexShrink: 1,
+        fontSize: 13,
+        color: "#15282E",
+        fontWeight: "600",
+    },
+    smallLabel1: {
+        fontSize: 12,
+        color: "#68777D",
+    },
+    amount1: {
+        fontSize: 13,
+        fontWeight: "700",
+        color: "#172B31",
+    },
+    metricsRow: {
+        flexDirection: "row",
+        alignItems: "stretch",
+        marginTop: 8,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: "#EDF1F3",
+    },
+    metricBox: {
+        minWidth: 78,
+        paddingRight: 20,
+    },
+    smallLabel: {
+        fontSize: 11,
+        color: "#718087",
+        fontWeight: "600",
+    },
+    amount: {
+        marginTop: 2,
+        fontSize: 16,
+        fontWeight: "800",
+        color: "#13879A",
     },
     cardActionRow: {
         flexDirection: "row",
         justifyContent: "flex-end",
         alignItems: "center",
-        gap: 10,
-        marginTop: -25,
+        gap: 8,
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: "#F0F3F5",
     },
-
     printBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 11,
         backgroundColor: "#0F6C7B",
-        width: isTablet ? 44 : 34,
-        height: isTablet ? 44 : 34,
-        borderRadius: isTablet ? 22 : 17,
         justifyContent: "center",
         alignItems: "center",
-        elevation: 4,
+        elevation: 2,
     },
-
+    deleteBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 11,
+        backgroundColor: "#EF4444",
+        justifyContent: "center",
+        alignItems: "center",
+        elevation: 2,
+    },
+    fabContainer: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: "flex-end",
+        paddingHorizontal: 18,
+        paddingBottom: Platform.OS === "ios" ? 24 : 18,
+        pointerEvents: "box-none",
+    },
+    fab: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: "#13879A",
+        justifyContent: "center",
+        alignItems: "center",
+        shadowColor: "#0F2027",
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 8,
+    },
+    overlay: {
+        flex: 1,
+        backgroundColor: "rgba(15,32,39,0.42)",
+        justifyContent: "flex-end",
+    },
+    sheet: {
+        width: "100%",
+        maxWidth: 620,
+        maxHeight: "92%",
+        alignSelf: "center",
+        backgroundColor: "#fff",
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: Platform.OS === "ios" ? 28 : 20,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+    },
+    dragBar: {
+        width: 44,
+        height: 4,
+        backgroundColor: "#D5DDE0",
+        borderRadius: 2,
+        alignSelf: "center",
+        marginBottom: 14,
+    },
+    modalHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 6,
+    },
+    title: {
+        fontSize: 19,
+        fontWeight: "800",
+        color: "#12272E",
+    },
+    resetText: {
+        color: "#DC2626",
+        fontWeight: "700",
+        marginRight: 16,
+    },
+    label: {
+        marginTop: 14,
+        marginBottom: 6,
+        color: "#46575D",
+        fontSize: 12,
+        fontWeight: "700",
+    },
+    bigInput: {
+        minHeight: 50,
+        backgroundColor: "#F5F8F9",
+        borderWidth: 1,
+        borderColor: "#E1E8EA",
+        paddingHorizontal: 14,
+        borderRadius: 13,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    inputText: {
+        flex: 1,
+        color: "#172B31",
+        fontSize: 14,
+    },
+    dateRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+    dateBox: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 50,
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#F5F8F9",
+        borderWidth: 1,
+        borderColor: "#E1E8EA",
+        paddingHorizontal: 12,
+        borderRadius: 13,
+    },
+    applyBtnNew: {
+        minHeight: 50,
+        backgroundColor: "#13879A",
+        paddingHorizontal: 20,
+        borderRadius: 14,
+        marginTop: 22,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    applyText: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "800",
+    },
+    pickerHeader: {
+        minHeight: 60,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderColor: "#E8EEF0",
+    },
+    pickerTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#15282E",
+    },
+    pickerSearch: {
+        minHeight: 48,
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#F3F7F8",
+        margin: 14,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#E1E8EA",
+    },
+    pickerItem: {
+        minHeight: 54,
+        justifyContent: "center",
+        paddingHorizontal: 18,
+        borderBottomWidth: 1,
+        borderColor: "#EEF2F3",
+    },
+    tabContainer: {
+        flexDirection: "row",
+        gap: 8,
+    },
+    tabBtn: {
+        flex: 1,
+        minHeight: 44,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#D9E2E5",
+        backgroundColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    activeTab: {
+        backgroundColor: "#13879A",
+        borderColor: "#13879A",
+    },
+    tabText: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#596A70",
+    },
+    activeText: {
+        color: "#fff",
+        fontWeight: "800",
+    },
     printerOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.45)",
         justifyContent: "flex-end",
     },
-
     printerSheet: {
+        width: "100%",
+        maxWidth: 620,
+        maxHeight: "82%",
+        alignSelf: "center",
         backgroundColor: "#fff",
-        borderTopLeftRadius: 25,
-        borderTopRightRadius: 25,
-        padding: 20,
-        maxHeight: "80%",
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 18,
     },
-
     printerHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 15,
+        marginBottom: 12,
     },
-
     printerTitle: {
-        fontSize: 20,
-        fontWeight: "700",
+        fontSize: 19,
+        fontWeight: "800",
         color: "#111827",
     },
-
     printerSubTitle: {
         marginTop: 3,
-        fontSize: 13,
-        fontWeight: "600",
+        fontSize: 12,
+        fontWeight: "700",
         color: "#0F6C7B",
     },
-
     printerCloseBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 42,
+        height: 42,
+        borderRadius: 12,
         backgroundColor: "#F1F5F9",
         justifyContent: "center",
         alignItems: "center",
     },
-
     printerSearchInput: {
-        height: 50,
+        height: 48,
         borderWidth: 1,
-        borderColor: "#D1D5DB",
+        borderColor: "#D7E0E3",
         borderRadius: 12,
-        paddingHorizontal: 15,
-        marginBottom: 12,
+        paddingHorizontal: 14,
+        marginBottom: 10,
         color: "#111827",
+        backgroundColor: "#F8FAFB",
     },
-
     printerItem: {
-        padding: 15,
+        minHeight: 60,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         borderBottomWidth: 1,
-        borderColor: "#EEEEEE",
+        borderColor: "#EEF2F3",
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
         borderRadius: 10,
     },
-
     printerItemSelected: {
         backgroundColor: "#E8F7F9",
     },
-
     printerName: {
         fontWeight: "700",
-        fontSize: 15,
+        fontSize: 14,
         color: "#111827",
     },
-
     printerStatus: {
         marginTop: 3,
         fontWeight: "600",
-        fontSize: 13,
+        fontSize: 12,
     },
-
     printerEmptyBox: {
-        minHeight: 100,
+        minHeight: 120,
         justifyContent: "center",
         alignItems: "center",
         paddingVertical: 20,
     },
-
     printerEmptyText: {
         marginTop: 8,
         color: "#6B7280",
         fontSize: 14,
     },
-
     printerErrorText: {
         color: "#DC2626",
         fontSize: 14,
         textAlign: "center",
     },
-
     printerRetryBtn: {
         marginTop: 10,
         paddingHorizontal: 20,
@@ -2002,72 +2029,68 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: "#0F6C7B",
     },
-
     printerRetryText: {
         color: "#fff",
         fontWeight: "700",
-    },
-
-    deleteBtn: {
-        marginTop: -25,
-        backgroundColor: "#EF4444",
-        width: isTablet ? 44 : 34,
-        height: isTablet ? 44 : 34,
-        borderRadius: isTablet ? 22 : 17,
-        justifyContent: "center",
-        alignItems: "center",
-        alignSelf: "flex-end"
     },
     alertOverlay: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        paddingHorizontal: 18,
         backgroundColor: "rgba(0,0,0,0.4)",
     },
-
     alertBox: {
-        width: isTablet ? "55%" : "88%",
+        width: "100%",
+        maxWidth: 420,
         backgroundColor: "#fff",
-        borderRadius: 18,
-        padding: 22,
+        borderRadius: 20,
+        padding: 24,
         alignItems: "center",
+        shadowColor: "#000",
+        shadowOpacity: 0.15,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 8,
     },
-
     alertTitle: {
         fontSize: 18,
-        fontWeight: "700",
+        fontWeight: "800",
         marginTop: 10,
-        color: "#000",
+        color: "#172B31",
     },
-
     alertMessage: {
         textAlign: "center",
         marginTop: 10,
-        color: "#444",
+        color: "#53636A",
         fontSize: 14,
+        lineHeight: 21,
     },
-
     alertBtn: {
+        minWidth: 100,
+        minHeight: 44,
         marginTop: 18,
         backgroundColor: "#13879A",
-        paddingHorizontal: isTablet ? 36 : 28,
-        paddingVertical: isTablet ? 16 : 11,
-        borderRadius: 10,
+        paddingHorizontal: 28,
+        borderRadius: 11,
+        alignItems: "center",
+        justifyContent: "center",
     },
     confirmRow: {
+        width: "100%",
         flexDirection: "row",
         marginTop: 18,
         gap: 12,
     },
-
     confirmBtn: {
-        paddingVertical: isTablet ? 16 : 10,
-        paddingHorizontal: isTablet ? 36 : 28,
-        borderRadius: 10,
+        flex: 1,
+        minHeight: 44,
+        borderRadius: 11,
+        alignItems: "center",
+        justifyContent: "center",
     },
-
     confirmBtnText: {
         color: "#fff",
-        fontWeight: "700",
+        fontWeight: "800",
     },
 });

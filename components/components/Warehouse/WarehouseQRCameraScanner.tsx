@@ -16,6 +16,10 @@ import Icon from "@expo/vector-icons/MaterialIcons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+// import { getWarehouseQrMatchRank } from "./utils/warehouseQrMatcher";
+
+import { getWarehouseQrMatchRank } from '@/common/utils/warehouseQrMatcher';
+
 const EXPECTED_LENGTH = 14;
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -43,7 +47,7 @@ const splitScanParts = value => {
   let cleanValue = cleanScannerValue(value);
 
   if (!cleanValue) return [];
-
+  console.log("cleanScannerValue", cleanScannerValue);
   cleanValue = cleanValue
     .replace(/\\"/g, '"')
     .replace(/\\+/g, "")
@@ -69,7 +73,12 @@ const normalizeScan = value => {
   const parts = splitScanParts(value);
   if (!parts.length) return "";
 
+  console.log("parts", parts);
+
+
   const raw = cleanScannerValue(value);
+
+  console.log("raw", raw);
 
   if (raw.includes("~")) {
     let finalParts = parts;
@@ -82,6 +91,9 @@ const normalizeScan = value => {
         finalParts = finalParts.slice(0, finalParts.length - 3);
       }
     }
+
+    console.log("finalParts.length", finalParts.length);
+    console.log("finalParts", finalParts);
 
     if (finalParts.length > EXPECTED_LENGTH) {
       finalParts = finalParts.slice(0, EXPECTED_LENGTH);
@@ -122,6 +134,25 @@ const getCartonKey = item =>
     item?.UId ||
     ""
   );
+
+const getStockRowKey = item => {
+  // ZUId/ZSrNo/ZSubSr are the stock-result identity. They are NOT expected
+  // in the QR string; they become available only after a stock row matches.
+  const uid = item?.ZUId ?? item?.zuid ?? item?.ZUID ?? item?.UId ?? item?.uid;
+  const srNo = item?.ZSrNo ?? item?.zsrno ?? item?.ZSRNO ?? item?.SrNo ?? item?.srno;
+  const subSr = item?.ZSubSr ?? item?.zsubsr ?? item?.ZSUBSR ?? item?.SubSr ?? item?.subsr;
+
+  if (uid !== undefined && uid !== null && uid !== "" &&
+      srNo !== undefined && srNo !== null && srNo !== "" &&
+      subSr !== undefined && subSr !== null && subSr !== "") {
+    return `${String(uid).trim()}|${String(srNo).trim()}|${String(subSr).trim()}`;
+  }
+
+  // Compatibility fallback only for payloads that do not expose stock identity.
+  return getCartonKey(item);
+};
+
+console.log("normalizeCart",normalizeCart);
 
 const getCartonName = item =>
   item?.cartonNo ||
@@ -219,28 +250,11 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
     }
   }, [permission]);
 
-  const scanMap = useMemo(() => {
-    const map = new Map();
-
-    cartons.forEach(row => {
-      if (row.scancode) {
-        map.set(normalizeScan(row.scancode), row);
-      }
-
-      if (row.scancode1) {
-        map.set(normalizeScan(row.scancode1), row);
-        map.set(normalizeScan(String(row.scancode1).replace(/\\"/g, '"')), row);
-      }
-    });
-
-    return map;
-  }, [cartons]);
-
   const selectedCartSet = useMemo(() => {
     const set = new Set();
 
     Object.values(scanned || {}).forEach(row => {
-      const key = getCartonKey(row);
+      const key = getStockRowKey(row);
       if (key) set.add(key);
     });
 
@@ -283,23 +297,25 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
 
   const markSelected = row => {
     const cartKey = getCartonKey(row);
+    const stockRowKey = getStockRowKey(row);
     const displayCarton = getCartonName(row) || cartKey;
 
-    if (!cartKey) {
-      setScanStatus("error", "Invalid Carton", "Carton number missing");
+    if (!cartKey || !stockRowKey) {
+      setScanStatus("error", "Invalid Carton", "Carton/stock identity missing");
       return false;
     }
 
-    if (selectedCartSet.has(cartKey)) {
+    if (selectedCartSet.has(stockRowKey)) {
       setScanStatus("duplicate", "Already Scanned", `Carton ${displayCarton} already selected`);
       return false;
     }
 
     setScanned(prev => ({
       ...prev,
-      [cartKey]: {
+      [stockRowKey]: {
         ...row,
         _scanCartonKey: cartKey,
+        _scanStockRowKey: stockRowKey,
       },
     }));
 
@@ -318,12 +334,11 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
       return;
     }
 
-    let matchingRow = scanMap.get(normalizedInput);
-
-    if (matchingRow) {
-      markSelected(matchingRow);
-      return;
-    }
+    // Do not select directly from scanMap here. Two stock rows can carry the
+    // same label data while representing different stock identities (for
+    // example current-year 253500823 and opening-stock O253500823). Row-aware
+    // ranking below must decide which stock record is selected.
+    let matchingRow = null;
 
     const scannedParts = splitScanParts(rawInput);
 
@@ -332,24 +347,49 @@ export default function WarehouseQRCameraScanner({ navigation, route }) {
       return;
     }
 
-    const scannedIsOld = rawInput.includes("~");
+    // Production-safe identity matching: compare only the stable business fields
+    // itmcode + mercode + grdcode + shdcode + cartno. This intentionally ignores
+    // weights and all other label-version-specific values.
+    // Rank all stock rows instead of taking the first O-equivalent carton.
+    // Exact carton text wins. Only when there is no exact carton match do we
+    // allow the historical O-prefix equivalence (253500823 <-> O253500823).
+    let bestRank = 0;
+    let bestRows = [];
 
-    matchingRow = cartons.find(row => {
-      const apiCsvParts = splitScanParts(row.scancode1);
-      const apiOldParts = splitScanParts(row.scancode);
+    cartons.forEach(row => {
+      const stockCartNo =
+        row?.cartonNo ?? row?.cartno ?? row?.CartNo ?? row?.cartno1 ?? row?.CartNo1;
 
-      if (scannedIsOld) {
-        return (
-          isOldToOldMatch(apiOldParts, scannedParts) ||
-          isOldToCsvMatch(scannedParts, apiCsvParts)
-        );
-      }
-
-      return (
-        isCsvToCsvMatch(apiCsvParts, scannedParts) ||
-        isOldToCsvMatch(apiOldParts, scannedParts)
+      const rank = Math.max(
+        getWarehouseQrMatchRank(row.scancode, rawInput, stockCartNo),
+        getWarehouseQrMatchRank(row.scancode1, rawInput, stockCartNo)
       );
+
+      if (rank > bestRank) {
+        bestRank = rank;
+        bestRows = rank > 0 ? [row] : [];
+      } else if (rank > 0 && rank === bestRank) {
+        bestRows.push(row);
+      }
     });
+
+    // If the QR cannot distinguish two stock rows at the same best rank, do
+    // not guess. ZUId/ZSrNo/ZSubSr exist only on stock results, not in the QR.
+    const uniqueBestRows = new Map();
+    bestRows.forEach(row => uniqueBestRows.set(getStockRowKey(row), row));
+
+    if (uniqueBestRows.size > 1) {
+      setScanStatus(
+        "error",
+        "Multiple Stock Matches",
+        "QR matches more than one stock row. Please verify the carton."
+      );
+      return;
+    }
+
+    matchingRow = uniqueBestRows.size === 1
+      ? Array.from(uniqueBestRows.values())[0]
+      : null;
 
     if (!matchingRow) {
       setScanStatus("error", "No Match", "Carton not found in loaded list");

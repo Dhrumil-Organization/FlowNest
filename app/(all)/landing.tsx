@@ -9,7 +9,7 @@
 //     Image,
 // } from 'react-native';
 // import { LinearGradient } from 'expo-linear-gradient';
-// import { useRouter } from 'expo-router';
+// import { useLocalSearchParams, useRouter } from 'expo-router';
 // import Icon from '@expo/vector-icons/MaterialIcons';
 // import theme from '@/components/theme';
 // import logo from '../../assets/images/logo.png';
@@ -395,11 +395,12 @@
 //         textAlign: 'center',
 //     },
 // });
+import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import theme from '@/components/theme';
 import Icon from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
@@ -418,10 +419,20 @@ const CARD_WIDTH = width * 0.72;
 const CARD_SPACING = 14;
 export default function LandingPage() {
     const router = useRouter();
+    const params = useLocalSearchParams<{ notificationLoginRequired?: string }>();
+    const [notificationLoginRequired, setNotificationLoginRequired] = useState(false);
     const scrollX = useRef(new Animated.Value(0)).current;
     const scrollRef = useRef(null);
     const currentIndex = useRef(0);
     const [lookupPlatform, setLookupPlatform] = useState<null>(null);
+
+    useEffect(() => {
+        console.log('Notification Login Required:', params.notificationLoginRequired);
+        setNotificationLoginRequired(params.notificationLoginRequired === '1');
+        if (params.notificationLoginRequired === '1') {
+            AppAlert.alert('Please log in to open this notification', 'You are currently logged out. Please log in first, then open the notification again to access its screen.');
+        }
+    }, [params.notificationLoginRequired]);
 
     useEffect(() => {
         const check = async () => {
@@ -510,6 +521,27 @@ export default function LandingPage() {
             style={styles.container}
             showsVerticalScrollIndicator={false}
         >
+            {notificationLoginRequired && (
+                <View style={styles.notificationLoginBanner}>
+                    <View style={styles.notificationLoginIcon}>
+                        <Icon name="notifications-none" size={22} color="#fff" />
+                    </View>
+                    <View style={styles.notificationLoginContent}>
+                        <Text style={styles.notificationLoginTitle}>Please log in to open this notification</Text>
+                        <Text style={styles.notificationLoginMessage}>
+                            You are currently logged out. Please log in first, then open the notification again to access its screen.
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={() => setNotificationLoginRequired(false)}
+                        style={styles.notificationLoginClose}
+                    >
+                        <Text style={styles.notificationLoginCloseText}>×</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             {/* ============== HERO SECTION ============== */}
             <LinearGradient
                 colors={[
@@ -756,6 +788,25 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: theme.NEUTRAL_BG,
     },
+    notificationLoginBanner: {
+        marginHorizontal: 16,
+        marginTop: 16,
+        padding: 14,
+        borderRadius: 14,
+        backgroundColor: '#7A4B00',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    notificationLoginIcon: {
+        width: 38, height: 38, borderRadius: 19,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.18)', marginRight: 10,
+    },
+    notificationLoginContent: { flex: 1 },
+    notificationLoginTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+    notificationLoginMessage: { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 19, marginTop: 4 },
+    notificationLoginClose: { paddingLeft: 8 },
+    notificationLoginCloseText: { color: '#fff', fontSize: 24, lineHeight: 24 },
 
     /* ===== HERO ===== */
     hero: {

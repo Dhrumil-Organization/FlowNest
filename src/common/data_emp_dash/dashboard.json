@@ -1,0 +1,98 @@
+{
+  "companyName": "Madhusudhan Fabrics",
+
+  "role": "Owner View",
+
+  "date": "2 Jun",
+
+  "updatedTime": "03:10 pm",
+
+  "totals": {
+    "ts": "₹8.0L",
+    "us": "$52.0L"
+  },
+
+  "trend": {
+    "title": "11-DAY TREND",
+    "data": [
+      {
+        "label": "20T",
+        "value": 8.1
+      },
+      {
+        "label": "22T",
+        "value": 8.5
+      },
+      {
+        "label": "24S",
+        "value": 7.9
+      },
+      {
+        "label": "26H",
+        "value": 9.2
+      },
+      {
+        "label": "28I",
+        "value": 8.8
+      }
+    ]
+  },
+
+  "categories": [
+    {
+      "id": "1",
+      "name": "Linen Shirting",
+      "today": "₹1.9L",
+      "updated": "₹12.4L",
+      "color": "#1EA7FF"
+    },
+
+    {
+      "id": "2",
+      "name": "Sportswear",
+      "today": "₹1.5L",
+      "updated": "₹9.8L",
+      "color": "#8B5CF6"
+    },
+
+    {
+      "id": "3",
+      "name": "Linen Suiting",
+      "today": "₹1.3L",
+      "updated": "₹8.7L",
+      "color": "#F59E0B"
+    },
+
+    {
+      "id": "4",
+      "name": "Denim Fabric",
+      "today": "₹1.2L",
+      "updated": "₹7.6L",
+      "color": "#10B981"
+    },
+
+    {
+      "id": "5",
+      "name": "Cotton Prints",
+      "today": "₹94,000",
+      "updated": "₹6.1L",
+      "color": "#F97316"
+    },
+
+    {
+      "id": "6",
+      "name": "Ripstop/Tech",
+      "today": "₹72,000",
+      "updated": "₹4.3L",
+      "color": "#06B6D4"
+    },
+
+    {
+      "id": "7",
+      "name": "Tussar Silk",
+      "today": "₹48,000",
+      "updated": "₹3.1L",
+      "color": "#EC4899"
+    }
+  ]
+}

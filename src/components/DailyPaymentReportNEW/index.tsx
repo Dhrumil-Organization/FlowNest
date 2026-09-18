@@ -1,3 +1,4 @@
+import { API } from '@/common/API/dynamicAPI';
 import { crlimtreq_styles } from '@/common/Style';
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import FullScreenLoader from '@/components/FullScreenLoader';
@@ -16,8 +17,7 @@ import {
     View
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { API } from '../../common/API/dynamicAPI';
-import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/Functions';
+import { fetchCurrentYearData, fetchPropertyData, fetchPropertyDataDCR, fetchPropertyGroupDataDCR, generateFinancialYearOptions, getCurrentFinancialYearMain } from '../../common/API/FunctionsNEW';
 import HeaderBar from '../../components/HeaderNew';
 import CustomDrawer from './CustomDrawer';
 

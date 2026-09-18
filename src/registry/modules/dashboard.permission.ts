@@ -21,6 +21,7 @@ registerPermissionArea({
         { key: 'sales_detail', name: 'Sales Detail Card', type: 'widget', displayOrder: 110, actions: [] },
         { key: 'production_detail', name: 'Production Detail Card', type: 'widget', displayOrder: 120, actions: [] },
         { key: 'collection_detail', name: 'Payment Collection Detail Card', type: 'widget', displayOrder: 130, actions: [] },
+        { key: 'payment_detail', name: 'Payment To Pay Detail Card', type: 'widget', displayOrder: 135, actions: [] },
         { key: 'outstanding_detail', name: 'Outstanding Detail Card', type: 'widget', displayOrder: 140, actions: [] },
       ],
     },

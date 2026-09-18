@@ -8,11 +8,12 @@ import {
     Animated,
     Dimensions,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { CustomListDrawerPropsNew, DesignData, ItemData, ItemStatus } from './Modal';
@@ -315,71 +316,154 @@ const CustomDrawer: React.FC<CustomListDrawerPropsNew> = ({
                                 />
 
                             </View>
-                            <View style={{ marginBottom: 10 }} >
+                            <View style={{ marginBottom: 10 }}>
                                 <Text style={styles.label}>From Date</Text>
-                                <TouchableOpacity activeOpacity={0.85} style={styles.dateTrigger} onPress={() => setCheckingDatePickerVisible(true)}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.dateTriggerText, !form.fromdate && styles.placeholderText]}>
-                                            {form.fromdate ? formatDisplayDate(form.fromdate) : "Select from date"}
-                                        </Text>
+
+                                {Platform.OS === 'web' ? (
+                                    // ---------- WEB ----------
+                                    <View style={[styles.dateTrigger, { position: 'relative' }]}>
+                                        {!form.fromdate && (
+                                            <Text
+                                                pointerEvents="none"
+                                                style={[
+                                                    styles.dateTriggerText,
+                                                    styles.placeholderText,
+                                                    { position: 'absolute', left: 12, top: 12 },
+                                                ]}
+                                            >
+                                                Select from date
+                                            </Text>
+                                        )}
+                                        {React.createElement('input', {
+                                            type: 'date',
+                                            value: form.fromdate || '',
+                                            max: toISODate(new Date()),
+                                            onChange: (e: any) => {
+                                                const v = e.target.value; // YYYY-MM-DD
+                                                setForm(prev => ({ ...prev, fromdate: v }));
+                                            },
+                                            style: {
+                                                flex: 1,
+                                                border: 'none',
+                                                outline: 'none',
+                                                background: 'transparent',
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                color: theme.TEXT_PRIMARY,
+                                                width: '100%',
+                                                padding: 0,
+                                                cursor: 'pointer',
+                                                fontFamily: 'inherit',
+                                            } as any,
+                                        })}
                                     </View>
-                                    <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                </TouchableOpacity>
+                                ) : (
+                                    // ---------- NATIVE ----------
+                                    <>
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={styles.dateTrigger}
+                                            onPress={() => setCheckingDatePickerVisible(true)}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.dateTriggerText, !form.fromdate && styles.placeholderText]}>
+                                                    {form.fromdate ? formatDisplayDate(form.fromdate) : 'Select from date'}
+                                                </Text>
+                                            </View>
+                                            <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
+                                        </TouchableOpacity>
 
-                                <DateTimePickerModal
-                                    isVisible={checkingDatePickerVisible}
-                                    mode="date"
-
-                                    // onConfirm={(date) => setForm(prev => ({ ...prev, EDate: toISODate(date) }))}
-                                    onConfirm={(date) => {
-                                        const selectedDate = new Date(date);
-                                        selectedDate.setHours(0, 0, 0, 0);
-                                        setForm(prev => ({ ...prev, fromdate: toISODate(selectedDate) }));
-                                        setCheckingDatePickerVisible(false);
-                                        // Force UI update
-                                        setTimeout(() => { }, 100); // Small delay to ensure state update
-                                    }}
-
-                                    onCancel={() => setCheckingDatePickerVisible(false)}
-                                    headerTextIOS="Pick From Date"
-                                    locale="en_GB"
-                                    // maximumDate={new Date(2099, 11, 31)}
-                                    // minimumDate={new Date(2000, 0, 1)} // Allow dates from 1st Jan 2000
-                                    maximumDate={new Date()} // Only allow today or past dates
-                                />
+                                        <DateTimePickerModal
+                                            isVisible={checkingDatePickerVisible}
+                                            mode="date"
+                                            onConfirm={(date) => {
+                                                const selectedDate = new Date(date);
+                                                selectedDate.setHours(0, 0, 0, 0);
+                                                setForm(prev => ({ ...prev, fromdate: toISODate(selectedDate) }));
+                                                setCheckingDatePickerVisible(false);
+                                            }}
+                                            onCancel={() => setCheckingDatePickerVisible(false)}
+                                            headerTextIOS="Pick From Date"
+                                            locale="en_GB"
+                                            maximumDate={new Date()}
+                                        />
+                                    </>
+                                )}
                             </View>
-                            <View style={{ marginBottom: 10 }} >
+                            <View style={{ marginBottom: 10 }}>
                                 <Text style={styles.label}>TO Date</Text>
-                                <TouchableOpacity activeOpacity={0.85} style={styles.dateTrigger} onPress={() => setCheckingDatePickerVisible1(true)}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.dateTriggerText, !form.todate && styles.placeholderText]}>
-                                            {form.todate ? formatDisplayDate(form.todate) : "Select Checking date"}
-                                        </Text>
+
+                                {Platform.OS === 'web' ? (
+                                    // ---------- WEB ----------
+                                    <View style={[styles.dateTrigger, { position: 'relative' }]}>
+                                        {!form.todate && (
+                                            <Text
+                                                pointerEvents="none"
+                                                style={[
+                                                    styles.dateTriggerText,
+                                                    styles.placeholderText,
+                                                    { position: 'absolute', left: 12, top: 12 },
+                                                ]}
+                                            >
+                                                Select to date
+                                            </Text>
+                                        )}
+                                        {React.createElement('input', {
+                                            type: 'date',
+                                            value: form.todate || '',
+                                            max: toISODate(new Date()),
+                                            min: form.fromdate || undefined,
+                                            onChange: (e: any) => {
+                                                const v = e.target.value; // YYYY-MM-DD
+                                                setForm(prev => ({ ...prev, todate: v }));
+                                            },
+                                            style: {
+                                                flex: 1,
+                                                border: 'none',
+                                                outline: 'none',
+                                                background: 'transparent',
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                color: theme.TEXT_PRIMARY,
+                                                width: '100%',
+                                                padding: 0,
+                                                cursor: 'pointer',
+                                                fontFamily: 'inherit',
+                                            } as any,
+                                        })}
                                     </View>
-                                    <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
-                                </TouchableOpacity>
+                                ) : (
+                                    // ---------- NATIVE ----------
+                                    <>
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={styles.dateTrigger}
+                                            onPress={() => setCheckingDatePickerVisible1(true)}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.dateTriggerText, !form.todate && styles.placeholderText]}>
+                                                    {form.todate ? formatDisplayDate(form.todate) : 'Select to date'}
+                                                </Text>
+                                            </View>
+                                            <Icon name="calendar-today" size={18} color={theme.TEXT_SECONDARY} />
+                                        </TouchableOpacity>
 
-                                <DateTimePickerModal
-                                    isVisible={checkingDatePickerVisible1}
-                                    mode="date"
-
-                                    // onConfirm={(date) => setForm(prev => ({ ...prev, EDate: toISODate(date) }))}
-                                    onConfirm={(date) => {
-                                        const selectedDate = new Date(date);
-                                        selectedDate.setHours(0, 0, 0, 0);
-                                        setForm(prev => ({ ...prev, todate: toISODate(selectedDate) }));
-                                        setCheckingDatePickerVisible1(false);
-                                        // Force UI update
-                                        setTimeout(() => { }, 100); // Small delay to ensure state update
-                                    }}
-
-                                    onCancel={() => setCheckingDatePickerVisible1(false)}
-                                    headerTextIOS="Pick todate Date"
-                                    locale="en_GB"
-                                    // maximumDate={new Date(2099, 11, 31)}
-                                    // minimumDate={new Date(2000, 0, 1)} // Allow dates from 1st Jan 2000
-                                    maximumDate={new Date()} // Only allow today or past dates
-                                />
+                                        <DateTimePickerModal
+                                            isVisible={checkingDatePickerVisible1}
+                                            mode="date"
+                                            onConfirm={(date) => {
+                                                const selectedDate = new Date(date);
+                                                selectedDate.setHours(0, 0, 0, 0);
+                                                setForm(prev => ({ ...prev, todate: toISODate(selectedDate) }));
+                                                setCheckingDatePickerVisible1(false);
+                                            }}
+                                            onCancel={() => setCheckingDatePickerVisible1(false)}
+                                            headerTextIOS="Pick To Date"
+                                            locale="en_GB"
+                                            maximumDate={new Date()}
+                                        />
+                                    </>
+                                )}
                             </View>
                             {/* <View style={{ marginBottom: 10 }} >
                                 <Text style={styles.label}>Sales Executive <Text style={{ color: 'red' }}>*</Text></Text>
@@ -679,6 +763,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     dateTriggerText: { fontSize: 14, color: theme.TEXT_PRIMARY, fontWeight: '600' },
+    placeholderText: { color: '#9CA3AF' },   // 👈 add this
     dateTrigger: { backgroundColor: '#F6F7FA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
 });
 

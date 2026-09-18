@@ -537,7 +537,12 @@
 // // //     fontSize: 11,
 // // //     fontWeight: '600',
 // // //   },
-// // //   dateBarRight: {
+// // //   paymentMeta: {
+  //   marginTop: 3,
+  //   fontSize: 10,
+  //   color: COLORS.textLight,
+  // },
+  // dateBarRight: {
 // // //     flexDirection: 'row',
 // // //     alignItems: 'center',
 // // //     gap: 8,
@@ -2767,7 +2772,7 @@ export default function OwnerDashboardScreen({
   navigation,
   route,
   getUserPrptype,
-  visibleSections = { sales: true, production: true, collection: true, outstanding: true },
+  visibleSections = { sales: true, production: true, collection: true, payment: true, outstanding: true },
   showAmountControl = true,
 }) {
   const router = useRouter();
@@ -2794,6 +2799,7 @@ export default function OwnerDashboardScreen({
   });
 
   const [outstandingSort, setOutstandingSort] = useState('desc');
+  const [paymentSort, setPaymentSort] = useState('desc');
 
   const load = useCallback(
     async (getUserPrptype, silent = false) => {
@@ -2902,7 +2908,7 @@ export default function OwnerDashboardScreen({
     return <ErrorView message={error} onRetry={() => load(getUserPrptype)} />;
   if (!data) return null;
 
-  const { sales, production, collection, outstanding } = data;
+  const { sales, production, collection, payment, outstanding } = data;
 
 
   const openProductionReport = () => {
@@ -2960,6 +2966,16 @@ export default function OwnerDashboardScreen({
 
       return { field: 'today', direction: 'desc' };
     });
+  };
+
+  const sortedPayment = [...(payment?.by_party || [])].sort((a, b) => {
+    const aValue = Number(a?.to_pay || 0);
+    const bValue = Number(b?.to_pay || 0);
+    return paymentSort === 'asc' ? aValue - bValue : bValue - aValue;
+  });
+
+  const togglePaymentSort = () => {
+    setPaymentSort(prev => prev === 'desc' ? 'asc' : 'desc');
   };
 
   const sortedOutstanding = [...outstanding.by_exec].sort((a, b) => {
@@ -3195,6 +3211,57 @@ export default function OwnerDashboardScreen({
             </SectionCard>
           )}
 
+          {/* ── PAYMENT TO PAY SECTION ── */}
+          {visibleSections.payment && payment && (
+            <SectionCard>
+              <SectionHeader
+                icon="💳"
+                title="PAYMENT TO PAY"
+                bgColor={COLORS.collBg}
+                subtitle="Uncleared payments"
+              />
+
+              <View style={styles.outsTotalRow}>
+                <View>
+                  <Text style={styles.outsTotalLabel}>Total To Pay</Text>
+                  <Text style={styles.paymentMeta}>
+                    {Number(payment?.total?.party_count || 0)} parties · {Number(payment?.total?.pending_count || 0)} payments
+                  </Text>
+                </View>
+                <LongPressValue
+                  rawValue={Number(payment?.total?.to_pay || 0)}
+                  formattedValue={displayAmount(Number(payment?.total?.to_pay || 0))}
+                  style={styles.outsTotalValue}
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ColHeader label1="PARTY" label2="PENDING" label3="TO PAY" />
+                <TouchableOpacity
+                  onPress={togglePaymentSort}
+                  style={{ marginLeft: -12, paddingLeft: 0 }}
+                >
+                  <Text style={{ fontSize: 9, color: '#8C837B' }}>▼</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TableWrapper rowCount={sortedPayment.length}>
+                {sortedPayment.map((party, i) => (
+                  <RankRow
+                    key={`${party?.prpcode || ''}-${party?.party_code || ''}-${i}`}
+                    rank={i + 1}
+                    name={party?.party_name || party?.party_code || 'Unknown Party'}
+                    leftVal={String(Number(party?.pending_count || 0))}
+                    rightVal={displayAmount(Number(party?.to_pay || 0))}
+                    rawLeftVal={Number(party?.pending_count || 0)}
+                    rawRightVal={Number(party?.to_pay || 0)}
+                    trendUp={false}
+                  />
+                ))}
+              </TableWrapper>
+            </SectionCard>
+          )}
+
           {/* ── OUTSTANDING SECTION ── */}
           {visibleSections.outstanding && (
             <SectionCard>
@@ -3390,6 +3457,11 @@ const styles = StyleSheet.create({
   subVal: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  paymentMeta: {
+    marginTop: 3,
+    fontSize: 10,
+    color: COLORS.textLight,
   },
   dateBarRight: {
     flexDirection: 'row',

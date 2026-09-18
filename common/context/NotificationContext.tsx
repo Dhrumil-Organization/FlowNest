@@ -92,7 +92,7 @@ const LEGACY_NOTIFICATION_ROUTES: Array<{ name: string; route: string }> = [
     ['Production Order Tracking', 'production-order-tracking'],
     ['Monthly Expense Report', 'monthly-expense-report'],
     ['Snap View', 'snap-view'],
-    ['Payable', 'payable'],
+    // ['Payable', 'Payable-Screen'],
     ['Daily Collection Report', 'daily-collection-report'],
     ['Sales Order Tracking', 'sales-order-tracking'],
     ['Daily Payment Report', 'daily-payment-report'],

@@ -46,8 +46,12 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
   const legacyCanTab = useAppSessionStore((state) => state.canTab);
   const legacyCanAction = useAppSessionStore((state) => state.canAction);
 
+  // Keep the mobile permission bypass aligned with the backend's platform-admin
+  // contract. AppAccessController treats user ID 1 as a platform administrator,
+  // so the client must not make that same user depend on per-resource grants.
   const isSuperAdmin =
-    Number(user?.is_superadmin || rawLoginResponse?.issuperadmin || 0) !== 0;
+    Number(user?.id || rawLoginResponse?.user?.id || 0) === 1
+    || Number(user?.is_superadmin || rawLoginResponse?.issuperadmin || 0) !== 0;
 
   const runtimeGrants = useMemo(() => {
     const grants = new Map<string, boolean>();

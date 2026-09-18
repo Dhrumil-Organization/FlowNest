@@ -27,6 +27,7 @@ export type DashboardDetailVisibility = {
   sales: boolean;
   production: boolean;
   collection: boolean;
+  payment: boolean;
   outstanding: boolean;
 };
 

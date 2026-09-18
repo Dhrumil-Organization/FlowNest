@@ -59,13 +59,16 @@ export type LoginOutcome = {
 export async function performLogin(
   username: string,
   password: string,
-  rememberAction?: 'save' | 'clear'
+  rememberAction?: 'save' | 'clear',
+  noti_token?: string,
+  getDeviceId?: string,
 ): Promise<LoginOutcome> {
   try {
     const res = await AuthAPI.login({
       name: username.trim(),
       password: password.trim(),
-      noti_token: 'test',
+      noti_token: noti_token || 'xyz-noti-token',
+      checkdevice: getDeviceId || 'xyz-device',
       // isclient: 1,
     });
 

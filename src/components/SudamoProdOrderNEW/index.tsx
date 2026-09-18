@@ -3,6 +3,7 @@ import { crlimtreq_styles } from '@/common/Style';
 import AppAlert from '@/common/utils/appAlert';
 import FullScreenLoader from '@/components/FullScreenLoader';
 import theme from '@/components/theme';
+import { isWeb } from '@/src/platform/runtime';
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,6 +15,7 @@ import {
     ScrollView,
     Text,
     TouchableOpacity,
+    useWindowDimensions,
     View
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -142,6 +144,22 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     const [webViewUrl, setWebViewUrl] = useState('');
     // const [historyDataSPO, setHistoryDataSPO] = useState<AllHistoryData[]>([]);
     // const [isHistoryLoading, setIsHistoryLoadingSPO] = useState(false);
+
+    const { width: screenWidth } = useWindowDimensions();
+
+    // 1 → phone | 2 → tablet | 3 → laptop | 4 → wide desktop
+    const numColumns =
+        screenWidth >= 1400 ? 4 :
+            screenWidth >= 1000 ? 3 :
+                screenWidth >= 700 ? 2 :
+                    1;
+
+    const GRID_PAD = 12;
+    const GRID_GAP = 12;
+    const gridItemWidth =
+        numColumns > 1
+            ? (screenWidth - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
+            : screenWidth;
 
     let cancelToken: any;
 
@@ -1565,7 +1583,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
     );
 
 
-     
+
     const TabBar = ({ activeTabSPO, setActiveTabSPO }) => (
         <View style={crlimtreq_styles.tabContainer1}>
             <TouchableOpacity
@@ -1611,7 +1629,7 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     placeholder="Search production verify..."
                 />
             ) : null}
-            <View style={crlimtreq_styles.container}>
+            <View style={[crlimtreq_styles.container, { flex: 1, backgroundColor: '#F5F5F5', marginBottom: -50 }]}>
                 {isLoadingSPO && <FullScreenLoader message={'Loading...'} />}
                 <TabBar activeTabSPO={activeTab1SPO} setActiveTabSPO={setActiveTab1SPO} />
                 {/* <TouchableOpacity
@@ -1629,11 +1647,32 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                 </TouchableOpacity> */}
                 {activeTab1SPO === 'requests' ? (
                     <FlatList
+                        key={`req-${numColumns}`}
                         ref={flatListRefSPO}
                         data={filteredDataSPO}
-                        renderItem={renderCard}
+                        numColumns={numColumns}
+                        {...(numColumns > 1
+                            ? {
+                                columnWrapperStyle: {
+                                    gap: GRID_GAP,
+                                    paddingHorizontal: GRID_PAD,
+                                },
+                            }
+                            : {})}
+                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        renderItem={({ item }) => (
+                            <View
+                                style={{
+                                    width: numColumns > 1 ? gridItemWidth : undefined,
+                                    flex: numColumns === 1 ? 1 : undefined,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                {renderCard({ item })}
+                            </View>
+                        )}
                         keyExtractor={(item) => item.uid}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonSPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -1647,11 +1686,32 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     />
                 ) : activeTab1SPO === 'history' ? (
                     <FlatList
+                        key={`hist-${numColumns}`}
                         ref={flatHistoryListRefSPO}
                         data={filteredhistoryDataSPO}
-                        renderItem={renderAllCardHistory}
+                        numColumns={numColumns}
+                        {...(numColumns > 1
+                            ? {
+                                columnWrapperStyle: {
+                                    gap: GRID_GAP,
+                                    paddingHorizontal: GRID_PAD,
+                                },
+                            }
+                            : {})}
+                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        renderItem={({ item }) => (
+                            <View
+                                style={{
+                                    width: numColumns > 1 ? gridItemWidth : undefined,
+                                    flex: numColumns === 1 ? 1 : undefined,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                {renderAllCardHistory({ item })}
+                            </View>
+                        )}
                         keyExtractor={(item) => item.uid}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonSPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -1665,11 +1725,32 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     />
                 ) : activeTab1SPO === 'verify' ? (
                     <FlatList
+                        key={`ver-${numColumns}`}
                         ref={flatVerifyListRefSPO}
                         data={filteredverifyDataSPO}
-                        renderItem={renderAllCardVerify}
+                        numColumns={numColumns}
+                        {...(numColumns > 1
+                            ? {
+                                columnWrapperStyle: {
+                                    gap: GRID_GAP,
+                                    paddingHorizontal: GRID_PAD,
+                                },
+                            }
+                            : {})}
+                        style={{ flex: 1, backgroundColor: '#F5F5F5' }}
+                        renderItem={({ item }) => (
+                            <View
+                                style={{
+                                    width: numColumns > 1 ? gridItemWidth : undefined,
+                                    flex: numColumns === 1 ? 1 : undefined,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                {renderAllCardVerify({ item })}
+                            </View>
+                        )}
                         keyExtractor={(item) => item.uid}
-                        contentContainerStyle={crlimtreq_styles.list}
+                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonSPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -1812,16 +1893,31 @@ const SudamoProdOrder: React.FC<Props> = ({ token, isConnected = true, username 
                     >
                         <Icon name="close" size={24} color="black" />
                     </TouchableOpacity>
-                    <WebView
-                        source={{ uri: webViewUrl }}
-                        style={{ flex: 1 }}
-                        startInLoadingState={true}
-                        renderLoading={() => (
-                            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                                <ActivityIndicator size="large" color="#0000ff" />
-                            </View>
-                        )}
-                    />
+                    {isWeb() ? (
+                        React.createElement('iframe', {
+                            title: 'Production Order Preview',
+                            src: webViewUrl,
+                            style: {
+                                flex: 1,
+                                width: '100%',
+                                height: '100%',
+                                border: 'none',
+                                backgroundColor: '#ffffff',
+                            },
+                            allow: 'fullscreen',
+                        })
+                    ) : (
+                        <WebView
+                            source={{ uri: webViewUrl }}
+                            style={{ flex: 1 }}
+                            startInLoadingState={true}
+                            renderLoading={() => (
+                                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                    <ActivityIndicator size="large" color="#0000ff" />
+                                </View>
+                            )}
+                        />
+                    )}
                 </View>
             </Modal>
 

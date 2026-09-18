@@ -1707,7 +1707,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, username, rightsMenuApp
             return (
 
                 <LinearGradient
-                    colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
+                    colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
                     style={{
                         position: "absolute",
                         bottom: 0,

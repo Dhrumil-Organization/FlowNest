@@ -2024,7 +2024,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     </View >
                 )}
 
-                <View style={styles.actionRow}>
+                {/* <View style={styles.actionRow}>
                     <View style={styles.pendingIconCenter}>
                         <TouchableOpacity
                             onPress={() =>
@@ -2050,7 +2050,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             />
                         </TouchableOpacity>
                     </View>
-                </View>
+                </View> */}
 
             </View >
         );

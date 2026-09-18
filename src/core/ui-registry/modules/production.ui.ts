@@ -73,4 +73,22 @@ registerUiNodes([
     action: 'view',
     order: 110,
   },
+  // {
+  //   id: 'nav.payable',
+  //   kind: 'navigation',
+  //   title: 'Payable',
+  //   permission: 'production.payable',
+  //   action: 'view',
+  //   route: 'Payable-Screen',
+  //   icon: 'assignment',
+  //   order: 120,
+  // },
+  // {
+  //   id: 'screen.payable',
+  //   kind: 'screen',
+  //   title: 'Payable',
+  //   permission: 'production.payable',
+  //   action: 'view',
+  //   order: 120,
+  // },
 ]);

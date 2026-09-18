@@ -145,7 +145,7 @@ export function NotificationProvider({
         { name: 'Production Order Tracking', route: 'production-order-tracking' },
         { name: 'Monthly Expense Report', route: 'monthly-expense-report' },
         { name: 'Snap View', route: 'snap-view' },
-        { name: 'Payable', route: 'payable' },
+        // { name: 'Payable', route: 'Payable-Screen' },
         { name: 'Daily Collection Report', route: 'daily-collection-report' },
         { name: 'Sales Order Tracking', route: 'sales-order-tracking' },
         { name: 'Sales Analysis', route: 'sales-analysis' },

@@ -1,0 +1,27 @@
+import AsyncStorage from '@/common/utils/compatibleStorage';
+import React, { useEffect, useState } from 'react';
+import ProdOrderTracking from '../../components/ProdOrderTrackingNEW';
+import PayableNew from '../../components/PayableNew';
+
+export function PayableScreen() {
+  const [token, setToken] = useState('');
+  const [username, setUsername] = useState('User');
+
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      const [storedToken, storedUser] = await Promise.all([
+        AsyncStorage.getItem('access_token'),
+        AsyncStorage.getItem('user_details'),
+      ]);
+      if (!mounted) return;
+      setToken(storedToken || '');
+      setUsername(storedUser || 'User');
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return <PayableNew token={token} username={username} />;
+}

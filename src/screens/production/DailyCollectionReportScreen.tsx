@@ -1,6 +1,8 @@
 import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { useEffect, useState } from 'react';
-import DailyCollectionReport from '../../components/DailyCollectionReportNEW';
+// import DailyCollectionReport from '../../components/DailyCollectionReportNEW';
+
+import DailyCollectionReport from '@/components/DailyCollectionReportNEW';
 
 export function DailyCollectionReportScreen() {
   const [token, setToken] = useState('');

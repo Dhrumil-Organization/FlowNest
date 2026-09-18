@@ -1015,7 +1015,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
-              <View style={crlimtreq_styles.cardSubHeader}>
+            <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
@@ -1119,7 +1119,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
-             <View style={crlimtreq_styles.cardSubHeader}>
+            <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>
@@ -1198,6 +1198,9 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                 <TouchableOpacity onPress={() => handleIconPress(item, 'reject')} disabled={!isConnected || item.isProcessed}>
                     <Icon name="cancel" size={40} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
                 </TouchableOpacity> */}
+                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                    <Icon name="check-circle" size={32} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleInfoPress(item.d1, item)} disabled={!isConnected}>
                     <View style={crlimtreq_styles.infoIconContainer}>
                         <Icon name="info" size={40} color={!isConnected ? "#ccc" : "#2196F3"} />
@@ -1266,7 +1269,7 @@ const GreySalesOrder: React.FC<Props> = ({ token, isConnected, username }) => {
                     <Text style={crlimtreq_styles.cardHeaderText}>{item.PONo}</Text>
                 </View>
             </View>
-             <View style={crlimtreq_styles.cardSubHeader}>
+            <View style={crlimtreq_styles.cardSubHeader}>
                 <Text style={crlimtreq_styles.cardSubHeaderText12}>{item.PrpCode}</Text>
             </View>
             <View style={crlimtreq_styles.cardSubHeader}>

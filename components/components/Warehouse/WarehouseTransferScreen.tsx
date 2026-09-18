@@ -27,12 +27,12 @@ import AsyncStorage from '@/common/utils/compatibleStorage';
 const keyOf = item =>
   String(
     item?.cartonNo ||
-      item?.cartno ||
-      item?.CartNo ||
-      item?.carcode ||
-      item?.CarCode ||
-      item?._scanCartonKey ||
-      `${item?.uid || item?.UId || ""}_${item?.vouno || ""}_${item?.psrno || item?.srno || item?.SrNo || ""}`
+    item?.cartno ||
+    item?.CartNo ||
+    item?.carcode ||
+    item?.CarCode ||
+    item?._scanCartonKey ||
+    `${item?.uid || item?.UId || ""}_${item?.vouno || ""}_${item?.psrno || item?.srno || item?.SrNo || ""}`
   );
 
 const searchable = item =>
@@ -346,54 +346,59 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
     });
   };
 
-  const openScanner = () => {
-  Keyboard.dismiss();
+  const openScanner = scanType => {
+    Keyboard.dismiss();
 
-  if (!toLocation.trim()) {
-    return AppAlert.alert("Validation", "Please enter/select To Location");
-  }
+    if (!toLocation.trim()) {
+      return AppAlert.alert("Validation", "Please enter/select To Location");
+    }
 
-  if (!cartons.length) {
-    return AppAlert.alert("Validation", "Please load carton data first");
-  }
+    if (!cartons.length) {
+      return AppAlert.alert("Validation", "Please load carton data first");
+    }
 
-  navigation.navigate("WarehouseQRScanner", {
-    mode: "TRANSFER",
-    cartons,
-    selected,
-    onScanResult: result => {
-      const rows = Array.isArray(result) ? result : [result];
+    navigation.navigate(
+      // "WarehouseQRScanner", 
+      scanType === "camera"
+        ? "WarehouseQRCameraScanner"
+        : "WarehouseQRScanner",
+      {
+        mode: "TRANSFER",
+        cartons,
+        selected,
+        onScanResult: result => {
+          const rows = Array.isArray(result) ? result : [result];
 
-      const validRows = rows.filter(Boolean);
+          const validRows = rows.filter(Boolean);
 
-      if (!validRows.length) return;
+          if (!validRows.length) return;
 
-      setSelected(prev => {
-        const next = { ...prev };
+          setSelected(prev => {
+            const next = { ...prev };
 
-        validRows.forEach(row => {
-          const key = keyOf(row);
-          if (key) {
-            next[key] = row;
-          }
-        });
+            validRows.forEach(row => {
+              const key = keyOf(row);
+              if (key) {
+                next[key] = row;
+              }
+            });
 
-        return next;
+            return next;
+          });
+
+          setSelectedOrder(prev => {
+            const newKeys = validRows
+              .map(row => keyOf(row))
+              .filter(Boolean);
+
+            return [
+              ...newKeys.reverse(),
+              ...prev.filter(x => !newKeys.includes(x)),
+            ];
+          });
+        },
       });
-
-      setSelectedOrder(prev => {
-        const newKeys = validRows
-          .map(row => keyOf(row))
-          .filter(Boolean);
-
-        return [
-          ...newKeys.reverse(),
-          ...prev.filter(x => !newKeys.includes(x)),
-        ];
-      });
-    },
-  });
-};
+  };
 
 
 
@@ -522,6 +527,23 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
                     }}
                   >
                     <Icon name="qr-code-scanner" size={28} color="#0f8f9a" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => openScanner("camera")}
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: "#0f8f9a",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#fff",
+                      marginLeft: 8,
+                    }}
+                  >
+                    <Icon name="camera" size={28} color="#0f8f9a" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -696,7 +718,7 @@ export default function WarehouseTransferScreen({ token, navigation, route }) {
                         fontSize: 12,
                       }}
                     >
-                     Location Code: {item.locationin}
+                      Location Code: {item.locationin}
                     </Text>
                   </View>
                 </TouchableOpacity>

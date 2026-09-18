@@ -273,6 +273,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
     sales: canAccess('dashboard.sales_detail'),
     production: canAccess('dashboard.production_detail'),
     collection: canAccess('dashboard.collection_detail'),
+    payment: canAccess('dashboard.payment_detail'),
     outstanding: canAccess('dashboard.outstanding_detail'),
   }), [canAccess]);
 

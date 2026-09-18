@@ -26,6 +26,7 @@ registerUiNodes([
         'dashboard.sales_detail',
         'dashboard.production_detail',
         'dashboard.collection_detail',
+        'dashboard.payment_detail',
         'dashboard.outstanding_detail',
       ],
     },

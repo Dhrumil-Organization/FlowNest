@@ -1,11 +1,10 @@
 import AppAlert from '@/common/utils/appAlert';
-/* eslint-disable react/no-unstable-nested-components */
+
 import Icon from '@expo/vector-icons/MaterialIcons';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     SafeAreaView,
@@ -13,7 +12,8 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    useWindowDimensions,
+    View
 } from 'react-native';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import { API } from '../../common/API/dynamicAPI';
@@ -34,6 +34,21 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     const [page, setPage] = useState(1);
     const [allData, setAllData] = useState(gePOTData || []);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const { width: screenWidth } = useWindowDimensions();
+
+    // 1 → phone | 2 → tablet | 3 → laptop | 4 → wide desktop
+    const numColumns =
+        screenWidth >= 1400 ? 4 :
+            screenWidth >= 1000 ? 3 :
+                screenWidth >= 700 ? 2 :
+                    1;
+
+    const GRID_PAD = 12;
+    const GRID_GAP = 12;
+    const gridItemWidth =
+        numColumns > 1
+            ? (screenWidth - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
+            : screenWidth;
 
     // useEffect(() => {
     //     if (!searchQueryPOT.trim()) {
@@ -414,31 +429,35 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* <FlatList
-                // data={filteredData}
-                data={filteredData.slice(0, page * 10)}
-                renderItem={renderCard}
-                keyExtractor={(item, index) => index.toString()}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No data found!</Text>
-                    </View>
-                }
-            /> */}
+        <View style={styles.container}>
             <FlatList
-                data={allData} // `allData` use karna hai
-                renderItem={renderCard}
+                key={`pot-grid-${numColumns}`}
+                data={allData}
+                numColumns={numColumns}
+                {...(numColumns > 1
+                    ? {
+                        columnWrapperStyle: {
+                            gap: GRID_GAP,
+                            paddingHorizontal: GRID_PAD,
+                        },
+                    }
+                    : {})}
+                style={{ flex: 1 }}
+                renderItem={({ item }) => (
+                    <View
+                        style={{
+                            width: numColumns > 1 ? gridItemWidth : undefined,
+                            flex: numColumns === 1 ? 1 : undefined,
+                            marginBottom: 12,
+                        }}
+                    >
+                        {renderCard({ item })}
+                    </View>
+                )}
                 keyExtractor={(item, index) => index.toString()}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[styles.listContent, { paddingBottom: 24 }]}
                 onEndReached={loadMoreData}
                 onEndReachedThreshold={0.3}
-                // ListFooterComponent={
-                //     isLoadingMore ? (
-                //         <ActivityIndicator size="large" color="rgb(86, 156, 214)" />
-                //     ) : null
-                // }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No data found!</Text>
@@ -474,27 +493,33 @@ const ProdOrderTrackingCard: React.FC<POTDataProps> = ({
                     </View>
                 </SafeAreaView>
             </Modal>
-
-        </SafeAreaView>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
+    // container: {
+    //     // flex: 1,
+    //     backgroundColor: '#f5f5f5',
+    //     marginBottom: -50,
+    //     // padding: 10,
+    // },
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
-        padding: 10,
+        marginBottom: -50,
     },
     card: {
         backgroundColor: '#fff',
         borderRadius: 8,
         padding: 15,
-        marginBottom: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.04)',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -601,7 +626,7 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
     },
     listContent: {
-        paddingBottom: 20,
+        // paddingBottom: 20,
     },
     emptyContainer: {
         padding: 20,

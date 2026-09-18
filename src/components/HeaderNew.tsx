@@ -109,7 +109,7 @@ export default function HeaderNew({
     const goBack = () => {
         // router.replace('/(tabs)');
         if (router.canGoBack()) router.back();
-        else router.replace('/(tabs)');
+        else router.replace('/new/(tabs)');
     };
 
     useEffect(() => {
@@ -177,9 +177,9 @@ export default function HeaderNew({
                                 <Text style={styles.breadcrumbBackText}>Back</Text>
                             </TouchableOpacity>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.replace('/(tabs)')}>
+                                {/* <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.replace('/(tabs)')}>
                                     <Icon name="home" size={18} color="#fff" />
-                                </TouchableOpacity>
+                                </TouchableOpacity> */}
                                 <Text style={styles.breadcrumbSeparator}>›</Text>
                                 <Text style={styles.breadcrumbCurrent} numberOfLines={1}>
                                     {breadcrumb}

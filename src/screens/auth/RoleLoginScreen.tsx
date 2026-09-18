@@ -1,4 +1,3 @@
-import AppAlert from '@/common/utils/appAlert';
 // ─────────────────────────────────────────────────────────────
 // FILE: src/screens/auth/RoleLoginScreen.tsx
 //
@@ -12,8 +11,11 @@ import AppAlert from '@/common/utils/appAlert';
 //     session store becomes authenticated, giving us two safe paths
 //     into the New ERP dashboard without allowing Legacy routing.
 // ─────────────────────────────────────────────────────────────
-
+import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import Icon from '@expo/vector-icons/MaterialIcons';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -29,7 +31,6 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { performLogin } from '../../core/authFlow';
 import {
   getBiometricLabel,
@@ -82,7 +83,8 @@ export function RoleLoginScreen() {
   const [bioSupported, setBioSupported] = useState(false);
   const [bioLabel, setBioLabel] = useState('screen lock');
   const [rememberMe, setRememberMe] = useState(true);
-
+  const [getNotitoken, setNotitoken] = useState('');
+  const [getDeviceId, setDeviceId] = useState('');
   // ---------- Password Validation State ----------
   const [validation, setValidation] = useState<PasswordValidation>({
     minLength: false,
@@ -107,6 +109,44 @@ export function RoleLoginScreen() {
     setPassword(text);
     setValidation(validatePassword(text));
   };
+
+  const requestPermissions = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Notification permission denied');
+      return false;
+    }
+    return true;
+  };
+
+  const getFCMToken = async () => {
+    try {
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) return null;
+
+      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log('Expo Push Token:', token);
+
+      if (token) {
+        await AsyncStorage.setItem('notification_token', token);
+        return token;
+      }
+    } catch (error) {
+      console.error('Error getting Expo push token:', error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const deviceId = Device.osInternalBuildId || "test-device";
+    console.log("Device ID:", deviceId);
+    setDeviceId(deviceId);
+    getFCMToken().then(token => {
+      if (token) {
+        setNotitoken(token);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -164,10 +204,14 @@ export function RoleLoginScreen() {
             ? 'clear'
             : undefined;
 
+      const noti_token = getNotitoken;
+
       const outcome = await performLogin(
         username,
         password,
-        rememberAction
+        rememberAction,
+        noti_token,
+        getDeviceId,
       );
 
       if (!outcome.success) {

@@ -223,6 +223,12 @@ export const crlimtreq_styles = StyleSheet.create({
         backgroundColor: '#f8f9fa', // Light gray background
         paddingBottom: 80,
     },
+    containerNew: {
+        flex: 1,
+        padding: 10,
+        backgroundColor: '#fff', // Light gray background
+        paddingBottom: 80,
+    },
     carouselModalContainer: {
         // padding: 15
     },

@@ -120,6 +120,13 @@ registerPermissionArea({
           displayOrder: 70,
           actions: [{ key: 'view', name: 'View' }],
         },
+        // {
+        //   key: 'payable',
+        //   name: 'Payable',
+        //   type: 'screen',
+        //   displayOrder: 80,
+        //   actions: [{ key: 'view', name: 'View' }],
+        // },
         // <-- add your new feature's resource object here (step 1)
       ],
     },
@@ -306,5 +313,23 @@ registerUiNodes([
     action: 'view',
     order: 110,
   },
+  // {
+  //   id: 'nav.payable',
+  //   kind: 'navigation',
+  //   title: 'Payable',
+  //   permission: 'production.payable',
+  //   action: 'view',
+  //   route: 'Payable-Screen',
+  //   icon: 'assignment',
+  //   order: 110,
+  // },
+  // {
+  //   id: 'screen.payable',
+  //   kind: 'screen',
+  //   title: 'Payable',
+  //   permission: 'production.payable',
+  //   action: 'view',
+  //   order: 110,
+  // },
   // <-- add your new feature's { nav, screen } node pair here (step 2)
 ]);

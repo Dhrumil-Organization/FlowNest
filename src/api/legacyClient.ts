@@ -698,5 +698,12 @@ export const GreyPackingAPI = {
 
   PackingList: (params: Record<string, any>) =>
     client.get('/greypackingbarcodebrowse', { params }),
+
+    openModify: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_open_modify', body),
+
+  deletePacking: (body: Record<string, any>) =>
+    client.post('/greypacking/mobile_delete', body),
+
 };
 

@@ -1383,7 +1383,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
             return (
                 <LinearGradient
-                    colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
+                    colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
                     style={{
                         position: "absolute",
                         bottom: 0,
@@ -1742,7 +1742,7 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
             return (
 
                 <LinearGradient
-                    colors={[theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]}
+                    colors={[theme.BRAND_DARK, theme.BRAND_DARK]}
                     style={{
                         position: "absolute",
                         bottom: 65,
@@ -1862,8 +1862,8 @@ const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected
 
                 </ScrollView>
 
-                <Footer />
 
+                <Footer />
             </View>
 
         );

@@ -7,8 +7,11 @@ import {
     Animated,
     Dimensions,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
+    SafeAreaView,
+    StatusBar,
     Text,
     TextInput,
     TouchableOpacity,
@@ -566,24 +569,41 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
     }));
 
     return (
-        <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onClose}>
+        <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent={false}>
+            <StatusBar barStyle="light-content" backgroundColor="#10283A" translucent={false} />
             <View style={styles.modalOverlay}>
                 <Animated.View style={[styles.drawerContainer, { transform: [{ translateY: slideAnim }] }]}>
+                    <SafeAreaView style={styles.safeAreaContainer}>
                     <View style={styles.referenceFilterSheet}>
                         <View style={styles.referenceFilterHeader}>
-                            <View style={styles.filterHeaderTitleRow}>
-                                <Icon name="filter-alt" size={22} color="#F97316" />
-                                <Text style={styles.filterHeaderTitle}>Payable Filter</Text>
+                            <TouchableOpacity
+                                style={styles.referenceBackButton}
+                                onPress={onClose}
+                                accessibilityRole="button"
+                                accessibilityLabel="Back to payable"
+                            >
+                                <Icon name="arrow-back" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+
+                            <View style={styles.commonHeaderTitleBlock}>
+                                <View style={styles.filterHeaderTitleRow}>
+                                    <Icon name="filter-alt" size={20} color="#F97316" />
+                                    <Text style={styles.filterHeaderTitle}>Payable Filter</Text>
+                                </View>
+                                <Text style={styles.commonHeaderSubtitle}>Select property, year and store</Text>
                             </View>
+
                             <TouchableOpacity style={styles.referenceCloseButton} onPress={onClose}>
-                                <Icon name="close" size={24} color="#10283A" />
+                                <Icon name="close" size={22} color="#10283A" />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView contentContainerStyle={styles.referenceFilterContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                            {selectField('property', 'Property', selectedPrpgrp?.PrpTypeOf || selectedPrpgrp?.PrpName || selectedPrpgrp || '', propertyOptions)}
-                            {selectField('year', 'Year', selectedYear, yearList)}
-                            {selectField('internal', 'Store', selectedInternal?.lable || selectedInternal?.label || 'Internal', internalOptions)}
+                            <View style={styles.commonFilterCard}>
+                                {selectField('property', 'Property Group', selectedPrpgrp?.PrpTypeOf || selectedPrpgrp?.PrpName || selectedPrpgrp || '', propertyOptions)}
+                                {selectField('year', 'Year', selectedYear, yearList)}
+                                {selectField('internal', 'Store', selectedInternal?.lable || selectedInternal?.label || 'Internal', internalOptions)}
+                            </View>
 
                             {/* <View style={styles.dateRow}>
                                 <View style={styles.dateColumn}>
@@ -604,16 +624,25 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
 
                             <View style={styles.optionalSection}>
                                 <Text style={styles.optionalTitle}>Additional Filters</Text>
-                                <TouchableOpacity style={styles.optionalSelect} onPress={toggleDesignAccordion}>
-                                    <Text style={styles.optionalSelectText}>Property Selection ({selectedDashPrp.length})</Text>
-                                    <Icon name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={22} color="#27445A" />
-                                </TouchableOpacity>
-                                {isDashPrpAccordionOpen && (displayedDashPrp.length > 0 ? displayedDashPrp.map((item: any) => (
+                                <View style={styles.multiSelectFieldGroup}>
+                                    <Text style={styles.simpleLabel}>Property</Text>
+                                    <TouchableOpacity style={styles.simpleSelect} onPress={toggleDesignAccordion} activeOpacity={0.85}>
+                                        <Text style={styles.simpleSelectText} numberOfLines={1}>
+                                            {selectedDashPrp.length > 0 ? `Selected Properties (${selectedDashPrp.length})` : 'Select Property'}
+                                        </Text>
+                                        <Icon name={isDashPrpAccordionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={22} color="#27445A" />
+                                    </TouchableOpacity>
+                                </View>
+                                {isDashPrpAccordionOpen && (displayedDashPrp.length > 0 ? (
+                                    <View style={styles.multiSelectOptions}>
+                                    {displayedDashPrp.map((item: any) => (
                                     <TouchableOpacity key={item.PrpCode} style={styles.inlineOption} onPress={() => toggleDashPrp(item)}>
                                         <Text style={styles.inlineOptionText}>{item.PrpName || item.PrpCode}</Text>
                                         <Icon name={selectedDashPrp.some((x) => x.PrpCode === item.PrpCode) ? 'check-circle' : 'radio-button-unchecked'} size={20} color="#F97316" />
                                     </TouchableOpacity>
-                                )) : <Text style={styles.noOptionText}>No properties available</Text>)}
+                                ))}
+                                    </View>
+                                ) : <Text style={styles.noOptionText}>No properties available</Text>)}
 
                                 <TouchableOpacity style={styles.optionalSelect} onPress={toggleDesignAccordionParty}>
                                     <Text style={styles.optionalSelectText}>Party Selection ({selectedDashParty.length})</Text>
@@ -653,6 +682,7 @@ const CustomDrawer: React.FC<CustomDrawerReceiveableProps> = ({
                             </TouchableOpacity>
                         </View>
                     </View>
+                    </SafeAreaView>
                 </Animated.View>
             </View>
         </Modal>
@@ -664,6 +694,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
+    },
+    safeAreaContainer: {
+        flex: 1,
+        backgroundColor: '#FBFAF7',
+        // Android does not apply the top safe-area inset to the core SafeAreaView.
+        // Reserve the status-bar height so the common header never slides underneath it.
+        paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0,
     },
     drawerContainer: {
         position: 'absolute',
@@ -1058,12 +1095,32 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     referenceFilterHeader: {
-        minHeight: 72,
-        paddingHorizontal: 22,
+        minHeight: 82,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         backgroundColor: '#10283A',
+    },
+    referenceBackButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.22)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    commonHeaderTitleBlock: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    commonHeaderSubtitle: {
+        color: '#B8C7D8',
+        fontSize: 11,
+        marginTop: 3,
+        fontWeight: '500',
     },
     referenceCloseButton: {
         width: 42,
@@ -1078,9 +1135,21 @@ const styles = StyleSheet.create({
         paddingTop: 18,
         paddingBottom: 24,
     },
+    commonFilterCard: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 18,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
     simpleFieldGroup: {
-        marginBottom: 16,
+        marginBottom: 14,
         zIndex: 20,
+    },
+    multiSelectFieldGroup: {
+        marginBottom: 10,
+        zIndex: 30,
     },
     simpleLabel: {
         fontSize: 13,
@@ -1154,6 +1223,15 @@ const styles = StyleSheet.create({
         borderBottomColor: '#E5EAF0',
     },
     inlineOptionText: { flex: 1, color: '#183247', fontSize: 13, marginRight: 8 },
+    multiSelectOptions: {
+        marginTop: 5,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#D7DEE6',
+        borderRadius: 11,
+        overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
+    },
     noOptionText: { color: '#7B8794', padding: 12 },
     referenceFilterActions: {
         flexDirection: 'row',

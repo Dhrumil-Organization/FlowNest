@@ -10,6 +10,7 @@ import { RegistryRenderer } from '@/src/core/ui-registry';
 import EmployDashboardSection from '@/src/screens/dashboard/employ/screens/EmployDashboardSection';
 import { useAppSessionStore } from '@/src/stores/AppSessionStore';
 import { S, T } from '@/src/theme';
+import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -114,6 +115,7 @@ function MonthlyReportCard({
 
 export function DashboardScreen(token: any, getUserPrptype: any) {
   const router = useRouter();
+  const { isDesktop, isTablet } = useDashboardResponsive();
   const { canAccess, isSuperAdmin } = usePermission();
   const appSession = useAppSessionStore((state) => state.appSession);
   const rawLoginResponse = useAppSessionStore((state) => state.rawLoginResponse);
@@ -286,10 +288,10 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
     <View style={styles.safe}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { load(true); loadExpense(true); }} tintColor={T.copper} />}
       >
-        <View style={styles.segment}>
+        <View style={[styles.segment, isDesktop && styles.segmentDesktop, isTablet && styles.segmentTablet]}>
           <TouchableOpacity
             disabled={!ownerAllowed}
             onPress={() => ownerAllowed && setView('owner')}
@@ -305,7 +307,7 @@ export function DashboardScreen(token: any, getUserPrptype: any) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.amountModeRow}>
+        <View style={[styles.amountModeRow, isDesktop && styles.amountModeRowDesktop]}>
           <Text style={styles.amountModeLabel}>AMOUNT</Text>
           <AmountDisplayModeControl mode={amountMode} onChange={setAmountMode} compact />
         </View>
@@ -440,13 +442,17 @@ const styles = StyleSheet.create({
   logoutButton: { borderWidth: 1, borderColor: '#294155', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   logoutText: { color: '#E5EEF5', fontWeight: '800', fontSize: 11 },
   scroll: { flex: 1 },
-  content: { padding: 14, paddingBottom: 100 },
+  content: { padding: 14, paddingBottom: 100, width: '100%' },
+  contentDesktop: { maxWidth: 1260, alignSelf: 'center', paddingHorizontal: 22, paddingBottom: 30 },
+  segmentDesktop: { maxWidth: 1260, alignSelf: 'center', width: '100%' },
+  segmentTablet: { marginHorizontal: 4 },
   segment: { flexDirection: 'row', backgroundColor: T.surface, borderWidth: 1, borderColor: T.border, borderRadius: 13, overflow: 'hidden', marginBottom: 14 },
   segmentButton: { flex: 1, paddingVertical: 13, alignItems: 'center' },
   segmentActive: { backgroundColor: T.nav },
   segmentDisabled: { opacity: 0.35 },
   segmentText: { color: T.muted, fontSize: 12, fontWeight: '900' },
   segmentTextActive: { color: '#fff' },
+  amountModeRowDesktop: { maxWidth: 1260, alignSelf: 'center', width: '100%', paddingHorizontal: 0 },
   amountModeRow: { marginTop: -6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   amountModeLabel: { color: T.muted, fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   monthlyReportCard: {

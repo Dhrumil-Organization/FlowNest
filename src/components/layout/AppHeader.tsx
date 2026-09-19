@@ -12,6 +12,7 @@ import { getCredentialsForPropertySwitch } from '../../lib/biometricAuth';
 import { useAppSessionStore } from '../../stores/AppSessionStore';
 import { T } from '../../theme';
 import { isEmbeddedWeb } from '@/src/core/embeddedAuth';
+import { useDashboardResponsive } from '@/src/components/EmployDashboard/rn-app/components/responsive';
 
 type Props = { eyebrow?: string; title: string; subtitle?: string; right?: React.ReactNode; showSignOut?: boolean };
 
@@ -45,6 +46,7 @@ function getInitials(u: any): string {
 // enclosing screen's own SafeAreaView is the single place safe-area is applied.
 export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, right, showSignOut = true }: Props) {
   const logout = useAppSessionStore(s => s.logout);
+  const { isDesktop, isTablet } = useDashboardResponsive();
   const router = useRouter();
   const pathname = usePathname();
   const isGreyPackingRoute = pathname?.includes('grey-packing') || pathname?.includes('greypacking');
@@ -158,7 +160,7 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
 
   return <View style={s.safe}>
     <StatusBar barStyle="light-content" backgroundColor={T.nav} />
-    <View style={[s.header, isGreyPackingRoute && s.headerCompact]}>
+    <View style={[s.header, isTablet && s.headerTablet, isDesktop && s.headerDesktop, isGreyPackingRoute && s.headerCompact]}>
       {isGreyPackingRoute && (
         <TouchableOpacity
           onPress={() => router.back()}
@@ -172,11 +174,11 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
       )}
 
       <View style={s.left}>
-      <Text style={s.eyebrow} numberOfLines={1}>{displayEyebrow}</Text>
+      <Text style={[s.eyebrow, isTablet && s.eyebrowTablet]} numberOfLines={1}>{displayEyebrow}</Text>
 
       {displayTitle !== 'Permission Manager' && (
         <Text
-          style={[s.title, isGreyPackingRoute && s.titleCompact]}
+          style={[s.title, isTablet && s.titleTablet, isDesktop && s.titleDesktop, isGreyPackingRoute && s.titleCompact]}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.7}
@@ -185,10 +187,10 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
         </Text>
       )}
 
-      {!isGreyPackingRoute && !!subtitle && <Text style={s.subtitle} numberOfLines={1}>{subtitle}</Text>}
+      {!isGreyPackingRoute && !!subtitle && <Text style={[s.subtitle, isTablet && s.subtitleTablet]} numberOfLines={1}>{subtitle}</Text>}
       {!isGreyPackingRoute && (
         <View style={s.versionRow}>
-          <Text style={[s.subtitle, s.versionText]} numberOfLines={1}>Version: {appVersion}</Text>
+          <Text style={[s.subtitle, s.versionText, isTablet && s.subtitleTablet]} numberOfLines={1}>Version: {appVersion}</Text>
 
           {switchUserLogin && (
             <View style={s.propertySwitchRow}>
@@ -214,15 +216,15 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
         </View>
       )}
     </View>
-      <View style={s.right}>
+      <View style={[s.right, isTablet && s.rightTablet]}>
         {right}
-        {showSignOut && <TouchableOpacity onPress={signOut} style={s.signOut}>
+        {showSignOut && <TouchableOpacity onPress={signOut} style={[s.signOut, isTablet && s.signOutTablet]}>
           {/* <Text style={s.signOutText}>Sign out</Text> */}
           <Icon name="logout" size={20} color="#fff" />
         </TouchableOpacity>}
         <TouchableOpacity
           onPress={() => router.push('/new/profile' as any)}
-          style={s.avatar}
+          style={[s.avatar, isTablet && s.avatarTablet]}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Open profile"
@@ -240,13 +242,22 @@ export function AppHeader({ eyebrow = 'SUDAMO TEXTILE ERP', title, subtitle, rig
 // `flexShrink:0` so it can no longer be the thing that gets squeezed
 // unpredictably.
 const s = StyleSheet.create({
-  safe: { backgroundColor: T.nav }, header: { backgroundColor: T.nav, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 5, flexDirection: 'row', alignItems: 'center' }, headerCompact: { paddingTop: 10, paddingBottom: 12, paddingHorizontal: 18 }, left: { flex: 1, paddingRight: 12, minWidth: 0 }, eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2, color: '#8EA6BA' }, title: { fontSize: 28, fontWeight: '900', color: '#fff', marginTop: 4 }, titleCompact: { fontSize: 22, marginTop: 2 }, subtitle: { fontSize: 13, fontWeight: '700', color: '#9FB0BF', marginTop: 6 },
+  safe: { backgroundColor: T.nav },
+  headerTablet: { paddingHorizontal: 16, paddingTop: 13, paddingBottom: 6 },
+  headerDesktop: { paddingHorizontal: 22 },
+  safeDummy: {},
+  header: { backgroundColor: T.nav, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 5, flexDirection: 'row', alignItems: 'center' }, headerCompact: { paddingTop: 10, paddingBottom: 12, paddingHorizontal: 18 }, left: { flex: 1, paddingRight: 12, minWidth: 0 }, eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2, color: '#8EA6BA' }, title: { fontSize: 28, fontWeight: '900', color: '#fff', marginTop: 4 }, titleCompact: { fontSize: 22, marginTop: 2 }, subtitle: { fontSize: 13, fontWeight: '700', color: '#9FB0BF', marginTop: 6 },
+  eyebrowTablet: { fontSize: 9 },
+  titleTablet: { fontSize: 22, marginTop: 3 },
+  titleDesktop: { fontSize: 28 },
+  subtitleTablet: { fontSize: 11, marginTop: 4 },
   versionRow: { flexDirection: 'row', alignItems: 'center', marginTop: -6, gap: 10 },
   versionText: { marginTop: 0, flexShrink: 0 },
   propertySwitchRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   propertySwitchText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   propertySwitchToggle: { transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] },
   right: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  rightTablet: { gap: 6 },
   backButton: {
     width: 42,
     height: 42,
@@ -257,5 +268,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  signOut: { borderWidth: 1.5, borderColor: '#2A4055', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 12 }, signOutText: { color: '#fff', fontWeight: '900', fontSize: 13 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' }, avatarText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }
+  signOut: { borderWidth: 1.5, borderColor: '#2A4055', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 12 },
+  signOutTablet: { borderRadius: 11, paddingHorizontal: 9, paddingVertical: 9 }, signOutText: { color: '#fff', fontWeight: '900', fontSize: 13 }, avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: T.copper, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)' }, avatarText: { color: '#fff', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }
 });

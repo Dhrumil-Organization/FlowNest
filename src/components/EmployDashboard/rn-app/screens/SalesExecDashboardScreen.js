@@ -28,6 +28,7 @@ import {
   TotalRow
 } from '../components/SharedComponents';
 import { SALES_EXEC_DASHBOARD_TOUR } from './DashboardTours';
+import { useDashboardResponsive } from '../components/responsive';
 
 // ─── Table scroll wrapper: auto height <10 rows, fixed+scroll ≥10 rows ───────
 const ROW_HEIGHT = 70;
@@ -86,6 +87,7 @@ export default function SalesExecDashboardScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [showTour, setShowTour] = useState(false);
+  const { isDesktop, isTablet } = useDashboardResponsive();
 
   console.log('activeTab', activeTab);
 
@@ -197,7 +199,7 @@ export default function SalesExecDashboardScreen({
         </View> */}
 
         {/* Breadcrumb */}
-        <View style={styles.breadcrumb}>
+        <View style={[styles.breadcrumb, (isDesktop || isTablet) && styles.breadcrumbWide]}>
         
           
           <TouchableOpacity
@@ -272,169 +274,341 @@ export default function SalesExecDashboardScreen({
             </View>
           </SectionCard>
 
-          {/* ─── SALES SECTION ─── */}
-          <SectionCard>
-            <SectionHeader icon="📊" title="SALES" bgColor={COLORS.salesBg} />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(sales.total.today)}
-              tealLeft
-              rightLabel="US MTD"
-              rightValue={formatAmount(sales.total.mtd)}
-              rawLeftValue={sales.total.today}
-              rawRightValue={sales.total.mtd}
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={salesTrend}
-                color={COLORS.teal}
-                fillColor={COLORS.teal}
-                width={340}
-                height={50}
-              />
-              <View style={styles.chartAxisRow}>
-                {sales.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
+          {isDesktop ? (
+            <View style={styles.desktopColumns}>
+              <View style={styles.desktopColumn}>
+                          {/* ─── SALES SECTION ─── */}
+                          <SectionCard>
+                            <SectionHeader icon="📊" title="SALES" bgColor={COLORS.salesBg} />
+                
+                            <TotalRow
+                              leftLabel="TODAY"
+                              leftValue={formatAmount(sales.total.today)}
+                              tealLeft
+                              rightLabel="US MTD"
+                              rightValue={formatAmount(sales.total.mtd)}
+                              rawLeftValue={sales.total.today}
+                              rawRightValue={sales.total.mtd}
+                            />
+                
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>DAILY TREND</Text>
+                              <MiniLineChart
+                                data={salesTrend}
+                                color={COLORS.teal}
+                                fillColor={COLORS.teal}
+                                responsive
+                                height={50}
+                              />
+                              <View style={styles.chartAxisRow}>
+                                {sales.daily_trend.map((d, i) => (
+                                  <Text key={i} style={styles.axisLabel}>
+                                    {d.day}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                
+                            <Text style={styles.subHeader}>TOP CUSTOMERS BY SALES</Text>
+                            <ColHeader label1="CUSTOMER" label2="TODAY" label3="BILLED" />
+                            <TableWrapper rowCount={sales.by_party.length}>
+                              {sales.by_party.map(p => (
+                                <RankRow
+                                  key={p.party_id}
+                                  rank={p.rank}
+                                  name={p.party_name}
+                                  leftVal={formatAmount(p.today)}
+                                  rightVal={formatAmount(p.mtd)}
+                                  rawLeftVal={p.today}
+                                  rawRightVal={p.mtd}
+                                  onPress={() => goToParty(p)}
+                                />
+                              ))}
+                            </TableWrapper>
+                          </SectionCard>
+              </View>
+              <View style={styles.desktopColumn}>
+                          {/* ─── PAYMENT COLLECTION SECTION ─── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="💰"
+                              title="PAYMENT COLLECTION"
+                              bgColor={COLORS.collBg}
+                            />
+                
+                            <TotalRow
+                              leftLabel="TODAY"
+                              leftValue={formatAmount(collection.total.today)}
+                              tealLeft
+                              rightLabel="DUE"
+                              rightValue={formatAmount(collection.total.due)}
+                              rawLeftValue={collection.total.today}
+                              rawRightValue={collection.total.due}
+                            />
+                
+                            {/* Progress bar: collected vs due */}
+                            <View style={styles.progressWrap}>
+                              <ProgressBar
+                                pct={
+                                  (collection.total.today /
+                                    (collection.total.today + collection.total.due)) *
+                                  100
+                                }
+                                color={COLORS.teal}
+                              />
+                              <View style={styles.progressLabels}>
+                                <Text style={styles.progressLabelLeft}>
+                                  Collected{' '}
+                                  {(
+                                    (collection.total.today /
+                                      (collection.total.today + collection.total.due)) *
+                                    100
+                                  ).toFixed(1)}
+                                  %
+                                </Text>
+                                <Text style={styles.progressLabelRight}>
+                                  Pending{' '}
+                                  {(
+                                    100 -
+                                    (collection.total.today /
+                                      (collection.total.today + collection.total.due)) *
+                                    100
+                                  ).toFixed(1)}
+                                  %
+                                </Text>
+                              </View>
+                            </View>
+                
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>COLLECTION TREND</Text>
+                              <MiniLineChart
+                                data={collectionTrend}
+                                color={COLORS.green}
+                                fillColor={COLORS.green}
+                                responsive
+                                height={50}
+                              />
+                              <View style={styles.chartAxisRow}>
+                                {collection.daily_trend.map((d, i) => (
+                                  <Text key={i} style={styles.axisLabel}>
+                                    {d.day}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                
+                            {/* Collections highest first */}
+                            <Text style={styles.subHeader}>COLLECTIONS — HIGHEST FIRST</Text>
+                            <ColHeader label1="CUSTOMER" label2="TODAY" label3="TOTAL" />
+                            <TableWrapper rowCount={collection.by_party.length}>
+                              {collection.by_party.map(p => (
+                                <RankRow
+                                  key={p.party_id}
+                                  rank={p.rank}
+                                  name={p.party_name}
+                                  leftVal={formatAmount(p.today)}
+                                  rightVal={formatAmount(p.total_collected)}
+                                  rawLeftVal={p.today}
+                                  rawRightVal={p.total_collected}
+                                  onPress={() =>
+                                    goToParty({
+                                      party_id: p.party_id,
+                                      party_name: p.party_name,
+                                    })
+                                  }
+                                />
+                              ))}
+                            </TableWrapper>
+                            {/* Outstanding highest first */}
+                            <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
+                            <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" />
+                            <TableWrapper rowCount={collection.outstanding_by_party.length}>
+                              {collection.outstanding_by_party.map(p => (
+                                <RankRow
+                                  key={p.party_id}
+                                  rank={p.rank}
+                                  name={p.party_name}
+                                  rightVal={formatAmount(p.amount)}
+                                  rawRightVal={p.amount}
+                                  trendUp={false}
+                                  onPress={() =>
+                                    goToParty({
+                                      party_id: p.party_id,
+                                      party_name: p.party_name,
+                                    })
+                                  }
+                                />
+                              ))}
+                            </TableWrapper>
+                          </SectionCard>
               </View>
             </View>
-
-            <Text style={styles.subHeader}>TOP CUSTOMERS BY SALES</Text>
-            <ColHeader label1="CUSTOMER" label2="TODAY" label3="BILLED" />
-            <TableWrapper rowCount={sales.by_party.length}>
-              {sales.by_party.map(p => (
-                <RankRow
-                  key={p.party_id}
-                  rank={p.rank}
-                  name={p.party_name}
-                  leftVal={formatAmount(p.today)}
-                  rightVal={formatAmount(p.mtd)}
-                  rawLeftVal={p.today}
-                  rawRightVal={p.mtd}
-                  onPress={() => goToParty(p)}
-                />
-              ))}
-            </TableWrapper>
-          </SectionCard>
-
-          {/* ─── PAYMENT COLLECTION SECTION ─── */}
-          <SectionCard>
-            <SectionHeader
-              icon="💰"
-              title="PAYMENT COLLECTION"
-              bgColor={COLORS.collBg}
-            />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(collection.total.today)}
-              tealLeft
-              rightLabel="DUE"
-              rightValue={formatAmount(collection.total.due)}
-              rawLeftValue={collection.total.today}
-              rawRightValue={collection.total.due}
-            />
-
-            {/* Progress bar: collected vs due */}
-            <View style={styles.progressWrap}>
-              <ProgressBar
-                pct={
-                  (collection.total.today /
-                    (collection.total.today + collection.total.due)) *
-                  100
-                }
-                color={COLORS.teal}
-              />
-              <View style={styles.progressLabels}>
-                <Text style={styles.progressLabelLeft}>
-                  Collected{' '}
-                  {(
-                    (collection.total.today /
-                      (collection.total.today + collection.total.due)) *
-                    100
-                  ).toFixed(1)}
-                  %
-                </Text>
-                <Text style={styles.progressLabelRight}>
-                  Pending{' '}
-                  {(
-                    100 -
-                    (collection.total.today /
-                      (collection.total.today + collection.total.due)) *
-                    100
-                  ).toFixed(1)}
-                  %
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>COLLECTION TREND</Text>
-              <MiniLineChart
-                data={collectionTrend}
-                color={COLORS.green}
-                fillColor={COLORS.green}
-                width={340}
-                height={50}
-              />
-              <View style={styles.chartAxisRow}>
-                {collection.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
-
-            {/* Collections highest first */}
-            <Text style={styles.subHeader}>COLLECTIONS — HIGHEST FIRST</Text>
-            <ColHeader label1="CUSTOMER" label2="TODAY" label3="TOTAL" />
-            <TableWrapper rowCount={collection.by_party.length}>
-              {collection.by_party.map(p => (
-                <RankRow
-                  key={p.party_id}
-                  rank={p.rank}
-                  name={p.party_name}
-                  leftVal={formatAmount(p.today)}
-                  rightVal={formatAmount(p.total_collected)}
-                  rawLeftVal={p.today}
-                  rawRightVal={p.total_collected}
-                  onPress={() =>
-                    goToParty({
-                      party_id: p.party_id,
-                      party_name: p.party_name,
-                    })
-                  }
-                />
-              ))}
-            </TableWrapper>
-            {/* Outstanding highest first */}
-            <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
-            <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" />
-            <TableWrapper rowCount={collection.outstanding_by_party.length}>
-              {collection.outstanding_by_party.map(p => (
-                <RankRow
-                  key={p.party_id}
-                  rank={p.rank}
-                  name={p.party_name}
-                  rightVal={formatAmount(p.amount)}
-                  rawRightVal={p.amount}
-                  trendUp={false}
-                  onPress={() =>
-                    goToParty({
-                      party_id: p.party_id,
-                      party_name: p.party_name,
-                    })
-                  }
-                />
-              ))}
-            </TableWrapper>
-          </SectionCard>
+          ) : (
+            <>
+                      {/* ─── SALES SECTION ─── */}
+                      <SectionCard>
+                        <SectionHeader icon="📊" title="SALES" bgColor={COLORS.salesBg} />
+            
+                        <TotalRow
+                          leftLabel="TODAY"
+                          leftValue={formatAmount(sales.total.today)}
+                          tealLeft
+                          rightLabel="US MTD"
+                          rightValue={formatAmount(sales.total.mtd)}
+                          rawLeftValue={sales.total.today}
+                          rawRightValue={sales.total.mtd}
+                        />
+            
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>DAILY TREND</Text>
+                          <MiniLineChart
+                            data={salesTrend}
+                            color={COLORS.teal}
+                            fillColor={COLORS.teal}
+                            responsive
+                            height={50}
+                          />
+                          <View style={styles.chartAxisRow}>
+                            {sales.daily_trend.map((d, i) => (
+                              <Text key={i} style={styles.axisLabel}>
+                                {d.day}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+            
+                        <Text style={styles.subHeader}>TOP CUSTOMERS BY SALES</Text>
+                        <ColHeader label1="CUSTOMER" label2="TODAY" label3="BILLED" />
+                        <TableWrapper rowCount={sales.by_party.length}>
+                          {sales.by_party.map(p => (
+                            <RankRow
+                              key={p.party_id}
+                              rank={p.rank}
+                              name={p.party_name}
+                              leftVal={formatAmount(p.today)}
+                              rightVal={formatAmount(p.mtd)}
+                              rawLeftVal={p.today}
+                              rawRightVal={p.mtd}
+                              onPress={() => goToParty(p)}
+                            />
+                          ))}
+                        </TableWrapper>
+                      </SectionCard>
+                      {/* ─── PAYMENT COLLECTION SECTION ─── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="💰"
+                          title="PAYMENT COLLECTION"
+                          bgColor={COLORS.collBg}
+                        />
+            
+                        <TotalRow
+                          leftLabel="TODAY"
+                          leftValue={formatAmount(collection.total.today)}
+                          tealLeft
+                          rightLabel="DUE"
+                          rightValue={formatAmount(collection.total.due)}
+                          rawLeftValue={collection.total.today}
+                          rawRightValue={collection.total.due}
+                        />
+            
+                        {/* Progress bar: collected vs due */}
+                        <View style={styles.progressWrap}>
+                          <ProgressBar
+                            pct={
+                              (collection.total.today /
+                                (collection.total.today + collection.total.due)) *
+                              100
+                            }
+                            color={COLORS.teal}
+                          />
+                          <View style={styles.progressLabels}>
+                            <Text style={styles.progressLabelLeft}>
+                              Collected{' '}
+                              {(
+                                (collection.total.today /
+                                  (collection.total.today + collection.total.due)) *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </Text>
+                            <Text style={styles.progressLabelRight}>
+                              Pending{' '}
+                              {(
+                                100 -
+                                (collection.total.today /
+                                  (collection.total.today + collection.total.due)) *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </Text>
+                          </View>
+                        </View>
+            
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>COLLECTION TREND</Text>
+                          <MiniLineChart
+                            data={collectionTrend}
+                            color={COLORS.green}
+                            fillColor={COLORS.green}
+                            responsive
+                            height={50}
+                          />
+                          <View style={styles.chartAxisRow}>
+                            {collection.daily_trend.map((d, i) => (
+                              <Text key={i} style={styles.axisLabel}>
+                                {d.day}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+            
+                        {/* Collections highest first */}
+                        <Text style={styles.subHeader}>COLLECTIONS — HIGHEST FIRST</Text>
+                        <ColHeader label1="CUSTOMER" label2="TODAY" label3="TOTAL" />
+                        <TableWrapper rowCount={collection.by_party.length}>
+                          {collection.by_party.map(p => (
+                            <RankRow
+                              key={p.party_id}
+                              rank={p.rank}
+                              name={p.party_name}
+                              leftVal={formatAmount(p.today)}
+                              rightVal={formatAmount(p.total_collected)}
+                              rawLeftVal={p.today}
+                              rawRightVal={p.total_collected}
+                              onPress={() =>
+                                goToParty({
+                                  party_id: p.party_id,
+                                  party_name: p.party_name,
+                                })
+                              }
+                            />
+                          ))}
+                        </TableWrapper>
+                        {/* Outstanding highest first */}
+                        <Text style={styles.subHeader}>OUTSTANDING — HIGHEST FIRST</Text>
+                        <ColHeader label1="CUSTOMER" label2="" label3="AMOUNT" />
+                        <TableWrapper rowCount={collection.outstanding_by_party.length}>
+                          {collection.outstanding_by_party.map(p => (
+                            <RankRow
+                              key={p.party_id}
+                              rank={p.rank}
+                              name={p.party_name}
+                              rightVal={formatAmount(p.amount)}
+                              rawRightVal={p.amount}
+                              trendUp={false}
+                              onPress={() =>
+                                goToParty({
+                                  party_id: p.party_id,
+                                  party_name: p.party_name,
+                                })
+                              }
+                            />
+                          ))}
+                        </TableWrapper>
+                      </SectionCard>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
       <TourOverlay
@@ -462,16 +636,20 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '700' },
   headerDate: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
   breadcrumb: {
+
     flexDirection: 'row',
     paddingHorizontal: 14,
     paddingVertical: 6,
     backgroundColor: '#E8EDF2',
   },
   breadcrumbText: { fontSize: 11, color: COLORS.textLight },
+  breadcrumbWide: { paddingHorizontal: 18, paddingVertical: 8 },
   breadcrumbSep: { fontSize: 11, color: COLORS.textLight },
   breadcrumbActive: { color: COLORS.primary, fontWeight: '600' },
   scroll: { flex: 1 },
-  content: { paddingTop: 10, paddingBottom: 24 },
+  content: { paddingTop: 10, paddingBottom: 24, width: '100%', alignSelf: 'center' },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, paddingHorizontal: 18, maxWidth: 1260, alignSelf: 'center', width: '100%' },
+  desktopColumn: { flex: 1, minWidth: 0 },
   profileCard: { marginHorizontal: 12, marginBottom: 12 },
   profileTop: { flexDirection: 'row', alignItems: 'center', padding: 14 },
   profileInfo: { flex: 1, marginLeft: 12 },

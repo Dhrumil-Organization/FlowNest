@@ -26,6 +26,7 @@ import {
   TotalRow
 } from '../components/SharedComponents';
 import { PARTY_DASHBOARD_TOUR } from './DashboardTours';
+import { useDashboardResponsive } from '../components/responsive';
 
 /**
  * PartyDashboardScreen
@@ -59,6 +60,7 @@ export default function PartyDashboardScreen({ username }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [showTour, setShowTour] = useState(false);
+  const { isDesktop, isTablet } = useDashboardResponsive();
 
   const load = useCallback(
     async getUserPrptype => {
@@ -135,7 +137,7 @@ export default function PartyDashboardScreen({ username }) {
         </View> */}
 
         {/* Breadcrumb: Owner › ExecName › PartyName */}
-        <View style={styles.breadcrumb}>
+        <View style={[styles.breadcrumb, (isDesktop || isTablet) && styles.breadcrumbWide]}>
           <Text style={styles.breadcrumbText}>Owner</Text>
           <Text style={styles.breadcrumbSep}> › </Text>
           <Text style={styles.breadcrumbText}>{execName}</Text>
@@ -199,114 +201,231 @@ export default function PartyDashboardScreen({ username }) {
             </View>
           </SectionCard>
 
-          {/* ─── SALES TREND ─── */}
-          <SectionCard>
-            <SectionHeader
-              icon="📈"
-              title="SALES TREND"
-              bgColor={COLORS.salesBg}
-            />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(sales_trend.total.today)}
-              tealLeft
-              rightLabel="US MTD"
-              rightValue={formatAmount(sales_trend.total.mtd)}
-            />
-
-            {/* Sparkline — last 11 days */}
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY SALES — LAST 11 DAYS</Text>
-              <MiniLineChart
-                data={salesData}
-                color={COLORS.teal}
-                fillColor={COLORS.teal}
-                width={340}
-                height={60}
-                showBaseline
-              />
-              {/* Day labels */}
-              <View style={styles.chartAxisRow}>
-                {salesLabels
-                  .filter((_, i) => i % 2 === 0)
-                  .map((lbl, i) => (
-                    <Text key={i} style={styles.axisLabel}>
-                      {lbl}
-                    </Text>
-                  ))}
+          {isDesktop ? (
+            <View style={styles.desktopColumns}>
+              <View style={styles.desktopColumn}>
+                          {/* ─── SALES TREND ─── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="📈"
+                              title="SALES TREND"
+                              bgColor={COLORS.salesBg}
+                            />
+                
+                            <TotalRow
+                              leftLabel="TODAY"
+                              leftValue={formatAmount(sales_trend.total.today)}
+                              tealLeft
+                              rightLabel="US MTD"
+                              rightValue={formatAmount(sales_trend.total.mtd)}
+                            />
+                
+                            {/* Sparkline — last 11 days */}
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>DAILY SALES — LAST 11 DAYS</Text>
+                              <MiniLineChart
+                                data={salesData}
+                                color={COLORS.teal}
+                                fillColor={COLORS.teal}
+                                responsive
+                                height={60}
+                                showBaseline
+                              />
+                              {/* Day labels */}
+                              <View style={styles.chartAxisRow}>
+                                {salesLabels
+                                  .filter((_, i) => i % 2 === 0)
+                                  .map((lbl, i) => (
+                                    <Text key={i} style={styles.axisLabel}>
+                                      {lbl}
+                                    </Text>
+                                  ))}
+                              </View>
+                            </View>
+                          </SectionCard>
+              </View>
+              <View style={styles.desktopColumn}>
+                          {/* ─── PAYMENT STATUS ─── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="💳"
+                              title="PAYMENT STATUS"
+                              bgColor={COLORS.collBg}
+                            />
+                
+                            <TotalRow
+                              leftLabel="COLLECTED"
+                              leftValue={formatAmount(payment_status.total.collected)}
+                              tealLeft
+                              rightLabel="DUE"
+                              rightValue={
+                                payment_status.total.due === 0
+                                  ? '—'
+                                  : formatAmount(payment_status.total.due)
+                              }
+                            />
+                
+                            {/* Rate row */}
+                            <View style={styles.rateRow}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.rateLabel}>COLLECTION RATE</Text>
+                                <Text style={styles.rateValue}>
+                                  {formatAmount(payment_status.collection_rate_today)} /{' '}
+                                  {formatAmount(payment_status.collection_rate_mtd)}
+                                </Text>
+                              </View>
+                              <Text
+                                style={[
+                                  styles.pendingPct,
+                                  payment_status.pending_pct > 0 && { color: COLORS.red },
+                                ]}
+                              >
+                                {payment_status.pending_pct > 0
+                                  ? `Pending ${payment_status.pending_pct.toFixed(1)}%`
+                                  : 'Fully Collected ✓'}
+                              </Text>
+                            </View>
+                
+                            {/* Progress bar */}
+                            <ProgressBar pct={collectedPct} color={COLORS.teal} />
+                
+                            {/* Collection trend — last 11 days */}
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>
+                                COLLECTION TREND — LAST 11 DAYS
+                              </Text>
+                              <MiniLineChart
+                                data={collectionData}
+                                color={COLORS.green}
+                                fillColor={COLORS.green}
+                                responsive
+                                height={60}
+                                showBaseline
+                              />
+                              <View style={styles.chartAxisRow}>
+                                {salesLabels
+                                  .filter((_, i) => i % 2 === 0)
+                                  .map((lbl, i) => (
+                                    <Text key={i} style={styles.axisLabel}>
+                                      {lbl}
+                                    </Text>
+                                  ))}
+                              </View>
+                            </View>
+                          </SectionCard>
               </View>
             </View>
-          </SectionCard>
-
-          {/* ─── PAYMENT STATUS ─── */}
-          <SectionCard>
-            <SectionHeader
-              icon="💳"
-              title="PAYMENT STATUS"
-              bgColor={COLORS.collBg}
-            />
-
-            <TotalRow
-              leftLabel="COLLECTED"
-              leftValue={formatAmount(payment_status.total.collected)}
-              tealLeft
-              rightLabel="DUE"
-              rightValue={
-                payment_status.total.due === 0
-                  ? '—'
-                  : formatAmount(payment_status.total.due)
-              }
-            />
-
-            {/* Rate row */}
-            <View style={styles.rateRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rateLabel}>COLLECTION RATE</Text>
-                <Text style={styles.rateValue}>
-                  {formatAmount(payment_status.collection_rate_today)} /{' '}
-                  {formatAmount(payment_status.collection_rate_mtd)}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.pendingPct,
-                  payment_status.pending_pct > 0 && { color: COLORS.red },
-                ]}
-              >
-                {payment_status.pending_pct > 0
-                  ? `Pending ${payment_status.pending_pct.toFixed(1)}%`
-                  : 'Fully Collected ✓'}
-              </Text>
-            </View>
-
-            {/* Progress bar */}
-            <ProgressBar pct={collectedPct} color={COLORS.teal} />
-
-            {/* Collection trend — last 11 days */}
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>
-                COLLECTION TREND — LAST 11 DAYS
-              </Text>
-              <MiniLineChart
-                data={collectionData}
-                color={COLORS.green}
-                fillColor={COLORS.green}
-                width={340}
-                height={60}
-                showBaseline
-              />
-              <View style={styles.chartAxisRow}>
-                {salesLabels
-                  .filter((_, i) => i % 2 === 0)
-                  .map((lbl, i) => (
-                    <Text key={i} style={styles.axisLabel}>
-                      {lbl}
-                    </Text>
-                  ))}
-              </View>
-            </View>
-          </SectionCard>
+          ) : (
+            <>
+                      {/* ─── SALES TREND ─── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="📈"
+                          title="SALES TREND"
+                          bgColor={COLORS.salesBg}
+                        />
+            
+                        <TotalRow
+                          leftLabel="TODAY"
+                          leftValue={formatAmount(sales_trend.total.today)}
+                          tealLeft
+                          rightLabel="US MTD"
+                          rightValue={formatAmount(sales_trend.total.mtd)}
+                        />
+            
+                        {/* Sparkline — last 11 days */}
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>DAILY SALES — LAST 11 DAYS</Text>
+                          <MiniLineChart
+                            data={salesData}
+                            color={COLORS.teal}
+                            fillColor={COLORS.teal}
+                            responsive
+                            height={60}
+                            showBaseline
+                          />
+                          {/* Day labels */}
+                          <View style={styles.chartAxisRow}>
+                            {salesLabels
+                              .filter((_, i) => i % 2 === 0)
+                              .map((lbl, i) => (
+                                <Text key={i} style={styles.axisLabel}>
+                                  {lbl}
+                                </Text>
+                              ))}
+                          </View>
+                        </View>
+                      </SectionCard>
+                      {/* ─── PAYMENT STATUS ─── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="💳"
+                          title="PAYMENT STATUS"
+                          bgColor={COLORS.collBg}
+                        />
+            
+                        <TotalRow
+                          leftLabel="COLLECTED"
+                          leftValue={formatAmount(payment_status.total.collected)}
+                          tealLeft
+                          rightLabel="DUE"
+                          rightValue={
+                            payment_status.total.due === 0
+                              ? '—'
+                              : formatAmount(payment_status.total.due)
+                          }
+                        />
+            
+                        {/* Rate row */}
+                        <View style={styles.rateRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.rateLabel}>COLLECTION RATE</Text>
+                            <Text style={styles.rateValue}>
+                              {formatAmount(payment_status.collection_rate_today)} /{' '}
+                              {formatAmount(payment_status.collection_rate_mtd)}
+                            </Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.pendingPct,
+                              payment_status.pending_pct > 0 && { color: COLORS.red },
+                            ]}
+                          >
+                            {payment_status.pending_pct > 0
+                              ? `Pending ${payment_status.pending_pct.toFixed(1)}%`
+                              : 'Fully Collected ✓'}
+                          </Text>
+                        </View>
+            
+                        {/* Progress bar */}
+                        <ProgressBar pct={collectedPct} color={COLORS.teal} />
+            
+                        {/* Collection trend — last 11 days */}
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>
+                            COLLECTION TREND — LAST 11 DAYS
+                          </Text>
+                          <MiniLineChart
+                            data={collectionData}
+                            color={COLORS.green}
+                            fillColor={COLORS.green}
+                            responsive
+                            height={60}
+                            showBaseline
+                          />
+                          <View style={styles.chartAxisRow}>
+                            {salesLabels
+                              .filter((_, i) => i % 2 === 0)
+                              .map((lbl, i) => (
+                                <Text key={i} style={styles.axisLabel}>
+                                  {lbl}
+                                </Text>
+                              ))}
+                          </View>
+                        </View>
+                      </SectionCard>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
       <TourOverlay
@@ -340,10 +459,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8EDF2',
   },
   breadcrumbText: { fontSize: 11, color: COLORS.textLight },
+  breadcrumbWide: { paddingHorizontal: 18, paddingVertical: 8 },
   breadcrumbSep: { fontSize: 11, color: COLORS.textLight },
   breadcrumbActive: { color: COLORS.primary, fontWeight: '600' },
   scroll: { flex: 1 },
-  content: { paddingTop: 10, paddingBottom: 24 },
+  content: { paddingTop: 10, paddingBottom: 24, width: '100%', alignSelf: 'center' },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, paddingHorizontal: 18, maxWidth: 1100, alignSelf: 'center', width: '100%' },
+  desktopColumn: { flex: 1, minWidth: 0 },
   profileCard: {},
   profileTop: { flexDirection: 'row', alignItems: 'center', padding: 14 },
   profileInfo: { flex: 1, marginLeft: 12 },

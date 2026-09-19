@@ -96,7 +96,7 @@ export interface InternalDropdown {
     value: string;
 }
 
-const DailyCollectionReport: React.FC<Props> = ({ token, navigation, isConnected, username, setIsLoggedIn, rightsMenuApps }) => {
+const DailyCollectionReport: React.FC<Props> = ({ token, isConnected, username, setIsLoggedIn }) => {
     const filterKey = 'all';
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingSummary, setIsLoadingSummary] = useState(false);

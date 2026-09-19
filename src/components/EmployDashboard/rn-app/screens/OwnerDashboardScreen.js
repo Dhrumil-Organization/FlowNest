@@ -29,6 +29,7 @@ import {
 import TourOverlay from '../../../../common/TourOverlay';
 import { OWNER_DASHBOARD_TOUR } from './DashboardTours';
 import DashboardSkeleton from '../components/DashboardSkeleton'; // ← NEW
+import { useDashboardResponsive } from '../components/responsive';
 
 // ─── Table scroll wrapper: auto height <10 rows, fixed+scroll ≥10 rows ───────
 const ROW_HEIGHT = 70;
@@ -78,6 +79,7 @@ export default function OwnerDashboardScreen({
   // YYYY-MM-DD string for API
   const dateString = date.toISOString().split('T')[0];
   const [showTour, setShowTour] = useState(false);
+  const { isDesktop, isTablet } = useDashboardResponsive();
 
   const load = useCallback(
     async getUserPrptype => {
@@ -151,7 +153,7 @@ export default function OwnerDashboardScreen({
           }
         >
           {/* ── DATE PICKER BAR ── */}
-          <View style={styles.dateBar}>
+          <View style={[styles.dateBar, isDesktop && styles.dateBarDesktop, isTablet && styles.dateBarTablet]}>
             <TouchableOpacity
               style={styles.dateBtn}
               onPress={() => setShowPicker(true)}
@@ -184,232 +186,467 @@ export default function OwnerDashboardScreen({
             />
           )}
 
-          {/* ── SALES SECTION ── */}
-          <SectionCard>
-            <SectionHeader
-              icon="📊"
-              title="SALES"
-              bgColor={COLORS.salesBg}
-              rightText={dateString}
-            />
+          {isDesktop ? (
+            <View style={styles.desktopColumns}>
+              <View style={styles.desktopColumn}>
+                          {/* ── SALES SECTION ── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="📊"
+                              title="SALES"
+                              bgColor={COLORS.salesBg}
+                              rightText={dateString}
+                            />
+                
+                            <TotalRow
+                              leftLabel="TODAY"
+                              leftValue={formatAmount(sales.total.today)}
+                              tealLeft
+                              rightLabel="MTD"
+                              rightValue={formatAmount(sales.total.mtd)}
+                              rawLeftValue={sales.total.today}
+                              rawRightValue={sales.total.mtd}
+                            />
+                
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>DAILY TREND</Text>
+                              <MiniLineChart
+                                data={salesTrend}
+                                color={COLORS.teal}
+                                fillColor={COLORS.teal}
+                                responsive
+                                height={55}
+                              />
+                              <View style={styles.chartAxisRow}>
+                                {sales.daily_trend.map((d, i) => (
+                                  <Text key={i} style={styles.axisLabel}>
+                                    {d.day}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                
+                            <ColHeader label1="CATEGORY" label2="TODAY" label3="MTD" />
+                            <TableWrapper rowCount={sales.by_category.length}>
+                              {sales.by_category.map((cat, i) => (
+                                <View key={i} style={styles.catItem}>
+                                  <RankRow
+                                    rank={i + 1}
+                                    name={cat.name}
+                                    leftVal={formatAmount(cat.today)}
+                                    rightVal={formatAmount(cat.mtd)}
+                                    rawLeftVal={cat.today}
+                                    rawRightVal={cat.mtd}
+                                    trendUp={cat.trend === 'up'}
+                                    noBorder
+                                  />
+                                  <View style={styles.catRow2}>
+                                    <View style={styles.row2Spacer} />
+                                    <View style={{ flex: 1 }} />
+                                    <View style={styles.row2Col}>
+                                      <Text style={styles.subLabel}>Qty:</Text>
+                                    </View>
+                                    <View style={styles.row2Col}>
+                                      <LongPressValue
+                                        rawValue={cat.todayqty}
+                                        formattedValue={
+                                          cat?.todayqty ? formatAmount(cat.todayqty) : 0
+                                        }
+                                        style={[styles.subVal, { color: COLORS.green }]}
+                                      />
+                                    </View>
+                                    <View style={styles.row2Col}>
+                                      <LongPressValue
+                                        rawValue={cat.mtdqty}
+                                        formattedValue={
+                                          cat?.mtdqty ? formatAmount(cat.mtdqty) : 0
+                                        }
+                                        style={[styles.subVal, { color: COLORS.orange }]}
+                                      />
+                                    </View>
+                                  </View>
+                                </View>
+                              ))}
+                            </TableWrapper>
+                          </SectionCard>
+              </View>
+              <View style={styles.desktopColumn}>
+                          {/* ── PRODUCTION SECTION ── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="⚙️"
+                              title="PRODUCTION"
+                              bgColor={COLORS.prodBg}
+                              rightText={dateString}
+                            />
+                
+                            <TotalRow
+                              leftLabel="TODAY (m)"
+                              leftValue={production.total.today_meters.toLocaleString('en-IN')}
+                              tealLeft
+                              rightLabel="MTD (m)"
+                              rightValue={production.total.mtd_meters.toLocaleString('en-IN')}
+                              rawLeftValue={production.total.today_meters}
+                              rawRightValue={production.total.mtd_meters}
+                              tooltipPrefix=""
+                            />
+                
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>DAILY TREND</Text>
+                              <MiniLineChart
+                                data={productionTrend}
+                                color="#AB47BC"
+                                fillColor="#AB47BC"
+                                responsive
+                                height={55}
+                              />
+                              <View style={styles.chartAxisRow}>
+                                {production.daily_trend.map((d, i) => (
+                                  <Text key={i} style={styles.axisLabel}>
+                                    {d.day}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                
+                            <ColHeader label1="MACHINE" label2="TODAY" label3="MTD" />
+                            <TableWrapper rowCount={production.by_machine.length}>
+                              {production.by_machine.map((m, i) => (
+                                <RankRow
+                                  key={i}
+                                  rank={i + 1}
+                                  name={m.machine}
+                                  leftVal={`${(m.target / 1000).toFixed(0)}K m`}
+                                  rightVal={`${(m.today / 1000).toFixed(1)}K m`}
+                                  trendUp={m.achievement === 'up'}
+                                />
+                              ))}
+                            </TableWrapper>
+                          </SectionCard>
 
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(sales.total.today)}
-              tealLeft
-              rightLabel="MTD"
-              rightValue={formatAmount(sales.total.mtd)}
-              rawLeftValue={sales.total.today}
-              rawRightValue={sales.total.mtd}
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={salesTrend}
-                color={COLORS.teal}
-                fillColor={COLORS.teal}
-                width={340}
-                height={55}
-              />
-              <View style={styles.chartAxisRow}>
-                {sales.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
+                          {/* ── PAYMENT COLLECTION SECTION ── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="💰"
+                              title="PAYMENT COLLECTION"
+                              bgColor={COLORS.collBg}
+                              rightText={dateString}
+                            />
+                
+                            <TotalRow
+                              leftLabel="TODAY"
+                              leftValue={formatAmount(collection.total.today)}
+                              tealLeft
+                              rightLabel="TOTAL MTD"
+                              rightValue={formatAmount(collection.total.mtd)}
+                              rawLeftValue={collection.total.today}
+                              rawRightValue={collection.total.mtd}
+                            />
+                
+                            <View style={styles.chartWrap}>
+                              <Text style={styles.trendLabel}>DAILY TREND</Text>
+                              <MiniLineChart
+                                data={collectionTrend}
+                                color={COLORS.green}
+                                fillColor={COLORS.green}
+                                responsive
+                                height={55}
+                              />
+                              <View style={styles.chartAxisRow}>
+                                {collection.daily_trend.map((d, i) => (
+                                  <Text key={i} style={styles.axisLabel}>
+                                    {d.day}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                
+                            <Text style={styles.subHeader}>
+                              BY SALES EXECUTIVE · TODAY · MTD
+                            </Text>
+                            <ColHeader label1="EXECUTIVE" label2="TODAY" label3="MTD" />
+                            <TableWrapper rowCount={collection.by_exec.length}>
+                              {collection.by_exec.map(exec => (
+                                <RankRow
+                                  key={exec.exec_id}
+                                  name={exec.name}
+                                  avatarColor={exec.avatar_color}
+                                  leftVal={formatAmount(exec.today)}
+                                  rightVal={formatAmount(exec.mtd)}
+                                  rawLeftVal={exec.today}
+                                  rawRightVal={exec.mtd}
+                                  onPress={() => goToExec(exec)}
+                                />
+                              ))}
+                            </TableWrapper>
+                          </SectionCard>
+              </View>
+              <View style={styles.desktopColumn}>
+                          {/* ── OUTSTANDING SECTION ── */}
+                          <SectionCard>
+                            <SectionHeader
+                              icon="⚠️"
+                              title="OUTSTANDING"
+                              bgColor={COLORS.outsBg}
+                            />
+                
+                            <View style={styles.outsTotalRow}>
+                              <Text style={styles.outsTotalLabel}>Total Due</Text>
+                              <LongPressValue
+                                rawValue={outstanding.total_due}
+                                formattedValue={formatAmount(outstanding.total_due)}
+                                style={styles.outsTotalValue}
+                              />
+                            </View>
+                
+                            <Text style={styles.subHeader}>
+                              BY SALES EXECUTIVE · HIGHEST FIRST
+                            </Text>
+                            <ColHeader label1="EXECUTIVE" label2="" label3="OUTSTANDING" />
+                            <TableWrapper rowCount={outstanding.by_exec.length}>
+                              {outstanding.by_exec.map(exec => (
+                                <RankRow
+                                  key={exec.exec_id}
+                                  name={exec.name}
+                                  avatarColor={exec.avatar_color}
+                                  rightVal={formatAmount(exec.outstanding)}
+                                  rawRightVal={exec.outstanding}
+                                  trendUp={false}
+                                  onPress={() => goToExec(exec)}
+                                />
+                              ))}
+                            </TableWrapper>
+                          </SectionCard>
               </View>
             </View>
+          ) : (
+            <>
+                      {/* ── SALES SECTION ── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="📊"
+                          title="SALES"
+                          bgColor={COLORS.salesBg}
+                          rightText={dateString}
+                        />
+            
+                        <TotalRow
+                          leftLabel="TODAY"
+                          leftValue={formatAmount(sales.total.today)}
+                          tealLeft
+                          rightLabel="MTD"
+                          rightValue={formatAmount(sales.total.mtd)}
+                          rawLeftValue={sales.total.today}
+                          rawRightValue={sales.total.mtd}
+                        />
+            
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>DAILY TREND</Text>
+                          <MiniLineChart
+                            data={salesTrend}
+                            color={COLORS.teal}
+                            fillColor={COLORS.teal}
+                            responsive
+                            height={55}
+                          />
+                          <View style={styles.chartAxisRow}>
+                            {sales.daily_trend.map((d, i) => (
+                              <Text key={i} style={styles.axisLabel}>
+                                {d.day}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+            
+                        <ColHeader label1="CATEGORY" label2="TODAY" label3="MTD" />
+                        <TableWrapper rowCount={sales.by_category.length}>
+                          {sales.by_category.map((cat, i) => (
+                            <View key={i} style={styles.catItem}>
+                              <RankRow
+                                rank={i + 1}
+                                name={cat.name}
+                                leftVal={formatAmount(cat.today)}
+                                rightVal={formatAmount(cat.mtd)}
+                                rawLeftVal={cat.today}
+                                rawRightVal={cat.mtd}
+                                trendUp={cat.trend === 'up'}
+                                noBorder
+                              />
+                              <View style={styles.catRow2}>
+                                <View style={styles.row2Spacer} />
+                                <View style={{ flex: 1 }} />
+                                <View style={styles.row2Col}>
+                                  <Text style={styles.subLabel}>Qty:</Text>
+                                </View>
+                                <View style={styles.row2Col}>
+                                  <LongPressValue
+                                    rawValue={cat.todayqty}
+                                    formattedValue={
+                                      cat?.todayqty ? formatAmount(cat.todayqty) : 0
+                                    }
+                                    style={[styles.subVal, { color: COLORS.green }]}
+                                  />
+                                </View>
+                                <View style={styles.row2Col}>
+                                  <LongPressValue
+                                    rawValue={cat.mtdqty}
+                                    formattedValue={
+                                      cat?.mtdqty ? formatAmount(cat.mtdqty) : 0
+                                    }
+                                    style={[styles.subVal, { color: COLORS.orange }]}
+                                  />
+                                </View>
+                              </View>
+                            </View>
+                          ))}
+                        </TableWrapper>
+                      </SectionCard>
+                      {/* ── PRODUCTION SECTION ── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="⚙️"
+                          title="PRODUCTION"
+                          bgColor={COLORS.prodBg}
+                          rightText={dateString}
+                        />
+            
+                        <TotalRow
+                          leftLabel="TODAY (m)"
+                          leftValue={production.total.today_meters.toLocaleString('en-IN')}
+                          tealLeft
+                          rightLabel="MTD (m)"
+                          rightValue={production.total.mtd_meters.toLocaleString('en-IN')}
+                          rawLeftValue={production.total.today_meters}
+                          rawRightValue={production.total.mtd_meters}
+                          tooltipPrefix=""
+                        />
+            
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>DAILY TREND</Text>
+                          <MiniLineChart
+                            data={productionTrend}
+                            color="#AB47BC"
+                            fillColor="#AB47BC"
+                            responsive
+                            height={55}
+                          />
+                          <View style={styles.chartAxisRow}>
+                            {production.daily_trend.map((d, i) => (
+                              <Text key={i} style={styles.axisLabel}>
+                                {d.day}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+            
+                        <ColHeader label1="MACHINE" label2="TODAY" label3="MTD" />
+                        <TableWrapper rowCount={production.by_machine.length}>
+                          {production.by_machine.map((m, i) => (
+                            <RankRow
+                              key={i}
+                              rank={i + 1}
+                              name={m.machine}
+                              leftVal={`${(m.target / 1000).toFixed(0)}K m`}
+                              rightVal={`${(m.today / 1000).toFixed(1)}K m`}
+                              trendUp={m.achievement === 'up'}
+                            />
+                          ))}
+                        </TableWrapper>
+                      </SectionCard>
+                      {/* ── PAYMENT COLLECTION SECTION ── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="💰"
+                          title="PAYMENT COLLECTION"
+                          bgColor={COLORS.collBg}
+                          rightText={dateString}
+                        />
+            
+                        <TotalRow
+                          leftLabel="TODAY"
+                          leftValue={formatAmount(collection.total.today)}
+                          tealLeft
+                          rightLabel="TOTAL MTD"
+                          rightValue={formatAmount(collection.total.mtd)}
+                          rawLeftValue={collection.total.today}
+                          rawRightValue={collection.total.mtd}
+                        />
+            
+                        <View style={styles.chartWrap}>
+                          <Text style={styles.trendLabel}>DAILY TREND</Text>
+                          <MiniLineChart
+                            data={collectionTrend}
+                            color={COLORS.green}
+                            fillColor={COLORS.green}
+                            responsive
+                            height={55}
+                          />
+                          <View style={styles.chartAxisRow}>
+                            {collection.daily_trend.map((d, i) => (
+                              <Text key={i} style={styles.axisLabel}>
+                                {d.day}
+                              </Text>
+                            ))}
+                          </View>
+                        </View>
+            
+                        <Text style={styles.subHeader}>
+                          BY SALES EXECUTIVE · TODAY · MTD
+                        </Text>
+                        <ColHeader label1="EXECUTIVE" label2="TODAY" label3="MTD" />
+                        <TableWrapper rowCount={collection.by_exec.length}>
+                          {collection.by_exec.map(exec => (
+                            <RankRow
+                              key={exec.exec_id}
+                              name={exec.name}
+                              avatarColor={exec.avatar_color}
+                              leftVal={formatAmount(exec.today)}
+                              rightVal={formatAmount(exec.mtd)}
+                              rawLeftVal={exec.today}
+                              rawRightVal={exec.mtd}
+                              onPress={() => goToExec(exec)}
+                            />
+                          ))}
+                        </TableWrapper>
+                      </SectionCard>
+                      {/* ── OUTSTANDING SECTION ── */}
+                      <SectionCard>
+                        <SectionHeader
+                          icon="⚠️"
+                          title="OUTSTANDING"
+                          bgColor={COLORS.outsBg}
+                        />
+            
+                        <View style={styles.outsTotalRow}>
+                          <Text style={styles.outsTotalLabel}>Total Due</Text>
+                          <LongPressValue
+                            rawValue={outstanding.total_due}
+                            formattedValue={formatAmount(outstanding.total_due)}
+                            style={styles.outsTotalValue}
+                          />
+                        </View>
+            
+                        <Text style={styles.subHeader}>
+                          BY SALES EXECUTIVE · HIGHEST FIRST
+                        </Text>
+                        <ColHeader label1="EXECUTIVE" label2="" label3="OUTSTANDING" />
+                        <TableWrapper rowCount={outstanding.by_exec.length}>
+                          {outstanding.by_exec.map(exec => (
+                            <RankRow
+                              key={exec.exec_id}
+                              name={exec.name}
+                              avatarColor={exec.avatar_color}
+                              rightVal={formatAmount(exec.outstanding)}
+                              rawRightVal={exec.outstanding}
+                              trendUp={false}
+                              onPress={() => goToExec(exec)}
+                            />
+                          ))}
+                        </TableWrapper>
+                      </SectionCard>
+            </>
+          )}
 
-            <ColHeader label1="CATEGORY" label2="TODAY" label3="MTD" />
-            <TableWrapper rowCount={sales.by_category.length}>
-              {sales.by_category.map((cat, i) => (
-                <View key={i} style={styles.catItem}>
-                  <RankRow
-                    rank={i + 1}
-                    name={cat.name}
-                    leftVal={formatAmount(cat.today)}
-                    rightVal={formatAmount(cat.mtd)}
-                    rawLeftVal={cat.today}
-                    rawRightVal={cat.mtd}
-                    trendUp={cat.trend === 'up'}
-                    noBorder
-                  />
-                  <View style={styles.catRow2}>
-                    <View style={styles.row2Spacer} />
-                    <View style={{ flex: 1 }} />
-                    <View style={styles.row2Col}>
-                      <Text style={styles.subLabel}>Qty:</Text>
-                    </View>
-                    <View style={styles.row2Col}>
-                      <LongPressValue
-                        rawValue={cat.todayqty}
-                        formattedValue={
-                          cat?.todayqty ? formatAmount(cat.todayqty) : 0
-                        }
-                        style={[styles.subVal, { color: COLORS.green }]}
-                      />
-                    </View>
-                    <View style={styles.row2Col}>
-                      <LongPressValue
-                        rawValue={cat.mtdqty}
-                        formattedValue={
-                          cat?.mtdqty ? formatAmount(cat.mtdqty) : 0
-                        }
-                        style={[styles.subVal, { color: COLORS.orange }]}
-                      />
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </TableWrapper>
-          </SectionCard>
-
-          {/* ── PRODUCTION SECTION ── */}
-          <SectionCard>
-            <SectionHeader
-              icon="⚙️"
-              title="PRODUCTION"
-              bgColor={COLORS.prodBg}
-              rightText={dateString}
-            />
-
-            <TotalRow
-              leftLabel="TODAY (m)"
-              leftValue={production.total.today_meters.toLocaleString('en-IN')}
-              tealLeft
-              rightLabel="MTD (m)"
-              rightValue={production.total.mtd_meters.toLocaleString('en-IN')}
-              rawLeftValue={production.total.today_meters}
-              rawRightValue={production.total.mtd_meters}
-              tooltipPrefix=""
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={productionTrend}
-                color="#AB47BC"
-                fillColor="#AB47BC"
-                width={340}
-                height={55}
-              />
-              <View style={styles.chartAxisRow}>
-                {production.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
-
-            <ColHeader label1="MACHINE" label2="TODAY" label3="MTD" />
-            <TableWrapper rowCount={production.by_machine.length}>
-              {production.by_machine.map((m, i) => (
-                <RankRow
-                  key={i}
-                  rank={i + 1}
-                  name={m.machine}
-                  leftVal={`${(m.target / 1000).toFixed(0)}K m`}
-                  rightVal={`${(m.today / 1000).toFixed(1)}K m`}
-                  trendUp={m.achievement === 'up'}
-                />
-              ))}
-            </TableWrapper>
-          </SectionCard>
-
-          {/* ── PAYMENT COLLECTION SECTION ── */}
-          <SectionCard>
-            <SectionHeader
-              icon="💰"
-              title="PAYMENT COLLECTION"
-              bgColor={COLORS.collBg}
-              rightText={dateString}
-            />
-
-            <TotalRow
-              leftLabel="TODAY"
-              leftValue={formatAmount(collection.total.today)}
-              tealLeft
-              rightLabel="TOTAL MTD"
-              rightValue={formatAmount(collection.total.mtd)}
-              rawLeftValue={collection.total.today}
-              rawRightValue={collection.total.mtd}
-            />
-
-            <View style={styles.chartWrap}>
-              <Text style={styles.trendLabel}>DAILY TREND</Text>
-              <MiniLineChart
-                data={collectionTrend}
-                color={COLORS.green}
-                fillColor={COLORS.green}
-                width={340}
-                height={55}
-              />
-              <View style={styles.chartAxisRow}>
-                {collection.daily_trend.map((d, i) => (
-                  <Text key={i} style={styles.axisLabel}>
-                    {d.day}
-                  </Text>
-                ))}
-              </View>
-            </View>
-
-            <Text style={styles.subHeader}>
-              BY SALES EXECUTIVE · TODAY · MTD
-            </Text>
-            <ColHeader label1="EXECUTIVE" label2="TODAY" label3="MTD" />
-            <TableWrapper rowCount={collection.by_exec.length}>
-              {collection.by_exec.map(exec => (
-                <RankRow
-                  key={exec.exec_id}
-                  name={exec.name}
-                  avatarColor={exec.avatar_color}
-                  leftVal={formatAmount(exec.today)}
-                  rightVal={formatAmount(exec.mtd)}
-                  rawLeftVal={exec.today}
-                  rawRightVal={exec.mtd}
-                  onPress={() => goToExec(exec)}
-                />
-              ))}
-            </TableWrapper>
-          </SectionCard>
-
-          {/* ── OUTSTANDING SECTION ── */}
-          <SectionCard>
-            <SectionHeader
-              icon="⚠️"
-              title="OUTSTANDING"
-              bgColor={COLORS.outsBg}
-            />
-
-            <View style={styles.outsTotalRow}>
-              <Text style={styles.outsTotalLabel}>Total Due</Text>
-              <LongPressValue
-                rawValue={outstanding.total_due}
-                formattedValue={formatAmount(outstanding.total_due)}
-                style={styles.outsTotalValue}
-              />
-            </View>
-
-            <Text style={styles.subHeader}>
-              BY SALES EXECUTIVE · HIGHEST FIRST
-            </Text>
-            <ColHeader label1="EXECUTIVE" label2="" label3="OUTSTANDING" />
-            <TableWrapper rowCount={outstanding.by_exec.length}>
-              {outstanding.by_exec.map(exec => (
-                <RankRow
-                  key={exec.exec_id}
-                  name={exec.name}
-                  avatarColor={exec.avatar_color}
-                  rightVal={formatAmount(exec.outstanding)}
-                  rawRightVal={exec.outstanding}
-                  trendUp={false}
-                  onPress={() => goToExec(exec)}
-                />
-              ))}
-            </TableWrapper>
-          </SectionCard>
         </ScrollView>
       </SafeAreaView>
       <TourOverlay
@@ -426,9 +663,13 @@ export default function OwnerDashboardScreen({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
   scroll: { flex: 1 },
-  content: { paddingTop: 8, paddingBottom: 24 },
+  content: { paddingTop: 8, paddingBottom: 24, width: '100%', alignSelf: 'center' },
+  desktopColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, paddingHorizontal: 18, maxWidth: 1260, alignSelf: 'center', width: '100%' },
+  desktopColumn: { flex: 1, minWidth: 0 },
 
   // ── Date bar ──
+  dateBarDesktop: { maxWidth: 1260, alignSelf: 'center', width: '100%', paddingHorizontal: 18 },
+  dateBarTablet: { paddingHorizontal: 6 },
   dateBar: {
     flexDirection: 'row',
     alignItems: 'center',

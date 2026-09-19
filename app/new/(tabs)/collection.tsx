@@ -37,7 +37,7 @@ import { CollectionScreen } from '@/src/screens/production/CollectionScreen';
 
 export default function PurchaseOrderRoute() {
   return (
-    <PermissionRouteGuard resource="production.Collection" action="view">
+    <PermissionRouteGuard resource="production.collection" action="view">
       <CollectionScreen />
     </PermissionRouteGuard>
   );

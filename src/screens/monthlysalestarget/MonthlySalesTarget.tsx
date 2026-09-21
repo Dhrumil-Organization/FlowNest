@@ -1,13 +1,12 @@
-import AppAlert from '@/common/utils/appAlert';
 import client from '@/common/API/client_fix_design';
 import { getCurrentFinancialYear } from '@/common/commonfunction';
+import AppAlert from '@/common/utils/appAlert';
+import AsyncStorage from '@/common/utils/compatibleStorage';
 import { T } from '@/src/theme';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@/common/utils/compatibleStorage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     FlatList,
     Modal,
     Pressable,
@@ -16,7 +15,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 // Helper function to generate consistent color from name
@@ -97,16 +96,16 @@ export function MonthlySalesTargetScreen() {
             : String(year % 100).padStart(2, "0");
     };
 
-    const loadTargetsForPeriod = async (month: number, year: number) => {
+    const loadTargetsForPeriod = async (month: number, year: number, userType: string) => {
         setLoading(true);
         try {
             const payload = {
-                prptype: userType || prpcode,
+                prptype: userType,
                 yearno: getFinancialYear(year, month),
                 monthno: String(month + 1).padStart(2, '0'),
                 txntype: "monthly_sales_target",
             };
-
+            console.log("bbb payload", payload);
             const response = await client.get('/monthly_sales_target_browse', {
                 params: payload,
             });
@@ -166,7 +165,7 @@ export function MonthlySalesTargetScreen() {
                         {
                             text: "OK",
                             onPress: async () => {
-                                await loadTargetsForPeriod(month, year);
+                                await loadTargetsForPeriod(month, year, userType);
                             },
                         },
                     ],
@@ -190,8 +189,9 @@ export function MonthlySalesTargetScreen() {
 
     useEffect(() => {
         if (!periodPicked) return;
+        if (!userType) return;
         setLoading(true);
-        loadTargetsForPeriod(month, year);
+        loadTargetsForPeriod(month, year, userType);
     }, [month, year, periodPicked, userType]);
 
     const shiftMonth = (delta: number) => {

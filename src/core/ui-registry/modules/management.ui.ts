@@ -1,9 +1,36 @@
 import { registerUiNodes } from '../uiRegistry';
 
 registerUiNodes([
-  { id: 'nav.home', kind: 'navigation', title: 'Home', permission: 'dashboard', action: 'view', route: 'index', icon: 'home', order: 10 },
-  { id: 'screen.dashboard', kind: 'screen', title: 'Dashboard', permission: 'dashboard', action: 'view', order: 10 },
-  { id: 'dashboard.monthly_target', kind: 'dashboard-card', parentId: 'screen.dashboard', title: 'Monthly Target', permission: 'dashboard.monthly_target', action: 'view', order: 10 },
+  {
+    id: 'nav.home',
+    kind: 'navigation',
+    title: 'Home',
+    permission: 'dashboard',
+    action: 'view',
+    route: 'index',
+    icon: 'home',
+    order: 10,
+  },
+
+  {
+    id: 'screen.dashboard',
+    kind: 'screen',
+    title: 'Dashboard',
+    permission: 'dashboard',
+    action: 'view',
+    order: 10,
+  },
+
+  {
+    id: 'dashboard.monthly_target',
+    kind: 'dashboard-card',
+    parentId: 'screen.dashboard',
+    title: 'Monthly Target',
+    permission: 'dashboard.monthly_target',
+    action: 'view',
+    order: 10,
+  },
+
   {
     id: 'dashboard.monthly_report',
     kind: 'dashboard-card',
@@ -13,6 +40,17 @@ registerUiNodes([
     action: 'view',
     order: 20,
   },
+
+  {
+    id: 'dashboard.costing_summary',
+    kind: 'dashboard-card',
+    parentId: 'screen.dashboard',
+    title: 'Costing / Production Cost',
+    permission: 'dashboard.costing_summary',
+    action: 'view',
+    order: 30,
+  },
+
   {
     id: 'dashboard.operational_details',
     kind: 'dashboard-card',
@@ -30,5 +68,14 @@ registerUiNodes([
         'dashboard.outstanding_detail',
       ],
     },
+  },
+
+  {
+    id: 'screen.creditor_dashboard',
+    kind: 'screen',
+    title: 'Creditor Dashboard',
+    permission: 'dashboard.creditor_dashboard',
+    action: 'view',
+    order: 135,
   },
 ]);

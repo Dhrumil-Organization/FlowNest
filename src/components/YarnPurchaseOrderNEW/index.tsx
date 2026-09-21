@@ -7,14 +7,13 @@ import {
     FlatList,
     LayoutAnimation,
     Modal,
-    Platform,
     TextInput as RNTextInput,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     useWindowDimensions,
-    View,
+    View
 } from 'react-native';
 // import RNFS from 'react-native-fs';
 // import { Buffer } from 'buffer';
@@ -203,17 +202,21 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     const [chartPayload, setChartPayload] = useState(null);
     const [ChartHelp, setChartHelpOpen] = useState(false);
     // 
-    const { width } = useWindowDimensions();
 
     // 1 col on phone, 2 on tablet, 3 on wide web
-    const numColumns =
-        Platform.OS === 'web'
-            ? width >= 1100 ? 3 : width >= 700 ? 2 : 1
-            : width >= 700 ? 2 : 1;
+    const { width } = useWindowDimensions();
+
+    const getColumns = () => {
+        if (width < 600) return 1;      // mobile
+        if (width < 1000) return 2;     // tablet
+        return 3;                       // web / large
+    };
+
+    const numColumns = getColumns();
 
     // Explicit item width so the last row doesn't stretch weirdly
-    const GRID_PAD = 12;
-    const GRID_GAP = 12;
+    const GRID_PAD = 10;
+    const GRID_GAP = 10;
     const gridItemWidth =
         numColumns > 1
             ? (width - GRID_PAD * 2 - GRID_GAP * (numColumns - 1)) / numColumns
@@ -1426,375 +1429,120 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
         const isRejected = item.IsAuth === '2';
 
         return (
-            <View style={[
-                styles.card,
-                isApproved ? styles.acceptedCard :
-                    isRejected ? styles.rejectedCard : null
-            ]}>
-                <View style={styles.headerRow}>
-                    <View style={styles.prpCodeContainer}>
-                        <Text style={styles.prpCodeText}>
-                            {item.PrpCode}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* HEADER */}
-                <View style={styles.headerRow}>
-                    <View>
-                        <Text style={styles.poNo}>{item.PONo}</Text>
-                        <Text style={styles.date}>{item.PODate}</Text>
-                    </View>
-
-                    {(isApproved || isRejected) && (
-                        <View style={[
-                            styles.statusChip,
-                            { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
-                        ]}>
-                            <Text style={{
-                                color: isApproved ? '#2E7D32' : '#C62828',
-                                fontWeight: '600'
-                            }}>
-                                {isApproved ? 'Approved' : 'Rejected'}
+            <View style={crlimtreq_styles.gridCardWrapper}>
+                <View style={[
+                    crlimtreq_styles.card,
+                    isApproved ? styles.acceptedCard :
+                        isRejected ? styles.rejectedCard : null
+                ]}>
+                    <View style={styles.headerRow}>
+                        <View style={styles.prpCodeContainer}>
+                            <Text style={styles.prpCodeText}>
+                                {item.PrpCode}
                             </Text>
                         </View>
-                    )}
-                </View>
-
-                {/* PARTY */}
-                <Text style={styles.party}>{item.ParName}</Text>
-
-                {/* DETAILS */}
-                <View style={styles.row}>
-                    <Text style={styles.label}>Broker</Text>
-                    <Text style={styles.value}>{item.BAccName || '-'}</Text>
-                </View>
-
-                <View style={styles.row}>
-                    <Text style={styles.label}>Net Amount</Text>
-                    <Text style={styles.value}>{item.NetAmt || '-'}</Text>
-                </View>
-
-                {API === "https://apiy.tms-webapp.com" && (
-                    < View style={styles.row}>
-                        <Text style={styles.label}>Store</Text>
-                        <Text style={styles.value}>{item.StoreName || '-'}</Text>
                     </View>
-                )}
 
-                <View style={styles.row}>
-                    <Text style={styles.label}>Auth By</Text>
-                    <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
-                </View>
-
-                {/* ACTION ROW */}
-                {(isApproved || isRejected) && (
-                    <View style={styles.actionRow}>
-
-                        <View style={[
-                            styles.iconBtn,
-                            { backgroundColor: isApproved ? '#4CAF50' : '#F44336' }
-                        ]}>
-                            <Icon
-                                name={isApproved ? 'check' : 'close'}
-                                size={20}
-                                color="#fff"
-                            />
+                    {/* HEADER */}
+                    <View style={styles.headerRow}>
+                        <View>
+                            <Text style={styles.poNo}>{item.PONo}</Text>
+                            <Text style={styles.date}>{item.PODate}</Text>
                         </View>
-                    </View>
-                )}
 
-                {/* 🔽 EXPAND BUTTON */}
-                <TouchableOpacity
-                    style={styles.expandHeader}
-                    onPress={() => toggleExpandHistory(item.UId)}
-                >
-                    <Text style={styles.expandText}>
-                        Items ({item.d1?.length || 0})
-                    </Text>
-
-                    <Icon
-                        name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                        size={24}
-                        color="#333"
-                    />
-                </TouchableOpacity>
-
-                {/* 🔽 EXPANDED ITEMS */}
-                {expandedHistoryCards[item.UId] && (
-                    <View style={styles.itemContainer}>
-                        {item.d1?.map((d1Item, index) => (
-                            
-
-                            <View key={index} style={styles.itemCard}>
-
-                                {/* TOP ROW (TITLE + ICON) */}
-                                <View style={styles.itemHeader}>
-                                    <Text style={styles.itemTitle}>
-                                        {d1Item.ItmName}
-                                    </Text>
-
-                                    <TouchableOpacity
-                                        style={styles.chartBtn}
-                                        onPress={() => {
-                                            console.log("NAV TEST", navigation);
-                                            
-                                            router.push({
-                                                pathname: '/ChartScreen',
-                                                params: {
-                                                    item: JSON.stringify(item),
-                                                    d1Item: JSON.stringify(d1Item),
-                                                    token: token
-
-                                                }
-                                            });
-                                        }}
-                                    >
-                                        <Icon name="bar-chart" size={18} color="#fff" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* DETAILS GRID */}
-                                < View style={styles.itemGrid} >
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Grade</Text>
-                                        <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Shade</Text>
-                                        <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Qty</Text>
-                                        <Text style={styles.itemValue}>{d1Item.Qty}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Rate</Text>
-                                        <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
-                                    </View>
-
-                                    <View style={styles.itemBox}>
-                                        <Text style={styles.itemLabel}>Amount</Text>
-                                        <Text style={styles.itemValue}>{d1Item.Amount}</Text>
-                                    </View>
-
-                                </View>
-
+                        {(isApproved || isRejected) && (
+                            <View style={[
+                                styles.statusChip,
+                                { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
+                            ]}>
+                                <Text style={{
+                                    color: isApproved ? '#2E7D32' : '#C62828',
+                                    fontWeight: '600'
+                                }}>
+                                    {isApproved ? 'Approved' : 'Rejected'}
+                                </Text>
                             </View>
-                        ))
-                        }
-                    </View >
-                )}
-
-            </View >
-        );
-    };
-
-    const renderCommonCard = ({ item, type }: { item: any, type: 'history' | 'request' | 'verify' }) => {
-
-        const isApproved = item.IsAuth === '1';
-        const isRejected = item.IsAuth === '2';
-
-        return (
-            <View style={[
-                crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
-                item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
-
-                {item.isProcessed && (
-                    <View style={styles.stampContainerYOS}>
-                        <View
-                            style={[
-                                styles.stamp,
-                                item.actionType === 'accept'
-                                    ? styles.stampAccepted
-                                    : styles.stampRejected,
-                            ]}
-                        >
-                            <Text style={styles.stampText}>
-                                {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-                <View style={styles.headerRow}>
-                    <View style={styles.prpCodeContainer}>
-                        <Text style={styles.prpCodeText}>
-                            {item.PrpCode}
-                        </Text>
-                    </View>
-                </View>
-                {/* HEADER */}
-                <View style={styles.headerRow}>
-                    <View>
-                        <Text style={styles.poNo}>{item.PONo}</Text>
-                        <Text style={styles.date}>{item.PODate}</Text>
+                        )}
                     </View>
 
-                    {(isApproved || isRejected) && (
-                        <View style={[
-                            styles.statusChip,
-                            { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
-                        ]}>
-                            <Text style={{
-                                color: isApproved ? '#2E7D32' : '#C62828',
-                                fontWeight: '600'
-                            }}>
-                                {isApproved ? 'Approved' : 'Rejected'}
-                            </Text>
+                    {/* PARTY */}
+                    <Text style={styles.party}>{item.ParName}</Text>
+
+                    {/* DETAILS */}
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Broker</Text>
+                        <Text style={styles.value}>{item.BAccName || '-'}</Text>
+                    </View>
+
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Net Amount</Text>
+                        <Text style={styles.value}>{item.NetAmt || '-'}</Text>
+                    </View>
+
+                    {API === "https://apiy.tms-webapp.com" && (
+                        < View style={styles.row}>
+                            <Text style={styles.label}>Store</Text>
+                            <Text style={styles.value}>{item.StoreName || '-'}</Text>
                         </View>
                     )}
-                </View>
 
-                {/* PARTY */}
-                <Text style={styles.party}>{item.ParName}</Text>
-
-                {/* DETAILS */}
-                <View style={styles.row}>
-                    <Text style={styles.label}>Broker</Text>
-                    <Text style={styles.value}>{item.BAccName || '-'}</Text>
-                </View>
-
-                <View style={styles.row}>
-                    <Text style={styles.label}>Net Amount</Text>
-                    <Text style={styles.value}>{item.NetAmt || '-'}</Text>
-                </View>
-                {API === "https://apiy.tms-webapp.com" && (
-                    < View style={styles.row}>
-                        <Text style={styles.label}>Store</Text>
-                        <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Auth By</Text>
+                        <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
                     </View>
-                )}
-                <View style={styles.row}>
-                    <Text style={styles.label}>Auth By</Text>
-                    <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
-                </View>
 
-                <View style={styles.row}>
-                    <View style={crlimtreq_styles.keyValuePair}>
-                        <Text style={styles.label}>Auth Remark:</Text>
-                        <RNTextInput
-                            style={crlimtreq_styles.editableValueBlack}
-                            value={editableValuesYPO[item.UId]?.ARemark || ''}
-                            onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                    {/* ACTION ROW */}
+                    {(isApproved || isRejected) && (
+                        <View style={styles.actionRow}>
+
+                            <View style={[
+                                styles.iconBtn,
+                                { backgroundColor: isApproved ? '#4CAF50' : '#F44336' }
+                            ]}>
+                                <Icon
+                                    name={isApproved ? 'check' : 'close'}
+                                    size={20}
+                                    color="#fff"
+                                />
+                            </View>
+                        </View>
+                    )}
+
+                    {/* 🔽 EXPAND BUTTON */}
+                    <TouchableOpacity
+                        style={styles.expandHeader}
+                        onPress={() => toggleExpandHistory(item.UId)}
+                    >
+                        <Text style={styles.expandText}>
+                            Items ({item.d1?.length || 0})
+                        </Text>
+
+                        <Icon
+                            name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                            size={24}
+                            color="#333"
                         />
-                    </View>
-                </View>
+                    </TouchableOpacity>
 
-                {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
-                {
-                    type === 'verify' && (
-                        <View style={styles.actionRow}>
-                            <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
-                                <Icon name="check-circle" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
-                                <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
-                            </TouchableOpacity>
-                        </View>
-                    )
-                }
-
-                {
-                    type === 'request' && (
-                        <View style={styles.actionRow}>
-
-                            {/* ✅ ACCEPT */}
-                            <TouchableOpacity
-                                onPress={() => handleIconPress(item, 'accept')}
-                                // disabled={!isConnected || item.IsAuth !== '0'}
-                                disabled={!isConnected || item.isProcessed}
-                            >
-                                <Icon
-                                    name="check-circle"
-                                    size={35}
-                                    color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"}
-                                />
-                            </TouchableOpacity>
-
-                            {/* ❌ REJECT */}
-                            <TouchableOpacity
-                                onPress={() => handleIconPress(item, 'reject')}
-                                // disabled={!isConnected || item.IsAuth !== '0'}
-                                disabled={!isConnected || item.isProcessed}
-                            >
-                                <Icon
-                                    name="cancel"
-                                    size={35}
-                                    color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"}
-                                />
-                            </TouchableOpacity>
-
-                            {/* 📄 FILE */}
-                            <TouchableOpacity
-                                onPress={() => {
-                                    if (isConnected && item.IsAuth === '0') {
-                                        handleCallURL(item);
-                                    }
-                                }}
-                                disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
-                            >
-                                {
-                                    getLocationLoading === item.UId ? (
-                                        <ActivityIndicator size={35} color="#2196F3" />
-                                    ) : (
-                                        <Icon
-                                            name="file-present"
-                                            size={35}
-                                            color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
-                                        />
-                                    )
-                                }
-                            </TouchableOpacity>
-
-                        </View>
-                    )
-                }
-
-                {/* 🔽 EXPAND */}
-                <TouchableOpacity
-                    style={styles.expandHeader}
-                    onPress={() => toggleExpandHistory(item.UId)}
-                >
-                    <Text style={styles.expandText}>
-                        Items ({item.d1?.length || 0})
-                    </Text>
-
-                    <Icon
-                        name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                        size={24}
-                        color="#333"
-                    />
-                </TouchableOpacity>
-
-                {/* 🔽 ITEMS */}
-                {
-                    expandedHistoryCards[item.UId] && (
+                    {/* 🔽 EXPANDED ITEMS */}
+                    {expandedHistoryCards[item.UId] && (
                         <View style={styles.itemContainer}>
                             {item.d1?.map((d1Item, index) => (
 
+
                                 <View key={index} style={styles.itemCard}>
 
+                                    {/* TOP ROW (TITLE + ICON) */}
                                     <View style={styles.itemHeader}>
                                         <Text style={styles.itemTitle}>
                                             {d1Item.ItmName}
                                         </Text>
 
-                                        {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
                                         <TouchableOpacity
                                             style={styles.chartBtn}
-                                            // onPress={() => navigation.navigate('ChartScreen', {
-                                            //     item,
-                                            //     d1Item,
-                                            //     token
-                                            // })}
-                                            onPress={() =>
-                                                // console.log('Chart clicked', d1Item);
-                                                // handleChartClick(item, d1Item);
+                                            onPress={() => {
+                                                console.log("NAV TEST", navigation);
+
                                                 router.push({
                                                     pathname: '/ChartScreen',
                                                     params: {
@@ -1803,14 +1551,15 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                                         token: token
 
                                                     }
-                                                })
-                                            }
+                                                });
+                                            }}
                                         >
                                             <Icon name="bar-chart" size={18} color="#fff" />
                                         </TouchableOpacity>
                                     </View>
 
-                                    <View style={styles.itemGrid}>
+                                    {/* DETAILS GRID */}
+                                    < View style={styles.itemGrid} >
 
                                         <View style={styles.itemBox}>
                                             <Text style={styles.itemLabel}>Grade</Text>
@@ -1840,11 +1589,269 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                                     </View>
 
                                 </View>
-                            ))}
+                            ))
+                            }
+                        </View >
+                    )}
+
+                </View >
+            </View>
+        );
+    };
+
+    const renderCommonCard = ({ item, type }: { item: any, type: 'history' | 'request' | 'verify' }) => {
+
+        const isApproved = item.IsAuth === '1';
+        const isRejected = item.IsAuth === '2';
+
+        return (
+            <View style={crlimtreq_styles.gridCardWrapper}>
+                <View style={[
+                    crlimtreq_styles.card, !isConnected && crlimtreq_styles.disabledCard,
+                    item.actionType === 'accept' ? crlimtreq_styles.acceptedCard : item.actionType === 'reject' ? crlimtreq_styles.rejectedCard : crlimtreq_styles.card]}>
+
+                    {item.isProcessed && (
+                        <View style={styles.stampContainerYOS}>
+                            <View
+                                style={[
+                                    styles.stamp,
+                                    item.actionType === 'accept'
+                                        ? styles.stampAccepted
+                                        : styles.stampRejected,
+                                ]}
+                            >
+                                <Text style={styles.stampText}>
+                                    {item.actionType === 'accept' ? 'APPROVED' : 'REJECTED'}
+                                </Text>
+                            </View>
                         </View>
-                    )
-                }
-            </View >
+                    )}
+                    <View style={styles.headerRow}>
+                        <View style={styles.prpCodeContainer}>
+                            <Text style={styles.prpCodeText}>
+                                {item.PrpCode}
+                            </Text>
+                        </View>
+                    </View>
+                    {/* HEADER */}
+                    <View style={styles.headerRow}>
+                        <View>
+                            <Text style={styles.poNo}>{item.PONo}</Text>
+                            <Text style={styles.date}>{item.PODate}</Text>
+                        </View>
+
+                        {(isApproved || isRejected) && (
+                            <View style={[
+                                styles.statusChip,
+                                { backgroundColor: isApproved ? '#E8F5E9' : '#FFEBEE' }
+                            ]}>
+                                <Text style={{
+                                    color: isApproved ? '#2E7D32' : '#C62828',
+                                    fontWeight: '600'
+                                }}>
+                                    {isApproved ? 'Approved' : 'Rejected'}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* PARTY */}
+                    <Text style={styles.party}>{item.ParName}</Text>
+
+                    {/* DETAILS */}
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Broker</Text>
+                        <Text style={styles.value}>{item.BAccName || '-'}</Text>
+                    </View>
+
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Net Amount</Text>
+                        <Text style={styles.value}>{item.NetAmt || '-'}</Text>
+                    </View>
+                    {API === "https://apiy.tms-webapp.com" && (
+                        < View style={styles.row}>
+                            <Text style={styles.label}>Store</Text>
+                            <Text style={styles.value}>{item.StoreName || '-'}</Text>
+                        </View>
+                    )}
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Auth By</Text>
+                        <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
+                    </View>
+
+                    <View style={styles.row}>
+                        <View style={crlimtreq_styles.keyValuePair}>
+                            <Text style={styles.label}>Auth Remark:</Text>
+                            <RNTextInput
+                                style={crlimtreq_styles.editableValueBlack}
+                                value={editableValuesYPO[item.UId]?.ARemark || ''}
+                                onChangeText={(text) => handleEdit(item.UId, 'ARemark', text)}
+                            />
+                        </View>
+                    </View>
+
+                    {/* 🔥 VERIFY TAB KE LIYE BUTTON */}
+                    {
+                        type === 'verify' && (
+                            <View style={styles.actionRow}>
+                                <TouchableOpacity onPress={() => handleIconPress(item, 'pending')} disabled={!isConnected || item.isProcessed}>
+                                    <Icon name="check-circle" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"} />
+                                </TouchableOpacity>
+
+                                <TouchableOpacity onPress={() => handleIconPress(item, 'verifyreject')} disabled={!isConnected || item.isProcessed}>
+                                    <Icon name="cancel" size={30} color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"} />
+                                </TouchableOpacity>
+                            </View>
+                        )
+                    }
+
+                    {
+                        type === 'request' && (
+                            <View style={styles.actionRow}>
+
+                                {/* ✅ ACCEPT */}
+                                <TouchableOpacity
+                                    onPress={() => handleIconPress(item, 'accept')}
+                                    // disabled={!isConnected || item.IsAuth !== '0'}
+                                    disabled={!isConnected || item.isProcessed}
+                                >
+                                    <Icon
+                                        name="check-circle"
+                                        size={35}
+                                        color={!isConnected || item.isProcessed ? "#ccc" : "#4CAF50"}
+                                    />
+                                </TouchableOpacity>
+
+                                {/* ❌ REJECT */}
+                                <TouchableOpacity
+                                    onPress={() => handleIconPress(item, 'reject')}
+                                    // disabled={!isConnected || item.IsAuth !== '0'}
+                                    disabled={!isConnected || item.isProcessed}
+                                >
+                                    <Icon
+                                        name="cancel"
+                                        size={35}
+                                        color={!isConnected || item.isProcessed ? "#ccc" : "#F44336"}
+                                    />
+                                </TouchableOpacity>
+
+                                {/* 📄 FILE */}
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (isConnected && item.IsAuth === '0') {
+                                            handleCallURL(item);
+                                        }
+                                    }}
+                                    disabled={!isConnected || item.IsAuth !== '0' || getLocationLoading === item.UId}
+                                >
+                                    {
+                                        getLocationLoading === item.UId ? (
+                                            <ActivityIndicator size={35} color="#2196F3" />
+                                        ) : (
+                                            <Icon
+                                                name="file-present"
+                                                size={35}
+                                                color={!isConnected || item.IsAuth !== '0' ? "#ccc" : "#2196F3"}
+                                            />
+                                        )
+                                    }
+                                </TouchableOpacity>
+
+                            </View>
+                        )
+                    }
+
+                    {/* 🔽 EXPAND */}
+                    <TouchableOpacity
+                        style={styles.expandHeader}
+                        onPress={() => toggleExpandHistory(item.UId)}
+                    >
+                        <Text style={styles.expandText}>
+                            Items ({item.d1?.length || 0})
+                        </Text>
+
+                        <Icon
+                            name={expandedHistoryCards[item.UId] ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                            size={24}
+                            color="#333"
+                        />
+                    </TouchableOpacity>
+
+                    {/* 🔽 ITEMS */}
+                    {
+                        expandedHistoryCards[item.UId] && (
+                            <View style={styles.itemContainer}>
+                                {item.d1?.map((d1Item, index) => (
+
+                                    <View key={index} style={styles.itemCard}>
+
+                                        <View style={styles.itemHeader}>
+                                            <Text style={styles.itemTitle}>
+                                                {d1Item.ItmName}
+                                            </Text>
+
+                                            {/* 🔥 CHART BUTTON (ALL TABS ME SAME) */}
+                                            <TouchableOpacity
+                                                style={styles.chartBtn}
+                                                // onPress={() => navigation.navigate('ChartScreen', {
+                                                //     item,
+                                                //     d1Item,
+                                                //     token
+                                                // })}
+                                                onPress={() =>
+                                                    // console.log('Chart clicked', d1Item);
+                                                    // handleChartClick(item, d1Item);
+                                                    router.push({
+                                                        pathname: '/ChartScreen',
+                                                        params: {
+                                                            item: JSON.stringify(item),
+                                                            d1Item: JSON.stringify(d1Item),
+                                                            token: token
+
+                                                        }
+                                                    })
+                                                }
+                                            >
+                                                <Icon name="bar-chart" size={18} color="#fff" />
+                                            </TouchableOpacity>
+                                        </View>
+
+                                        <View style={styles.itemGrid}>
+
+                                            <View style={styles.itemBox}>
+                                                <Text style={styles.itemLabel}>Grade</Text>
+                                                <Text style={styles.itemValue}>{d1Item.GrdName}</Text>
+                                            </View>
+
+                                            <View style={styles.itemBox}>
+                                                <Text style={styles.itemLabel}>Shade</Text>
+                                                <Text style={styles.itemValue}>{d1Item.ShdName}</Text>
+                                            </View>
+
+                                            <View style={styles.itemBox}>
+                                                <Text style={styles.itemLabel}>Qty</Text>
+                                                <Text style={styles.itemValue}>{d1Item.Qty}</Text>
+                                            </View>
+
+                                            <View style={styles.itemBox}>
+                                                <Text style={styles.itemLabel}>Rate</Text>
+                                                <Text style={styles.itemValue}>{d1Item.UnitRate}</Text>
+                                            </View>
+
+                                            <View style={styles.itemBox}>
+                                                <Text style={styles.itemLabel}>Amount</Text>
+                                                <Text style={styles.itemValue}>{d1Item.Amount}</Text>
+                                            </View>
+
+                                        </View>
+
+                                    </View>
+                                ))}
+                            </View>
+                        )
+                    }
+                </View >
+            </View>
         );
     };
 
@@ -1933,24 +1940,14 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         ref={flatListRefYPO}
                         data={filteredDataSPO}
                         numColumns={numColumns}
-                        columnWrapperStyle={
-                            numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        }
+                        // columnWrapperStyle={
+                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
+                        // }
                         style={{ flex: 1, backgroundColor: '#F5F5F5' }}   // 👈 kills black space
                         // renderItem={renderCard}
-                        renderItem={({ item }) => (
-                            <View
-                                style={{
-                                    width: numColumns > 1 ? gridItemWidth : undefined,
-                                    flex: numColumns === 1 ? 1 : undefined,
-                                    marginHorizontal: numColumns > 1 ? 0 : 0,   // card already has own margin
-                                }}
-                            >
-                                {renderCommonCard({ item, type: 'request' })}
-                            </View>
-                        )}
+                        renderItem={({ item }) => renderCommonCard({ item, type: 'request' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
+                        contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -1976,18 +1973,18 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         ref={flatHistoryListRefYPO}
                         data={filteredhistoryDataSPO}
                         numColumns={numColumns}
-                        columnWrapperStyle={
-                            numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        }
+                        // columnWrapperStyle={
+                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
+                        // }
                         style={{ flex: 1, backgroundColor: '#F5F5F5' }}
                         renderItem={({ item }) => (
-                            <View style={{ width: numColumns > 1 ? gridItemWidth : undefined, flex: numColumns === 1 ? 1 : undefined }}>
+                            <>
                                 {renderAllCardHistory({ item })}
-                            </View>
+                            </>
                         )}
                         // renderItem={({ item }) => renderCommonCard({ item, type: 'history' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
+                        contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}
@@ -2013,17 +2010,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                         ref={flatVerifyListRefYPO}
                         data={filteredverifyDataSPO}
                         numColumns={numColumns}
-                        columnWrapperStyle={
-                            numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
-                        }
+                        // columnWrapperStyle={
+                        //     numColumns > 1 ? { gap: GRID_GAP, paddingHorizontal: GRID_PAD } : undefined
+                        // }
                         style={{ flex: 1, backgroundColor: '#F5F5F5' }}
-                        renderItem={({ item }) => (
-                            <View style={{ width: numColumns > 1 ? gridItemWidth : undefined, flex: numColumns === 1 ? 1 : undefined }}>
-                                {renderCommonCard({ item, type: 'verify' })}
-                            </View>
-                        )}
+                        renderItem={({ item }) => renderCommonCard({ item, type: 'verify' })}
                         keyExtractor={(item) => item.UId}
-                        contentContainerStyle={[crlimtreq_styles.list, { flexGrow: 1, paddingBottom: 24 }]}
+                        contentContainerStyle={crlimtreq_styles.list}
                         onScroll={({ nativeEvent }) => {
                             setShowTopButtonYPO(nativeEvent.contentOffset.y > 100);
                         }}

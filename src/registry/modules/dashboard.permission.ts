@@ -17,12 +17,13 @@ registerPermissionArea({
 
         { key: 'monthly_target', name: 'Monthly Target Summary', type: 'widget', displayOrder: 10, actions: [] },
         { key: 'monthly_report', name: 'Monthly Report', type: 'report', displayOrder: 60, actions: [{ key: 'print', name: 'Print' }, { key: 'export', name: 'Export' }] },
-
+        { key: 'costing_summary', name: 'Costing / Production Cost Card', type: 'widget', displayOrder: 20, actions: [] },
         { key: 'sales_detail', name: 'Sales Detail Card', type: 'widget', displayOrder: 110, actions: [] },
         { key: 'production_detail', name: 'Production Detail Card', type: 'widget', displayOrder: 120, actions: [] },
         { key: 'collection_detail', name: 'Payment Collection Detail Card', type: 'widget', displayOrder: 130, actions: [] },
         { key: 'payment_detail', name: 'Payment To Pay Detail Card', type: 'widget', displayOrder: 135, actions: [] },
         { key: 'outstanding_detail', name: 'Outstanding Detail Card', type: 'widget', displayOrder: 140, actions: [] },
+        { key: 'creditor_dashboard', name: 'Creditor Dashboard', type: 'screen', displayOrder: 137, actions: [] },
       ],
     },
     {

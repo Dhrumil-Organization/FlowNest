@@ -1084,6 +1084,8 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
 
     const handleValidation = (updatedItem: any) => {
+        const isHistoryTab =
+            String(activeTab1YPO).trim().toLowerCase() === 'history';
         if (selectedActionYPO === 'accept') {
 
             // const numericNewLimit2: any = parseFloat(updatedItem.limit2.replace(/,/g, ''));
@@ -1118,7 +1120,24 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             //     return false;
             // }
         }
-        if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+
+        //     if (
+        //         updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
+        //     ) {
+        //         AppAlert.alert(
+        //             'Validation Error',
+        //             'Auth Remark cannot be empty for Vouchar No.: ' + updatedItem.ParName
+        //         )
+        //         setShowOverlayYPO(false);
+        //         return false;
+        //     }
+        // }
+        if (
+            !isHistoryTab &&
+            (selectedActionYPO === 'pending' ||
+                selectedActionYPO === 'verifyreject')
+        ) {
 
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
@@ -1592,6 +1611,35 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             ))
                             }
                         </View >
+                    )}
+
+                    {String(item.isauthedit) === '1' && (
+                        <View style={crlimtreq_styles.cardActions}>
+
+                            <TouchableOpacity
+                                onPress={() =>
+                                    handleIconPress(
+                                        {
+                                            ...item,
+                                            itemNameArray:
+                                                item.d1?.map(x => x.ItmName).join(', ') || '',
+                                        } as unknown as CardData,
+                                        'pending'
+                                    )
+                                }
+                                disabled={!isConnected || item.isProcessed}
+                            >
+                                <Icon
+                                    name="check-circle"
+                                    size={30}
+                                    color={
+                                        !isConnected || item.isProcessed
+                                            ? "#ccc"
+                                            : "#F44336"
+                                    }
+                                />
+                            </TouchableOpacity>
+                        </View>
                     )}
 
                 </View >

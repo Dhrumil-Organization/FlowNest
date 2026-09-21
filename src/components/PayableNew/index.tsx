@@ -111,7 +111,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             searchRef.current = searchQueryPOT;
 
             // const filtered = getCardData[0]?.data?.outsummary?.filter(item =>
-            console.log('getOutSummary:', getOutSummary);
+            // console.log('getOutSummary:', getOutSummary);
             const filtered = getOutSummary.filter(item =>
                 Object.values(item).some(val =>
                     String(val).toLowerCase().includes(searchQueryPOT.toLowerCase())
@@ -179,7 +179,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     // }, [searchQueryPOTDetails, selectedAccCode, visibleDetailItems, getOutDetails]);
 
     useEffect(() => {
-        console.log('ddd:', selectedAccCode, getOutDetails);
+        // console.log('ddd:', selectedAccCode, getOutDetails);
         const details = getOutDetails?.filter(
             (detail) => detail.ACCCODE === selectedAccCode
         );
@@ -188,7 +188,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                 String(val).toLowerCase().includes(searchQueryPOTDetails.toLowerCase())
             )
         );
-        console.log('filtered:', filtered);
+        // console.log('filtered:', filtered);
         setFilteredDetails(filtered || []);
     }, [searchQueryPOTDetails, selectedAccCode, getOutDetails]);
 
@@ -277,10 +277,10 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             );
             if (responsesync.data.success === true) {
                 setSyncLoading(false);
-                console.log('🔵 Sync API Response:', responsesync.data.data.dashlastsync, '🔵 Sync API Response Prpgroup:', responsesync.data.data.prpgroup);
+                // console.log('🔵 Sync API Response:', responsesync.data.data.dashlastsync, '🔵 Sync API Response Prpgroup:', responsesync.data.data.prpgroup);
                 const receivables_sync_date_api = responsesync.data.data.dashlastsync || '';
                 const receivables_prpgroup_api = responsesync.data.data.prpgroup || '';
-                console.log('🔵 receivables_sync_date_api', receivables_sync_date_api, '🔵 receivables_prpgroup_api', receivables_prpgroup_api);
+                // console.log('🔵 receivables_sync_date_api', receivables_sync_date_api, '🔵 receivables_prpgroup_api', receivables_prpgroup_api);
 
                 setreceivables_sync_date(receivables_sync_date_api);
                 setreceivables_prpgroup(receivables_prpgroup_api);
@@ -325,7 +325,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             if (responseprp.data.success === true) {
                 setdashPropertyLoading(false);
                 // setSyncLoading(false);
-                console.log('🔵 dashPrp API Response:', payload, responseprp);
+                // console.log('🔵 dashPrp API Response:', payload, responseprp);
                 const maindata = responseprp.data.data.prp;
                 setdashPrp(maindata);
             }
@@ -384,13 +384,13 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             );
             if (responseparty.data.success === true) {
                 setdashPartyLoading(false);
-                console.log('🔵 dashParty API Response:', payload, responseparty);
+                // console.log('🔵 dashParty API Response:', payload, responseparty);
                 const maindata = responseparty.data.response.data;
                 setdashParty(maindata);
             }
             if (responsesexe.data.success === true) {
                 setdashSexeLoading(false);
-                console.log('🔵 dashSexe API Response:', payloadSexe, responsesexe);
+                // console.log('🔵 dashSexe API Response:', payloadSexe, responsesexe);
                 const maindataSexe = responsesexe.data.response.data;
                 setdashSexe(maindataSexe);
             }
@@ -403,7 +403,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
     const dashSubHead = async (selectedPrpgrp, selectedDashPrp) => {
         setdashSubHeadLoading(true);
-        console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
+        // console.log('🔵 selectedPrpgrp', selectedPrpgrp, '🔵 selectedDashPrp', selectedDashPrp);
 
         const payload = {
             prptype: selectedPrpgrp?.PrpTypeCode,
@@ -423,7 +423,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             if (response.data.success === true) {
                 setdashSubHeadLoading(false);
                 // AppAlert.alert('No Data Found');
-                console.log('🔵 dashSubHead API Response:', payload, response);
+                // console.log('🔵 dashSubHead API Response:', payload, response);
                 const maindata = response.data.data.data;
                 setdashSubHead(maindata);
 
@@ -443,13 +443,13 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     // const dashAccount = useCallback(async (selectedPrpgrp, selectedInternal, selectedDashParty, selectedDashPrp, selectedDashSubHead, selectedDashSexe) => {
     const dashAccount = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead) => {
         setAccountLoading(true);
-        console.log('🔵 🔵I am Calling1 dashAccount');
-        console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
+        // console.log('🔵 🔵I am Calling1 dashAccount');
+        // console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
         if (
             !selectedPrpgrp ||
             !selectedInternal
         ) {
-            console.log('⚠️ Required selections are missing. Skipping dashAccount call.');
+            // console.log('⚠️ Required selections are missing. Skipping dashAccount call.');
             return;
         }
         const formatDate123 = (rawDate: any) => {
@@ -466,9 +466,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
         const prpCodesArray = selectedDashPrp.map(item => item.PrpCode);
         const subHeadArray = selectedDashSubHead.map(item => item.SHead);
         const sexeArray = selectedDashSexe.map(item => item.Code);
-        console.log('🔵 🔵I am Callin2 dashAccount');
+        // console.log('🔵 🔵I am Callin2 dashAccount');
         try {
-            console.log('🔵 🔵I am Calling3 dashAccount');
+            // console.log('🔵 🔵I am Calling3 dashAccount');
             const payload = {
                 prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
                 prpcodes: prpCodesArray && prpCodesArray,
@@ -519,11 +519,11 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                 params: payload,
                 paramsSerializer: params => qs.stringify(params, { arrayFormat: 'brackets' }),
             });
-            console.log('🔵 🔵I am Calling4 dashAccount', payload, response);
+            // console.log('🔵 🔵I am Calling4 dashAccount', payload, response);
 
             if (response.data.success == true) {
                 setAccountLoading(false);
-                console.log('🔵 dashAccount API Response:', response);
+                // console.log('🔵 dashAccount API Response:', response);
                 setdashAccount(response.data.data.data);
                 // Handle response data here
             }
@@ -552,8 +552,8 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
         }
     }, [selectedPrpgrp, selectedDashPrp, token]);
 
-    console.log('🔵 receivables_sync_date', receivables_sync_date);
-    console.log('🔵 receivables_prpgroup', receivables_prpgroup);
+    // console.log('🔵 receivables_sync_date', receivables_sync_date);
+    // console.log('🔵 receivables_prpgroup', receivables_prpgroup);
 
     useEffect(() => {
         if (contentWidth > 0 && containerWidth > 0) {
@@ -638,9 +638,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                     }
                 })
             );
-            console.log('🔵 payload', payload, response);
+            // console.log('🔵 payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data Sexe:', response.data.response.data);
+                // console.log('✅ Data Sexe:', response.data.response.data);
                 setExeData(response.data.response.data);
                 fetchDesign();
                 // fetchItem();
@@ -691,9 +691,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                     }
                 })
             );
-            console.log('🔵 design payload', payload, response);
+            // console.log('🔵 design payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data:', response.data.response.data);
+                // console.log('✅ Data:', response.data.response.data);
                 setDesignData(response.data.response.data);
                 fetchItem();
                 // setAllHistoryData([])
@@ -754,9 +754,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                     }
                 })
             );
-            console.log('🔵 item payload', payload, response);
+            // console.log('🔵 item payload', payload, response);
             if (response.data.success && response.data.response.data.length > 0) {
-                console.log('✅ Data:', response.data.response.data);
+                // console.log('✅ Data:', response.data.response.data);
                 setItemData(response.data.response.data);
                 // setAllHistoryData([])
             } else {
@@ -784,14 +784,14 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
     const handleConfirmAction = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0) => {
         setIsLoading(true);
-        console.log('🔵 CardName:', CardName); // Debug log
-        console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
+        // console.log('🔵 CardName:', CardName); // Debug log
+        // console.log('🔵 🔵I am Calling1 Table');
+        // console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
         if (
             !selectedPrpgrp ||
             !selectedInternal
         ) {
-            console.log('⚠️ Required selections are missing. Skipping Table call.');
+            // console.log('⚠️ Required selections are missing. Skipping Table call.');
             setIsLoading(false);
             return;
         }
@@ -810,9 +810,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
         const subHeadArray = selectedDashSubHead.map(item => item.SHead);
         const sexeArray = selectedDashSexe.map(item => item.Code);
         const accountArray = selectedDashAccount.map(item => item.AccCode);
-        console.log('🔵 🔵I am Callin2 Table');
+        // console.log('🔵 🔵I am Callin2 Table');
         try {
-            console.log('🔵 🔵I am Calling3 Table');
+            // console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
                 prptype: selectedPrpgrp && selectedPrpgrp?.PrpTypeCode,
@@ -840,7 +840,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                 dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode,
                 txntype: '/payable-view'
             };
-            console.log('🔵 Table API Payload:', payload);
+            // console.log('🔵 Table API Payload:', payload);
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
@@ -849,15 +849,15 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
             // const response = await axios.post(`https://apig.tms-webapp.com/api/dashdata`, payload, { headers });
             const response = await axios.post(`${API}/api/dashdata`, payload, { headers });
-            console.log('🔵 🔵I am Calling4 Table', payload, response);
+            // console.log('🔵 🔵I am Calling4 Table', payload, response);
             const data = response.data.data?.dashoutcards || [];
             const data1 = response.data.data?.outdetail || [];
-            console.log('🔵 ddd', data1);
+            // console.log('🔵 ddd', data1);
             const data2 = response.data.data?.outsummary || [];
 
 
             if (response.data.success == true) {
-                console.log('🔵 Table API Response:', response);
+                // console.log('🔵 Table API Response:', response);
                 if (data && data.length > 0) {
                     setIsDrawerVisible(false);
                     setIsLoading(false);
@@ -888,15 +888,15 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
     const handleConfirmActionNew = useCallback(async (selectedDashPrp, selectedDashParty, selectedDashSexe, selectedDashSubHead, selectedDashAccount, CardName = '', isAcc = 0, card) => {
         setIsLoading(true);
-        console.log('🔵 CardName:', CardName); // Debug log
-        console.log('🔵 🔵I am Calling1 Table');
-        console.log('🔵 🔵 Selected Card', card);
-        console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
+        // console.log('🔵 CardName:', CardName); // Debug log
+        // console.log('🔵 🔵I am Calling1 Table');
+        // console.log('🔵 🔵 Selected Card', card);
+        // console.log('🔵 selectedDashPrp', selectedDashPrp, '🔵 selectedDashParty', selectedDashParty, '🔵 selectedDashSexe', selectedDashSexe, '🔵 selectedDashSubHead', selectedDashSubHead, selectedPrpgrp, selectedInternal);
         if (
             !selectedPrpgrp ||
             !selectedInternal
         ) {
-            console.log('⚠️ Required selections are missing. Skipping Table call.');
+            // console.log('⚠️ Required selections are missing. Skipping Table call.');
             setIsLoading(false);
             return;
         }
@@ -915,9 +915,9 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
         const subHeadArray = selectedDashSubHead.map(item => item.SHead);
         const sexeArray = selectedDashSexe.map(item => item.Code);
         const accountArray = selectedDashAccount.map(item => item.AccCode);
-        console.log('🔵 🔵I am Callin2 Table');
+        // console.log('🔵 🔵I am Callin2 Table');
         try {
-            console.log('🔵 🔵I am Calling3 Table');
+            // console.log('🔵 🔵I am Calling3 Table');
             const payload = {
                 CardName: CardName.toUpperCase(),
                 accounts: accountArray ? accountArray : [],
@@ -948,7 +948,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                 dashparcode: selectedDashParty && selectedDashParty[0]?.ParCode || "",
                 txntype: '/payable-view'
             };
-            console.log('🔵 Table API Payload:', payload);
+            // console.log('🔵 Table API Payload:', payload);
             const headers = {
                 Authorization: `Bearer ${getToken()}`,
                 'Content-Type': 'application/json',
@@ -957,15 +957,15 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
             // const response = await axios.post(`https://apig.tms-webapp.com/api/dashdata`, payload, { headers });
             const response = await axios.post(`${API}/api/dashdata`, payload, { headers });
-            console.log('🔵 🔵I am Calling4 Table', payload, response);
+            // console.log('🔵 🔵I am Calling4 Table', payload, response);
             const data = response.data.data?.dashoutcards || [];
             const data1 = response.data.data?.outdetail || [];
-            console.log('🔵 ddd', data1);
+            // console.log('🔵 ddd', data1);
             const data2 = response.data.data?.outsummary || {};
 
 
             if (response.data.success == true) {
-                console.log('🔵 Table API Response:', response);
+                // console.log('🔵 Table API Response:', response);
                 if (data && data.length > 0) {
                     setIsDrawerVisible(false);
                     setIsLoading(false);
@@ -1002,27 +1002,27 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
     const handleDashPrpSelect = (prp: DashPrp[]) => {
         setSelectedDashPrp(prp);
-        console.log("Selected Dash Prp in Parent:", prp);
+        // console.log("Selected Dash Prp in Parent:", prp);
     };
     const handleDashPartySelect = (party: DashParty[]) => {
         setSelectedDashParty(party);
-        console.log("Selected Dash Party in Parent:", party);
+        // console.log("Selected Dash Party in Parent:", party);
     };
     const handleDashSexeSelect = (sexe: DashSexe[]) => {
         setSelectedDashSexe(sexe);
-        console.log("Selected Dash Sexe in Parent:", sexe);
+        // console.log("Selected Dash Sexe in Parent:", sexe);
     };
     const handleDashAccountSelect = (acc: DashAccount[]) => {
         setSelectedDashAccount(acc);
-        console.log("Selected Dash Account in Parent:", acc);
+        // console.log("Selected Dash Account in Parent:", acc);
     };
     const handleDashSubHeadSelect = (sub: DashSubHead[]) => {
         setSelectedDashSubHead(sub);
-        console.log("Selected Dash SubHead in Parent:", sub);
+        // console.log("Selected Dash SubHead in Parent:", sub);
     };
     const handleItemSelect = (items: ItemData[]) => {
         setSelectedItems(items);
-        console.log("Selected Items in Parent:", items);
+        // console.log("Selected Items in Parent:", items);
     };
     const handleItemStatusChange = (status: ItemStatus) => {
         setSelectedItemStatus(status);
@@ -1038,18 +1038,27 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     //     ['#FBE9E7', '#FFCCBC'], // red
     //     ['#E8F5E9', '#C8E6C9'], // green
     // ];
-    // Original premium card palette retained.
-    // Soft professional palette: readable on both mobile and tablet/web-sized layouts.
+    // Soft professional palette matching the reference design.
     const DASHBOARD_COLORS = [
-        ['#FFF0DF', '#FFE4C7'], // warm ivory
-        ['#E7F0FF', '#D5E6FF'], // powder blue
-        ['#FFE7E9', '#FFD4D9'], // soft rose
-        ['#F0E8FF', '#E3D5FF'], // lavender
-        ['#E2F7EF', '#CDEFE2'], // mint
-        ['#FFF0D8', '#FFE4B5'], // sand
-        ['#E8EEF8', '#D7E1F0'], // slate blue
-        ['#E5F3F7', '#D2EAF0'], // aqua
+        ['#FFF0DF', '#FFE1C2'], // All - peach
+        ['#E8F1FF', '#D5E6FF'], // Advance - blue
+        ['#FFE9EC', '#FFD4D9'], // Over due - rose
+        ['#F0EAFE', '#E4D8FF'], // Not due - lavender
+        ['#E2F7EF', '#D0F0E4'], // Due today - mint
+        ['#FFF0DD', '#FFE3BE'], // On account - cream
+        ['#EAF0F8', '#DCE6F4'],
+        ['#E7F4F7', '#D3E9EE'],
     ];
+
+    const getCardVisual = (caption: string = '') => {
+        const key = caption.toLowerCase();
+        if (key.includes('advance')) return { icon: 'account-balance-wallet', iconBg: '#CFE1FF', iconColor: '#1454A4', text: '#174B9B' };
+        if (key.includes('over')) return { icon: 'schedule', iconBg: '#FFD0D5', iconColor: '#C62828', text: '#B91C1C' };
+        if (key.includes('not due')) return { icon: 'description', iconBg: '#DED0FF', iconColor: '#59319B', text: '#3F287C' };
+        if (key.includes('due today')) return { icon: 'calendar-month', iconBg: '#C8EEE1', iconColor: '#08745D', text: '#08624F' };
+        if (key.includes('on account')) return { icon: 'monetization-on', iconBg: '#FFE0AE', iconColor: '#C56A08', text: '#B45309' };
+        return { icon: 'groups', iconBg: '#FFE0BD', iconColor: '#C85A08', text: '#A94309' };
+    };
 
     const formatIndianNumber = (value: any) => {
         if (!value && value !== 0) return "0"; // Handle undefined/null
@@ -1070,50 +1079,41 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
 
 
     const DashboardGrid = ({ cards, onCardPress, activeSlab }) => {
-        const numColumns = Platform.isPad ? 4 : 2;
+        const numColumns = Platform.isPad ? 3 : 2;
 
         const renderItem = ({ item, index }) => {
             const isActive = activeSlab === item.slab;
             const isDisabled = parseFloat(item.summary.replace(/,/g, '')) === 0; // Remove commas before checking
             const colors = DASHBOARD_COLORS[index % DASHBOARD_COLORS.length];
+            const visual = getCardVisual(item.caption);
 
             return (
                 <TouchableOpacity
                     activeOpacity={isDisabled ? 1 : 0.9}
                     onPress={isDisabled ? undefined : () => onCardPress(item)}
-                    style={[
-                        styles.dashboardCard,
-                        isActive && styles.activeDashboardCard,
-                        // isDisabled && styles.disabledCard,
-                    ]}
+                    style={[styles.dashboardCard, isActive && styles.activeDashboardCard]}
                     disabled={isDisabled}
                 >
                     <LinearGradient
-                        colors={
-                            isActive
-                                ? [theme.BRAND_GRADIENT_START, theme.BRAND_GRADIENT_END]
-                                : isDisabled
-                                    ? ['#E2E8F0', '#CBD5E1']
-                                    : colors
-                        }
+                        colors={isActive ? ['#DCEBFF', '#C7DDFF'] : isDisabled ? ['#EEF1F5', '#E2E8F0'] : colors}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
                         style={styles.dashboardCardInner}
                     >
-                        <Text
-                            style={[
-                                styles.dashboardCaption,
-                                { color: isActive ? '#FFFFFF' : isDisabled ? '#64748B' : '#243447' },
-                            ]}
-                        >
-                            {isActive && isLoading ? 'Loading...' : item.caption?.toUpperCase()}
-                        </Text>
-                        <Text
-                            style={[
-                                styles.dashboardValue,
-                                { color: isActive ? '#FFFFFF' : isDisabled ? '#64748B' : '#10283A' },
-                            ]}
-                        >
-                            ₹ {formatIndianNumber(item.summary)}
-                        </Text>
+                        <View style={styles.dashboardCardTopRow}>
+                            <View style={[styles.dashboardIconCircle, { backgroundColor: visual.iconBg }]}>
+                                <Icon name={visual.icon as any} size={27} color={visual.iconColor} />
+                            </View>
+                            <Icon name="chevron-right" size={27} color={visual.text} />
+                        </View>
+                        <View style={styles.dashboardTextBlock}>
+                            <Text style={[styles.dashboardCaption, { color: visual.text }]} numberOfLines={1}>
+                                {isActive && isLoading ? 'Loading...' : item.caption?.toUpperCase()}
+                            </Text>
+                            <Text style={[styles.dashboardValue, { color: visual.text }]} numberOfLines={1} adjustsFontSizeToFit>
+                                ₹ {formatIndianNumber(item.summary)}
+                            </Text>
+                        </View>
                     </LinearGradient>
                 </TouchableOpacity>
             );
@@ -1132,6 +1132,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                     rowGap: 14,
                 }}
                 showsVerticalScrollIndicator={false}
+                style={styles.dashboardList}
                 ListEmptyComponent={
                     !isLoading ? (
                         <View style={crlimtreq_styles.emptyContainer}>
@@ -2152,7 +2153,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     };
 
     const DetailTable = () => {
-        console.log("Filtered Details:", filteredDetails);
+        // console.log("Filtered Details:", filteredDetails);
 
         // Helper function to generate a unique key from NTRANDATE + TRANID
         const calcValue = (item) => {
@@ -2166,7 +2167,7 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             return keyA.localeCompare(keyB); // String comparison for NTRANDATE-TRANID
         });
 
-        console.log("Sorted Data (Ascending by NTRANDATE + TRANID):", sortedData);
+        // console.log("Sorted Data (Ascending by NTRANDATE + TRANID):", sortedData);
 
         // Calculate cumulative CUMBAL
         let cumulativeData = [];
@@ -2188,12 +2189,12 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
             }
         });
 
-        console.log("Cumulative Data (Ascending by NTRANDATE + TRANID):", cumulativeData);
+        // console.log("Cumulative Data (Ascending by NTRANDATE + TRANID):", cumulativeData);
 
         // Reverse to descending order (latest first)
         const finalData = [...cumulativeData].reverse();
 
-        console.log("Final Data (Descending by NTRANDATE + TRANID):", finalData);
+        // console.log("Final Data (Descending by NTRANDATE + TRANID):", finalData);
 
         // Columns definition
         const detailColumns = [
@@ -2473,13 +2474,13 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
     const closeDrawer = () => setIsDrawerVisible(false);
     const closeDrawer123 = () => setSummaryDrawerVisible(false);
 
-    console.log('🔵 POT Data:', gePOTData);
-    console.log('🔵 Caption:', getActiveCardDetails?.caption);
-    console.log('🔵 selectedPrpgrp', selectedPrpgrp, selectedPrpgrp?.PrpTypeCode, selectedPrpgrp?.PrpTypeOf);
-    console.log('🔵 selectedInternal', selectedInternal, selectedInternal?.lable, selectedInternal?.value);
+    // console.log('🔵 POT Data:', gePOTData);
+    // console.log('🔵 Caption:', getActiveCardDetails?.caption);
+    // console.log('🔵 selectedPrpgrp', selectedPrpgrp, selectedPrpgrp?.PrpTypeCode, selectedPrpgrp?.PrpTypeOf);
+    // console.log('🔵 selectedInternal', selectedInternal, selectedInternal?.lable, selectedInternal?.value);
 
     return (
-        <>
+        <View style={styles.payableScreen}>
             {/* Payable search and dashboard controls */}
             <View style={styles.payableSearchSection}>
                 <View style={styles.payableSearchBox}>
@@ -2498,15 +2499,16 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                     <Icon name="filter-alt" size={22} color="#FFFFFF" />
                 </TouchableOpacity>
             </View>
-            {/* Single, non-repeating sync status row */}
-            <View style={styles.syncStatusRow}>
-                <Icon name="event" size={17} color="#F97316" />
-                <Text style={styles.syncStatusText}>
-                    {syncLoading ? 'Last Syncing...' : `Last Synced: ${receivables_sync_date || '--'}`}
-                </Text>
-                <View style={styles.syncStatusSpacer} />
-                <Icon name="sync" size={17} color="#0F9D8A" />
-                <Text style={styles.syncUpdatedText}>Data is up to date</Text>
+            <View style={styles.syncToggleContainer}>
+                <View style={styles.narrationBar}>
+                    <View style={styles.syncToggle}>
+                        <Icon name="event-available" size={19} color="#F97316" />
+                        <Text style={styles.syncLabel}>
+                            {syncLoading ? 'Last Syncing...' : `Last Synced: ${receivables_sync_date || '—'}`}
+                        </Text>
+                        <Icon name="sync" size={18} color="#0F9F8B" />
+                    </View>
+                </View>
             </View>
 
             {/* {showLastSync && (
@@ -2685,11 +2687,21 @@ const PayableNew: React.FC<Props> = ({ token, username }) => {
                 setAccountLoading={setAccountLoading}
             // 
             />
-        </>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
+    payableScreen: {
+        flex: 1,
+        width: '100%',
+        backgroundColor: '#F7F9FC',
+        overflow: 'hidden',
+    },
+    dashboardList: {
+        flex: 1,
+        backgroundColor: '#F7F9FC',
+    },
     // 
     accordionContainer: {
         marginBottom: 10,
@@ -2854,9 +2866,16 @@ const styles = StyleSheet.create({
     },
     syncToggle: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 15,
+        gap: 8,
+        paddingHorizontal: 14,
+        minHeight: 44,
+    },
+    syncLabel: {
+        flex: 1,
+        color: '#17324A',
+        fontSize: 12,
+        fontWeight: '700',
     },
     syncDetails: {
         padding: 10,
@@ -3019,87 +3038,50 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         padding: 4,
     },
-    syncStatusRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        minHeight: 46,
-        marginHorizontal: 14,
-        marginBottom: 4,
-        paddingHorizontal: 12,
-        borderRadius: 12,
-        backgroundColor: '#EEF3FA',
-        borderWidth: 1,
-        borderColor: '#DCE6F2',
-    },
-    syncStatusText: {
-        marginLeft: 8,
-        color: '#243B55',
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    syncStatusSpacer: { flex: 1 },
-    syncUpdatedText: {
-        marginLeft: 5,
-        color: '#0F766E',
-        fontSize: 10,
-        fontWeight: '700',
-    },
     narrationBar: {
-        paddingVertical: 0,
-        marginHorizontal: 0,
-        marginTop: 1,
-        // marginBottom: 8,
+        marginHorizontal: 14,
+        marginTop: 4,
+        marginBottom: 2,
+        borderRadius: 12,
+        backgroundColor: '#EAF1FB',
+        borderWidth: 1,
+        borderColor: '#DCE7F5',
         overflow: 'hidden',
-        shadowColor: theme.SHADOW,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-        width: '100%',
     },
-    // 
-    // dashboardCard: {
-    //     flex: 1,
-    //     height: 130,               // ✅ fixed height
-    //     borderRadius: 16,
-    //     overflow: 'hidden',
-    //     borderWidth: 1,
-    //     borderColor: '#e0e0e0',
-
-    //     // shadow
-    //     elevation: 3,
-    //     shadowColor: '#000',
-    //     shadowOpacity: 0.12,
-    //     shadowRadius: 6,
-    //     shadowOffset: { width: 0, height: 3 },
-    // },
     dashboardCard: {
         flex: 1,
-        height: 124,
+        minHeight: 142,
         borderRadius: 18,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 6 },
+        borderColor: 'rgba(255,255,255,0.85)',
+        elevation: 3,
+        shadowColor: '#17324A',
+        shadowOpacity: 0.10,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
     },
 
 
-    // dashboardCardInner: {
-    //     flex: 1,
-    //     justifyContent: 'center',
-    //     alignItems: 'center',
-    //     padding: 14,
-    // },
     dashboardCardInner: {
         flex: 1,
-        justifyContent: 'center',
+        justifyContent: 'space-between',
+        padding: 12,
+    },
+    dashboardCardTopRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        justifyContent: 'space-between',
+    },
+    dashboardIconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dashboardTextBlock: {
+        marginTop: 9,
     },
 
 
@@ -3116,16 +3098,15 @@ const styles = StyleSheet.create({
     // },
     dashboardCaption: {
         fontSize: 12,
-        color: '#243447',
-        marginBottom: 6,
-        fontWeight: '600',
-        letterSpacing: 0.8,
+        marginBottom: 4,
+        fontWeight: '800',
+        letterSpacing: 0.25,
     },
 
     dashboardValue: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#10283A',
+        fontSize: 18,
+        fontWeight: '900',
+        letterSpacing: -0.25,
     },
 
 

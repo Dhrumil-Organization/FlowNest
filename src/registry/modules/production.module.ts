@@ -131,7 +131,7 @@ registerPermissionArea({
         //   key: 'payable',
         //   name: 'Payable',
         //   type: 'screen',
-        //   displayOrder: 80,
+        //   displayOrder: 70,
         //   actions: [{ key: 'view', name: 'View' }],
         // },
         // <-- add your new feature's resource object here (step 1)

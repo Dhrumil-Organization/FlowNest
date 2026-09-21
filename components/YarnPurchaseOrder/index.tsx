@@ -1342,6 +1342,13 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
     };
 
     const handleValidation = (updatedItem: any) => {
+        const isHistoryTab =
+            String(activeTab1YPO).trim().toLowerCase() === 'history';
+
+        console.log('Current Tab:', activeTab1YPO);
+        console.log('Is History Tab:', isHistoryTab);
+        console.log('Selected Action:', selectedActionYPO);
+
         if (selectedActionYPO === 'accept') {
 
             // const numericNewLimit2: any = parseFloat(updatedItem.limit2.replace(/,/g, ''));
@@ -1376,7 +1383,12 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
             //     return false;
             // }
         }
-        if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        // if (selectedActionYPO === 'pending' || selectedActionYPO === 'verifyreject') {
+        if (
+            !isHistoryTab &&
+            (selectedActionYPO === 'pending' ||
+                selectedActionYPO === 'verifyreject')
+        ) {
 
             if (
                 updatedItem.ARemark === '' || updatedItem.ARemark === null || updatedItem.ARemark === undefined || !updatedItem.ARemark
@@ -1863,6 +1875,11 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     <Text style={styles.value}>{item.AuthorisedBy || '-'}</Text>
                 </View>
 
+                <View style={styles.row}>
+                    <Text style={styles.label}>Auth Status</Text>
+                    <Text style={styles.value}>{item.AuthStatus || '-'}</Text>
+                </View>
+
                 {/* ACTION ROW */}
                 {(isApproved || isRejected) && (
                     <View style={styles.actionRow}>
@@ -2024,8 +2041,18 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                     </View >
                 )}
 
-                {/* <View style={styles.actionRow}>
-                    <View style={styles.pendingIconCenter}>
+                {/* {String(item.isauthedit) === '1' && (
+                    <View style={styles.actionRow}>
+                        <View style={styles.pendingIconCenter}>
+
+                        </View>
+                    </View>
+                )} */}
+
+
+                {String(item.isauthedit) === '1' && (
+                    <View style={crlimtreq_styles.cardActions}>
+
                         <TouchableOpacity
                             onPress={() =>
                                 handleIconPress(
@@ -2050,7 +2077,7 @@ const YarnPurchaseOrder: React.FC<Props> = ({ token, navigation, isConnected, us
                             />
                         </TouchableOpacity>
                     </View>
-                </View> */}
+                )}
 
             </View >
         );
